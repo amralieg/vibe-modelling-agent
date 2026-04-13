@@ -2,7 +2,6 @@
   "widget_values": {
     "business_domains": "",
     "org_divisions": "Operations, Business and Corporate",
-    "model_vibes": "",
     "cataloging_style": "One Catalog",
     "catalog_prefix": "",
     "catalog_suffix": "",
@@ -23,8 +22,9 @@
   },
   "businesses": [
     {
-      "name": "Banking",
-      "description": "Payments and Fintech is a transformative industry connecting consumers, merchants, and financial institutions through fast, secure electronic payment networks, digital wallets, and innovative financial technology solutions spanning over 200 countries."
+     "name": "Manufacturing",
+      "description": "Industrial Manufacturing encompasses the design, production, and delivery of automation systems, electrification solutions, and smart infrastructure components for factories, buildings, transportation, and urban environments.",
+      "model_vibes": " maximum of 2 domains, and 8 tables for any model you generate"
     }
   ]
 }
