@@ -21,6 +21,7 @@
 
 ## Table of Contents
 
+- [Documentation](#-documentation)
 - [What Is Vibe Modelling?](#what-is-vibe-modelling)
 - [Concepts](#-concepts)
   - [Industry Data Models vs. Business Data Models](#industry-data-models-vs-business-data-models)
@@ -45,6 +46,18 @@
 - [Metric Views](#-metric-views)
 - [Troubleshooting](#-troubleshooting)
 - [Glossary](#-glossary)
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|:---|:---|
+| [docs/design-guide.md](docs/design-guide.md) | Technical design reference |
+| [docs/integration-guide.md](docs/integration-guide.md) | UI/consumer integration protocol |
+| [docs/whitepaper.md](docs/whitepaper.md) | Philosophy and complete rules catalog |
+| [runner/runner-guide.md](runner/runner-guide.md) | Pipeline orchestrator guide |
+| [tests/testing-guide.md](tests/testing-guide.md) | Test suite reference |
 
 ---
 
@@ -153,7 +166,7 @@ Divisions are the top-level organizational grouping. Every domain belongs to exa
 
 A **domain** is a logical grouping of related data products (tables). When deployed, each domain maps 1:1 to a Unity Catalog **schema**.
 
-- Named in `snake_case` (e.g., `customer_management`, `order_fulfillment`)
+- Named in `snake_case`, exactly one word (e.g., `customer`, `fulfillment`, `logistics`)
 - Count depends on model scope (MVM vs ECM) and industry complexity tier
 - The `shared` domain is **reserved** — the pipeline auto-creates it during SSOT consolidation; never create it manually
 
@@ -327,7 +340,7 @@ Run the notebook. Done.
 | 02. Description | `A multinational aluminum smelting company operating across 12 countries with 15,000 employees` |
 | 03. Operation | `new base model` |
 | 05. Model Scope | `Expanded Coverage Model - ECM` |
-| 06. Business Domains | `production, quality_control, supply_chain, customer, sales, logistics, billing` |
+| 06. Business Domains | `production, quality, supply, customer, sales, logistics, billing` |
 | 07. Org Divisions | `Operations, Business and Corporate` |
 | 09. Deployment Catalog | `contoso_dev` |
 | 10. Sample Records | `10` |
@@ -435,7 +448,7 @@ To use it: point widget **11. Context File** to this file, set operation to `vib
 
 ## 🎛️ Widget Reference
 
-The notebook exposes **24 configurable widgets**. Below is the complete reference.
+The notebook exposes **28 configurable widgets**. Below is the complete reference.
 
 ### Core Configuration Widgets (01–11)
 
@@ -490,7 +503,7 @@ MVM = lean core (fewer domains/tables, same attribute depth). ECM = comprehensiv
 #### 06. Business Domains
 Comma-separated list of specific domains you want. If blank, the LLM auto-generates the optimal set for your industry.
 
-**Sample values:** `customer, sales, billing, inventory, logistics` | `patient_care, pharmacy, clinical_trials`
+**Sample values:** `customer, sales, billing, inventory, logistics` | `clinical, pharmacy, research`
 
 #### 07. Included Org Divisions
 **Options:** `Operations` | `Operations and Business` | `Operations, Business and Corporate`
@@ -866,6 +879,8 @@ The agent enforces a comprehensive rule system during generation and QA:
 | **Honesty Check (G11)** | 0–100 scale; below 55 = permanently discarded; 55–70 = borderline retry; ≥90 = accepted; contradiction penalty applied post-processing |
 | **Product Design (G12)** | M:N requires 3 indicators with ≥2 of 3 strong; association ratio ECM ≤15%, MVM ≤5%; core products 1–3 per domain; forbidden product suffixes (_analysis, _analytics, _report, _prediction); Silver Layer only (no analytics products) |
 | **Sample Data (G13)** | Exact record count; sequential PK from 10001; FK random [10001, 10001+N-1]; regex compliance; 3-letter country codes; no Lorem Ipsum; realistic business data |
+| **Vibe Constraints (G14)** | Dedup overlap thresholds; max relocation percentage per pass; normalization confidence 95%; mutation budgets by mode (surgical, holistic, generative); domain hard ceiling factor |
+| **Physical Schema Deployment (G15)** | Schema and table creation factories; attribute dict factory; product dict factory; FK dependency ordering; consolidation and cleanup |
 | **Subdomains** | Exactly 2-word names; min products per subdomain per tier; no overlapping words; balanced distribution; no placeholder names |
 
 ---
