@@ -135,7 +135,7 @@ The pipeline executes a series of stages, each with a specific purpose, quality 
 ### Stage 1: Setup and Configuration
 - **Purpose:** Validate inputs, create metamodel tables, initialize session
 - **Duration:** 2-10 seconds
-- **What happens:** Widget parameters are read, context file is parsed, metamodel tables (_business, _vibe_progress) are created/verified, session row is inserted
+- **What happens:** Widget parameters are read, metamodel tables (_business, _vibe_progress) are created/verified, session row is inserted
 - **Quality check:** Input validation (required fields, valid operation, valid scope)
 - **Progress budget:** 1.0%
 
@@ -206,7 +206,7 @@ The pipeline executes a series of stages, each with a specific purpose, quality 
 ### Stage 10: Model Finalization
 - **Purpose:** Finalize the logical model, generate next vibes
 - **Duration:** 10-30 seconds
-- **What happens:** Final model state captured with complete products_by_domain and fk_links. Product count may increase vs QA (parent/bridge tables added). Next vibes and model context files generated.
+- **What happens:** Final model state captured with complete products_by_domain and fk_links. Product count may increase vs QA (parent/bridge tables added). Next vibes and model JSON files generated.
 - **Progress budget:** 1.0%
 
 ### Stage 11: Subdomain Allocation
@@ -531,9 +531,9 @@ See Section 13 for the complete prompt reference.
 | vibe modeling of version | Apply NL refinements | Version + vibes |
 | shrink ecm | Convert ECM to MVM | Version + catalog |
 | enlarge mvm | Expand MVM to ECM | Version + catalog |
-| install model | Deploy to UC | Context file + catalog |
+| install model | Deploy to UC | Model JSON file (widget 11) + catalog |
 | uninstall model version | Remove physical artifacts | Business + version + catalog |
-| generate sample data | Generate synthetic records | Context file + catalog |
+| generate sample data | Generate synthetic records | Model JSON file (widget 11) + catalog |
 
 ### Resize Rules
 **Shrink (ECM->MVM):**
@@ -1002,13 +1002,13 @@ Widgets are the Databricks notebook input parameters that configure each agent r
 | 05 | data_model_scopes | MVM or ECM scope selection | Dropdown |
 | 06 | business_domains | Optional: pre-specified domain names (comma-separated) | Text |
 | 07 | org_divisions | Optional: custom division names and allocation | Text |
-| 08 | model_vibes | Natural-language refinement instructions for vibe operations | Multiline Text |
+| 08 | model_vibes | Natural-language refinement instructions — inline text (max 2,000 chars) or file path to `.txt` on a UC Volume | Multiline Text |
 | 09 | deployment_catalog | Unity Catalog target catalog for physical deployment | Text |
 | 09a | cataloging_style | Catalog naming strategy: one_catalog, per_division, per_domain | Dropdown |
 | 09b | catalog_prefix | Optional prefix applied to catalog names | Text |
 | 09c | catalog_suffix | Optional suffix applied to catalog names | Text |
 | 10 | generate_samples | Whether to generate sample data (true/false) | Dropdown |
-| 11 | context_file | Path to a model context JSON file (for install/vibe operations) | Text |
+| 11 | context_file | Path to a previously generated model.json file (for install/continuation operations) | Text |
 | 12 | naming_convention | Naming convention: snake_case, camelCase, PascalCase | Dropdown |
 | 13 | primary_key_suffix | PK column suffix (default: _id) | Text |
 | 15 | schema_prefix | Optional prefix applied to schema names | Text |

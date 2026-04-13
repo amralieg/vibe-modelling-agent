@@ -4,7 +4,7 @@
 
 - [Overview](#overview)
 - [Widgets](#widgets)
-- [Context File Format](#context-file-format)
+- [Batch Input JSON Format](#batch-input-json-format)
 - [Task DAG](#task-dag)
 - [Key Functions](#key-functions)
 - [Execution Flow](#execution-flow)
@@ -21,7 +21,7 @@
 
 ## Overview
 
-The Vibe Runner is a multi-industry data model pipeline orchestrator implemented as a Databricks notebook. It reads an industry context JSON file containing one or more business/industry definitions, then for each industry orchestrates a 4-task Databricks job pipeline:
+The Vibe Runner is a multi-industry data model pipeline orchestrator implemented as a Databricks notebook. It reads a batch input JSON containing the notebook widget values and one or more business/industry definitions, then for each industry orchestrates a 4-task Databricks job pipeline:
 
 1. **Generate an ECM** (Expanded Coverage Model)
 2. **Install the ECM** into a dedicated Unity Catalog catalog
@@ -38,7 +38,7 @@ The notebook exposes five configurable widgets:
 
 | Widget | Type | Default | Purpose |
 |---|---|---|---|
-| `business_context` | text | `/Workspace/Users/<your-user>/vibe-modelling/industries.json` | Path to the JSON file containing industry definitions |
+| `business_context` | text | `/Workspace/Users/<your-user>/vibe-modelling/industries.json` | Path to the batch input JSON containing widget values and business definitions to process |
 | `vibe_modelling_agent` | text | `""` (empty string) | Path to the agent notebook. Auto-discovers if left blank |
 | `folder_path` | text | `./lakehouse-models` | Local output folder for model artifacts |
 | `dry_run` | dropdown | `yes` | Whether to use dry-run mode (`yes` / `no`) |
@@ -46,19 +46,19 @@ The notebook exposes five configurable widgets:
 
 ---
 
-## Context File Format
+## Batch Input JSON Format
 
-The context JSON file defines global configuration and a list of businesses to process. The file must contain two top-level sections: `widget_values` and `businesses`.
+The batch input JSON defines the notebook widget values to use and a list of businesses to process. It is simply a programmatic way to pass widget values for multiple businesses in one run. The file must contain two top-level sections: `widget_values` and `businesses`.
 
 ### `widget_values` Section
 
-Contains 21 required keys that control model generation behavior:
+Contains 21 required keys that mirror the notebook widget form:
 
 | Key | Description |
 |---|---|
 | `business_domains` | Comma-separated list of business domains to model |
 | `org_divisions` | Organizational divisions to include |
-| `model_vibes` | Style/personality directives for model generation |
+| `model_vibes` | Natural-language refinement instructions — inline text (max 2,000 chars) or file path to `.txt` on a UC Volume |
 | `cataloging_style` | Strategy for organizing catalogs |
 | `catalog_prefix` | Prefix applied to catalog names |
 | `catalog_suffix` | Suffix applied to catalog names |
@@ -154,7 +154,7 @@ Creates a new Databricks job or reuses an existing one (matched by name), then t
 
 ### `load_business_context(json_path)`
 
-Loads and validates the industry context JSON file. Performs structural validation of the `widget_values` and `businesses` sections. On parse errors, provides rich diagnostics including context lines around the error location.
+Loads and validates the batch input JSON. Performs structural validation of the `widget_values` and `businesses` sections. On parse errors, provides rich diagnostics including surrounding lines around the error location.
 
 ### `build_notebook_params(widget_values, business, operation, ...)`
 
@@ -173,7 +173,7 @@ Checks whether the install catalog already exists. If it does not exist, creates
 Performs pre-flight validation before launching the pipeline for a business. Checks seven or more conditions including:
 
 - Agent notebook path exists and is accessible
-- Context JSON is structurally valid
+- Batch input JSON is structurally valid
 - Required widget values are present
 - Catalog names are valid identifiers
 - No naming collisions between staging and install catalogs
@@ -224,7 +224,7 @@ The notebook executes in the following order:
 
 1. Prints an ASCII art banner.
 2. Creates and reads widget values. Auto-discovers the agent notebook path if the `vibe_modelling_agent` widget is left blank.
-3. Loads and validates the context JSON file via `load_business_context()`.
+3. Loads and validates the batch input JSON via `load_business_context()`.
 4. Initializes the Databricks `WorkspaceClient` and `SparkSession`.
 5. If `dry_run` is set to `yes`: uploads a simulated agent notebook via `create_dry_run_notebook()`.
 6. Creates the local output folder specified by `folder_path`.
@@ -344,7 +344,7 @@ When `dry_run` is set to `yes`, the runner creates and uploads a simulated agent
   - CSV documentation files
   - Sample data files
 
-Dry-run mode is useful for testing the pipeline orchestration, validating context files, and verifying infrastructure without consuming compute resources for actual model generation.
+Dry-run mode is useful for testing the pipeline orchestration, validating the batch input JSON, and verifying infrastructure without consuming compute resources for actual model generation.
 
 ---
 
@@ -406,7 +406,7 @@ The runner implements multiple layers of error handling:
 
 | Error Scenario | Handling Strategy |
 |---|---|
-| JSON parse errors | Rich diagnostics with context lines around the error location |
+| JSON parse errors | Rich diagnostics with surrounding lines around the error location |
 | Missing widget keys | Explicit validation that enumerates all missing keys in the error message |
 | Pre-launch validation failures | Seven or more pre-flight checks run before any job is submitted |
 | Catalog clash detection | Warns if install catalogs contain existing schemas (excluding internal schemas) |
@@ -436,7 +436,7 @@ The runner implements multiple layers of error handling:
 | `databricks-sdk` | Workspace client, job management, file operations |
 | `pyspark` | SparkSession for catalog/schema DDL operations |
 | `dbutils` | Databricks utilities for file system operations and widgets |
-| `json` | Context file parsing |
+| `json` | Batch input JSON parsing |
 | `os` | File system path operations |
 | `re` | Regular expressions for name sanitization |
 | `time` | Sleep/polling intervals |

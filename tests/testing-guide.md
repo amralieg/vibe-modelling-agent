@@ -76,13 +76,13 @@ The suite follows the strategy **"ECM once, ALL ops on MVM + edge cases + negati
 | #   | Test Name          | Label                                       | What It Validates                                | Expected Outcome                                   |
 |-----|--------------------|---------------------------------------------|--------------------------------------------------|----------------------------------------------------|
 | 12  | 12_empty_vibes     | Handle empty model_vibes gracefully         | Agent handles absent or empty vibes without crash | Clean exit or "no vibes"/"empty vibes" type error  |
-| 13  | 13_ctx_install     | Install from context file (model.json)      | Agent can install from a pre-existing model file  | Install succeeds, schemas and tables created       |
+| 13  | 13_ctx_install     | Install from model.json file                | Agent can install from a pre-existing model file  | Install succeeds, schemas and tables created       |
 
 ### Negative / Guard-Rail Tests (14--15)
 
 | #   | Test Name          | Label                                                          | What It Validates                                       | Expected Outcome                                               |
 |-----|--------------------|----------------------------------------------------------------|---------------------------------------------------------|----------------------------------------------------------------|
-| 14  | 14_invalid_ctx     | Reject invalid context files (2 sub-tests)                     | Agent rejects non-existent path and pasted JSON alike   | Both sub-tests fail with clear error messages                  |
+| 14  | 14_invalid_ctx     | Reject invalid model JSON files (2 sub-tests)                  | Agent rejects non-existent path and pasted JSON alike   | Both sub-tests fail with clear error messages                  |
 | 15  | 15_no_biz_name     | Reject empty business_name                                     | Agent enforces required business_name parameter         | Fails with error mentioning `business_name`                    |
 
 ---
@@ -384,8 +384,8 @@ Phase 4  Execute tests:
            10  Generate sample data for v2
            11  Uninstall MVM v2
            12  Empty vibes edge case
-           13  Context file install
-           14  Invalid context files (2 sub-tests)
+           13  Model JSON file install
+           14  Invalid model JSON files (2 sub-tests)
            15  Missing business_name
 Phase 5  Merge all test logs
 Phase 6  Convention verification + vibe effectiveness audit

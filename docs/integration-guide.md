@@ -72,13 +72,13 @@ When the UI creates the job, it **MUST** set these exact tag keys. All values mu
 | `data_model_scopes` | `Minimum Viable Model - MVM` or `Expanded Coverage Model - ECM` |
 | `business_domains` | Comma-separated domain hints (optional) |
 | `org_divisions` | `Operations`, `Operations and Business`, or `Operations, Business and Corporate` |
-| `model_vibes` | Inline vibes text or `/path/to/vibes.txt` |
+| `model_vibes` | Inline vibes text (max 2,000 chars) or file path to `.txt` on a UC Volume (e.g., `/Volumes/.../vibes.txt`) |
 | `deployment_catalog` | Target Unity Catalog name |
 | `cataloging_style` | `One Catalog`, `Catalog per Division`, or `Catalog per Domain` |
 | `catalog_prefix` | Prefix for catalog names |
 | `catalog_suffix` | Suffix for catalog names |
 | `generate_samples` | `0`, `5`, `10`, `15`, `20`, `25`, `50`, or `100` |
-| `context_file` | Path to model JSON file (optional) |
+| `context_file` | Path to previously generated model.json file (optional, for re-install or continuation) |
 | `naming_convention` | `snake_case`, `camelCase`, `PascalCase`, or `SCREAMING_CASE` |
 | `primary_key_suffix` | Primary key suffix (default `_id`) |
 | `schema_prefix` | Schema prefix |

@@ -37,7 +37,7 @@
 - [Widget Reference](#-widget-reference)
   - [Core Widgets (01–11)](#core-configuration-widgets-0111)
   - [Convention Widgets (12–24)](#model-convention-widgets-1224)
-- [Context File Format](#-context-file-format)
+- [Auto-Generated Next Vibes](#-auto-generated-next-vibes)
 - [The Complete Action Catalog](#-the-complete-action-catalog)
 - [Pipeline Stages](#-pipeline-stages)
 - [Output Artifacts](#-output-artifacts)
@@ -351,23 +351,25 @@ Run the notebook. Done.
 
 | Widget | Value |
 |:---|:---|
+| 01. Business | `Contoso Manufacturing` |
+| 02. Description | *(same as before)* |
 | 03. Operation | `vibe modeling of version` |
 | 04. Version | `1` |
 | 08. Model Vibes | `Add a warranty domain. Remove the corporate_strategy domain. Run quality checks.` |
-| 11. Context File | `/Volumes/catalog/schema/volume/vibes/contoso_business_context.json` |
 </details>
 
 <details>
 <summary><b>Recipe 4: Use Auto-Generated Next Vibes</b></summary>
 
-After any pipeline run, find `next_vibes.txt` in the `vibes/` output folder.
+After any pipeline run, find `next_vibes.txt` in the `vibes/` output folder. Copy the suggested vibes into widget 08.
 
 | Widget | Value |
 |:---|:---|
+| 01. Business | `Contoso Manufacturing` |
+| 02. Description | *(same as before)* |
 | 03. Operation | `vibe modeling of version` |
 | 04. Version | Next version number (previous + 1) |
-| 11. Context File | `/Volumes/catalog/schema/volume/vibes/contoso_business_context.json` |
-| 08. Model Vibes | *(leave empty — vibes are inside the context file)* |
+| 08. Model Vibes | *(paste recommended vibes from next_vibes.txt)* |
 </details>
 
 <details>
@@ -377,7 +379,7 @@ After any pipeline run, find `next_vibes.txt` in the `vibes/` output folder.
 |:---|:---|
 | 03. Operation | `install model` |
 | 09. Deployment Catalog | `prod_catalog` |
-| 11. Context File | `/Volumes/catalog/schema/volume/vibes/contoso_business_context.json` |
+| 11. Model JSON File | `/Volumes/catalog/schema/volume/vibes/contoso/v1_ecm/model.json` |
 | 10. Sample Records | `0` *(or a number for test data)* |
 </details>
 
@@ -389,13 +391,13 @@ The `03. Operation` widget selects which pipeline mode to run:
 
 | Operation | Purpose | Key Requirements |
 |:---|:---|:---|
-| **`new base model`** | Generate a brand-new data model from scratch | Business name + description |
-| **`vibe modeling of version`** | Apply natural-language instructions to refine an existing version | Version + vibes (widget 08 or context file) |
+| **`new base model`** | Generate a brand-new data model from scratch | Business name + description (via widgets) |
+| **`vibe modeling of version`** | Apply natural-language instructions to refine an existing version | Version + vibes (widget 08) |
 | **`shrink ecm`** | Convert an ECM to a leaner MVM | Version + deployment catalog |
 | **`enlarge mvm`** | Expand an MVM into a comprehensive ECM | Version + deployment catalog |
-| **`install model`** | Deploy a logical model into physical Unity Catalog objects | Context file + deployment catalog |
+| **`install model`** | Deploy a logical model into physical Unity Catalog objects | Model JSON file (widget 11) + deployment catalog |
 | **`uninstall model version`** | Remove a version's physical artifacts from the catalog | Business name + version + catalog |
-| **`generate sample data`** | Generate synthetic sample records for an existing deployed model | Context file + deployment catalog |
+| **`generate sample data`** | Generate synthetic sample records for an existing deployed model | Model JSON file (widget 11) + deployment catalog |
 
 ---
 
@@ -442,7 +444,7 @@ After **every** pipeline run, the agent produces `next_vibes.txt` and `current_v
 - Model health metadata: confidence score, warning counts, issue breakdown
 - Version history and progression tracking
 
-To use it: point widget **11. Context File** to this file, set operation to `vibe modeling of version`, set the next version, and run.
+To use them: copy the recommended vibes into widget **08. Model Vibes**, set operation to `vibe modeling of version`, set the next version, and run.
 
 ---
 
@@ -454,29 +456,28 @@ The notebook exposes **28 configurable widgets**. Below is the complete referenc
 
 | # | Widget | Type | Mandatory | Default | Description |
 |:---:|:---|:---:|:---:|:---:|:---|
-| **01** | **Business (name)** | Text | **Yes**<sup>1</sup> | — | Your business/organization name |
+| **01** | **Business (name)** | Text | **Yes** | — | Your business/organization name |
 | **02** | **Description** | Text | Recommended | — | What your business does (richer = better model) |
 | **03** | **Operation** | Dropdown | **Yes** | `new base model` | Pipeline operation to run |
-| **04** | **Version** | Dropdown | Conditional<sup>2</sup> | — | Model version number (1–100) |
+| **04** | **Version** | Dropdown | Conditional<sup>1</sup> | — | Model version number (1–100) |
 | **05** | **Model Scope** | Dropdown | **Yes** | `Minimum Viable Model - MVM` | MVM (lean) or ECM (comprehensive) |
 | **06** | **Business Domains** | Text | No | — | Comma-separated seed domains |
 | **07** | **Included Org Divisions** | Dropdown | **Yes** | `Operations and Business` | Which divisions to include |
-| **08** | **Model Vibes** | Text | Conditional<sup>3</sup> | — | Natural language instructions or path to vibes.txt |
-| **09** | **Deployment Catalog** | Text | Conditional<sup>4</sup> | — | Unity Catalog for physical deployment |
+| **08** | **Model Vibes** | Text | Conditional<sup>2</sup> | — | Natural language instructions — **inline** (max 2,000 chars) or **file path** to a `.txt` on a UC Volume |
+| **09** | **Deployment Catalog** | Text | Conditional<sup>3</sup> | — | Unity Catalog for physical deployment |
 | **10** | **Sample Records** | Dropdown | No | `0` | Synthetic records per table (0 = none) |
-| **11** | **Context File** | Text | Conditional<sup>5</sup> | — | Path to business context JSON file |
+| **11** | **Model JSON File** | Text | Conditional<sup>4</sup> | — | Path to a previously generated `model.json` for re-install or continuation |
 
-<sup>1</sup> Not required when context file provides it.
-<sup>2</sup> Required for all operations except `new base model` (auto-assigned).
-<sup>3</sup> Required for `vibe modeling of version` (unless vibes are in the context file).
-<sup>4</sup> Required for `install`, `uninstall`, `generate sample data`, `shrink`, `enlarge`. Optional for `new base model` and `vibe modeling`.
-<sup>5</sup> Required for `install model`, `generate sample data`. Recommended for `vibe modeling of version`.
+<sup>1</sup> Required for all operations except `new base model` (auto-assigned).
+<sup>2</sup> Required for `vibe modeling of version`.
+<sup>3</sup> Required for `install`, `uninstall`, `generate sample data`, `shrink`, `enlarge`. Optional for `new base model` and `vibe modeling`.
+<sup>4</sup> Required for `install model`, `generate sample data` when re-deploying a previously generated model.
 
 <details>
 <summary><b>Detailed Widget Descriptions (click to expand)</b></summary>
 
 #### 01. Business (name)
-The name of your business. Used as the top-level identifier across the entire model. Case-insensitive matching (stored via `LOWER()`). If a context file provides a business name, it takes precedence.
+The name of your business. Used as the top-level identifier across the entire model. Case-insensitive matching (stored via `LOWER()`).
 
 **Sample values:** `Contoso Inc`, `Acme Healthcare`, `Global Telecom Corp`, `NextGen Retail`
 
@@ -511,7 +512,11 @@ Comma-separated list of specific domains you want. If blank, the LLM auto-genera
 Controls which organizational divisions contribute domains to the model.
 
 #### 08. Model Vibes
-Write inline instructions **OR** provide a file path (`/Volumes/.../vibes.txt`). See [The Vibing Workflow](#-the-vibing-workflow) for examples.
+Supports **two input modes**:
+- **Inline text** — type your vibe instructions directly into the widget (max **2,000 characters**). Best for short, targeted changes.
+- **File path** — provide a path to a `.txt` file on a Unity Catalog Volume (e.g., `/Volumes/catalog/schema/vol/my_vibes.txt`). Best for longer, multi-paragraph instructions that exceed the inline limit.
+
+See [The Vibing Workflow](#-the-vibing-workflow) for examples of what vibes can do.
 
 #### 09. Deployment Catalog
 The Unity Catalog where physical schemas, tables, FK constraints, tags, and sample data will be created. Must already exist. You need `CREATE SCHEMA` privileges. If blank for `new base model`/`vibe modeling`, only the logical model (JSON artifacts) is produced.
@@ -523,10 +528,10 @@ The Unity Catalog where physical schemas, tables, FK constraints, tags, and samp
 
 `0` = skip sample data generation. `10` = good default for review. `50`–`100` = for load testing / demos. Sample data respects FK relationships (child records reference valid parent IDs).
 
-#### 11. Context File
-Path to a JSON file containing business context, model conventions, and/or vibe instructions. After every run, the agent generates `next_vibes.txt` in the `vibes/` folder — review it for recommended next vibe instructions.
+#### 11. Model JSON File
+*(Optional)* Path to a previously generated `model.json` file on a Unity Catalog Volume. Used when re-installing or continuing from a prior run. After every run, the agent generates `next_vibes.txt` in the `vibes/` folder — review it for recommended next vibe instructions.
 
-**Sample values:** `/Volumes/my_catalog/my_schema/vol/vibes/contoso_business_context.json`
+**Sample values:** `/Volumes/my_catalog/my_schema/vol/vibes/contoso/v1_ecm/model.json`
 </details>
 
 ### Model Convention Widgets (12–24)
@@ -555,73 +560,11 @@ Path to a JSON file containing business context, model conventions, and/or vibe 
 
 ---
 
-## 📄 Context File Format
+## 📄 Auto-Generated Next Vibes
 
-The context file is a JSON document — the most powerful way to configure a run. It can provide business context, model conventions, and vibe instructions all in one place.
+After every run, the agent produces `next_vibes.txt` in the `vibes/` output folder with recommended next vibe instructions. Copy these into widget **08. Model Vibes** for the next iteration.
 
-### Structure
-
-```json
-{
-  "user_config": {
-    "operation": "vibe modeling of version",
-    "model_version": "2",
-    "data_model_scopes": "Minimum Viable Model - MVM",
-    "deployment_catalog": "my_catalog",
-    "generate_samples": "10"
-  },
-  "business_context": {
-    "business_information": {
-      "business": "Contoso Manufacturing",
-      "description": "A multinational aluminum smelting and manufacturing company",
-      "industry_alignment": "Industrial Manufacturing - Aluminum Smelting",
-      "core_business_processes": "Smelting, casting, rolling, extrusion, recycling",
-      "orgnaization_divisions": "operations, business, corporate",
-      "data_domains": "production, quality_control, supply_chain, customer, sales",
-      "common_business_jargons": "pot=electrolytic cell, potline=row of pots, tap=metal extraction",
-      "operational_systems_of_records": "SAP ERP, OSIsoft PI, MES System, LIMS",
-      "industry_governing_body": "Aluminum Association, ISO 9001, EPA regulations"
-    },
-    "model_conventions": {
-      "data_asset_naming_convention": "snake_case",
-      "primary_key_suffix": "_id",
-      "tag_prefix": "dbx_",
-      "table_id_type": "BIGINT",
-      "boolean_format": "Boolean (True/False)",
-      "date_format": "yyyy-MM-dd",
-      "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"
-    },
-    "vibe_modelling_instructions": "Add a sustainability domain. Remove corporate_strategy. Ensure production tables have shift_id FK."
-  }
-}
-```
-
-### Section Reference
-
-| Section | Purpose |
-|:---|:---|
-| `user_config` | Widget-equivalent settings. Values here **override** widget values. |
-| `business_context.business_information` | Rich business context fed to the LLM |
-| `business_context.model_conventions` | Naming and formatting conventions |
-| `business_context.vibe_modelling_instructions` | Natural language instructions |
-
-### Business Information Fields
-
-| Field | What to Provide |
-|:---|:---|
-| `business` | Your business name |
-| `description` | What your business does — **the richer, the better** |
-| `industry_alignment` | Your specific industry (drives complexity tier classification) |
-| `core_business_processes` | Comma-separated key processes |
-| `orgnaization_divisions` | `operations, business, corporate` (which to model) |
-| `data_domains` | Seed domains (optional — LLM generates if empty) |
-| `common_business_jargons` | `abbreviation=definition` pairs for industry terminology |
-| `operational_systems_of_records` | Source systems (SAP, Salesforce, custom apps, etc.) |
-| `industry_governing_body` | Regulatory bodies and standards |
-
-### Auto-Generated Next Vibes File
-
-After every run, the agent produces `next_vibes.txt` in the `vibes/` folder with recommended next vibe instructions. The `model.json` file includes session metadata which extends the structure above with:
+The `model.json` file includes session metadata:
 
 ```json
 {
@@ -927,10 +870,10 @@ Metric views are auto-generated per domain, focusing on KPIs that would appear i
 | Circular dependency warning | DAG violation | Agent auto-fixes during QA; if persistent: `"Break cycles"` |
 | SSOT violation (duplicate entities) | Same concept in multiple domains | Vibe: `"Run quality checks"` or `"Fix duplicates"` |
 | Pipeline crashed mid-run | LLM timeout or transient error | Re-run with same inputs — agent cleans up incomplete versions |
-| Context file parse error | Invalid JSON (smart quotes, trailing commas) | Validate JSON; use straight quotes only |
+| Model JSON file parse error | Invalid JSON (smart quotes, trailing commas) | Validate JSON; use straight quotes only |
 | *"Version X exists but is incomplete"* | Previous run failed | Agent auto-detects — just re-run |
 | Model too large / too many tables | ECM + high complexity tier | Use `shrink ecm`, or vibe: `"Keep only core business tables"` |
-| Convention changes not applied | Running vibe without context file | Provide context file with updated `model_conventions` |
+| Convention changes not applied | Convention widgets not set | Update the model convention widgets (12–24) with your desired values before running |
 | Metric views have `COUNT(1)` instead of real KPIs | Nested aggregates were auto-replaced | LLM prompt prevents this; re-run metrics: `"Regenerate metrics"` |
 
 ---
