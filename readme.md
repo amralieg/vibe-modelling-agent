@@ -246,7 +246,7 @@ FK relationships **MUST** form a **Directed Acyclic Graph (DAG)**:
 | | MVM (Minimum Viable Model) | ECM (Expanded Coverage Model) |
 |:---|:---|:---|
 | **Size** | 30–50% of ECM table count | Full coverage |
-| **Attribute depth** | **SAME as ECM** — full production-grade | Full production-grade |
+| **Attribute depth** | **SAME as ECM** — full production-grade (same min/max per tier) | Full production-grade |
 | **Domains** | Essential business functions only | All functions including corporate back-office |
 | **Ideal for** | SMBs, rapid deployments, POCs, dev/test | Fortune 100, multinational enterprises |
 | **Lightness** | Fewer domains & tables (NEVER thinner attributes) | Maximum breadth |
@@ -263,7 +263,7 @@ Every domain is organized into **subdomains** — semantic groupings of related 
 |:---|:---|
 | **Count** | Minimum and maximum subdomains per domain are defined by the complexity tier. Never exactly 1 subdomain per domain. |
 | **Naming** | EXACTLY 2 words per subdomain name. 1 word = rejected. 3+ words = rejected. |
-| **Min Products** | Every subdomain must contain at least the minimum products per subdomain defined by the tier (tier_1–tier_2: 3, tier_3–tier_5: 2–3). |
+| **Min Products** | Every subdomain must contain at least the minimum products per subdomain defined by the tier: ECM tier_1–tier_4: 3, ECM tier_5: 2; MVM tier_1–tier_3: 3, MVM tier_4–tier_5: 2. |
 | **No Overlap** | No two subdomains within the same domain may share any word in their names. |
 | **Business Terms** | Use business terminology, NOT technical terms. |
 | **Balanced** | Products distributed as evenly as possible across subdomains. |
@@ -302,11 +302,11 @@ The agent auto-classifies your business into one of five tiers:
 
 | Tier | MVM Domains | MVM Products/Domain | Subdomains/Domain |
 |:---|:---:|:---:|:---:|
-| `tier_1` | 9–14 | 8–16 | 3–6 |
-| `tier_2` | 8–12 | 8–14 | 2–5 |
-| `tier_3` | 6–10 | 7–13 | 2–5 |
-| `tier_4` | 5–8 | 6–11 | 2–4 |
-| `tier_5` | 3–6 | 5–10 | 2–4 |
+| `tier_1` | 9–14 | 8–16 | 2–4 |
+| `tier_2` | 8–12 | 8–14 | 2–4 |
+| `tier_3` | 6–10 | 7–13 | 2–4 |
+| `tier_4` | 5–8 | 6–11 | 2–3 |
+| `tier_5` | 3–6 | 5–10 | 2–3 |
 
 MVM counts are automatically derived as ~30–50% of the ECM counts for each tier. Attribute depth (min/max attributes per product) is **the same** for both MVM and ECM within each tier.
 
@@ -325,7 +325,7 @@ MVM counts are automatically derived as ~30–50% of the ECM counts for each tie
 | 02. Description | `A brief description of what your company does` |
 | 03. Operation | `new base model` |
 | 05. Model Scope | `Minimum Viable Model - MVM` |
-| 09. Deployment Catalog | `my_catalog` *(or leave blank for logical-only)* |
+| 09. Installation Catalog | `my_catalog` *(or leave blank for logical-only)* |
 | Everything else | Defaults |
 
 Run the notebook. Done.
@@ -342,7 +342,7 @@ Run the notebook. Done.
 | 05. Model Scope | `Expanded Coverage Model - ECM` |
 | 06. Business Domains | `production, quality, supply, customer, sales, logistics, billing` |
 | 07. Org Divisions | `Operations, Business and Corporate` |
-| 09. Deployment Catalog | `contoso_dev` |
+| 09. Installation Catalog | `contoso_dev` |
 | 10. Sample Records | `10` |
 </details>
 
@@ -378,7 +378,7 @@ After any pipeline run, find `next_vibes.txt` in the `vibes/` output folder. Cop
 | Widget | Value |
 |:---|:---|
 | 03. Operation | `install model` |
-| 09. Deployment Catalog | `prod_catalog` |
+| 09. Installation Catalog | `prod_catalog` |
 | 11. Model JSON File | `/Volumes/catalog/schema/volume/vibes/contoso/v1_ecm/model.json` |
 | 10. Sample Records | `0` *(or a number for test data)* |
 </details>
@@ -464,7 +464,7 @@ The notebook exposes **28 configurable widgets**. Below is the complete referenc
 | **06** | **Business Domains** | Text | No | — | Comma-separated seed domains |
 | **07** | **Included Org Divisions** | Dropdown | **Yes** | `Operations and Business` | Which divisions to include |
 | **08** | **Model Vibes** | Text | Conditional<sup>2</sup> | — | Natural language instructions — **inline** (max 2,000 chars) or **file path** to a `.txt` on a UC Volume |
-| **09** | **Deployment Catalog** | Text | Conditional<sup>3</sup> | — | Unity Catalog for physical deployment |
+| **09** | **Installation Catalog** | Text | Conditional<sup>3</sup> | — | Unity Catalog for physical deployment |
 | **10** | **Sample Records** | Dropdown | No | `0` | Synthetic records per table (0 = none) |
 | **11** | **Model JSON File** | Text | Conditional<sup>4</sup> | — | Path to a previously generated `model.json` for re-install or continuation |
 
@@ -518,7 +518,7 @@ Supports **two input modes**:
 
 See [The Vibing Workflow](#-the-vibing-workflow) for examples of what vibes can do.
 
-#### 09. Deployment Catalog
+#### 09. Installation Catalog
 The Unity Catalog where physical schemas, tables, FK constraints, tags, and sample data will be created. Must already exist. You need `CREATE SCHEMA` privileges. If blank for `new base model`/`vibe modeling`, only the logical model (JSON artifacts) is produced.
 
 **Sample values:** `dev_catalog`, `prod_data_models`, `contoso_lakehouse`
@@ -748,7 +748,7 @@ Vibes are translated into **190+ specific actions** organized into categories. Y
 
 ## 🔄 Pipeline Stages
 
-When you run the agent, it executes these progress stages in order (the `#` column is the stage ID emitted in progress events):
+When you run the agent, it executes these progress stages in order (the `#` column is for reference only — no numeric stage IDs are emitted in progress events):
 
 | # | Stage | Duration | What Happens |
 |:---:|:---|:---:|:---|
@@ -757,7 +757,7 @@ When you run the agent, it executes these progress stages in order (the `#` colu
 | 3 | **Collecting Business Context** | 10–30s | LLM enriches your description across business/industry dimensions |
 | 4 | **Designing Domains** | 15–60s | Generates domains following division model + SSOT |
 | 5 | **Creating Data Products** | 1–10m | Products per domain with architect review |
-| 6 | **Enriching with Attributes** | 5–40m | All columns for every product |
+| 6 | **Enriching Data Products with Attributes** | 5–40m | All columns for every product |
 | 7 | **Cross-Domain Linking** | 1–5m | In-domain → global sweep → pairwise comparison |
 | 8 | **Quality Assurance** | 30s–3m | 9 sub-checks (naming, PK/types, overlaps, topology, auto-remediation) |
 | 9 | **Applying Naming Conventions** | 10–30s | Final naming consistency pass |
@@ -780,16 +780,27 @@ When you run the agent, it executes these progress stages in order (the `#` colu
 
 | File | Description |
 |:---|:---|
+| `model.json` | Complete model export (primary output) |
+| `readme.md` | Human-readable model documentation |
 | `vibes/current_vibes.txt` | Vibe instructions used in this run |
 | `vibes/next_vibes.txt` | Recommended next vibe instructions |
 | `domains.json` | All domain definitions |
 | `products.json` | All product (table) definitions |
 | `attributes.json` | All attribute (column) definitions |
-| `README.md` | Human-readable model documentation |
-| `data_model.json` | Complete model export |
-| `data_dictionary` | Column-level reference guide |
-| `Excel/CSV export` | Spreadsheet of the entire model |
-| `model_report` | Full documentation report |
+| `docs/*.xlsx` / `docs/*.csv` | Excel/CSV export of the entire model (CSV fallback if openpyxl unavailable) |
+| `docs/*_model_overview_*.md` | Model overview document |
+| `schemas/*.sql` | SQL DDL files (per-domain schemas, cross-domain FKs, catalogs) |
+| `diagram/*_dbml_*.txt` | DBML schema diagram |
+| `ontology/*_rdf_*.ttl` | RDF/Turtle ontology representation |
+| `docs/releasenotes.txt` | Auto-generated release notes |
+
+### Conditional Artifacts (Generated on Demand via Queued Operations)
+
+| File | Description |
+|:---|:---|
+| `docs/*_data_dictionary_*.txt` | Column-level reference guide |
+| `docs/*_model_report_*.txt` | Full documentation report |
+| `docs/*_test_cases_*.txt` | Generated test cases |
 
 ### Physical Deployment (When Catalog Is Set)
 
@@ -822,7 +833,7 @@ The agent enforces a comprehensive rule system during generation and QA:
 | **Honesty Check (G11)** | 0–100 scale; below 55 = permanently discarded; 55–70 = borderline retry; ≥90 = accepted; contradiction penalty applied post-processing |
 | **Product Design (G12)** | M:N requires 3 indicators with ≥2 of 3 strong; association ratio ECM ≤15%, MVM ≤5%; core products 1–3 per domain; forbidden product suffixes (_analysis, _analytics, _report, _prediction); Silver Layer only (no analytics products) |
 | **Sample Data (G13)** | Exact record count; sequential PK from 10001; FK random [10001, 10001+N-1]; regex compliance; 3-letter country codes; no Lorem Ipsum; realistic business data |
-| **Vibe Constraints (G14)** | Dedup overlap thresholds; max relocation percentage per pass; normalization confidence 95%; mutation budgets by mode (surgical, holistic, generative); domain hard ceiling factor |
+| **Vibe Constraints (G14)** | Dedup overlap thresholds; max relocation percentage per pass; normalization confidence 95%; mutation budgets by mode (surgical, holistic, generative); domain hard ceiling factor 1.5x |
 | **Physical Schema Deployment (G15)** | Schema and table creation factories; attribute dict factory; product dict factory; FK dependency ordering; consolidation and cleanup |
 | **Subdomains** | Exactly 2-word names; min products per subdomain per tier; no overlapping words; balanced distribution; no placeholder names |
 
@@ -830,18 +841,20 @@ The agent enforces a comprehensive rule system during generation and QA:
 
 ## 🤖 LLM Architecture
 
-The agent uses a **multi-model ensemble** with automatic demotion:
+The agent uses a **multi-model ensemble** with automatic demotion and recovery:
 
-| Role | Purpose | Models |
-|:---|:---|:---|
-| **Thinker** | Complex reasoning, architecture reviews, QA decisions | Claude Opus 4.6, Claude Opus 4.5 |
-| **Worker (large)** | High-volume generation: products, attributes, FKs, dedup | Claude Sonnet 4.6, Claude Sonnet 4.5 |
-| **Worker (small)** | Simpler tasks: domain generation, tag classification | GPT-OSS 120B |
-| **Worker (tiny)** | Sample data generation | GPT-OSS 20B |
+| Order | Role | Purpose | Endpoint | Input Tokens | Output Tokens |
+|:---:|:---|:---|:---|:---:|:---:|
+| 10 | **Thinker (large)** | Complex reasoning, architecture reviews, QA decisions | `databricks-claude-opus-4-6` | 200,000 | 128,000 |
+| 20 | **Worker (large)** | High-volume generation: products, attributes, FKs, dedup | `databricks-claude-sonnet-4-6` | 200,000 | 64,000 |
+| 30 | **Thinker (large)** | Fallback thinker | `databricks-claude-opus-4-5` | 200,000 | 64,000 |
+| 40 | **Worker (large)** | Fallback worker | `databricks-claude-sonnet-4-5` | 200,000 | 64,000 |
+| 50 | **Worker (small)** | Simpler tasks: domain generation, tag classification | `databricks-gpt-oss-120b` | 131,072 | 25,000 |
+| 60 | **Worker (tiny)** | Sample data generation | `databricks-gpt-oss-20b` | 131,072 | 25,000 |
 
-**Automatic model demotion:** If a model fails or returns low-quality results after N attempts (default: 3), the agent demotes to the next model in the priority chain. The pipeline always completes.
+**Automatic model demotion:** After 3 cumulative failures on a model, the entire priority order is demoted — the failing model is pushed down and the next model takes its place. After 5 consecutive successes, the original order is restored. After 3 consecutive timeouts, a model is marked broken and skipped for the rest of the session.
 
-**Prompt architecture:** 40+ specialized prompts, each mapped to a specific model role and temperature setting. Thinker prompts use temperature 0 for deterministic reasoning. Sample generation uses temperature 0.5 for creative variety.
+**Prompt architecture:** 49 specialized prompts, each mapped to a specific model role and temperature setting. Thinker prompts use temperature 0 for deterministic reasoning. Worker prompts use temperature 0–0.3 for controlled generation. Sample generation uses temperature 0.5 for creative variety.
 
 ---
 

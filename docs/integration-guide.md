@@ -288,7 +288,7 @@ The handshake prevents the agent from writing faster than the UI can consume. It
    - `CHUNK_SIZE = 300` — Max events per Delta INSERT batch
    - `MAX_PROGRESS_RETRIES = 5` — Retry count for flush failures
 
-   - If `processing_status == 'ready'` → the UI has not consumed the last batch yet. The agent waits up to **30 seconds** (`HANDSHAKE_TIMEOUT_SECONDS`). If the timeout expires, it flushes anyway.
+   - If `processing_status == 'ready'` → the UI has not consumed the last batch yet. The agent waits up to **90 seconds** (`HANDSHAKE_TIMEOUT_SECONDS`). If the timeout expires, it flushes anyway.
    - If `processing_status == 'done'` → the agent flushes all pending events to `_vibe_progress`, computes `increment_sum`, updates `completed_percent`, and sets `processing_status = 'ready'`.
 6. **UI** polls the business table. When it sees `processing_status = 'ready'`:
    - Reads new rows from `_vibe_progress` (see Section 6).
@@ -379,24 +379,31 @@ If `last_updated_at` has not changed for more than **5 minutes** and `completed_
 Every session follows this bookend pattern:
 
 ```
-┌─────────────────────────────┐
-│ Vibe Session (stage_started) │  ← FIRST event
-├─────────────────────────────┤
-│ Setup and Configuration     │
-│ Interpreting Instructions   │
-│ Collecting Business Context │
-│ Designing Domains           │
-│ Creating Data Products      │
-│ Enriching with Attributes   │
-│ Cross-Domain Linking        │
-│ Quality Assurance           │
-│ Model Finalization          │
-│ Physical Schema             │
-│ Tags, FKs, Samples, etc.   │
-│ Consolidation and Cleanup   │
-├─────────────────────────────┤
-│ Vibe Session (stage_ended)   │  ← LAST event
-└─────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│ Vibe Session (stage_started)                  │  ← FIRST event
+├──────────────────────────────────────────────┤
+│ Setup and Configuration                       │
+│ Interpreting Instructions                     │
+│ Collecting Business Context                   │
+│ Designing Domains                             │
+│ Creating Data Products                        │
+│ Enriching Data Products with Attributes       │
+│ Cross-Domain Linking                          │
+│ Quality Assurance                             │
+│ Applying Naming Conventions                   │
+│ Model Finalization                            │
+│ Subdomain Allocation                          │
+│ Physical Schema Construction                  │
+│ Applying Foreign Keys                         │
+│ Applying Tags                                 │
+│ Applying Metric Views                         │
+│ Generating Sample Data                        │
+│ Generating Metric View Artifacts              │
+│ Generating Artifacts                          │
+│ Consolidation and Cleanup                     │
+├──────────────────────────────────────────────┤
+│ Vibe Session (stage_ended)                    │  ← LAST event
+└──────────────────────────────────────────────┘
 ```
 
 Each intermediate pipeline stage follows this lifecycle:
@@ -1168,7 +1175,7 @@ This event provides the **complete model snapshot** after all QA.
 
 1. `step_name = "README Generation"` → `{"artifact": "readme.md", "path": "/Volumes/.../readme.md"}`
 2. `step_name = "Excel/CSV Export"` → `{"artifact": "excel_csv_export"}`
-3. `step_name = "Data Model JSON"` → `{"artifact": "data_model_json", "path": "/Volumes/.../data_model.json"}`
+3. `step_name = "Data Model JSON"` → `{"artifact": "data_model_json", "path": "/Volumes/.../model.json"}`
 4. `step_name = "Data Dictionary"` → `{"artifact": "data_dictionary"}`
 5. `step_name = "Model Report"` → `{"artifact": "model_report"}`
 
@@ -1473,10 +1480,10 @@ The following widgets are available for configuring the pipeline but are not cov
 | Collecting Business Context | 10–30 seconds | 1 event |
 | Designing Domains | 15–60 seconds | 1 event |
 | Creating Data Products | 1–10 minutes | 1 per domain (parallel) |
-| Enriching Data Products | 5–40 minutes | 1 per product (parallel) |
+| Enriching Data Products with Attributes | 5–40 minutes | 1 per product (parallel) |
 | Cross-Domain Linking | 1–5 minutes | 6 intermediate events |
 | Quality Assurance | 30 seconds–3 minutes | 9+ sub-step events |
-| Physical Schema | 1–10 minutes | per database + batched tables |
+| Physical Schema Construction | 1–10 minutes | per database + batched tables |
 | Applying Tags | 2–15 minutes | periodic batch events |
 | Generating Artifacts | 30 seconds–2 minutes | 5 per-artifact events |
 
@@ -1487,7 +1494,7 @@ The flush interval is **10 seconds**, so the client should expect batches arrivi
 ## 14. Edge Cases and Error Handling
 
 ### Handshake Timeout
-If the UI does not set `processing_status = 'done'` within **30 seconds**, the agent flushes anyway. No data is lost.
+If the UI does not set `processing_status = 'done'` within **90 seconds** (`HANDSHAKE_TIMEOUT_SECONDS`), the agent flushes anyway. No data is lost.
 
 ### Concurrent Sessions
 Each session is identified by the composite key `(business, version, model_scope)`. Only one session can run at a time for a given key.
