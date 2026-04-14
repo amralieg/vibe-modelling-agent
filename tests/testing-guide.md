@@ -127,7 +127,7 @@ Each test receives a randomized set of conventions drawn from the pools below. T
 | `catalog_suffix`           | (empty), `_zone`, `_catalog`                                                    |
 | `classification_levels`    | 3 different schemes                                                             |
 
-Randomization is performed by the `_random_conventions(test_id)` and `_random_catalog_widgets(test_id)` helper functions. Each test ID seeds a distinct random draw so that results are reproducible across re-runs of the same test.
+Each test ID seeds a distinct random draw so that results are reproducible across re-runs of the same test.
 
 ---
 
@@ -156,11 +156,11 @@ CREATE SCHEMA <test_catalog>._metamodel;
 
 ### Phase 4 -- Run All Tests
 
-Executes all 10 test definitions in sequence, respecting the dependency chain. Each test is invoked via `run_test()` which calls `dbutils.notebook.run()` with the test's parameter dict.
+Executes all 10 test definitions in sequence, respecting the dependency chain. Each test invokes the agent notebook with the test's parameter dictionary.
 
 ### Phase 5 -- Merge All Logs
 
-Consolidates per-test log files into unified artifacts using `merge_all_logs(test_results)`:
+Consolidates per-test log files into unified artifacts:
 
 - `merged_info.log` -- combined info and error summaries per test
 - `merged_error.log` -- combined error logs per test
@@ -169,7 +169,7 @@ Stack traces are stripped during the merge process.
 
 ### Phase 6 -- Convention Verification and Vibe Effectiveness Audit
 
-Runs the `verify_conventions()` function against metamodel tables and the `audit_vibe_effectiveness()` function to compare v1 and v2 models. See the dedicated sections below.
+Queries metamodel tables to check convention compliance and compares v1 vs v2 models to measure vibe effectiveness. See the dedicated sections below.
 
 ### Phase 7 -- Quality Report
 
@@ -187,7 +187,7 @@ Prints the consolidated test results and overall pass/fail determination. Writes
 
 ## Convention Verification
 
-The `verify_conventions(test_result, version, scope)` function queries metamodel tables in the test catalog and checks adherence to the randomized conventions that were assigned to each test.
+After tests run, the suite queries metamodel tables in the test catalog and checks adherence to the randomized conventions that were assigned to each test.
 
 **Checks performed:**
 
@@ -205,7 +205,7 @@ Each check produces a compliance percentage. These are averaged into a single co
 
 ## Vibe Effectiveness Audit
 
-The `audit_vibe_effectiveness(base_version, new_version, scope, vibes_text)` function compares the v1 and v2 metamodel snapshots to determine whether the vibe evolution actually changed the model in the expected ways.
+After the vibe evolution test (Test 01), the suite compares the v1 and v2 metamodel snapshots to determine whether the vibe evolution actually changed the model in the expected ways.
 
 **Metrics collected:**
 
@@ -251,48 +251,17 @@ Phase 7 computes a weighted overall quality score from four components.
 
 ---
 
-## Key Functions
+## Test Results
 
-### Test Execution
+Each test produces a result with the following fields:
 
-| Function                                  | Description                                                                                         |
-|-------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| `run_test(test_def, timeout_seconds=43200)` | Calls `dbutils.notebook.run()` with the test definition parameters. Returns a `TestResult`. Captures notebook exit JSON, parses status and warnings, snapshots error logs before/after for failure diagnostics. |
-
-### Verification and Auditing
-
-| Function                                                              | Description                                                               |
-|-----------------------------------------------------------------------|---------------------------------------------------------------------------|
-| `verify_conventions(test_result, version, scope)`                     | Queries metamodel tables and checks convention compliance.                |
-| `audit_vibe_effectiveness(base_version, new_version, scope, vibes_text)` | Compares v1 and v2 metamodel snapshots to measure vibe impact.           |
-
-### Log Management
-
-| Function                        | Description                                                                  |
-|---------------------------------|------------------------------------------------------------------------------|
-| `merge_all_logs(test_results)`  | Consolidates all per-test log files into merged artifacts. Strips stack traces. |
-
-### Discovery and Helpers
-
-| Function                              | Description                                                                  |
-|---------------------------------------|------------------------------------------------------------------------------|
-| `_random_conventions(test_id)`        | Generates a randomized set of convention parameters for a test.              |
-| `_random_catalog_widgets(test_id)`    | Generates randomized catalog-related parameters for a test.                  |
-| `_find_model_json(version, scope)`    | Locates the `model.json` file on the volume for a given version and scope.   |
-| `_extract_real_error(test_params, pre_snapshot)` | Reads new error log lines (comparing against pre-run snapshot) to extract diagnostic information on failure. |
-
-### Data Classes
-
-**`TestResult`** -- Holds the outcome of a single test execution.
-
-| Field              | Type   | Description                                      |
-|--------------------|--------|--------------------------------------------------|
-| `test_name`        | str    | Identifier for the test (e.g., `01_new_base_model_ecm`) |
-| `test_label`       | str    | Human-readable description                       |
-| `status`           | str    | `PASSED`, `FAILED`, or `SKIPPED`                 |
-| `duration_seconds` | float  | Wall-clock execution time                        |
-| `error_msg`        | str    | Error message if the test failed, empty otherwise |
-| `params`           | dict   | The full parameter dictionary passed to the agent |
+| Field | Description |
+|---|---|
+| **Test Name** | Identifier for the test (e.g., `01_vibe_modeling_mvm`) |
+| **Label** | Human-readable description |
+| **Status** | `PASSED`, `FAILED`, or `SKIPPED` |
+| **Duration** | Wall-clock execution time in seconds |
+| **Error** | Error message if the test failed, empty otherwise |
 
 ---
 

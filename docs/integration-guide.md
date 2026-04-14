@@ -149,7 +149,7 @@ This means the notebook is always safe to run directly — it will either delega
 
 ### 3.1 Business Table (Session Table)
 
-**Location**: `<catalog>.<schema>._business` (the exact table is configured via `MAIN_METAMODEL_TABLES.BUSINESS`).
+**Location**: `<catalog>.<schema>._business`
 
 This table stores one row per business model. The agent adds session-tracking columns to this table automatically on first run.
 
@@ -229,7 +229,7 @@ Pass this string as the `vibe_session_id` widget parameter when launching the Da
 1. The agent receives `session_id` as a string.
 2. It computes `int(SHA256(session_id).hex(), 16) & 0x7FFFFFFFFFFFFFFF` to produce a `BIGINT`.
 3. It inserts a row into the business table with `processing_status = 'pending'`.
-4. It then calls `initialize_session()` which sets `processing_status = 'done'` and `completed_percent = 0.0`.
+4. It initializes the session, setting `processing_status = 'done'` and `completed_percent = 0.0`.
 5. It emits the first event: `stage_name = "Vibe Session"`, `step_name = "Session Started"`, `status = "stage_started"`.
 
 **Important**: When a `session_id` is provided by an external consumer, the agent uses the `'ready'`/`'done'` handshake protocol. When no `session_id` is provided, it always writes `'done'` and skips the handshake entirely.
@@ -279,16 +279,16 @@ The handshake prevents the agent from writing faster than the UI can consume. It
 ### Flow
 
 1. **Agent** inserts the business row with `processing_status = 'pending'`.
-2. **Agent** calls `initialize_session()`, which sets `processing_status = 'done'`, `completed_percent = 0.0`.
+2. **Agent** initializes the session, setting `processing_status = 'done'`, `completed_percent = 0.0`.
 3. **Agent** emits `"Vibe Session"` / `"Session Started"` (first event).
 4. **Agent** runs pipeline stages, buffering events to a local JSONL spool file.
-5. Every **10 seconds** (configurable via `FLUSH_INTERVAL_SECONDS`), the agent checks:
+5. Every **10 seconds** (configurable), the agent checks:
 
-   Additional constants:
-   - `CHUNK_SIZE = 300` — Max events per Delta INSERT batch
-   - `MAX_PROGRESS_RETRIES = 5` — Retry count for flush failures
+   Additional details:
+   - Max events per Delta INSERT batch: **300**
+   - Retry count for flush failures: **5**
 
-   - If `processing_status == 'ready'` → the UI has not consumed the last batch yet. The agent waits up to **90 seconds** (`HANDSHAKE_TIMEOUT_SECONDS`). If the timeout expires, it flushes anyway.
+   - If `processing_status == 'ready'` → the UI has not consumed the last batch yet. The agent waits up to **90 seconds**. If the timeout expires, it flushes anyway.
    - If `processing_status == 'done'` → the agent flushes all pending events to `_vibe_progress`, computes `increment_sum`, updates `completed_percent`, and sets `processing_status = 'ready'`.
 6. **UI** polls the business table. When it sees `processing_status = 'ready'`:
    - Reads new rows from `_vibe_progress` (see Section 6).
@@ -1494,7 +1494,7 @@ The flush interval is **10 seconds**, so the client should expect batches arrivi
 ## 14. Edge Cases and Error Handling
 
 ### Handshake Timeout
-If the UI does not set `processing_status = 'done'` within **90 seconds** (`HANDSHAKE_TIMEOUT_SECONDS`), the agent flushes anyway. No data is lost.
+If the UI does not set `processing_status = 'done'` within **90 seconds**, the agent flushes anyway. No data is lost.
 
 ### Concurrent Sessions
 Each session is identified by the composite key `(business, version, model_scope)`. Only one session can run at a time for a given key.

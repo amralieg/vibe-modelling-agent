@@ -6,7 +6,7 @@
 - [Widgets](#widgets)
 - [Batch Input JSON Format](#batch-input-json-format)
 - [Task DAG](#task-dag)
-- [Key Functions](#key-functions)
+- [How the Runner Works](#how-the-runner-works-internals)
 - [Execution Flow](#execution-flow)
 - [Pipeline Flow per Business](#pipeline-flow-per-business)
 - [Catalog Naming](#catalog-naming)
@@ -148,133 +148,36 @@ ECM Generate (task 1)
 
 ---
 
-## Key Functions
+## How the Runner Works (Internals)
 
-### Utility Functions
+The runner handles several responsibilities under the hood. You do not need to understand the code, but knowing what happens at each stage helps troubleshoot failures.
 
-#### `log(msg="")`
+### Name Sanitization
 
-Prints a timestamped log line. Empty string prints a blank line for visual separation.
+Business names are automatically converted into safe identifiers for catalogs, job names, and file paths. Special characters are replaced with underscores, stop words are stripped, and consecutive underscores are collapsed. For example, `"Global Logistics Corp"` becomes `global_logistics_corp`.
 
-#### `generate_session_id()`
+### Pre-Launch Validation
 
-Returns a positive 64-bit integer session ID derived from `uuid.uuid4()` (masked with `MAX_SIGNED_INT64`). Used to uniquely identify pipeline runs.
+Before any job is submitted, the runner runs pre-flight checks:
+- All required input fields are present and valid
+- The staging catalog can be created (existing one is dropped and recreated for a clean slate)
+- ECM and MVM install catalogs are checked for clashes — if they already contain user schemas (excluding `default`, `information_schema`, `_metamodel`, `_metrics`), a warning is raised
 
-#### `_sanitize_tag(value)`
+### Job Lifecycle
 
-Replaces unsafe characters with `_`, collapses repeating underscores, and strips leading/trailing underscores. Used to produce Databricks-safe job tag values.
+The runner creates a multi-task Databricks job with the 4-task DAG (see [Task DAG](#task-dag)), triggers it, and polls for completion. During polling:
+- Per-task status is reported at the configured `ping_interval`
+- When tasks succeed, the notebook exit JSON is parsed for status and warnings
+- The job run URL is logged for direct monitoring in the Databricks UI
 
-#### `sanitize_name(name, strip_stop_words=True)`
+### Artifact Handling
 
-Converts a business name into a safe identifier suitable for use in catalog names, job names, and file paths. Strips stop words by default to produce concise identifiers.
+After successful completion:
+1. Volume artifacts are copied from the staging catalog to the local output folder
+2. The copy is verified to ensure files (especially `model.json`) arrived intact
+3. The staging catalog is dropped to clean up temporary resources
 
-### Widget and Configuration Functions
-
-#### `create_widgets()`
-
-Removes all existing widgets and creates the three runner widgets: `business_context`, `dry_run`, and `ping_interval`.
-
-#### `read_widgets()`
-
-Reads widget values, resolves `folder_path` (hardcoded to `./../models`), parses `ping_interval` to seconds, auto-discovers the agent notebook path via `posixpath.join`, and returns a configuration dictionary.
-
-#### `load_business_context(json_path)`
-
-Loads and validates the batch input JSON. Performs structural validation of the `widget_values` and `businesses` sections. On parse errors, provides rich diagnostics including surrounding lines around the error location.
-
-#### `build_notebook_params(widget_values, business, operation, deployment_catalog, data_model_scopes, context_file, model_version, generate_samples)`
-
-Assembles the full parameter dictionary passed to the agent notebook for a single task. Copies all `WIDGET_VALUE_KEYS` from `widget_values`, adds operation-specific parameters, merges per-business overrides, and optionally overrides `generate_samples`.
-
-### Job Management Functions
-
-#### `build_job_tags(business_name, operation, notebook_path, model_scope, version, session_id)`
-
-Constructs a dictionary of job tags prefixed with `dbx_vibe_modelling_*`. These tags are applied to the Databricks job for tracking, filtering, and observability.
-
-#### `find_or_create_job(w, job_name, notebook_path, params, job_tags, task_configs, timeout_seconds)`
-
-Builds `jobs.Task` list from `task_configs` (or a single task if none provided), finds a job by name or creates it, resets/creates settings, calls `run_now`, and returns `(job_id, run_id, reused)`.
-
-#### `submit_notebook_run(w, notebook_path, params, run_name, timeout_seconds, business_name, operation, model_scope, version)`
-
-Wraps job creation with standardized naming conventions and job tags. Delegates to `find_or_create_job` after constructing the appropriate job name and tag set. Returns `run_id` or `None` on failure.
-
-#### `wait_for_run(w, run_id, run_name, job_id, poll_interval)`
-
-Polls a single-task Databricks run to completion. Prints the run URL, logs status updates at the configured `poll_interval`. Returns `(result_state, duration_hrs)`.
-
-#### `wait_for_multi_task_run(w, run_id, job_name, task_keys, biz_name, biz_idx, biz_total, ping_interval, job_id, poll_interval)`
-
-Polls a multi-task Databricks job to completion with per-task status reporting. Tracks the state of each task individually, fetches notebook output for successful tasks to parse exit JSON and warnings. Returns `(task_results_dict, total_hrs)`.
-
-#### `_parse_exit_json(raw_value, default_status="unknown")`
-
-Parses the notebook exit JSON value to extract `(status, warnings_list)`. Handles missing, empty, and malformed input defensively.
-
-#### `_get_workspace_host_and_org()`
-
-Attempts to retrieve `(host, org_id)` from `dbruntime.databricks_repl_context.getContext().toJson()`, falling back to `WorkspaceClient().config.host`. Returns `("", "")` on failure.
-
-### Catalog Management Functions
-
-#### `ensure_staging_catalog(spark, catalog_name)`
-
-`DROP CATALOG IF EXISTS ... CASCADE` then `CREATE CATALOG`. Guarantees a clean working environment for each pipeline run. Returns `bool`.
-
-#### `ensure_install_catalog(spark, catalog_name)`
-
-Checks whether the install catalog already exists. If it does not exist, creates it. If it does exist, runs clash detection for pre-existing user schemas (excluding `default`, `information_schema`, `_metamodel`, `_metrics`). Returns `(ok: bool, user_schemas: list)`.
-
-#### `drop_catalog(spark, catalog_name)`
-
-`DROP CATALOG IF EXISTS ... CASCADE`. Logs success/failure. Returns `bool`.
-
-#### `_pre_launch_validate(spark, biz_name, staging_catalog, ecm_v1_catalog, mvm_v1_catalog, business, widget_values, notebook_path, effective_notebook)`
-
-Performs pre-flight validation before launching the pipeline for a business. Builds an `errors` list for missing/invalid inputs, calls `ensure_install_catalog` for ECM/MVM and `ensure_staging_catalog`. Raises `ValueError` with a formatted message listing all errors, or logs success.
-
-### Pipeline Orchestration Functions
-
-#### `run_pipeline_for_business(w, spark, business, widget_values, notebook_path, folder_path, ping_interval, session_id, dry_run, biz_idx, biz_total, effective_notebook)`
-
-Core orchestration function for a single industry. Manages the full lifecycle: catalog setup, parameter construction, multi-task job submission, monitoring, artifact copying, and cleanup. See [Pipeline Flow per Business](#pipeline-flow-per-business) for details.
-
-#### `create_dry_run_notebook(w, runner_notebook_dir)`
-
-Generates and uploads a simulated agent notebook to the workspace at `{runner_notebook_dir}/vibe_runner_dry_run`. This notebook mimics the real agent by creating fake metamodel tables, physical schemas, and volume artifacts without performing actual model generation. Returns the path string or `None` on failure.
-
-### Artifact and Volume Functions
-
-#### `get_model_json_path(catalog_name, business_name, version, scope)`
-
-Returns the full Volume path to `model.json`: `/Volumes/{catalog_name}/_metamodel/vol_root/business/{sanitized}/v{version}_{scope}/model.json`.
-
-#### `get_business_volume_root(catalog_name, business_name)`
-
-Returns the Volume root path for a business: `/Volumes/{catalog_name}/_metamodel/vol_root/business/{sanitized}`.
-
-#### `copy_business_folder(source_catalog, business_name, folder_path)`
-
-Copies volume artifacts from a Unity Catalog volume to a local folder. Attempts `shutil.copytree` first, then falls back to `dbutils.fs.cp` if the initial method fails. Returns `bool`.
-
-#### `verify_copied_files(folder_path, business_name)`
-
-Walks the destination directory, requires files and ideally `model.json`. Logs `VERIFY OK` or `VERIFY FAILED`. Returns `bool`.
-
-### Results and Reporting Functions
-
-#### `save_results(results, folder_path)`
-
-Placeholder for writing a summary report. Currently a no-op (`pass`). When implemented, will write a Markdown report file summarizing the pipeline run with per-industry results, status, timing, and error details.
-
-#### `display_results(results)`
-
-Logs a wide ASCII summary table with per-industry results including status, duration, and warning counts.
-
-#### `main()`
-
-Entry point. Prints ASCII art banner, creates/reads widgets, loads context, initializes `WorkspaceClient` and Spark, optionally creates dry-run notebook, loops `run_pipeline_for_business` for each industry, calls `display_results` and `save_results`, builds a DataFrame `display`, raises `RuntimeError` if any industry failed, and returns the results list.
+If copying fails via one method, a fallback copy mechanism is attempted automatically.
 
 ---
 
@@ -284,20 +187,19 @@ The notebook executes in the following order:
 
 1. Prints an ASCII art banner.
 2. Creates and reads widget values. Auto-discovers the agent notebook path relative to the runner notebook location.
-3. Loads and validates the batch input JSON via `load_business_context()`.
-4. Initializes the Databricks `WorkspaceClient` and `SparkSession`.
-5. If `dry_run` is set to `yes`: uploads a simulated agent notebook via `create_dry_run_notebook()`.
-6. Creates the local output folder specified by `folder_path`.
-7. For each business in the `businesses` array (processed sequentially): runs `run_pipeline_for_business()`.
-8. Displays an ASCII results table via `display_results()`.
-9. Calls `save_results()` (currently a no-op placeholder).
-10. Returns the results list.
+3. Loads and validates the batch input JSON.
+4. Initializes the Databricks workspace client and Spark session.
+5. If `dry_run` is set to `yes`: uploads a simulated agent notebook that mimics the real agent without performing actual model generation.
+6. Creates the local output folder.
+7. For each business in the `businesses` array (processed sequentially): runs the full pipeline lifecycle (see [Pipeline Flow per Business](#pipeline-flow-per-business)).
+8. Displays an ASCII summary table with per-industry results including status, duration, and warning counts.
+9. Returns the results list.
 
 ---
 
 ## Pipeline Flow per Business
 
-The `run_pipeline_for_business()` function executes the following steps for each industry:
+For each industry, the runner executes the following steps:
 
 ### 1. Derive Catalog Names
 
@@ -311,7 +213,7 @@ Three catalogs are derived from the sanitized business name:
 
 ### 2. Pre-Launch Validation
 
-Runs `_pre_launch_validate()` to confirm all prerequisites are met.
+Confirms all prerequisites are met (see [Pre-Launch Validation](#pre-launch-validation) above).
 
 ### 3. Build Parameters for All Four Tasks
 
@@ -326,16 +228,16 @@ Each task receives a tailored parameter dictionary:
 
 ### 4. Create Multi-Task Job
 
-Calls `find_or_create_job()` to create (or reuse) a Databricks job with the four-task DAG and triggers a run.
+Creates (or reuses) a Databricks job with the four-task DAG and triggers a run.
 
 ### 5. Monitor Execution
 
-Calls `wait_for_multi_task_run()` to poll the job, reporting per-task progress at the configured interval.
+Polls the job to completion, reporting per-task progress at the configured interval.
 
 ### 6. On Success
 
-- Copies volume artifacts from the staging catalog to the local output folder via `copy_business_folder()`.
-- Verifies the copied artifacts via `verify_copied_files()`.
+- Copies volume artifacts from the staging catalog to the local output folder.
+- Verifies the copied artifacts (checks for files, especially `model.json`).
 - Drops the staging catalog to clean up temporary resources.
 
 ### 7. On Failure
@@ -410,9 +312,9 @@ Dry-run mode is useful for testing the pipeline orchestration, validating the ba
 
 ## Output Artifacts
 
-### Markdown Report
+### Summary Report
 
-The `save_results()` function is currently a placeholder (no-op). When implemented, it will write a summary report to the output folder with per-industry results, status, duration, and error details.
+A summary report feature is planned but not yet implemented. When available, it will write a report to the output folder with per-industry results, status, duration, and error details.
 
 ### Model Artifacts
 
