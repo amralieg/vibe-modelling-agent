@@ -1,0 +1,30 @@
+{
+  "widget_values": {
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
+    "catalog_prefix": "",
+    "catalog_suffix": "",
+    "generate_samples": "0",
+    "naming_convention": "snake_case",
+    "primary_key_suffix": "_id",
+    "schema_prefix": "",
+    "schema_suffix": "",
+    "tag_prefix": "dbx_",
+    "tag_suffix": "",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No"
+  },
+  "businesses": [
+    {
+     "name": "Manufacturing",
+      "description": "Industrial Manufacturing encompasses the design, production, and delivery of automation systems, electrification solutions, and smart infrastructure components for factories, buildings, transportation, and urban environments.",
+      "model_vibes": " maximum of 2 domains, and 8 tables for any model you generate"
+    }
+  ]
+}

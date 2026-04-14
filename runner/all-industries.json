@@ -1,0 +1,225 @@
+{
+  "widget_values": {
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
+    "catalog_prefix": "",
+    "catalog_suffix": "",
+    "generate_samples": "0",
+    "naming_convention": "snake_case",
+    "primary_key_suffix": "_id",
+    "schema_prefix": "",
+    "schema_suffix": "",
+    "tag_prefix": "dbx_",
+    "tag_suffix": "",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No"
+  },
+  "businesses": [
+    {
+      "name": "Agriculture",
+      "description": "Agriculture is a global industry encompassing crop cultivation, animal husbandry, and food production, providing essential supply chain solutions from farm to table for food manufacturers and consumers worldwide.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Health Insurance",
+      "description": "Health Insurance is a critical sector providing medical, dental, and vision coverage to individuals, employers, and government beneficiaries, managing care networks and wellness programs to ensure accessible and affordable healthcare.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Education",
+      "description": "Education is a foundational industry spanning universities, colleges, and research institutions that deliver undergraduate, graduate, and professional programs across the arts, sciences, engineering, and business disciplines.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Telecommunication",
+      "description": "Telecommunications is a global industry providing wireless services, broadband, fiber internet, and digital entertainment to billions of consumer and business customers through extensive network infrastructure.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Manufacturing",
+      "description": "Industrial Manufacturing encompasses the design, production, and delivery of automation systems, electrification solutions, and smart infrastructure components for factories, buildings, transportation, and urban environments.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Healthcare",
+      "description": "Healthcare is a vast industry operating hospitals, clinics, outpatient facilities, and integrated care systems, delivering patient care, medical research, diagnostics, and health education across diverse populations and regions.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Pharmaceuticals",
+      "description": "Pharmaceuticals is a research-intensive industry focused on discovering, developing, and manufacturing medicines, vaccines, and consumer health products to treat and prevent diseases across therapeutic areas including oncology, immunology, and rare diseases.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Genomics Biotech",
+      "description": "Genomics and Biotechnology is a rapidly evolving industry developing sequencing, array-based, and gene-editing solutions for genetic analysis, enabling advances in precision medicine, drug development, agricultural genomics, and diagnostics.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Clinical Trials",
+      "description": "Clinical Trials is a specialized industry that designs, manages, and monitors clinical research studies for pharmaceutical and biotech sponsors, providing data analytics, regulatory expertise, and patient recruitment to accelerate drug development.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Banking",
+      "description": "Retail and Investment Banking is a cornerstone of the global financial system, providing commercial lending, investment banking, securities trading, asset management, and wealth advisory services to corporations, governments, and individuals.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Payments Fintech",
+      "description": "Payments and Fintech is a transformative industry connecting consumers, merchants, and financial institutions through fast, secure electronic payment networks, digital wallets, and innovative financial technology solutions spanning over 200 countries.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Oil Gas",
+      "description": "Oil and Gas is a multinational industry engaged in the exploration, production, refining, and marketing of petroleum and natural gas products, along with petrochemical manufacturing operations that fuel the global economy.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Energy Utilities",
+      "description": "Energy and Utilities is a critical infrastructure industry generating, transmitting, and distributing electric power from renewable and conventional sources to residential, commercial, and industrial customers worldwide.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Chemical Mfg",
+      "description": "Chemical Manufacturing is a foundational industry producing a wide range of chemicals, plastics, performance materials, and agricultural solutions used across automotive, construction, electronics, and consumer goods sectors.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Semiconductors",
+      "description": "Semiconductor is a high-technology industry that designs and fabricates advanced integrated circuits, processors, and chips powering computing, mobile, automotive, AI, and IoT applications across the digital economy.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Transport Shipping",
+      "description": "Transport and Shipping is a global logistics industry providing express delivery, freight forwarding, supply chain management, and e-commerce fulfillment services that connect businesses and consumers across continents.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Airlines",
+      "description": "Airlines is a global industry operating passenger and cargo flights across extensive route networks, offering premium travel experiences, loyalty programs, and hub-and-spoke connectivity linking cities worldwide.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Automotive",
+      "description": "Automotive is a major manufacturing industry producing cars, trucks, SUVs, and commercial vehicles along with hybrid and electric powertrains, connected mobility services, and autonomous driving technologies.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Food Beverage",
+      "description": "Food and Beverage is a global consumer industry manufacturing, marketing, and distributing a diverse portfolio of snacks, beverages, dairy products, and packaged foods through retail, foodservice, and direct-to-consumer channels.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Grocery",
+      "description": "Grocery is a large-scale retail industry operating supermarkets, pharmacies, and fuel centers, offering fresh produce, private-label brands, and omnichannel shopping experiences with delivery and pickup services.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Restaurants",
+      "description": "Restaurants is a global foodservice industry operating quick-service, casual, and fine-dining establishments through franchise and company-owned models, serving millions of customers daily with a focus on speed, quality, and value.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Travel Hospitality",
+      "description": "Travel and Hospitality is a global industry operating hotels, resorts, and vacation properties across luxury, premium, and select-service segments, providing loyalty programs, event spaces, and curated guest experiences.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Ecommerce",
+      "description": "E-Commerce is a rapidly growing digital industry operating online marketplaces, fulfillment networks, and technology platforms that connect millions of buyers and sellers with fast delivery, personalized recommendations, and seamless transactions.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Life Insurance",
+      "description": "Life and Annuity Insurance is a financial services industry providing life insurance policies, annuities, retirement planning, and wealth protection products to individuals and families, managing long-term risk and investment portfolios.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Retail",
+      "description": "Retail is a massive consumer-facing industry operating hypermarkets, department stores, discount outlets, and e-commerce platforms, offering groceries, apparel, electronics, and household goods at competitive prices to diverse demographics.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Consumer Goods",
+      "description": "Consumer Goods is a broad manufacturing industry producing and marketing household, health, hygiene, and personal care products distributed through retail stores, e-commerce platforms, and wholesale channels worldwide.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Apparel Fashion",
+      "description": "Apparel and Fashion is a creative and commercial industry designing, manufacturing, and marketing athletic, lifestyle, and luxury clothing, footwear, and accessories through retail stores, e-commerce, and wholesale partnerships.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Mining",
+      "description": "Mining is a resource extraction industry engaged in the exploration, mining, and processing of minerals including iron ore, copper, coal, lithium, and nickel, supplying raw materials to the steel, energy, and manufacturing sectors.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Legal",
+      "description": "Legal is a professional services industry providing advisory and representation services across corporate transactions, dispute resolution, intellectual property, employment law, and regulatory compliance for organizations and governments.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Advertising",
+      "description": "Advertising and Marketing is a dynamic industry delivering creative campaigns, media planning and buying, public relations, data-driven analytics, and brand strategy to help organizations reach and engage their target audiences.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Staffing HR",
+      "description": "Staffing and Human Resources is a workforce solutions industry providing temporary and permanent talent placement, recruitment process outsourcing, workforce management, and HR consulting services across all industries and skill levels.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Real Estate",
+      "description": "Real Estate is a capital-intensive industry encompassing commercial and residential property sales, leasing, valuations, property management, development, and investment advisory services for owners, investors, and tenants.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Construction",
+      "description": "Construction is a global engineering and building industry delivering large-scale infrastructure, energy, and commercial projects including highways, airports, bridges, power plants, and residential developments.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Waste Management",
+      "description": "Waste Management is an environmental services industry providing residential and commercial waste collection, recycling, landfill operations, hazardous waste handling, and sustainable waste-to-energy solutions.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Sports Entertainment",
+      "description": "Sports and Entertainment is a live experience industry operating professional leagues, broadcasting networks, athlete management, venue operations, concerts, and fan engagement platforms across global markets.",
+      "model_vibes": ""
+    },
+    {
+      "name": "NGO",
+      "description": "Nonprofit Organizations are mission-driven entities providing humanitarian aid, disaster relief, health services, education, and community development programs to vulnerable and underserved populations worldwide.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Gaming",
+      "description": "Gaming and Interactive Entertainment is a digital media industry developing and publishing video games, operating online gaming platforms, esports leagues, and providing game engine technology for console, PC, and mobile platforms.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Water Utilities",
+      "description": "Water and Wastewater is an essential utilities industry providing water treatment, purification, distribution, and recycling services to municipalities and industrial clients, ensuring clean water access and environmental compliance.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Shipping Ports",
+      "description": "Shipping and Ports is a maritime logistics industry managing marine terminals, container handling, vessel operations, and port infrastructure at major seaports, facilitating international trade and global supply chain connectivity.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Media Broadcasting",
+      "description": "Media and Broadcasting is a global content and distribution industry encompassing film studios, television networks, streaming platforms, music labels, news organizations, and digital publishers that produce, license, and deliver entertainment and information to audiences through linear, on-demand, and social channels.",
+      "model_vibes": ""
+    }
+  ]
+}
