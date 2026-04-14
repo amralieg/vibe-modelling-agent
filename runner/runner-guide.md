@@ -52,13 +52,12 @@ The batch input JSON defines the notebook widget values to use and a list of bus
 
 ### `widget_values` Section
 
-Contains 21 required keys that mirror the notebook widget form:
+Contains 20 required keys that mirror the notebook widget form:
 
 | Key | Description |
 |---|---|
 | `business_domains` | Comma-separated list of business domains to model |
 | `org_divisions` | Organizational divisions to include |
-| `model_vibes` | Natural-language refinement instructions — inline text (max 2,000 chars) or file path to `.txt` on a UC Volume |
 | `cataloging_style` | Strategy for organizing catalogs |
 | `catalog_prefix` | Prefix applied to catalog names |
 | `catalog_suffix` | Suffix applied to catalog names |
@@ -81,45 +80,51 @@ Contains 21 required keys that mirror the notebook widget form:
 
 An array of objects, each representing one industry/business to process:
 
+| Key | Required | Description |
+|---|---|---|
+| `name` | Yes | Business/industry name |
+| `description` | Yes | Detailed description of the business |
+| `model_vibes` | No | Natural-language refinement instructions — inline text (max 2,000 chars) or file path to `.txt` on a UC Volume. Defaults to empty string if omitted. |
+| `widget_values` | No | Object of widget_value overrides for this specific business (any of the 20 keys above) |
+
 ```json
 {
   "widget_values": {
-    "business_domains": "sales, marketing, finance",
-    "org_divisions": "retail, corporate",
-    "model_vibes": "enterprise, comprehensive",
-    "cataloging_style": "domain-based",
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
     "catalog_prefix": "",
     "catalog_suffix": "",
-    "generate_samples": "yes",
+    "generate_samples": "0",
     "naming_convention": "snake_case",
     "primary_key_suffix": "_id",
     "schema_prefix": "",
     "schema_suffix": "",
-    "tag_prefix": "",
+    "tag_prefix": "dbx_",
     "tag_suffix": "",
     "table_id_type": "BIGINT",
-    "boolean_format": "BOOLEAN",
-    "date_format": "DATE",
-    "timestamp_format": "TIMESTAMP",
-    "classification_levels": "public, internal, confidential",
-    "housekeeping_columns": "created_at, updated_at, created_by, updated_by",
-    "history_tracking_columns": "effective_from, effective_to, is_current"
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No"
   },
   "businesses": [
     {
-      "business_name": "Acme Retail",
-      "business_description": "A mid-size retail chain specializing in home goods and electronics.",
+      "name": "Acme Retail",
+      "description": "A mid-size retail chain specializing in home goods and electronics.",
       "model_vibes": "retail-focused, inventory-heavy"
     },
     {
-      "business_name": "Global Logistics Corp",
-      "business_description": "International freight and supply chain management company."
+      "name": "Global Logistics Corp",
+      "description": "International freight and supply chain management company."
     }
   ]
 }
 ```
 
-Each business object requires `business_name` and `business_description`. Any of the 21 `widget_values` keys can be overridden at the business level.
+Each business object requires `name` and `description`. The `model_vibes` field is set per-business (not in `widget_values`). Any of the 20 `widget_values` keys can be overridden at the business level via a nested `widget_values` object.
 
 ---
 
