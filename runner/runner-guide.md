@@ -6,7 +6,7 @@
 - [Widgets](#widgets)
 - [Batch Input JSON Format](#batch-input-json-format)
 - [Task DAG](#task-dag)
-- [Key Functions](#key-functions)
+- [How the Runner Works](#how-the-runner-works-internals)
 - [Execution Flow](#execution-flow)
 - [Pipeline Flow per Business](#pipeline-flow-per-business)
 - [Catalog Naming](#catalog-naming)
@@ -34,15 +34,20 @@ After all tasks succeed, the runner copies volume artifacts to a local folder an
 
 ## Widgets
 
-The notebook exposes five configurable widgets:
+The notebook exposes three configurable widgets:
 
 | Widget | Type | Default | Purpose |
 |---|---|---|---|
 | `business_context` | text | `/Workspace/Users/<your-user>/vibe-modelling/industries.json` | Path to the batch input JSON containing widget values and business definitions to process |
-| `vibe_modelling_agent` | text | `""` (empty string) | Path to the agent notebook. Auto-discovers if left blank |
-| `folder_path` | text | `./lakehouse-models` | Local output folder for model artifacts |
 | `dry_run` | dropdown | `yes` | Whether to use dry-run mode (`yes` / `no`) |
 | `ping_interval` | dropdown | `1m` | Status logging frequency during job polling: `10s`, `20s`, `30s`, `1m`, `2m`, `5m`, `10m`, `15m` |
+
+**Auto-discovered settings:**
+
+| Setting | Value | Behavior |
+|---|---|---|
+| Agent notebook path | Auto-discovered relative to runner | Resolved via `posixpath.join(runner_dir, "./../agent/dbx_vibe_modelling_agent")`. Falls back to `./../agent/dbx_vibe_modelling_agent` if auto-discovery fails. |
+| Output folder path | `./../models` | Hardcoded relative path where model artifacts are copied after successful pipeline runs. |
 
 ---
 
@@ -52,7 +57,7 @@ The batch input JSON defines the notebook widget values to use and a list of bus
 
 ### `widget_values` Section
 
-Contains 20 required keys that mirror the notebook widget form:
+Contains 19 required keys that mirror the notebook convention widgets:
 
 | Key | Description |
 |---|---|
@@ -85,7 +90,7 @@ An array of objects, each representing one industry/business to process:
 | `name` | Yes | Business/industry name |
 | `description` | Yes | Detailed description of the business |
 | `model_vibes` | No | Natural-language refinement instructions — inline text (max 2,000 chars) or file path to `.txt` on a UC Volume. Defaults to empty string if omitted. |
-| `widget_values` | No | Object of widget_value overrides for this specific business (any of the 20 keys above) |
+| `widget_values` | No | Object of widget_value overrides for this specific business (any of the 19 keys above) |
 
 ```json
 {
@@ -124,7 +129,7 @@ An array of objects, each representing one industry/business to process:
 }
 ```
 
-Each business object requires `name` and `description`. The `model_vibes` field is set per-business (not in `widget_values`). Any of the 20 `widget_values` keys can be overridden at the business level via a nested `widget_values` object.
+Each business object requires `name` and `description`. The `model_vibes` field is set per-business (not in `widget_values`). Any of the 19 `widget_values` keys can be overridden at the business level via a nested `widget_values` object.
 
 ---
 
@@ -143,83 +148,36 @@ ECM Generate (task 1)
 
 ---
 
-## Key Functions
+## How the Runner Works (Internals)
 
-### `sanitize_name(name, strip_stop_words=True)`
+The runner handles several responsibilities under the hood. You do not need to understand the code, but knowing what happens at each stage helps troubleshoot failures.
 
-Converts a business name into a safe identifier suitable for use in catalog names, job names, and file paths. Strips stop words by default to produce concise identifiers.
+### Name Sanitization
 
-### `build_job_tags(business_name, operation, notebook_path, model_scope, version, session_id)`
+Business names are automatically converted into safe identifiers for catalogs, job names, and file paths. Special characters are replaced with underscores, stop words are stripped, and consecutive underscores are collapsed. For example, `"Global Logistics Corp"` becomes `global_logistics_corp`.
 
-Constructs a dictionary of job tags prefixed with `dbx_vibe_modelling_*`. These tags are applied to the Databricks job for tracking, filtering, and observability.
+### Pre-Launch Validation
 
-### `find_or_create_job(w, job_name, notebook_path, params, job_tags, task_configs, timeout_seconds)`
+Before any job is submitted, the runner runs pre-flight checks:
+- All required input fields are present and valid
+- The staging catalog can be created (existing one is dropped and recreated for a clean slate)
+- ECM and MVM install catalogs are checked for clashes — if they already contain user schemas (excluding `default`, `information_schema`, `_metamodel`, `_metrics`), a warning is raised
 
-Creates a new Databricks job or reuses an existing one (matched by name), then triggers a run. Accepts the WorkspaceClient, job configuration parameters, and task definitions. Returns the run ID.
+### Job Lifecycle
 
-### `load_business_context(json_path)`
+The runner creates a multi-task Databricks job with the 4-task DAG (see [Task DAG](#task-dag)), triggers it, and polls for completion. During polling:
+- Per-task status is reported at the configured `ping_interval`
+- When tasks succeed, the notebook exit JSON is parsed for status and warnings
+- The job run URL is logged for direct monitoring in the Databricks UI
 
-Loads and validates the batch input JSON. Performs structural validation of the `widget_values` and `businesses` sections. On parse errors, provides rich diagnostics including surrounding lines around the error location.
+### Artifact Handling
 
-### `build_notebook_params(widget_values, business, operation, ...)`
+After successful completion:
+1. Volume artifacts are copied from the staging catalog to the local output folder
+2. The copy is verified to ensure files (especially `model.json`) arrived intact
+3. The staging catalog is dropped to clean up temporary resources
 
-Assembles the full parameter dictionary passed to the agent notebook for a single task. Merges global `widget_values` with business-level overrides and adds operation-specific parameters such as `operation`, `schema_prefix`, catalog names, and model scope.
-
-### `ensure_staging_catalog(spark, catalog_name)`
-
-Drops the staging catalog if it already exists, then recreates it. This guarantees a clean working environment for each pipeline run.
-
-### `ensure_install_catalog(spark, catalog_name)`
-
-Checks whether the install catalog already exists. If it does not exist, creates it. If it does exist, runs clash detection to warn about pre-existing schemas that may conflict with the install.
-
-### `_pre_launch_validate(...)`
-
-Performs pre-flight validation before launching the pipeline for a business. Checks seven or more conditions including:
-
-- Agent notebook path exists and is accessible
-- Batch input JSON is structurally valid
-- Required widget values are present
-- Catalog names are valid identifiers
-- No naming collisions between staging and install catalogs
-- Workspace client is authenticated
-- Sufficient permissions for catalog operations
-
-### `create_dry_run_notebook(w, runner_notebook_dir)`
-
-Generates and uploads a simulated agent notebook to the workspace. This notebook mimics the real agent by creating fake metamodel tables, physical schemas, and volume artifacts without performing actual model generation.
-
-### `submit_notebook_run(...)`
-
-Wraps job creation with standardized naming conventions and job tags. Delegates to `find_or_create_job` after constructing the appropriate job name and tag set.
-
-### `wait_for_run(w, run_id, run_name, ...)`
-
-Polls a single-task Databricks run to completion. Logs status updates at the configured `ping_interval`. Returns the final run status.
-
-### `wait_for_multi_task_run(w, run_id, job_name, task_keys, ...)`
-
-Polls a multi-task Databricks job to completion with per-task status reporting. Tracks the state of each task individually and logs which tasks are pending, running, succeeded, or failed.
-
-### `run_pipeline_for_business(...)`
-
-Core orchestration function for a single industry. Manages the full lifecycle: catalog setup, parameter construction, job submission, monitoring, artifact copying, and cleanup. See [Pipeline Flow per Business](#pipeline-flow-per-business) for details.
-
-### `copy_business_folder(source_catalog, business_name, folder_path)`
-
-Copies volume artifacts from a Unity Catalog volume to a local folder. Attempts `shutil.copytree` first, then falls back to `dbutils.fs.cp` if the initial method fails.
-
-### `verify_copied_files(folder_path, business_name)`
-
-Validates that the expected artifact structure was successfully copied to the local folder. Checks for the presence of required directories and files.
-
-### `save_results(results, folder_path)`
-
-Writes a Markdown report file summarizing the pipeline run. The report includes an overall summary and per-industry results with status, timing, and error details.
-
-### `display_results(results)`
-
-Renders an ASCII table to the notebook output showing the status of each industry pipeline run.
+If copying fails via one method, a fallback copy mechanism is attempted automatically.
 
 ---
 
@@ -228,21 +186,20 @@ Renders an ASCII table to the notebook output showing the status of each industr
 The notebook executes in the following order:
 
 1. Prints an ASCII art banner.
-2. Creates and reads widget values. Auto-discovers the agent notebook path if the `vibe_modelling_agent` widget is left blank.
-3. Loads and validates the batch input JSON via `load_business_context()`.
-4. Initializes the Databricks `WorkspaceClient` and `SparkSession`.
-5. If `dry_run` is set to `yes`: uploads a simulated agent notebook via `create_dry_run_notebook()`.
-6. Creates the local output folder specified by `folder_path`.
-7. For each business in the `businesses` array (processed sequentially): runs `run_pipeline_for_business()`.
-8. Displays an ASCII results table via `display_results()`.
-9. Writes a Markdown report file via `save_results()`.
-10. Returns the results list.
+2. Creates and reads widget values. Auto-discovers the agent notebook path relative to the runner notebook location.
+3. Loads and validates the batch input JSON.
+4. Initializes the Databricks workspace client and Spark session.
+5. If `dry_run` is set to `yes`: uploads a simulated agent notebook that mimics the real agent without performing actual model generation.
+6. Creates the local output folder.
+7. For each business in the `businesses` array (processed sequentially): runs the full pipeline lifecycle (see [Pipeline Flow per Business](#pipeline-flow-per-business)).
+8. Displays an ASCII summary table with per-industry results including status, duration, and warning counts.
+9. Returns the results list.
 
 ---
 
 ## Pipeline Flow per Business
 
-The `run_pipeline_for_business()` function executes the following steps for each industry:
+For each industry, the runner executes the following steps:
 
 ### 1. Derive Catalog Names
 
@@ -256,7 +213,7 @@ Three catalogs are derived from the sanitized business name:
 
 ### 2. Pre-Launch Validation
 
-Runs `_pre_launch_validate()` to confirm all prerequisites are met.
+Confirms all prerequisites are met (see [Pre-Launch Validation](#pre-launch-validation) above).
 
 ### 3. Build Parameters for All Four Tasks
 
@@ -271,16 +228,16 @@ Each task receives a tailored parameter dictionary:
 
 ### 4. Create Multi-Task Job
 
-Calls `find_or_create_job()` to create (or reuse) a Databricks job with the four-task DAG and triggers a run.
+Creates (or reuses) a Databricks job with the four-task DAG and triggers a run.
 
 ### 5. Monitor Execution
 
-Calls `wait_for_multi_task_run()` to poll the job, reporting per-task progress at the configured interval.
+Polls the job to completion, reporting per-task progress at the configured interval.
 
 ### 6. On Success
 
-- Copies volume artifacts from the staging catalog to the local output folder via `copy_business_folder()`.
-- Verifies the copied artifacts via `verify_copied_files()`.
+- Copies volume artifacts from the staging catalog to the local output folder.
+- Verifies the copied artifacts (checks for files, especially `model.json`).
 - Drops the staging catalog to clean up temporary resources.
 
 ### 7. On Failure
@@ -317,8 +274,9 @@ All job tags are prefixed with `dbx_vibe_modelling_` and include the following:
 
 | Tag | Description |
 |---|---|
+| `dbx_vibe_modelling_launcher_source` | Source that launched the job: `Vibe_Modelling_Notebook` (notebook) or `Vibe_Modelling_App` (external app/UI) |
 | `dbx_vibe_modelling_business` | Business/industry name |
-| `dbx_vibe_modelling_model` | Model type (ECM or MVM) |
+| `dbx_vibe_modelling_model` | Model scope and version (e.g., `ecm_v1`, `mvm_v1`) |
 | `dbx_vibe_modelling_operation` | Current operation (e.g., `new base model`, `install model`) |
 | `dbx_vibe_modelling_notebook` | Path to the agent notebook |
 | `dbx_vibe_modelling_session_id` | Unique session identifier for the run |
@@ -355,15 +313,9 @@ Dry-run mode is useful for testing the pipeline orchestration, validating the ba
 
 ## Output Artifacts
 
-### Markdown Report
+### Summary Report
 
-A summary report is written to the output folder:
-
-```
-vibe_runner_results_{timestamp}.md
-```
-
-The report contains an overall summary and per-industry results including status, duration, and any error details.
+A summary report feature is planned but not yet implemented. When available, it will write a report to the output folder with per-industry results, status, duration, and error details.
 
 ### Model Artifacts
 

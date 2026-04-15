@@ -118,13 +118,13 @@ The agent auto-classifies your business into one of five tiers based on 7 scorin
 **MVM Tier Sizing:**
 | Tier | Domains | Products/Domain | Attrs/Product | Subdomains/Domain |
 |---|---|---|---|---|
-| tier_1 | 9-14 | 8-16 | 15-50 | 3-6 |
-| tier_2 | 8-12 | 8-14 | 12-50 | 2-5 |
-| tier_3 | 6-10 | 7-13 | 10-45 | 2-5 |
-| tier_4 | 5-8 | 6-11 | 10-40 | 2-4 |
-| tier_5 | 3-6 | 5-10 | 8-35 | 2-4 |
+| tier_1 | 9-14 | 8-16 | 15-50 | 2-4 |
+| tier_2 | 8-12 | 8-14 | 12-50 | 2-4 |
+| tier_3 | 6-10 | 7-13 | 10-45 | 2-4 |
+| tier_4 | 5-8 | 6-11 | 10-40 | 2-3 |
+| tier_5 | 3-6 | 5-10 | 8-35 | 2-3 |
 
-Note: Attribute depth (min/max) is the SAME for both MVM and ECM within each tier. Association table uplift factor: 1.2x (applied to base table count). Max attributes buffer factor: 1.25x (allowing exceptional overflow).
+Note: Attribute depth (min/max) is the SAME for both MVM and ECM within each tier. Association table uplift factor: 1.2x (applied to base table count). Max attributes buffer factor: 1.2x (allowing exceptional overflow). Max attributes hard reject factor: 1.4x.
 
 ---
 
@@ -171,7 +171,7 @@ The pipeline executes a series of stages, each with a specific purpose, quality 
 - **Purpose:** Generate all columns for every product
 - **Duration:** 5-40 minutes
 - **What happens:** Attributes generated per product in parallel. Each attribute has name, type, tags, value_regex, business_glossary_term, description, reference. Mandatory attributes enforced by product type. Semantic distinction rules prevent false-positive dedup. Attribute dedup runs per product (>80% confidence threshold).
-- **Quality check:** Attribute count within tier range (with 1.25x buffer max), PK present, no product name prefix, tag classification validation, PII classification matrix, data type validation, semantic distinction rules
+- **Quality check:** Attribute count within tier range (with 1.2x buffer max, 1.4x hard reject), PK present, no product name prefix, tag classification validation, PII classification matrix, data type validation, semantic distinction rules
 - **Progress budget:** 25.0%
 
 ### Stage 7: Cross-Domain Linking
@@ -401,7 +401,7 @@ Rules governing attribute generation, typing, deduplication, and tagging.
 - ATT-RUL-021 through ATT-RUL-030: PK/FK suffix rules (PK = product_name + suffix, FK = must end with target PK name)
 - ATT-RUL-031 through ATT-RUL-040: Attribute deduplication (semantic distinction rules, >80% confidence threshold, false-positive prevention)
 - ATT-RUL-041 through ATT-RUL-050: Tag and classification rules (PII matrix, classification levels, no primary_key/foreign_key tags)
-- ATT-RUL-051 through ATT-RUL-057: Attribute count enforcement (tier range, 1.25x buffer max, 1.75x hard reject factor)
+- ATT-RUL-051 through ATT-RUL-057: Attribute count enforcement (tier range, 1.2x buffer max, 1.4x hard reject factor)
 
 #### REL-RUL: Relationship Rules (001-026)
 Rules governing FK validation, cycle detection, and DAG enforcement.
@@ -494,13 +494,13 @@ See Section 13 for the complete prompt reference.
 | max_retries | 3 | LLM retry count |
 | product_attributes_dedupe_threshold | 40 | Attribute overlap % for dedup |
 | min_honesty_score_threshold | 65 | Min acceptable honesty score |
-| ai_query_timeout_seconds | 480 | LLM call timeout |
+| ai_query_timeout_seconds | 120 (MVM) / 240 (ECM) | LLM call timeout (some parallel workers use 480s) |
 | domain_metrics_timeout_seconds | 720 | Metric view generation timeout |
 | model_demotion_after_n_failures | 3 | Failures before model demotion |
 | product_sample_records | 10 | Records per table for sample data |
 | association_table_uplift | 1.2 | Factor for junction tables |
-| max_attributes_buffer_factor | 1.25 | Attribute overflow buffer |
-| max_attributes_hard_reject_factor | 1.75 | Hard reject if attributes exceed this factor |
+| max_attributes_buffer_factor | 1.2 | Attribute overflow buffer |
+| max_attributes_hard_reject_factor | 1.4 | Hard reject if attributes exceed this factor |
 | domain_hard_ceiling_factor | 1.5 | Domain count hard ceiling |
 | resize_tolerance_pct | 15 | +/-% for resize targets |
 
@@ -624,223 +624,171 @@ What IS a duplicate:
 
 ## 13. Complete Prompt Reference (49 Prompts)
 
-The agent uses 49 specialized LLM prompt templates. Each prompt is mapped to a model type, size class, and temperature setting. The prompts are listed below grouped by pipeline phase.
+The agent uses 49 specialized LLM prompt templates. Each prompt is mapped to a model type, size class, and temperature setting. The prompts are listed below in registry order, grouped by pipeline phase.
 
-### Business Context and Vibe Analysis
+### Vibe Analysis and Business Context
 
 | # | Prompt Name | Model Type | Size | Temp | Purpose |
 |---|---|---|---|---|---|
 | 1 | VIBE_MASTER_PROMPT | thinker | large | 0 | Single-pass vibe analysis: parses NL vibes into structured requirements, mode classification, scope extraction, and action routing |
-| 2 | BUSINESS_CONTEXT_PROMPT | thinker | large | 0 | Business enrichment: industry alignment, complexity tier classification, division allocation, jargon extraction, governing bodies |
+| 2 | VIBE_AUDIT_PROMPT | thinker | large | 0 | Post-execution vibe audit: verifies requirement fulfillment, scores outcomes, identifies gaps |
+| 3 | BUSINESS_CONTEXT_PROMPT | thinker | large | 0 | Business enrichment: industry alignment, complexity tier classification, division allocation, jargon extraction, governing bodies |
+| 4 | MODEL_GENERATION_PARAMETER_PROMPT | thinker | large | 0 | Derive model generation parameters (tier sizing, domain counts, product targets) from enriched business context |
 
 ### Domain Generation
 
 | # | Prompt Name | Model Type | Size | Temp | Purpose |
 |---|---|---|---|---|---|
-| 3 | DOMAIN_GENERATE_PROMPT | worker | small | 0.1 | Generate candidate domains within tier range, respecting division model and naming rules |
-| 4 | DOMAIN_JUDGE_PROMPT | thinker | large | 0 | Multi-variant domain judging: evaluates multiple domain proposals and selects the best set |
+| 5 | DOMAIN_GENERATE_PROMPT | worker | small | 0.1 | Generate candidate domains within tier range, respecting division model and naming rules |
+| 6 | DOMAIN_JUDGE_PROMPT | thinker | large | 0 | Multi-variant domain judging: evaluates multiple domain proposals and selects the best set |
 
-### Product Generation
-
-| # | Prompt Name | Model Type | Size | Temp | Purpose |
-|---|---|---|---|---|---|
-| 5 | PRODUCT_GENERATE_PROMPT | worker | large | 0 | Generate products per domain with First-Class Entity Test compliance, data_type and function classification |
-| 6 | MODEL_ARCHITECT_REVIEW_PROMPT | thinker | large | 0 | Holistic model review: runs 15 architecture tests, scores overall model, recommends structural changes |
-
-### Attribute Generation
+### Product Generation and Deduplication
 
 | # | Prompt Name | Model Type | Size | Temp | Purpose |
 |---|---|---|---|---|---|
-| 7 | ATTRIBUTE_GENERATE_PROMPT | worker | large | 0 | Generate all columns for a product: name, type, tags, value_regex, glossary term, description |
+| 7 | MODEL_ARCHITECT_REVIEW_PROMPT | thinker | large | 0 | Holistic model review: runs 15 architecture tests, scores overall model, recommends structural changes |
+| 8 | PRODUCT_GENERATE_PROMPT | worker | large | 0 | Generate products per domain with First-Class Entity Test compliance, data_type and function classification |
+| 9 | PRODUCT_GLOBAL_DEDUP_PROMPT | thinker | large | 0 | Global deduplication: detect same-name and synonym products across all domains |
+| 10 | PRODUCT_DUPLICATE_DETECT_PROMPT | worker | large | 0 | Pairwise duplicate detection: compare two products for semantic overlap and recommend merge/keep |
+| 11 | PRODUCT_MERGE_SIMILAR_PROMPT | worker | large | 0 | Merge two similar products into one authoritative product with reconciled attributes |
+| 12 | PRODUCT_IDENTIFY_CORE_PROMPT | worker | large | 0 | Identify 1-3 core products per domain for protection from removal during QA |
+
+### Attribute Generation and Deduplication
+
+| # | Prompt Name | Model Type | Size | Temp | Purpose |
+|---|---|---|---|---|---|
+| 13 | ATTRIBUTE_GENERATE_PROMPT | worker | large | 0 | Generate all columns for a product: name, type, tags, value_regex, glossary term, description |
+| 14 | ATTRIBUTE_DEDUP_PROMPT | worker | large | 0 | Deduplicate attributes within a product: detect semantic duplicates with >80% confidence |
 
 ### Foreign Key Linking
 
 | # | Prompt Name | Model Type | Size | Temp | Purpose |
 |---|---|---|---|---|---|
-| 8 | FK_IN_DOMAIN_LINK_PROMPT | worker | large | 0 | In-domain FK linking: identify relationships between tables within a single domain |
-| 9 | FK_CROSS_DOMAIN_MESH_PROMPT | worker | large | 0 | Cross-domain sweep: global pass to identify FK links across all domain boundaries |
-| 10 | FK_PAIRWISE_LINK_PROMPT | worker | large | 0 | Pairwise domain comparison: detailed FK analysis between two specific domains |
-| 11 | FK_MANY_TO_MANY_PROMPT | worker | large | 0 | M:N detection: identify many-to-many relationships requiring junction/association tables |
-| 12 | FK_CYCLE_BREAK_PROMPT | thinker | large | 0 | Cycle breaking specialist: determine which FK in a cycle to remove (weakest link analysis) |
+| 15 | FK_IN_DOMAIN_LINK_PROMPT | worker | large | 0 | In-domain FK linking: identify relationships between tables within a single domain |
+| 16 | FK_CROSS_DOMAIN_MESH_PROMPT | worker | large | 0 | Cross-domain sweep: global pass to identify FK links across all domain boundaries |
+| 17 | FK_PAIRWISE_LINK_PROMPT | worker | large | 0 | Pairwise domain comparison: detailed FK analysis between two specific domains |
+| 18 | FK_MANY_TO_MANY_PROMPT | worker | large | 0 | M:N detection: identify many-to-many relationships requiring junction/association tables |
 
-### Classification and Allocation
-
-| # | Prompt Name | Model Type | Size | Temp | Purpose |
-|---|---|---|---|---|---|
-| 13 | TAG_CLASSIFY_PROMPT | worker | small | 0 | Classify attributes with PII tags and data classification levels |
-| 14 | SUBDOMAIN_ALLOCATE_PROMPT | worker | large | 0 | Group products within each domain into semantic subdomains |
-
-### Sample Data
+### FK Quality and Resolution
 
 | # | Prompt Name | Model Type | Size | Temp | Purpose |
 |---|---|---|---|---|---|
-| 15 | SAMPLE_GENERATE_PROMPT | worker | tiny | 0.5 | Generate synthetic sample records per table, respecting FK relationships and regex patterns |
+| 19 | PRODUCT_MERGE_SMALL_PROMPT | worker | large | 0 | Evaluate small tables (< 5 attributes) for merge, keep, or drop decisions |
+| 20 | FK_ANOMALY_DETECT_PROMPT | worker | large | 0 | Detect FK anomalies: broken references, type mismatches, orphaned columns |
+| 21 | FK_AMBIGUOUS_RESOLVE_PROMPT | worker | large | 0 | Resolve ambiguous FKs: columns that could match multiple target tables |
+| 22 | FK_BROKEN_RESOLVE_PROMPT | worker | large | 0 | Fix broken FK references: reconnect or remove FKs pointing to deleted/renamed tables |
+| 23 | QUALITY_NORMALIZATION_PROMPT | thinker | large | 0 | Detect denormalization violations and orphaned FK columns across the model |
+| 24 | FK_FIND_MISSING_PROMPT | thinker | large | 0 | Comprehensive scan: classify each unlinked _id column as LINK, CREATE, DROP, or KEEP_AS_IS |
+| 25 | QUALITY_DOMAIN_FIT_PROMPT | worker | large | 0 | Product-domain location fit: determine if tables are in the correct domain |
+| 26 | FK_BATCH_RESOLVE_PROMPT | worker | large | 0 | Batch-resolve multiple unlinked FK columns in a single LLM call |
+| 27 | FK_COLUMN_RENAME_PROMPT | worker | large | 0 | Fix FK column names that don't match the target table's PK naming convention |
+| 28 | FK_CYCLE_BREAK_PROMPT | thinker | large | 0 | Cycle breaking specialist: determine which FK in a cycle to remove (weakest link analysis) |
+
+### Classification, Metrics, and Allocation
+
+| # | Prompt Name | Model Type | Size | Temp | Purpose |
+|---|---|---|---|---|---|
+| 29 | TAG_CLASSIFY_PROMPT | worker | small | 0 | Classify attributes with PII tags and data classification levels |
+| 30 | SAMPLE_GENERATE_PROMPT | worker | tiny | 0.5 | Generate synthetic sample records per table, respecting FK relationships and regex patterns |
+| 31 | DOMAIN_METRICS_PROMPT | worker | large | 0 | Generate Databricks metric view definitions (dimensions, measures, filters) per domain |
+| 32 | SUBDOMAIN_ALLOCATE_PROMPT | worker | large | 0 | Group products within each domain into semantic subdomains |
+| 33 | VIBE_CREATE_NEXT_PROMPT | thinker | large | 0.3 | Generate next-vibe recommendations based on static analysis findings and model health |
 
 ### Resize Operations
 
 | # | Prompt Name | Model Type | Size | Temp | Purpose |
 |---|---|---|---|---|---|
-| 16 | RESIZE_SHRINK_DOMAIN_PROMPT | thinker | large | 0 | Shrink ECM to MVM: select domains and products to remove, prioritize corporate and non-core |
-| 17 | RESIZE_ENLARGE_DOMAIN_PROMPT | thinker | large | 0 | Enlarge MVM to ECM: identify new domains and products to add while retaining all existing |
+| 34 | RESIZE_SHRINK_DOMAIN_PROMPT | thinker | large | 0 | Shrink ECM to MVM: select domains and products to remove, prioritize corporate and non-core |
+| 35 | RESIZE_ENLARGE_DOMAIN_PROMPT | thinker | large | 0 | Enlarge MVM to ECM: identify new domains and products to add while retaining all existing |
 
-### Quality Assurance
-
-| # | Prompt Name | Model Type | Size | Temp | Purpose |
-|---|---|---|---|---|---|
-| 18 | QA_NORMALIZE_3NF_PROMPT | thinker | large | 0 | Normalize model to 3NF: identify normalization violations and restructure tables |
-
-### LLM Fallback System
+### Quality Assurance and Advanced Operations
 
 | # | Prompt Name | Model Type | Size | Temp | Purpose |
 |---|---|---|---|---|---|
-| 19 | LLM_FALLBACK_CLASSIFY_PROMPT | worker | small | 0 | Fallback classification: classify entities when primary classification fails |
-| 20 | LLM_FALLBACK_QUERY_PROMPT | worker | small | 0 | Fallback query: reformulate failed queries for retry |
-| 21 | LLM_FALLBACK_EXECUTE_PROMPT | worker | small | 0 | Fallback execution: execute operations when primary execution path fails |
+| 36 | QA_ESTIMATE_ROWS_PROMPT | worker | small | 0 | Estimate expected row counts for tables (used in sample data sizing) |
+| 37 | QA_NORMALIZE_3NF_PROMPT | thinker | large | 0 | Normalize model to 3NF: identify normalization violations and restructure tables |
+| 38 | QA_DENORMALIZE_PROMPT | thinker | large | 0 | Denormalize tables for analytics use cases: create wide/star schema tables |
+| 39 | QA_INDUSTRY_TEMPLATE_PROMPT | thinker | large | 0 | Apply industry-standard template patterns to enrich the model |
+| 40 | QA_REVERSE_ENGINEER_PROMPT | worker | large | 0 | Reverse-engineer a model from an existing Unity Catalog schema |
+| 41 | QA_GENERATE_DESCRIPTIONS_PROMPT | worker | small | 0 | Auto-generate business descriptions for entities missing descriptions |
+| 42 | QA_SUGGEST_ATTRS_PROMPT | worker | large | 0 | Suggest additional attributes for tables that may be missing important columns |
+| 43 | QA_SUGGEST_TABLES_PROMPT | worker | large | 0 | Suggest additional tables that may be missing from the model |
 
-### Vibe Operations
+### Vibe Execution and Fallback
 
 | # | Prompt Name | Model Type | Size | Temp | Purpose |
 |---|---|---|---|---|---|
-| 22 | VIBE_DROP_PROMPT | worker | large | 0 | Execute drop actions on domains, products, or attributes |
-| 23 | VIBE_CREATE_PROMPT | worker | large | 0 | Execute create actions for new domains, products, or attributes |
-| 24 | VIBE_RENAME_PROMPT | worker | large | 0 | Execute rename actions on any entity |
-| 25 | VIBE_ALTER_DESCRIPTION_PROMPT | worker | large | 0 | Modify descriptions on entities |
-| 26 | VIBE_MODIFY_PROMPT | worker | large | 0 | General modification of entity properties |
-| 27 | VIBE_MERGE_PROMPT | thinker | large | 0 | Merge two or more entities (products, domains) with attribute reconciliation |
-| 28 | VIBE_SPLIT_PROMPT | thinker | large | 0 | Split an entity into multiple entities with attribute distribution |
-| 29 | VIBE_TRANSFORM_NAME_PROMPT | worker | large | 0 | Transform naming patterns across entities |
-| 30 | VIBE_SET_PROPERTY_PROMPT | worker | large | 0 | Set metadata properties on entities |
-| 31 | VIBE_TAG_PROMPT | worker | small | 0 | Apply or modify tags on entities |
-| 32 | VIBE_ADD_COLUMNS_TEMPLATE_PROMPT | worker | large | 0 | Add column template sets to specified tables |
-| 33 | VIBE_MOVE_PROMPT | worker | large | 0 | Move products between domains |
-| 34 | VIBE_GENERATE_ARTIFACT_PROMPT | worker | large | 0 | Generate specific documentation artifacts on demand |
-| 35 | VIBE_QUERY_PROMPT | thinker | large | 0 | Answer analytical queries about the model |
-| 36 | VIBE_LINK_PROMPT | worker | large | 0 | Create specific FK links between tables |
-| 37 | VIBE_DISCOVER_LINKS_PROMPT | worker | large | 0 | Discover missing FK links across the model |
-| 38 | VIBE_FIX_LINKS_PROMPT | worker | large | 0 | Fix broken or invalid FK references |
-| 39 | VIBE_MODEL_CHECKUP_PROMPT | thinker | large | 0 | Run comprehensive model health check |
-| 40 | VIBE_RUN_QUALITY_CHECKS_PROMPT | thinker | large | 0 | Execute quality assurance checks on demand |
-| 41 | VIBE_RUN_LINKING_PROMPT | worker | large | 0 | Re-run the full linking pipeline |
-| 42 | VIBE_NORMALIZE_3NF_PROMPT | thinker | large | 0 | Normalize specified tables or domains to 3NF |
-| 43 | VIBE_DENORMALIZE_ANALYTICS_PROMPT | thinker | large | 0 | Denormalize tables for analytics use cases |
-| 44 | VIBE_PROMOTE_TABLE_PROMPT | worker | large | 0 | Promote a helper table to a full product table |
-| 45 | VIBE_INLINE_TABLE_PROMPT | worker | large | 0 | Inline a table's attributes into its parent |
-| 46 | VIBE_SWAP_DOMAINS_PROMPT | worker | large | 0 | Swap products between two domains |
-| 47 | VIBE_ENLARGE_MODEL_PROMPT | thinker | large | 0 | Enlarge the model (add domains/products) |
-| 48 | VIBE_SHRINK_MODEL_PROMPT | thinker | large | 0 | Shrink the model (remove domains/products) |
-| 49 | VIBE_STANDARDIZE_NAMING_PROMPT | worker | large | 0 | Standardize all naming across the model to match conventions |
+| 44 | VIBE_DROP_PROMPT | worker | large | 0 | Execute drop actions on domains, products, or attributes |
+| 45 | IMPORT_CSV_PROMPT | worker | small | 0 | Import and parse CSV data to create or update model entities |
+| 46 | LLM_FALLBACK_CLASSIFY_PROMPT | worker | small | 0 | Fallback classification: classify entities when primary classification fails |
+| 47 | LLM_FALLBACK_QUERY_PROMPT | worker | large | 0 | Fallback query: reformulate failed queries for retry |
+| 48 | LLM_FALLBACK_EXECUTE_PROMPT | worker | large | 0 | Fallback execution: execute operations when primary execution path fails |
+| 49 | VIBE_PARSE_PROMPT | thinker | large | 0 | Parse and structure raw vibe text into actionable requirement objects |
 
 ---
 
-## 14. Complete Class Reference (18 Classes)
+## 14. Architecture Design Patterns
 
-### Infrastructure Classes
+The agent is built around several deliberate architectural decisions. This section explains what each pattern achieves and why it was chosen.
 
-#### JobLauncher
-Self-contained Databricks job launcher for running the agent as a scheduled or triggered job. Handles workspace client initialization, notebook task configuration, cluster selection, and job lifecycle management. Used for programmatic invocation of the agent outside the interactive notebook context.
+### Catalog Resolution Strategy
 
-#### CatalogResolver
-Resolves Unity Catalog catalog and schema names based on the configured cataloging style. Supports three styles:
-- **one_catalog:** All schemas under a single catalog (e.g., `my_catalog.domain_schema`)
-- **per_division:** One catalog per organizational division (e.g., `operations_catalog.domain_schema`)
-- **per_domain:** One catalog per domain (e.g., `domain_catalog.domain_schema`)
+The agent supports three catalog organization styles, each suited to different governance needs:
 
-Applies user-configured prefixes and suffixes to catalog and schema names.
+| Style | Behavior | Best For |
+|---|---|---|
+| **One Catalog** | All domain schemas under a single catalog | Small/medium teams, simple governance |
+| **Catalog per Division** | One catalog per org division (operations, business, corporate) | Division-level access control |
+| **Catalog per Domain** | One catalog per domain | Maximum isolation, large enterprises |
 
-#### _MiniDiskCache
-Thread-safe disk cache using Python's pickle serialization. Provides get/set/has operations with file-system-backed persistence. Used to cache intermediate results (e.g., business context, domain lists) across pipeline stages to avoid redundant LLM calls during retries or restarts.
+User-configured prefixes and suffixes are applied to both catalog and schema names, allowing alignment with existing naming standards (e.g., `dev_`, `prod_`, `_lakehouse`).
 
-### AI and Concurrency Classes
+### LLM Resilience Architecture
 
-#### AIAgentManager
-Thread-safe concurrency manager for LLM calls. Uses a bounded semaphore to limit the number of concurrent API requests (default: 20 via `max_concurrent_batches`). Prevents overwhelming the serving endpoints and ensures fair resource allocation across parallel pipeline stages.
+Every LLM call goes through a multi-layer resilience stack:
 
-#### AIAgent
-Core LLM interaction layer. Responsible for:
-- **Routing:** Selects the appropriate model based on prompt type (thinker vs worker) and size requirement (large, small, tiny)
-- **Retries:** Up to 3 retries with exponential backoff on transient failures
-- **Timeouts:** Per-call timeout enforcement (default: 480 seconds)
-- **Fallbacks:** Cascades through the model chain on failure (see Section 6)
-- **Demotion/Recovery:** Tracks cumulative failures and consecutive successes per model for automatic demotion and recovery
-- **Honesty scoring:** Extracts and validates honesty_score from every LLM response; applies contradiction penalty
+1. **Model routing** — Each prompt specifies whether it needs a thinker (complex reasoning) or worker (high-volume generation), and the size class. The agent picks the best available model.
+2. **Retry with feedback** — On transient failure, up to 3 retries with exponential backoff. Validation failures are formatted as specific feedback and sent back to the LLM.
+3. **Fallback cascade** — On persistent failure, the agent cascades to the next model in the priority chain (see Section 6).
+4. **Automatic demotion/recovery** — After 3 cumulative failures, a model is demoted in priority. After 5 consecutive successes, the original order is restored. After 3 consecutive timeouts, a model is skipped for the session.
+5. **Honesty gating** — Every LLM response self-reports a quality score (0–100). Below 55 = permanently discarded; 55–70 = retry; above the threshold = accepted.
 
-#### ObservationsLogger
-Thread-safe CSV logger that records every LLM interaction's honesty score, model used, prompt name, latency, and outcome. The observations log is written to the artifacts directory and provides a complete audit trail of all AI decisions made during a session.
+### Concurrency Control
 
-#### SmartWorkerValidator
-Code-based validation layer for LLM outputs. Performs structural and semantic checks including:
-- JSON structure validation (required fields, correct types, valid enums)
-- Business context validation (names match conventions, counts within ranges)
-- Count enforcement (product counts, attribute counts within tier ranges)
-- FK reference validation (targets exist, no self-references, type compatibility)
+The pipeline runs many LLM calls in parallel (product generation across domains, attribute generation across products). Two mechanisms prevent resource exhaustion:
 
-### Thread Safety Classes
+- **Bounded concurrency** — A configurable limit (default: 20) caps the number of simultaneous LLM API requests, preventing endpoint overload.
+- **Global thread ceiling** — A cross-stage coordinator ensures that even when multiple pipeline stages run parallel workloads, the total thread count never exceeds the system limit. Nested parallelism is detected and prevented to avoid deadlocks.
 
-#### NestedThreadPoolError
-Custom exception raised when a nested ThreadPoolExecutor is detected. Prevents deadlocks that can occur when a thread pool worker attempts to create its own thread pool.
+### Vibe Orchestration Lifecycle
 
-#### ThreadPoolGuard
-Context manager that uses thread-local storage to detect and prevent nested ThreadPoolExecutor usage. Wraps all parallel execution blocks in the pipeline.
+When a user provides natural-language vibes, the system follows a six-phase lifecycle:
 
-#### GlobalConcurrencyManager
-Singleton class that manages global concurrency limits across the entire agent. Ensures that the combined number of concurrent threads across all pipeline stages never exceeds the system limit. Uses a counting semaphore for cross-stage coordination.
+1. **Parse** — Analyze the vibe text into structured requirements: each with an intent (drop, create, rename, merge, etc.), scope (model, domain, product, attribute), mode classification, and priority.
+2. **Plan** — Route each requirement to an action primitive, build an execution plan respecting mutation budgets and hard constraints extracted from phrases like "do not", "must not", "never".
+3. **Execute** — Apply mutations within the budget, respecting constraints. Each pipeline step is wrapped to pin requirements and track progress.
+4. **Validate** — Run verification checks against the modified model to confirm each requirement was fulfilled.
+5. **Remediate** — Auto-fix failed verifications where possible.
+6. **Score** — Compute an overall fulfillment score and report any unfulfilled requirements.
 
-### Logging Utilities
+### Validation Pipeline
 
-#### InfoFilter
-Logging filter that restricts log output to INFO level and below, preventing DEBUG-level noise in production output.
+LLM outputs are never trusted blindly. Every critical generation (products, attributes, FK links) goes through a validate-feedback-retry loop:
 
-#### ImmediateFlushFileHandler
-Custom logging file handler that flushes after every write, ensuring log entries are immediately persisted. Critical for debugging long-running pipeline stages that may fail mid-execution.
+1. **Generate** — LLM produces output
+2. **Validate** — Structural and semantic checks: JSON structure, naming conventions, count ranges, FK references, business rules
+3. **Feedback** — Validation failures are formatted as specific feedback
+4. **Retry** — LLM regenerates with the feedback context (up to max retries)
 
-### Vibe System Classes
+When user vibes are present, count enforcement is relaxed to warnings rather than hard failures — the user's intent takes priority over strict tier ranges.
 
-#### VibeRequirement
-Dataclass representing a single atomic user requirement parsed from vibe text. Fields:
-- `id`: Unique identifier for the requirement
-- `original_text`: Raw text from the user's vibe
-- `intent`: Classified intent (e.g., drop, create, rename, merge, query)
-- `scope`: Target scope (model, domain, product, attribute)
-- `scope_targets`: Specific entity names targeted
-- `granularity`: Fine-grained or coarse-grained
-- `mode`: surgical, holistic, or generative
-- `priority`: Execution priority (higher = earlier)
-- `constraint_type`: hard_constraint, soft_preference, or suggestion
-- `verification_strategy`: How to verify the requirement was fulfilled
-- `status`: pending, fulfilled, failed, skipped
-- `evidence`: Proof of fulfillment or failure reason
+### Real-Time Progress Tracking
 
-#### VibeManifest
-Parsed set of all user requirements from a vibe session. Fields:
-- `raw_text`: Original unprocessed vibe text
-- `requirements`: List of VibeRequirement objects
-- `overall_mode`: Dominant mode across all requirements (surgical/holistic/generative)
-- `operation_routing`: Maps each requirement to the appropriate pipeline action
+The agent writes pipeline progress to a Delta table (`_vibe_progress`) enabling live monitoring. A producer-consumer handshake protocol prevents the agent from writing faster than the UI can consume. Events are buffered locally and flushed in batches every 10 seconds, with a configurable handshake timeout of 90 seconds.
 
-#### VibeVerificationClause
-Maps a single requirement to its verifier function. Contains the verification logic (lambda or function reference), expected outcome, and tolerance thresholds. Used during the post-execution validation phase to determine requirement fulfillment.
+### Audit Trail
 
-#### VibeContract
-Compiled contract that governs the entire vibe execution session. Fields:
-- `mode`: surgical, holistic, or generative
-- `scope`: Affected scope boundaries
-- `hard_constraints`: Forbidden operations extracted from "do not", "must not", "never" phrases
-- `forbidden_ops`: Explicit operation blacklist
-- `mutation_budget`: Maximum allowed mutations per entity type (see Mutation Budgets table in Section 7)
-- `rollout_mode`: Execution strategy (cutover, shadow, canary)
-- `fidelity_gates`: Quality thresholds that must be met
-
-#### VibeOrchestrator
-Central orchestrator for vibe-driven modifications. Executes the full vibe lifecycle:
-1. **Parse:** Analyze vibe text into VibeManifest via VIBE_MASTER_PROMPT
-2. **Plan:** Route requirements to action primitives, build execution plan
-3. **Execute:** Apply mutations within mutation budget, respecting hard constraints
-4. **Validate:** Run VibeVerificationClauses against the modified model
-5. **Remediate:** Auto-fix failed verifications where possible
-6. **Score:** Compute overall fulfillment score and report unfulfilled requirements
-
-#### VibeWriter
-Real-time pipeline progress writer to Delta tables. Records stage transitions, progress percentages, timing data, and status messages into the `_vibe_progress` metamodel table. Enables live monitoring of pipeline execution through the Databricks UI or API queries.
+Every LLM interaction is logged: prompt name, model used, latency, honesty score, and outcome. This observations log provides a complete audit trail of all AI decisions made during a session.
 
 ---
 
@@ -914,78 +862,54 @@ The vibe system supports the following atomic action primitives. Each maps to a 
 
 ## 16. DAG Enforcement Deep Dive
 
-The agent enforces a strict Directed Acyclic Graph (DAG) topology on all FK relationships. This section documents the internal algorithms.
+The agent enforces a strict Directed Acyclic Graph (DAG) topology on all FK relationships. This section explains the strategy and design choices.
 
-### Adjacency Construction
+### How Cycles Are Prevented
 
-**`_build_fk_adjacency()`** -- Builds a directed adjacency list from all FK references in the model. Each FK link `A -> B` (table A has an FK column referencing table B's PK) creates a directed edge. Self-referencing hierarchical FKs are excluded from the adjacency graph.
+Before any new FK link is added during the linking stages, a BFS (Breadth-First Search) reachability check runs. Given a proposed link from table A to table B, the system checks whether A is already reachable from B. If it is, the link would create a cycle and is rejected. This prevents cycles from ever being introduced.
 
-### Pre-Addition Cycle Check
+### How Existing Cycles Are Detected
 
-**`_would_create_cycle()`** -- BFS-based check invoked BEFORE adding any new FK link. Given a proposed edge `A -> B`, performs a BFS from `B` to determine if `A` is reachable. If reachable, the proposed link would create a cycle and is rejected. This prevents cycles from being introduced during the linking stages.
+A full DFS (Depth-First Search) traversal runs across the entire FK graph during QA. It uses a three-color marking scheme (white/gray/black) to identify back edges — the hallmark of cycles. All cycles are reported, each represented as the ordered chain of tables forming the loop.
 
-### Full Cycle Detection
+### How Cycles Are Broken
 
-**`_detect_cycles_dfs()`** -- Full DFS traversal to find ALL cycles in the FK graph. Uses a three-color marking scheme (white/gray/black) to identify back edges. Returns a list of all cycles found, each represented as an ordered list of table names forming the cycle.
+Cycle breaking runs up to 3 rounds. Each round:
 
-### Cycle Breaking with Retry
+1. **Detect** remaining cycles via DFS
+2. **LLM-based breaking** — A thinker-class model determines which FK in each cycle is the "weakest link" based on business criticality
+3. **Heuristic fallback** — If the LLM fails, edge betweenness centrality scoring identifies the FK whose removal would disrupt the fewest shortest paths in the graph
+4. **Verify** — Re-run DFS to confirm the cycle is eliminated
+5. **Iterate** — If cycles remain, proceed to the next round
 
-**`_break_cycles_with_retry()`** -- Orchestrates up to 3 rounds of cycle breaking. Each round:
-1. Runs `_detect_cycles_dfs()` to find remaining cycles
-2. Attempts LLM-based breaking via `_break_cycles_internal()`
-3. Falls back to heuristic breaking via `_break_cycles_heuristic_internal()` if LLM fails
-4. Re-runs DFS to verify cycles are eliminated
-5. If cycles remain, proceeds to next round
+### Breaking Priority
 
-### LLM-Based Cycle Breaking
+| Priority | FK Pattern | Decision |
+|---|---|---|
+| **Always broken first** | Computed references: `latest_*`, `current_*`, `primary_*`, `active_*`, `default_*`, `first_*`, `last_*`, `preferred_*` | These are convenience pointers, not structural relationships |
+| **Never broken** | Parent-child hierarchical FKs: `parent_*`, `manager_*`, `reporting_*`, `supervisor_*`, `alternate_*`, `original_*`, `superseded_*` | These represent real business hierarchies |
+| **Never broken** | Core ownership FKs (e.g., `order_item.order_id`) | These are identity-defining relationships |
 
-**`_break_cycles_internal()`** -- Uses the FK_CYCLE_BREAK_PROMPT (thinker/large, temperature 0) to determine which FK in each cycle is the "weakest link" -- the relationship that is least essential to the business model. The LLM considers:
-- Business criticality of each relationship
-- Whether the FK is a parent-child relationship (protected by REL-RUL-012, REL-RUL-020)
-- Whether the FK is a computed reference (latest_*, current_*, primary_*, active_*, default_*, first_*, last_*, preferred_*) -- these are broken first
-- The impact of removal on downstream queries
+### Design Choice: Why Up to 3 Rounds?
 
-### Heuristic Cycle Breaking
-
-**`_break_cycles_heuristic_internal()`** -- Fallback when LLM-based breaking fails or times out. Uses edge betweenness centrality scoring to identify the FK that, if removed, would disrupt the fewest shortest paths in the graph. Edges with higher betweenness centrality are more likely to be part of multiple cycles and are therefore better candidates for removal.
-
-### Protected Relationships
-
-The following FK patterns are NEVER broken during cycle resolution:
-- Parent-child hierarchical FKs: `parent_*`, `manager_*`, `reporting_*`, `supervisor_*`, `alternate_*`, `original_*`, `superseded_*` (REL-RUL-012)
-- Explicitly protected domain relationships (REL-RUL-020)
-
-Computed references are always broken FIRST: `latest_*`, `current_*`, `primary_*`, `active_*`, `default_*`, `first_*`, `last_*`, `preferred_*`
+A single round of cycle breaking can create residual cycles when multiple cycles share edges. By running up to 3 rounds, the agent handles cascading effects without risking infinite loops. In practice, most models are cycle-free after round 1.
 
 ---
 
-## 17. Static Analysis Engine
+## 17. Static Analysis Checks
 
-The `run_metamodel_static_analysis()` function performs comprehensive code-based validation of the model without LLM involvement. It runs after every major pipeline stage and during QA. The checks are:
+The agent performs comprehensive code-based validation of the model without LLM involvement. This runs after every major pipeline stage and during QA. The checks are:
 
-### Broken FK References
-Validates that every FK column's target table and target column actually exist in the model. Reports broken references where the target has been renamed, moved, or deleted.
-
-### PK/FK Column Name Mismatches
-Verifies that FK column names end with the target table's PK name (per G01-R008). Detects cases where the FK column was created with a stale or incorrect name.
-
-### Unlinked _id Columns
-Identifies columns ending in `_id` that are NOT the table's PK and are NOT registered as FK columns. These are potential missing FK relationships that should be investigated.
-
-### Siloed/Disconnected Tables
-Detects tables with zero incoming and zero outgoing FK relationships. Siloed tables violate the connectivity requirement and must be linked to at least one other table.
-
-### Duplicate Table Names Across Domains
-Checks for products with identical names in different domains. This violates SSOT -- each table name must be globally unique (or consolidated into the `shared` domain).
-
-### Missing PKs and table_names
-Validates that every product has exactly one PK column and a valid `table_name` property. Auto-inserts missing PKs where possible.
-
-### FK Cycles (DFS)
-Runs full DFS cycle detection (see Section 16) as part of the static analysis pass. Any detected cycles are reported as critical findings.
-
-### Orphaned Domain References
-Identifies FK references pointing to products in domains that no longer exist (e.g., after domain removal or consolidation).
+| Check | What It Catches | Why It Matters |
+|---|---|---|
+| **Broken FK references** | FK columns pointing to tables/columns that no longer exist | Prevents runtime errors during physical deployment |
+| **PK/FK name mismatches** | FK column names that don't end with the target PK name (per G01-R008) | Ensures self-documenting FK naming |
+| **Unlinked `_id` columns** | Columns ending in `_id` that aren't PKs and have no FK relationship | Identifies potential missing relationships |
+| **Siloed/disconnected tables** | Tables with zero incoming and zero outgoing FK relationships | Ensures every table participates in the data model |
+| **Duplicate table names** | Products with identical names in different domains | Prevents SSOT violations |
+| **Missing PKs** | Products without a primary key column | Every table must have exactly one PK |
+| **FK cycles** | Circular dependency chains in the FK graph | DAG topology is mandatory (see Section 16) |
+| **Orphaned domain references** | FKs pointing to products in domains that no longer exist | Prevents stale references after domain removal |
 
 ---
 
@@ -1074,7 +998,7 @@ Note: Widget 14 is intentionally skipped in the numbering.
 ### LLM Retry and Fallback
 
 Every LLM call follows this pattern:
-1. **Primary attempt:** Call the preferred model with configured timeout (default 480s)
+1. **Primary attempt:** Call the preferred model with configured timeout (default 120s MVM / 240s ECM)
 2. **Retry on transient failure:** Up to 3 retries with exponential backoff
 3. **Fallback cascade:** On persistent failure, cascade to next model in chain (see Section 6)
 4. **Timeout tracking:** Track timeout frequency per model for demotion decisions
@@ -1084,13 +1008,13 @@ Every LLM call follows this pattern:
 
 For critical LLM generations (products, attributes, FK links), the pipeline implements a validate-feedback-retry loop:
 1. **Generate:** LLM produces output
-2. **Validate:** SmartWorkerValidator checks structure, naming, counts, and business rules
+2. **Validate:** Structural and semantic checks on naming, counts, and business rules
 3. **Feedback:** Validation failures are formatted as specific feedback and sent back to the LLM
 4. **Retry:** LLM regenerates with the feedback context (up to max_retries)
 
 ### Honesty Score Gating
 
-- **Threshold:** Minimum acceptable honesty score is 65 (configurable via `min_honesty_score_threshold`)
+- **Threshold:** Minimum acceptable honesty score is 65 (configurable)
 - **Below 55:** Response is permanently discarded (no retries allowed)
 - **55-70:** Response triggers retry logic with feedback
 - **Contradiction penalty:** Applied when LLM responses contain internally inconsistent statements (e.g., claiming a rule was followed while the output violates it)
@@ -1115,9 +1039,8 @@ When vibing an existing model, artifacts from the previous version are carried o
 
 The agent uses two mechanisms to prevent thread-related failures:
 
-**ThreadPoolGuard:** Context manager that wraps all `ThreadPoolExecutor` usage. Uses thread-local storage to detect and prevent nested thread pool creation, which would cause deadlocks.
-
-**GlobalConcurrencyManager:** Singleton that enforces a global ceiling on concurrent threads. Even when multiple pipeline stages attempt parallel execution, the total thread count never exceeds the configured limit (`max_concurrent_batches`).
+- **Nested parallelism detection** — All parallel execution blocks are guarded to detect and prevent nested thread pool creation, which would cause deadlocks.
+- **Global thread ceiling** — A cross-stage coordinator enforces a ceiling on concurrent threads. Even when multiple pipeline stages attempt parallel execution, the total thread count never exceeds the configured limit (default: 20).
 
 ---
 
