@@ -274,6 +274,7 @@ All job tags are prefixed with `dbx_vibe_modelling_` and include the following:
 
 | Tag | Description |
 |---|---|
+| `dbx_vibe_modelling_launcher_source` | Source that launched the job: `Vibe_Modelling_Notebook` (notebook) or `Vibe_Modelling_App` (external app/UI) |
 | `dbx_vibe_modelling_business` | Business/industry name |
 | `dbx_vibe_modelling_model` | Model scope and version (e.g., `ecm_v1`, `mvm_v1`) |
 | `dbx_vibe_modelling_operation` | Current operation (e.g., `new base model`, `install model`) |
