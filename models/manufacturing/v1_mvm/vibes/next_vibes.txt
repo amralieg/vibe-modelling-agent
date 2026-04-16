@@ -1,0 +1,43 @@
+**Model Quality Score: 62/100**
+
+**PRIORITY 1 — Self-referencing FK on order.status_history:** order.status_history has an FK to order.status_history, but without a clear business-labeled column (e.g., previous_status_history_id or parent_status_history_id), this is likely an invalid self-reference where the FK column name matches the PK. Verify and either add a meaningful prefix label or remove the self-FK.
+
+**PRIORITY 2 — Self-referencing FK on shared.fiscal_period:** shared.fiscal_period references itself (FK to shared.fiscal_period) without an evident business label like parent_fiscal_period_id or prior_fiscal_period_id. Clarify the column name to reflect the business relationship (e.g., prior_period_id) or remove if it is a modeling artifact.
+
+**PRIORITY 3 — Orphaned domain-root tables with zero inbound FKs:** logistics.carrier, order.priority, production.order_type, production.shift, quality.defect_code, sales.competitor, service.sla_commitment, shared.address, shared.storage_location, shared.uom, and shared.warranty_policy are referenced by others but several lookup/reference tables like finance.bank_account and finance.chart_of_accounts lack sufficient inbound links. Specifically, finance.bank_account has no inbound FKs — payment references it, but confirm no other domain needs bank account linkage (e.g., shared.ap_invoice, procurement.supplier_invoice should reference it for payment routing).
+
+**PRIORITY 4 — Missing FK from order.line_item to customer.account_hierarchy:** order.line_item has no direct or indirect FK to any customer entity. A sales order line must trace to a customer/sold-to party. Add an FK from order.line_item (or its parent order header, which is conspicuously absent) to customer.account_hierarchy or customer.sales_area_assignment.
+
+**PRIORITY 5 — Missing order header table:** order.line_item, order.schedule_line, order.status_history, and order.order_confirmation all exist but there is no order.order or order.sales_order header entity to bind them. The line_item table likely carries header-level attributes that should be normalized. Add an order.order_header product and re-point line_item, status_history, and order_confirmation FKs to it. This is not scope expansion — it is structural completeness within the existing order domain.
+
+**PRIORITY 6 — Missing FK from service.contract_line to service.service_contract or equivalent:** service.contract_line has no FK to any service contract header. It references order.blanket_order instead, which is semantically incorrect for service agreements. Add an FK from service.contract_line to asset.service_contract (the only service contract entity in the model).
+
+**PRIORITY 7 — Duplicate pricing/price list proliferation:** shared.product_price_list, sales.sales_price_list, and product.price_list_item overlap significantly in purpose. sales.sales_price_list already FKs to shared.product_price_list, but the three-way split creates ambiguity. Consolidate sales.sales_price_list attributes into shared.product_price_list or clearly differentiate their grain and rename to eliminate confusion (e.g., shared.price_list_header vs. product.price_list_line).
+
+**PRIORITY 8 — Missing FK from logistics.delivery to customer.account_hierarchy:** Outbound deliveries must reference a ship-to customer. logistics.delivery links to shared.address and shared.contact but has no FK to any customer entity. Add an FK to customer.account_hierarchy or customer.partner_function for ship-to/sold-to resolution.
+
+**PRIORITY 9 — Missing FK from finance.ar_invoice to order.line_item or order.order_confirmation:** ar_invoice references customer.credit_profile and customer.installed_base but has no traceability back to the originating sales order. Add an FK from finance.ar_invoice to order.order_confirmation or order.line_item to close the order-to-cash loop.
+
+**PRIORITY 10 — Questionable FK from inventory.stock_position to customer.segment and sales.sales_territory:** Stock positions are physical inventory states and should not carry commercial segmentation or territory references. These FKs suggest attribute leakage from demand planning into inventory. Remove these FKs from inventory.stock_position and ensure demand-side segmentation lives in procurement.demand_forecast or sales.forecast only.
+
+**PRIORITY 11 — Missing FK from production.order_status to a production order entity:** production.order_status references batch, order_type, routing, and work_center but has no FK to a production order header (production.planned_order or a missing production.production_order). Link order_status to production.planned_order at minimum.
+
+**PRIORITY 12 — Suspicious FK from shared.failure_record to procurement.purchase_requisition:** A failure record documenting an equipment/component failure should not directly reference a purchase requisition. This coupling bypasses proper workflow (failure → work order → requisition). Remove this FK and ensure the linkage flows through asset.work_order_operation instead.
+
+**PRIORITY 13 — Missing FK from shared.plant to shared.location or shared.address:** Plants are physical sites but shared.plant has no FK to shared.location or shared.address, making geographic resolution impossible. Add an FK from shared.plant to shared.location.
+
+**PRIORITY 14 — Generic FK column naming on shared.category:** shared.category FKs to asset.class and shared.warranty_policy, which is an unusual combination suggesting this is an overloaded catch-all classification table. Verify that the FK to shared.warranty_policy is intentional and not a modeling error; if category is meant to be a generic taxonomy, it should not reference warranty_policy directly.
+
+**PRIORITY 15 — Missing FK from quality.customer_complaint to customer.account_hierarchy:** quality.customer_complaint references customer.installed_base but has no direct FK to customer.account_hierarchy, making it impossible to aggregate complaints by customer account. Add an FK to customer.account_hierarchy.
+
+Other known minor issues from static analysis:
+  1. FK reference inventory.inventory_valuation.supplier_invoice_id points to non-existent table shared.supplier_invoice
+  2. FK reference inventory.wip_stock.bop_operation_id points to non-existent table shared.bop_operation
+  3. Column engineering.approved_manufacturer.supplier_id looks like an FK but has no foreign_key_to reference
+  4. FK reference production.routing_operation.bop_operation_id points to non-existent table shared.bop_operation
+  5. Table asset.measurement_reading has 2 FK columns pointing to asset.measurement_point (measurement_point_id, sensor_measurement_point_id) (generic/unlabeled: measurement_point_id) — rename generic columns to describe their business role (e.g., inspector_employee_id, approver_employee_id; origin_plan_id, amendment_plan_id)
+  6. Table production.shop_order_operation has 2 FK columns pointing to production.work_center (machine_work_center_id, work_center_id) (generic/unlabeled: work_center_id) — rename generic columns to describe their business role (e.g., inspector_employee_id, approver_employee_id; origin_plan_id, amendment_plan_id)
+  7. Table sales.opportunity_competitor has 2 FK columns pointing to sales.competitor (competitor_id, crm_opportunity_competitor_id) (generic/unlabeled: competitor_id) — rename generic columns to describe their business role (e.g., inspector_employee_id, approver_employee_id; origin_plan_id, amendment_plan_id)
+  8. Table procurement.preferred_supplier_list has 2 FK columns pointing to shared.supplier (supplier_id, supplier_qualification_supplier_id) (generic/unlabeled: supplier_id) — rename generic columns to describe their business role (e.g., inspector_employee_id, approver_employee_id; origin_plan_id, amendment_plan_id)
+
+LLM quality score: 62/100

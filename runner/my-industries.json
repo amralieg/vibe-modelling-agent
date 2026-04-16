@@ -22,9 +22,9 @@
   },
   "businesses": [
     {
-     "name": "Manufacturing",
-      "description": "Industrial Manufacturing encompasses the design, production, and delivery of automation systems, electrification solutions, and smart infrastructure components for factories, buildings, transportation, and urban environments.",
-      "model_vibes": " maximum of 2 domains, and 8 tables for any model you generate"
+      "name": "Airlines",
+      "description": "Airlines is a global industry operating passenger and cargo flights across extensive route networks, offering premium travel experiences, loyalty programs, and hub-and-spoke connectivity linking cities worldwide.",
+      "model_vibes": ""
     }
   ]
 }
