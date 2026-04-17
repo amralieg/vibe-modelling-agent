@@ -1,5 +1,41 @@
 # Vibe Modelling Agent Integration Guide
 
+> Producer-consumer protocol for UIs and downstream consumers to observe and interact with the Vibe Modelling Agent in real time: session handshake, progress events, `result_json` schemas, and SQL reference.
+
+[← Back to project root](../readme.md) · [Design guide](design-guide.md) · [Whitepaper](whitepaper.md)
+
+---
+
+## Table of Contents
+
+- [1. Architecture Overview](#1-architecture-overview)
+- [2. How to Launch](#2-how-to-launch)
+  - [Mode A — UI Creates the Job (Recommended)](#mode-a--ui-creates-the-job-recommended)
+  - [Mode B — Notebook Auto-Launches Itself](#mode-b--notebook-auto-launches-itself)
+  - [Launch Flow Diagram](#launch-flow-diagram)
+- [3. Tables](#3-tables)
+  - [3.1 Business Table (Session Table)](#31-business-table-session-table)
+  - [3.2 Progress Table](#32-progress-table)
+- [4. Session ID Assignment](#4-session-id-assignment)
+- [5. Handshake Protocol (Producer-Consumer)](#5-handshake-protocol-producer-consumer)
+- [6. Polling Strategy](#6-polling-strategy)
+  - [6.1 Polling the Business Table (Session Status)](#61-polling-the-business-table-session-status)
+  - [6.2 Polling the Progress Table (Event Log)](#62-polling-the-progress-table-event-log)
+  - [6.3 Detecting Completion](#63-detecting-completion)
+  - [6.4 Detecting Errors](#64-detecting-errors)
+  - [6.5 Detecting Stale Sessions](#65-detecting-stale-sessions)
+- [7. Event Lifecycle](#7-event-lifecycle)
+- [8. Complete Stage Reference with result_json Schemas](#8-complete-stage-reference-with-result_json-schemas)
+- [9. How the UI Should Build the Model Visually](#9-how-the-ui-should-build-the-model-visually)
+- [10. Querying result_json (VARIANT Column)](#10-querying-result_json-variant-column)
+- [11. Client Implementation Pseudocode](#11-client-implementation-pseudocode)
+- [12. Operational Modes](#12-operational-modes)
+- [13. Timing Characteristics](#13-timing-characteristics)
+- [14. Edge Cases and Error Handling](#14-edge-cases-and-error-handling)
+- [15. SQL Quick Reference](#15-sql-quick-reference)
+
+---
+
 ## 1. Architecture Overview
 
 The Vibe Modelling Agent is a long-running backend pipeline that generates enterprise data models (domains, products, attributes, foreign keys, physical schemas, tags, sample data, and artifacts) using LLMs. It runs as a Databricks notebook job on serverless compute.
@@ -1620,3 +1656,7 @@ WHERE session_id = <session_id_bigint>
   AND status = 'stage_ended'
   AND result_json:status::STRING = 'success'
 ```
+
+---
+
+[← Back to project root](../readme.md)

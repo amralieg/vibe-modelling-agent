@@ -4,6 +4,29 @@
 
 This document outlines a vibed Lakehouse data model for the Manufacturing business that can be deployed to Databricks Platform. The model is structured into business-aligned domains and denormalized data products, optimized for analytical workloads.
 
+## Table of Contents
+
+- [Output Folder Structure](#output-folder-structure)
+- [Model Metrics](#model-metrics)
+- [Business Summary](#business-summary)
+- [Business Domains & Subdomains](#business-domains--subdomains)
+  - [Asset](#domain-asset)
+  - [Engineering](#domain-engineering)
+  - [Inventory](#domain-inventory)
+  - [Logistics](#domain-logistics)
+  - [Production](#domain-production)
+  - [Quality](#domain-quality)
+  - [Customer](#domain-customer)
+  - [Order](#domain-order)
+  - [Product](#domain-product)
+  - [Sales](#domain-sales)
+  - [Service](#domain-service)
+  - [Shared](#domain-shared)
+  - [Finance](#domain-finance)
+  - [Procurement](#domain-procurement)
+- [Metric Views](#metric-views)
+
+
 ## Output Folder Structure
 
 All artifacts for version **v1_mvm** are organized as follows:
@@ -53,6 +76,8 @@ v1_mvm/
 
 ## Business Domains & Subdomains
 
+<a id="domain-asset"></a>
+
 ### Domain: Asset
 
 | Domain | Division | Total Subdomains | Description | Total Products |
@@ -79,6 +104,8 @@ v1_mvm/
 | service_coverage | contract_coverage | association_data | This association product represents the Contract (coverage assignment) between service_contract and maintenance_plan. It captures the formal scope definition of which maintenance plans are covered under a given vendor service contract, including the specific terms, visit allocations, and priority levels that apply to each plan-contract pairing. Each record links one service_contract to one maintenance_plan with attributes that exist only in the context of this coverage relationship — such as how many PM visits are allocated to that plan under that contract, and the effective coverage dates for that specific pairing.. Existence Justification: In industrial manufacturing EAM, a single service contract (e.g., a vendor OEM agreement) explicitly covers multiple maintenance plans — for example, Contract SC-2024-001 covers PM Plan MP-CNC-001, MP-CNC-002, and MP-HVAC-003 at Plant A. Conversely, a single maintenance plan (e.g., a quarterly lubrication cycle for a CNC machine) can be covered by multiple service contracts over its lifetime, or simultaneously by overlapping contracts (e.g., an OEM contract for parts and a third-party contract for labor). The business actively manages this coverage scope as a formal assignment — procurement and maintenance teams create, update, and terminate these coverage records as contracts are negotiated and plans are revised. | 8 |
 | service_coverage | service_contract | master_data | OEM and third-party maintenance service contract records covering manufacturing equipment. Captures contract scope, covered assets, SLA terms (response time, uptime guarantees), contract value, billing frequency, included services (preventive maintenance, emergency response, spare parts), and contract performance metrics. Distinct from customer-facing service contracts managed in the service domain — this covers vendor-side maintenance contracts for owned assets. | 46 |
 
+<a id="domain-engineering"></a>
+
 ### Domain: Engineering
 
 | Domain | Division | Total Subdomains | Description | Total Products |
@@ -102,6 +129,8 @@ v1_mvm/
 | product_structure | component_tooling_assignment | association_data | This association product represents the Assignment relationship between a BOM line item (component) and a tooling/equipment master record. It captures which specific tools are required to manufacture a given component, including the role of each tool, its setup sequence, effectivity window, and the plant where the assignment applies. Each record links one bom_line to one tooling_equipment with attributes that exist only in the context of this component-tool pairing. Supports PPAP qualification, tooling planning, and MRP tooling requirement explosion.. Existence Justification: In industrial manufacturing, a BOM line item (component) genuinely requires multiple specialized tools simultaneously — e.g., a machined part needs a fixture, a cutting tool, and a gauge — while each tool is shared across many different BOM components across different assemblies and plants. This is an operationally managed relationship: engineering teams actively create, update, and retire component-tooling assignments as part of PPAP qualification, tooling planning, and production readiness. The relationship carries its own data (usage type, setup sequence, effectivity dates, plant scope) that belongs to neither the BOM line nor the tool master alone. | 8 |
 | product_structure | plm_lifecycle_state | reference_data | Reference record defining the authorized lifecycle states and state transition rules for PLM-managed objects (components, BOMs, drawings, CAD models) within the Teamcenter PLM workflow. Captures state code, state name, allowed transitions, required approvals, and applicable object types. Provides the governance framework for product data maturity progression from concept through obsolescence. | 40 |
 | product_structure | substitute_component | master_data | Association record defining approved substitute or alternate components that can replace a primary component in a BOM when the primary is unavailable or obsolete. Captures the primary component reference, substitute component reference, substitution type (full, conditional, temporary), applicable BOM context, approval status, and any use restrictions or quantity adjustments. Supports MRP exception handling and supply chain resilience. | 39 |
+
+<a id="domain-inventory"></a>
 
 ### Domain: Inventory
 
@@ -127,6 +156,8 @@ v1_mvm/
 | stock_movement | replenishment_order | transactional_data | Tracks internal replenishment requests and warehouse replenishment orders generated to move stock from reserve storage to pick locations or from bulk storage to forward pick areas. Captures replenishment order number, trigger type (min/max, kanban, manual), source location, destination location, SKU, requested quantity, replenishment status (open, in-progress, completed), priority, and completion timestamp. Aligned with Infor WMS replenishment module. | 48 |
 | stock_movement | stock_transfer | transactional_data | Records inter-plant, inter-warehouse, and inter-location stock transfer orders and their execution. Captures transfer order number, transfer type (plant-to-plant, warehouse-to-warehouse, storage location transfer, STO), source plant/warehouse/location, destination plant/warehouse/location, SKU, quantity, transfer status, planned date, actual transfer date, and transport reference. Aligned with SAP MM STO and Infor WMS transfer order. | 40 |
 | stock_movement | transaction | transactional_data | Transactional record of every inventory movement event including goods receipts (GRN), goods issues, stock transfers, returns, scrapping, production confirmations, and adjustments. Captures movement type, quantity, unit of measure, source and destination locations, reference document (PO, production order, sales order), posting date, batch number, and posting user. Aligned with SAP MM material document and Infor WMS transaction history. | 44 |
+
+<a id="domain-logistics"></a>
 
 ### Domain: Logistics
 
@@ -155,6 +186,8 @@ v1_mvm/
 | transport_planning | route | master_data | Master definition of a transportation lane or route between an origin location and a destination location. Stores origin/destination location codes, transport mode, distance (km/miles), standard transit days, preferred carrier, route type (direct, hub-and-spoke, multimodal), and active status. Used as the reference backbone for TMS route optimization and freight rate assignment. | 40 |
 | transport_planning | route_stop | transactional_data | Individual stop or waypoint within a multi-leg or milk-run route. Records stop sequence, location code, planned arrival/departure timestamps, dwell time, stop type (pickup, delivery, cross-dock, customs), and actual arrival/departure for on-time performance tracking. Enables granular visibility into multi-stop freight movements. | 39 |
 | transport_planning | transport_plan | transactional_data | TMS-generated transportation plan that consolidates shipment demands into optimized load plans and route assignments. Captures planning horizon, optimization objective (cost, time, CO2), total planned loads, planned carrier mix, planned freight spend, and plan status (draft, confirmed, executed). Supports MRP II-aligned distribution requirements planning (DRP) and freight budget management. | 40 |
+
+<a id="domain-production"></a>
 
 ### Domain: Production
 
@@ -186,6 +219,8 @@ v1_mvm/
 | shop_execution | production_confirmation | transactional_data | Goods confirmation record posted against a production order upon completion of production activities (SAP PP Goods Receipt / Order Confirmation). Captures confirmed quantity (yield), scrap quantity, rework quantity, confirmation timestamp, confirming operator, work center, movement type, storage location, batch number, and variance reason codes. Triggers inventory postings (WIP to finished goods), actual cost settlement, and order status updates. SSOT for production output quantities and completion events. | 48 |
 | shop_execution | schedule | transactional_data | Planned production schedule generated by MRP II / capacity planning for a planning horizon. Captures planned production quantities per finished good or semi-finished material, per work center, per time bucket (daily/weekly). Stores schedule version, planning horizon start/end, planned order references, capacity load percentage, scheduling strategy (forward/backward), takt time targets, and schedule status (draft, released, frozen). Drives shop floor execution sequencing and feeds ATP/CTP commitments to the order domain. SSOT for the production plan. | 48 |
 | shop_execution | shop_order_operation | transactional_data | Execution-level record for each operation performed against a production order on the shop floor (Opcenter MES Operation / SAP PP Confirmation at operation level). Tracks actual start/finish timestamps, operator ID, work center, machine ID, actual setup time, actual run time, actual labor time, yield quantity, scrap quantity, rework quantity, operation status (queued, active, completed, held), and NC (non-conformance) flag. Provides granular WIP tracking and feeds OEE calculations and actual cost confirmations. | 49 |
+
+<a id="domain-quality"></a>
 
 ### Domain: Quality
 
@@ -219,6 +254,8 @@ v1_mvm/
 | measurement_compliance | gauge | master_data | Gauge and measurement instrument master record for all measuring equipment used in quality inspection. Captures gauge ID, description, gauge type (CMM, caliper, micrometer, go/no-go, torque wrench), calibration interval, last calibration date, next due date, calibration status, and assigned location. Supports ISO 9001 Clause 7.1.5 measurement resource management. | 43 |
 | measurement_compliance | gauge_calibration | transactional_data | Calibration event record for each gauge or measurement instrument calibration activity. Captures calibration date, calibration lab (internal/external), calibration standard used, as-found and as-left condition, pass/fail result, calibration certificate number, and next scheduled calibration date. Provides full MSA and traceability audit trail. | 38 |
 
+<a id="domain-customer"></a>
+
 ### Domain: Customer
 
 | Domain | Division | Total Subdomains | Description | Total Products |
@@ -238,6 +275,8 @@ v1_mvm/
 | commercial_relationships | account_contact_role | master_data | Association entity linking contacts to accounts with specific business roles, capturing the nature of the relationship between a person and an organization. Captures role type (primary commercial contact, technical decision maker, accounts payable contact, plant manager, executive sponsor), start date, end date, active flag, and communication preference. Enables targeted communication routing and relationship mapping across complex B2B accounts. | 34 |
 | commercial_relationships | pricing_coverage_assignment | association_data | This association product represents the Contract between account_hierarchy and pricing_agreement. It captures the formal assignment of a negotiated pricing agreement to a specific account hierarchy node (subsidiary, division, or affiliate), defining the scope, validity period, approval status, and exclusivity of that coverage. Each record links one account_hierarchy node to one pricing_agreement with attributes that exist only in the context of this specific node-agreement assignment. Feeds SAP S/4HANA condition record scoping and global account management workflows.. Existence Justification: In industrial manufacturing, global pricing agreements are negotiated at the corporate parent level but must be explicitly applied to specific entities within the account hierarchy (subsidiaries, divisions, affiliates). A single pricing agreement covers multiple hierarchy nodes (e.g., all EMEA subsidiaries of a global OEM), and a given hierarchy node may be covered by multiple pricing agreements for different product lines or agreement types. This is an operationally managed relationship — commercial teams actively create, maintain, and expire these assignments as part of account management and SAP S/4HANA condition record management. | 8 |
 | commercial_relationships | sales_area_assignment | master_data | Maps customer accounts to specific SAP S/4HANA sales areas (Sales Organization, Distribution Channel, Division) defining which products and pricing conditions apply to each customer in each sales area. Captures sales organization code, distribution channel, division, customer group, price list type, incoterms, delivery priority, and order combination flag. Foundational for order management and pricing determination. | 36 |
+
+<a id="domain-order"></a>
 
 ### Domain: Order
 
@@ -268,6 +307,8 @@ v1_mvm/
 | quotation_management | quotation_line_item | transactional_data | Individual line item within a commercial quotation detailing a specific product, system, or component being quoted. Captures line number, material/SKU, quoted quantity, unit of measure, list price, quoted net price, discount percentage, delivery lead time, configuration options, technical specifications summary, and line item status. Enables granular pricing and configuration tracking at the item level for complex industrial manufacturing quotations. | 43 |
 | quotation_management | rfq_request | transactional_data | Inbound Request for Quotation (RFQ) or Request for Proposal (RFP) received from a customer or prospect. Captures RFQ/RFP number, customer identity, submission date, response due date, project name, application type (factory automation, building electrification, transportation infrastructure), required delivery date, technical requirements summary, quantity requirements, budget indication, evaluation criteria, RFQ status (received, under review, responded, awarded, declined), and assigned sales/application engineer. SSOT for inbound customer RFQ/RFP records. | 41 |
 
+<a id="domain-product"></a>
+
 ### Domain: Product
 
 | Domain | Division | Total Subdomains | Description | Total Products |
@@ -289,6 +330,8 @@ v1_mvm/
 | commercial_pricing | price_list_item | master_data | Individual line-level pricing record within a price list, associating a specific SKU or catalog item to a unit price, pricing unit of measure, minimum quantity, and scale/tiered pricing breaks. Captures list price, floor price, recommended retail price (RRP), and any surcharge or discount conditions. Supports volume-based pricing tiers (e.g., 1-9 units at $X, 10-99 units at $Y). The authoritative source for base product pricing consumed by order management and CPQ. | 41 |
 | compliance_safety | hazardous_substance | master_data | Tracks restricted and declarable substances present in catalog items for RoHS, REACH, and other chemical compliance programs. Captures substance name, CAS number, substance concentration (ppm), threshold limit per regulation, applicable regulation (RoHS, REACH SVHC, California Prop 65), declaration type (exemption, substitution, declaration of conformity), and the associated catalog item or component. Supports product compliance documentation and customer material declarations (e.g., IPC-1752A). | 42 |
 | compliance_safety | regulatory_certification | master_data | Records all product-level regulatory certifications and compliance approvals required for market access — including CE Marking, UL Listing, RoHS compliance, REACH substance declarations, CSA, CCC, and EAC certifications. Captures certification type, issuing body, certificate number, scope (product or product family), issue date, expiry date, applicable markets/regions, certification status (valid, expired, under renewal), and the responsible compliance owner. Critical for export control and customer compliance documentation. | 40 |
+
+<a id="domain-sales"></a>
 
 ### Domain: Sales
 
@@ -314,6 +357,8 @@ v1_mvm/
 | revenue_planning | forecast | transactional_data | Periodic sales forecast record capturing projected revenue, units, and margin by product family, territory, and time period. Supports rolling forecast cycles (monthly/quarterly) for industrial automation and electrification product lines. Tracks forecast version, submission date, confidence level, and variance to quota. Feeds S&OP and financial planning. | 44 |
 | revenue_planning | quota | master_data | Defines periodic revenue, margin, and unit sales quotas assigned to individual sales representatives, channel partners, or territory teams for industrial product lines and solution categories. Tracks quota type (revenue/units/margin), period (monthly/quarterly/annual), product family scope, and attainment basis. | 39 |
 | revenue_planning | territory_assignment | association_data | Association entity linking sales representatives or channel partners to specific territories with defined roles, effective periods, and quota allocations. Supports split-territory scenarios common in large industrial project sales where multiple reps collaborate on a single account or geography. | 32 |
+
+<a id="domain-service"></a>
 
 ### Domain: Service
 
@@ -342,6 +387,8 @@ v1_mvm/
 | field_operations | technician | master_data | Master records for field service technicians and service engineers deployed to customer sites for installation, commissioning, repair, and maintenance of automation and electrification products. Captures technician employee ID, name, skill certifications (PLC programming, drive commissioning, HMI configuration, electrical safety), product line competencies, geographic service territory, current availability status, base location, vehicle assignment, and active work order count. Distinct from workforce.employee which is the HR master — this entity captures service-domain-specific competency and dispatch attributes not held in the HR system. | 35 |
 | parts_inventory | spare_parts_catalog | master_data | Master catalog of spare parts and aftermarket components available for service and repair of Manufacturing's automation systems, electrification solutions, and smart infrastructure products. Captures part number, part description, compatible product families, supersession chain (old part to new part), list price, lead time, minimum order quantity, hazardous material flag, shelf life, storage conditions, and availability status. Serves as the aftermarket parts reference for field service engineers and customer self-service portals. Complements inventory.sku which manages stock positions — this entity manages the commercial aftermarket catalog definition. | 40 |
 | parts_inventory | spare_parts_request | transactional_data | Transactional records for spare parts and MRO materials requested to fulfill field service orders and warranty repairs for customer-installed automation and electrification equipment. Captures the originating field service order or warranty claim, requested part number, part description, quantity requested, urgency level, requested delivery date, source warehouse, fulfillment status, actual quantity issued, and shipment reference. Distinct from inventory domain stock management — this entity captures the service-driven demand signal and fulfillment tracking specific to aftermarket operations. | 51 |
+
+<a id="domain-shared"></a>
 
 ### Domain: Shared
 
@@ -407,6 +454,8 @@ v1_mvm/
 | product_engineering | product_variant | master_data | Master record defining configurable product variants and option combinations for automation systems and electrification solutions offered in multiple configurations. Captures variant code, variant description, base product reference, configuration options (voltage, power rating, communication protocol, enclosure class), variant-specific BOM reference, and market applicability. Supports ATO (Assemble to Order) and ETO (Engineer to Order) fulfillment models. | 45 |
 | product_engineering | tooling_equipment | master_data | Master record for specialized manufacturing tooling, jigs, fixtures, molds, and test equipment designed or managed by the engineering function. Captures tool number, tool type, associated process operation, design revision, tool material, tool life (shots or cycles), current status (active, under repair, retired), storage location, and calibration requirement flag. Distinct from production asset records owned by the asset domain. | 38 |
 
+<a id="domain-finance"></a>
+
 ### Domain: Finance
 
 | Domain | Division | Total Subdomains | Description | Total Products |
@@ -427,6 +476,8 @@ v1_mvm/
 | ledger_management | chart_of_accounts | master_data | Authoritative master list of all general ledger account codes used across Manufacturing legal entities. Defines account number, account name, account type (asset, liability, equity, revenue, expense), financial statement line mapping, IFRS/GAAP classification, cost element linkage, and consolidation group assignment. Supports multi-chart configurations for local statutory versus group IFRS reporting. | 38 |
 | ledger_management | journal_entry | transactional_data | Core transactional record capturing every financial posting made to the general ledger across all Manufacturing legal entities. Records document number, document type, posting date, document date, fiscal year, fiscal period, reference document, posting key, reversal indicator, source system, currency, exchange rate, and posting user. The atomic unit of the double-entry bookkeeping system and the foundation for all financial statements. Sourced from SAP S/4HANA FI. | 43 |
 | ledger_management | journal_entry_line | transactional_data | Individual line item within a journal entry document, representing a single debit or credit posting to a GL account. Captures line item number, GL account, debit/credit indicator, amount in transaction currency, amount in local currency, amount in group currency, cost center, profit center, WBS element, business area, tax code, assignment field, and line item text. Provides the granular detail required for account analysis, cost allocation, and audit trails. | 42 |
+
+<a id="domain-procurement"></a>
 
 ### Domain: Procurement
 

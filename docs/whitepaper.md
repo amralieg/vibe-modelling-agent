@@ -1,4 +1,8 @@
-# Vibe Data Modeling: A White Paper
+# Vibe Data Modeling — A White Paper
+
+> Philosophy, methodology, and complete rules catalog for building industry-neutral data models with the Vibe Modelling Agent.
+
+[← Back to project root](../readme.md) · [Design guide](design-guide.md) · [Integration guide](integration-guide.md)
 
 > **NOTE:** All examples in this paper are illustrative and industry-neutral. When applying these concepts, always adapt terminology, domain names, product names, and entity names to the specific industry and business being modeled.
 
@@ -8,33 +12,33 @@
 
 - [Introduction](#introduction)
 - [Step 1 -- The Base Model](#step-1----the-base-model)
-  - [1.1 -- Knowing the Business Before Modeling It](#11----knowing-the-business-before-modeling-it)
-  - [1.2 -- Segmenting the Organization into Three Divisions](#12----segmenting-the-organization-into-three-divisions)
-  - [1.3 -- Segmenting Divisions into Domains](#13----segmenting-divisions-into-domains)
-  - [1.4 -- Filling Domains with Tables](#14----filling-domains-with-tables)
-  - [1.5 -- Filling Tables with Attributes](#15----filling-tables-with-attributes)
-  - [1.6 -- In-Domain Linking](#16----in-domain-linking)
-  - [1.7 -- Cross-Domain Linking and Pairwise Comparison](#17----cross-domain-linking-and-pairwise-comparison)
-  - [1.8 -- Quality Checks, Deployment, and Self-Assessment](#18----quality-checks-deployment-and-self-assessment)
+  - [1.1 -- Knowing the Business Before Modeling It](#11--knowing-the-business-before-modeling-it)
+  - [1.2 -- Segmenting the Organization into Three Divisions](#12--segmenting-the-organization-into-three-divisions)
+  - [1.3 -- Segmenting Divisions into Domains](#13--segmenting-divisions-into-domains)
+  - [1.4 -- Filling Domains with Tables](#14--filling-domains-with-tables)
+  - [1.5 -- Filling Tables with Attributes](#15--filling-tables-with-attributes)
+  - [1.6 -- In-Domain Linking](#16--in-domain-linking)
+  - [1.7 -- Cross-Domain Linking and Pairwise Comparison](#17--cross-domain-linking-and-pairwise-comparison)
+  - [1.8 -- Quality Checks, Deployment, and Self-Assessment](#18--quality-checks-deployment-and-self-assessment)
 - [Step 2 -- Vibe Modeling](#step-2----vibe-modeling)
-  - [2.1 -- Understanding Intent: Surgical, Holistic, and Generative Modes](#21----understanding-intent-surgical-holistic-and-generative-modes)
-  - [2.2 -- Model Evolution: The Progression Toward the Ideal](#22----model-evolution-the-progression-toward-the-ideal)
+  - [2.1 -- Understanding Intent: Surgical, Holistic, and Generative Modes](#21--understanding-intent-surgical-holistic-and-generative-modes)
+  - [2.2 -- Model Evolution: The Progression Toward the Ideal](#22--model-evolution-the-progression-toward-the-ideal)
 - [The Ontology and DAG-First Mindset](#the-ontology-and-dag-first-mindset)
 - [Closing](#closing)
 - [Appendix: Data Modeling Rules Catalog](#appendix-data-modeling-rules-catalog)
-  - [G01 -- Naming Convention Rules](#g01----naming-convention-rules)
-  - [G02 -- Semantic Deduplication Rules](#g02----semantic-deduplication-rules)
-  - [G03 -- Foreign Key Rules](#g03----foreign-key-rules)
-  - [G04 -- Primary Key Rules](#g04----primary-key-rules)
-  - [G05 -- Normalization Rules](#g05----normalization-rules)
-  - [G06 -- Domain and Division Rules](#g06----domain-and-division-rules)
-  - [G07 -- Data Type Rules](#g07----data-type-rules)
-  - [G08 -- Tag and Classification Rules](#g08----tag-and-classification-rules)
-  - [G09 -- Relationship and Graph Rules](#g09----relationship-and-graph-rules)
-  - [G11 -- Quality and Validation Rules](#g11----quality-and-validation-rules)
-  - [G12 -- Product Design Rules](#g12----product-design-rules)
+  - [G01 -- Naming Convention Rules](#g01--naming-convention-rules)
+  - [G02 -- Semantic Deduplication Rules](#g02--semantic-deduplication-rules)
+  - [G03 -- Foreign Key Rules](#g03--foreign-key-rules)
+  - [G04 -- Primary Key Rules](#g04--primary-key-rules)
+  - [G05 -- Normalization Rules](#g05--normalization-rules)
+  - [G06 -- Domain and Division Rules](#g06--domain-and-division-rules)
+  - [G07 -- Data Type Rules](#g07--data-type-rules)
+  - [G08 -- Tag and Classification Rules](#g08--tag-and-classification-rules)
+  - [G09 -- Relationship and Graph Rules](#g09--relationship-and-graph-rules)
+  - [G11 -- Quality and Validation Rules](#g11--quality-and-validation-rules)
+  - [G12 -- Product Design Rules](#g12--product-design-rules)
   - [Semantic Distinction Rules (Supplementary)](#semantic-distinction-rules-supplementary)
-  - [SUB -- Subdomain Rules](#sub----subdomain-rules)
+  - [SUB -- Subdomain Rules](#sub--subdomain-rules)
 
 ---
 
@@ -84,7 +88,7 @@ The modeler describes the organization. The system segments it into three divisi
 
 ---
 
-### 1.1 -- Knowing the Business Before Modeling It
+### 1.1 — Knowing the Business Before Modeling It
 
 Every data model begins with a question: *what does this business do?*
 
@@ -110,7 +114,7 @@ And every step -- from this enrichment to the last foreign key constraint -- fol
 
 ---
 
-### 1.2 -- Segmenting the Organization into Three Divisions
+### 1.2 — Segmenting the Organization into Three Divisions
 
 Before a single domain is named, the system establishes the organizational scaffolding. Every business, regardless of industry, operates in three concentric rings of activity. Understanding these rings is the first architectural decision.
 
@@ -124,7 +128,7 @@ This three-ring structure is not a suggestion. It is a constraint (**G06-R001**)
 
 ---
 
-### 1.3 -- Segmenting Divisions into Domains
+### 1.3 — Segmenting Divisions into Domains
 
 The three divisions are now established -- Operations, Business, Corporate. But a division is too broad to model directly. No one builds a database called "Operations." The next step is to break each division into domains -- the actual modeling units that will hold tables, columns, and relationships.
 
@@ -154,7 +158,7 @@ The result is a set of domains, each classified into one of the three divisions.
 
 ---
 
-### 1.4 -- Filling Domains with Tables
+### 1.4 — Filling Domains with Tables
 
 With domains established, the model enters its most prolific phase: filling each domain with data products -- the tables that will hold the business's data.
 
@@ -180,7 +184,7 @@ Each table receives a primary key following a sacred convention (**G04-R001**, *
 
 ---
 
-### 1.5 -- Filling Tables with Attributes
+### 1.5 — Filling Tables with Attributes
 
 Every table now has a name, a classification, and a primary key. But a table without columns is just a label. This step gives each table its substance.
 
@@ -202,7 +206,7 @@ Within each table, columns follow a strict seating arrangement (**G12-R021**): p
 
 ---
 
-### 1.6 -- In-Domain Linking
+### 1.6 — In-Domain Linking
 
 Tables exist. Columns exist. But without relationships, they are a collection of isolated spreadsheets. The web of foreign key relationships is what transforms tables into a model.
 
@@ -222,7 +226,7 @@ After the domain-level linking pass, a batch semantic resolution step sweeps the
 
 ---
 
-### 1.7 -- Cross-Domain Linking and Pairwise Comparison
+### 1.7 — Cross-Domain Linking and Pairwise Comparison
 
 If in-domain linking connects the rooms of a house, cross-domain linking connects the houses into a city. This is where the model becomes a true enterprise data mesh.
 
@@ -240,7 +244,7 @@ Throughout this phase, the model enforces its most important structural law (**G
 
 ---
 
-### 1.8 -- Quality Checks, Deployment, and Self-Assessment
+### 1.8 — Quality Checks, Deployment, and Self-Assessment
 
 Everything built so far -- domains, tables, columns, relationships -- has been constructed in stages, each following its own rules. But has the whole held together? A city built neighborhood by neighborhood can still have mismatched roads, dead ends, and buildings that violate the zoning code. This step holds the entire model up to the light.
 
@@ -270,7 +274,7 @@ Vibe modeling is how their feedback reaches the model. The modeler writes natura
 
 ---
 
-### 2.1 -- Understanding Intent: Surgical, Holistic, and Generative Modes
+### 2.1 — Understanding Intent: Surgical, Holistic, and Generative Modes
 
 Before executing anything, the system must understand what the modeler truly wants. It reads the entire instruction in context and performs a five-dimensional analysis of intent: preservation (keep the model intact or rebuild?), scope (specific entities or broad principle?), change philosophy (targeted fix or new content?), satisfaction (polishing or frustrated?), and the core desired outcome.
 
@@ -300,11 +304,11 @@ The modeler wants something fundamentally new. Their implicit contract: *"Create
 
 In generative mode, the modeler's instructions are decomposed into twelve tailored briefings -- one for each downstream worker (domain generation, product generation, attribute generation, in-domain linking, cross-domain linking, many-to-many detection, semantic deduplication, global deduplication, product merge, attribute deduplication, normalization, and cycle breaking). Each worker receives not a generic copy of the vibe, but a custom briefing with specific requirements, enriched guidance, explicit do's and don'ts, cautions about potential mistakes, and quality criteria. The result is creative without being chaotic: twelve workers, each interpreting the same vision through the lens of their own expertise.
 
-After all changes -- whether surgical, holistic, or generative -- the model re-enters the same quality pipeline from [section 1.8](#18----quality-checks-deployment-and-self-assessment). The same rules apply. The same checks run. A table born during a vibe receives the same scrutiny as a table born during the original creation. Vibe modeling does not shortcut quality.
+After all changes -- whether surgical, holistic, or generative -- the model re-enters the same quality pipeline from [section 1.8](#18--quality-checks-deployment-and-self-assessment). The same rules apply. The same checks run. A table born during a vibe receives the same scrutiny as a table born during the original creation. Vibe modeling does not shortcut quality.
 
 ---
 
-### 2.2 -- Model Evolution: The Progression Toward the Ideal
+### 2.2 — Model Evolution: The Progression Toward the Ideal
 
 The real power of vibe modeling is not any single iteration. It is the progression.
 
@@ -382,7 +386,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G01 -- Naming Convention Rules
+### G01 — Naming Convention Rules
 
 *How to name domains, tables, and columns consistently.*
 
@@ -412,7 +416,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G02 -- Semantic Deduplication Rules
+### G02 — Semantic Deduplication Rules
 
 *How to detect and resolve duplicate concepts to maintain a Single Source of Truth.*
 
@@ -442,7 +446,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G03 -- Foreign Key Rules
+### G03 — Foreign Key Rules
 
 *How to create and maintain foreign key relationships.*
 
@@ -464,7 +468,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G04 -- Primary Key Rules
+### G04 — Primary Key Rules
 
 *How to define and manage primary keys.*
 
@@ -481,7 +485,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G05 -- Normalization Rules
+### G05 — Normalization Rules
 
 *How to enforce Third Normal Form (3NF) and handle denormalization.*
 
@@ -504,7 +508,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G06 -- Domain and Division Rules
+### G06 — Domain and Division Rules
 
 *How to organize domains and classify them into divisions.*
 
@@ -530,7 +534,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G07 -- Data Type Rules
+### G07 — Data Type Rules
 
 *What data types to use for columns.*
 
@@ -545,7 +549,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G08 -- Tag and Classification Rules
+### G08 — Tag and Classification Rules
 
 *How to classify data sensitivity and apply tags.*
 
@@ -563,7 +567,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G09 -- Relationship and Graph Rules
+### G09 — Relationship and Graph Rules
 
 *How the data model's relationships must be structured.*
 
@@ -584,7 +588,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G11 -- Quality and Validation Rules
+### G11 — Quality and Validation Rules
 
 *Quality standards the data model must meet.*
 
@@ -603,7 +607,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### G12 -- Product Design Rules
+### G12 — Product Design Rules
 
 *How to design tables (data products) for the model.*
 
@@ -652,7 +656,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 
 ---
 
-### SUB -- Subdomain Rules
+### SUB — Subdomain Rules
 
 *How to organize products into subdomains within a domain. These rules govern the allocation of products to semantic groupings that provide an additional organizational layer between domains and products.*
 
@@ -685,3 +689,7 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 | G11 | Quality and Validation Rules | 10 |
 | G12 | Product Design Rules | 26 |
 | SUB | Subdomain Rules | 8 |
+
+---
+
+[← Back to project root](../readme.md)

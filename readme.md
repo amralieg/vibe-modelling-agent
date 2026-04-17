@@ -53,11 +53,12 @@
 
 | Document | Description |
 |:---|:---|
+| [docs/](docs/readme.md) | Documentation index — whitepaper, design guide, integration guide |
 | [docs/design-guide.md](docs/design-guide.md) | Technical design reference |
 | [docs/integration-guide.md](docs/integration-guide.md) | UI/consumer integration protocol |
 | [docs/whitepaper.md](docs/whitepaper.md) | Philosophy and complete rules catalog |
-| [runner/runner-guide.md](runner/runner-guide.md) | Pipeline orchestrator guide |
-| [tests/testing-guide.md](tests/testing-guide.md) | Test suite reference |
+| [runner/readme.md](runner/readme.md) | Pipeline orchestrator guide |
+| [tests/readme.md](tests/readme.md) | Test suite reference |
 
 ---
 
@@ -788,7 +789,7 @@ When you run the agent, it executes these progress stages in order (the `#` colu
 | `products.json` | All product (table) definitions |
 | `attributes.json` | All attribute (column) definitions |
 | `docs/*.xlsx` / `docs/*.csv` | Excel/CSV export of the entire model (CSV fallback if openpyxl unavailable) |
-| `docs/*_model_overview_*.md` | Model overview document |
+| `readme.md` (parent folder) | Model overview document comparing MVM and ECM scopes |
 | `schemas/*.sql` | SQL DDL files (per-domain schemas, cross-domain FKs, catalogs) |
 | `diagram/*_dbml_*.txt` | DBML schema diagram |
 | `ontology/*_rdf_*.ttl` | RDF/Turtle ontology representation |
