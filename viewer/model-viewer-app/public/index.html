@@ -267,40 +267,60 @@ function calcDomainViewPositions(filteredNodes){
   });
   if(!Object.keys(groups).length) return {};
   const sorted=Object.entries(groups).sort((a,b)=>a[0]==='__ungrouped__'?1:b[0]==='__ungrouped__'?-1:a[0].localeCompare(b[0]));
-  const ns=80; // spacing between nodes inside a group
-  const gap=120; // gap between groups
+  const ns=130; // spacing between nodes inside a group
+  const pad=160; // extra padding around each group for subdomain box + label
 
-  // Calculate each group's bounding size
+  // Calculate each group's bounding size including padding
   const groupSizes=sorted.map(([,tables])=>{
-    const tc=Math.max(1,Math.ceil(Math.sqrt(tables.length)));
-    const tr=Math.ceil(tables.length/tc);
-    return {w:tc*ns+gap, h:tr*ns+gap};
+    const cols=Math.max(1,Math.ceil(Math.sqrt(tables.length)));
+    const rows=Math.ceil(tables.length/cols);
+    return {w:cols*ns+pad, h:rows*ns+pad, cols, rows};
   });
 
-  // Place groups in a circle to avoid overlap
   const numGroups=sorted.length;
   if(numGroups===1){
     const tables=sorted[0][1];
-    const tc=Math.max(1,Math.ceil(Math.sqrt(tables.length)));
+    const {cols}=groupSizes[0];
     const positions={};
     tables.forEach((n,i)=>{
-      const row=Math.floor(i/tc),col=i%tc;
-      positions[n.data.id]={x:(col-(tc-1)/2)*ns, y:(row-(Math.ceil(tables.length/tc)-1)/2)*ns};
+      const row=Math.floor(i/cols),col=i%cols;
+      positions[n.data.id]={x:(col-(cols-1)/2)*ns, y:(row-(Math.ceil(tables.length/cols)-1)/2)*ns};
     });
     return positions;
   }
 
-  const circumference=groupSizes.reduce((sum,g)=>sum+Math.max(g.w,g.h),0);
-  const outerR=Math.max(400, circumference/(2*Math.PI));
+  // Grid layout: pack subdomain boxes into rows/cols using max width/height per column/row
+  const gap=100;
+  const gCols=Math.ceil(Math.sqrt(numGroups));
+  const gRows=Math.ceil(numGroups/gCols);
+  const colWidths=new Array(gCols).fill(0);
+  const rowHeights=new Array(gRows).fill(0);
+  groupSizes.forEach((g,gi)=>{
+    const gc=gi%gCols, gr=Math.floor(gi/gCols);
+    colWidths[gc]=Math.max(colWidths[gc],g.w);
+    rowHeights[gr]=Math.max(rowHeights[gr],g.h);
+  });
+  const totalW=colWidths.reduce((s,w)=>s+w,0)+(gCols-1)*gap;
+  const totalH=rowHeights.reduce((s,h)=>s+h,0)+(gRows-1)*gap;
+  const colCenters=colWidths.map((w,i)=>{
+    let x=-totalW/2;
+    for(let k=0;k<i;k++) x+=colWidths[k]+gap;
+    return x+w/2;
+  });
+  const rowCenters=rowHeights.map((h,i)=>{
+    let y=-totalH/2;
+    for(let k=0;k<i;k++) y+=rowHeights[k]+gap;
+    return y+h/2;
+  });
 
   const positions={};
   sorted.forEach(([,tables],gi)=>{
-    const angle=(2*Math.PI*gi/numGroups)-(Math.PI/2);
-    const cx=outerR*Math.cos(angle), cy=outerR*Math.sin(angle);
-    const tc=Math.max(1,Math.ceil(Math.sqrt(tables.length)));
+    const gc=gi%gCols, gr=Math.floor(gi/gCols);
+    const cx=colCenters[gc], cy=rowCenters[gr];
+    const {cols,rows}=groupSizes[gi];
     tables.forEach((n,i)=>{
-      const row=Math.floor(i/tc),col=i%tc;
-      positions[n.data.id]={x:cx+(col-(tc-1)/2)*ns, y:cy+(row-(Math.ceil(tables.length/tc)-1)/2)*ns};
+      const row=Math.floor(i/cols),col=i%cols;
+      positions[n.data.id]={x:cx+(col-(cols-1)/2)*ns, y:cy+(row-(rows-1)/2)*ns};
     });
   });
   return positions;
@@ -328,13 +348,13 @@ function getStylesheet(showDomains=true,sizeScale=1){
       textBackgroundPadding:nd(2)+'px '+nd(5)+'px',textBackgroundShape:'roundrectangle',
     }},
     {selector:'.domain-view-node',style:{
-      shape:'ellipse',width:nd(28),height:nd(28),backgroundColor:'data(color)',
+      shape:'ellipse',width:nd(42),height:nd(42),backgroundColor:'data(color)',
       borderWidth:3,borderColor:'rgba(255,255,255,0.95)',
       content:'data(label)',textValign:'bottom',textHalign:'center',
-      fontSize:fs(11),fontWeight:'600',color:'#ffffff',
-      textOutlineWidth:0,textMarginY:nd(8),
+      fontSize:fs(15),fontWeight:'700',color:'#ffffff',
+      textOutlineWidth:0,textMarginY:nd(10),
       textBackgroundColor:'rgba(40,40,60,0.92)',textBackgroundOpacity:1,
-      textBackgroundPadding:nd(3)+'px '+nd(6)+'px',textBackgroundShape:'roundrectangle',
+      textBackgroundPadding:nd(4)+'px '+nd(8)+'px',textBackgroundShape:'roundrectangle',
     }},
     {selector:'.table-node:selected',style:{
       width:nd(35),height:nd(35),borderWidth:4,borderColor:'#FFD700',backgroundColor:'#FFD700',
@@ -401,23 +421,23 @@ function getStylesheet(showDomains=true,sizeScale=1){
       shape:'round-rectangle',backgroundColor:'data(color)',backgroundOpacity:0.12,
       borderWidth:2,borderColor:'data(color)',borderOpacity:0.5,borderStyle:'dashed',
       content:'data(label)',textValign:'top',textHalign:'center',
-      fontSize:'13px',fontWeight:'700',color:'#dddddd',
-      textOutlineWidth:0,textMarginY:-10,padding:'35px',
-      textBackgroundColor:'rgba(30,30,50,0.92)',textBackgroundOpacity:1,
-      textBackgroundPadding:'6px 12px',textBackgroundShape:'roundrectangle',
+      fontSize:'18px',fontWeight:'700',color:'#ffffff',
+      textOutlineWidth:0,textMarginY:-14,padding:'45px',
+      textBackgroundColor:'rgba(30,30,50,0.95)',textBackgroundOpacity:1,
+      textBackgroundPadding:'8px 16px',textBackgroundShape:'roundrectangle',
     }},
   ];
   const domainStyle=showDomains?{selector:'.domain-node',style:{
-    shape:'round-rectangle',width:'data(width)',height:'data(height)',
+    shape:'round-rectangle',
     backgroundColor:'data(color)',backgroundOpacity:0.12,
     borderWidth:2,borderColor:'data(color)',borderOpacity:0.4,
     content:'data(label)',textValign:'top',textHalign:'center',
-    fontSize:'14px',fontWeight:'600',color:'#ffffff',
-    textOutlineWidth:0,textMarginY:-15,padding:'15px',
+    fontSize:'16px',fontWeight:'700',color:'#ffffff',
+    textOutlineWidth:0,textMarginY:-18,padding:'30px',
     textBackgroundColor:'rgba(30,30,50,0.95)',textBackgroundOpacity:1,
     textBackgroundPadding:'10px 16px',textBackgroundShape:'roundrectangle',
   }}:{selector:'.domain-node',style:{
-    width:0,height:0,backgroundOpacity:0,borderWidth:0,content:'',padding:0,
+    backgroundOpacity:0,borderWidth:0,content:'',padding:0,
   }};
   const subdomainHide=showDomains?{}:{selector:'.subdomain-node',style:{
     width:0,height:0,backgroundOpacity:0,borderWidth:0,borderOpacity:0,content:'',padding:0,
@@ -1005,17 +1025,20 @@ function App(){
       const relDomains=new Set();
       const result=[];
       const cn=tableById[tid];
-      if(cn){relDomains.add(cn.data.domain);result.push({...cn,data:{...cn.data,parent:undefined},classes:'table-node center-node'});}
+      if(cn){relDomains.add(cn.data.domain);result.push({...cn,classes:'table-node domain-view-node center-node'});}
       [...outIds,...inIds].filter(id=>id!==tid).forEach(id=>{
         const n=tableById[id];if(!n)return;
         relDomains.add(n.data.domain);
-        result.push({...n,data:{...n.data,parent:undefined},classes:outIds.has(id)?'table-node fk-target':'table-node fk-source'});
+        result.push({...n,classes:outIds.has(id)?'table-node domain-view-node fk-target':'table-node domain-view-node fk-source'});
       });
-      // Add domain boxes (visible when Domains toggle is on, hidden by stylesheet when off)
-      [...relDomains].filter(Boolean).forEach(d=>{const n=domainByName[d];if(n)result.push(n);});
+      // Add domain compound parents so every involved table sits inside its domain box
+      [...relDomains].filter(Boolean).forEach(d=>{
+        const n=domainByName[d];
+        if(n) result.push({...n,classes:'domain-node fk-domain'});
+      });
       outEdges.forEach(e=>result.push({...e,classes:'fk-edge outgoing-edge'}));
       inEdges.forEach(e=>result.push({...e,classes:'fk-edge incoming-edge'}));
-      return applyDomainSizes(result);
+      return result;
     }
 
     if(type==='edge'&&value){
@@ -1137,25 +1160,58 @@ function App(){
         Object.fromEntries(Object.entries(domainSizes.main||{}).map(([k,v])=>[k,v])));
       cy.nodes().forEach(n=>{if(pos[n.id()])n.position(pos[n.id()]);});
     } else if(!type && layout==='circle'){
-      // Circular: free all table nodes from parents, run native circle layout on tables only
-      cy.nodes().forEach(n=>{if(n.data('type')!=='domain')n.move({parent:null});});
-      cy.nodes('[type="domain"]').style({width:0,height:0,backgroundOpacity:0,borderWidth:0,content:'',padding:0});
-      cy.nodes('[type!="domain"]').layout({name:'circle',animate:false,fit:true,padding:60,avoidOverlap:true,spacingFactor:1.5}).run();
-    } else if(type==='attribute'||type==='edge'){
-      cy.layout({name:'preset',animate:false,fit:true,padding:50}).run();
+      // Circular grouped by domain — tables stay compound children so dragging a box moves them
+      const tblNodes=cy.nodes('.table-node').sort((a,b)=>{
+        const da=(a.data('domain')||''), db=(b.data('domain')||'');
+        return da<db?-1:da>db?1:0;
+      });
+      const cnt=tblNodes.length;
+      if(cnt>0){
+        const r=Math.max(300, cnt*25);
+        tblNodes.forEach((node,i)=>{
+          const angle=(2*Math.PI*i/cnt)-(Math.PI/2);
+          node.position({x:r*Math.cos(angle), y:r*Math.sin(angle)});
+        });
+      }
+    } else if(type==='domain' && layout==='circle'){
+      // Circular grouped by subdomain — compound parents auto-wrap; dragging box moves products
+      const tblNodes=cy.nodes('.domain-view-node').sort((a,b)=>{
+        const pa=(a.data('parent')||''), pb=(b.data('parent')||'');
+        return pa<pb?-1:pa>pb?1:0;
+      });
+      const cnt=tblNodes.length;
+      if(cnt>0){
+        const r=Math.max(300, cnt*30);
+        tblNodes.forEach((node,i)=>{
+          const angle=(2*Math.PI*i/cnt)-(Math.PI/2);
+          node.position({x:r*Math.cos(angle), y:r*Math.sin(angle)});
+        });
+      }
+    } else if(type==='attribute'||type==='edge'||type==='domain'){
+      cy.layout({name:'preset',animate:false,fit:true,padding:60}).run();
     } else if(type==='table'){
-      cy.layout({name:'concentric',animate:false,fit:true,padding:120,
-        avoidOverlap:true,minNodeSpacing:60,spacingFactor:1.5,
-        concentric:function(node){return node.hasClass('center-node')?2:1;},
-        levelWidth:function(){return 1;}
-      }).run();
+      // Circular grouped by domain — center table at origin, FK neighbors arranged around it
+      const centerNode=cy.nodes('.center-node');
+      if(centerNode.length) centerNode.position({x:0,y:0});
+      const ringNodes=cy.nodes('.domain-view-node').difference(centerNode).sort((a,b)=>{
+        const da=(a.data('domain')||''), db=(b.data('domain')||'');
+        return da<db?-1:da>db?1:0;
+      });
+      const cnt=ringNodes.length;
+      if(cnt>0){
+        const r=Math.max(280, cnt*40);
+        ringNodes.forEach((node,i)=>{
+          const angle=(2*Math.PI*i/cnt)-(Math.PI/2);
+          node.position({x:r*Math.cos(angle), y:r*Math.sin(angle)});
+        });
+      }
     } else {
       // Other layouts (cose, concentric, grid) or domain sub-views
       const layoutCfg={...(LAYOUT_CONFIGS[layout]||LAYOUT_CONFIGS.circle)};
       cy.layout(layoutCfg).run();
     }
     // Fit to screen — multiple passes to handle large graphs that settle slowly
-    const doFit=()=>{cy.fit(60);if(cy.zoom()>1.5)cy.zoom(1.5);cy.center();};
+    const doFit=()=>{cy.fit(60);if(cy.zoom()>1.8)cy.zoom(1.8);cy.center();};
     setTimeout(doFit,200);
     setTimeout(doFit,1000);
     setTimeout(doFit,3000);
@@ -1192,9 +1248,7 @@ function App(){
     const {type,value}=filterState;
     const {edgesBySource,edgesByTarget}=graphIndexes||{};
     if(type==='table'&&value){
-      const out=(edgesBySource||{})[value]?.length||0;
-      const inn=(edgesByTarget||{})[value]?.length||0;
-      return `🔗 ${out} out, ${inn} in`;
+      return `📊 ${value}`;
     }
     if(type==='domain'&&value) return `Domain: ${value}`;
     if(type==='edge'&&typeof value==='object') return `🔗 ${(value.source||'').split('.').pop()}.${value.source_column||''} → ${(value.target||'').split('.').pop()}.${value.target_column||''}`;

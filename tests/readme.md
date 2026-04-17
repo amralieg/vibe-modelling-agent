@@ -1,4 +1,37 @@
-# Vibe Tester -- End-to-End Integration Test Suite
+# Vibe Tester — End-to-End Integration Test Suite
+
+> End-to-end integration test suite for the Vibe Modelling Agent. Exercises the full agent lifecycle on Databricks, from model generation through physical deployment, sample data creation, and teardown.
+
+[← Back to project root](../readme.md) · [Runner guide](../runner/readme.md) · [Design guide](../docs/design-guide.md) · [Integration guide](../docs/integration-guide.md)
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Test Strategy](#test-strategy)
+  - [Test Categories](#test-categories)
+- [All 10 Test Cases](#all-10-test-cases)
+  - [Runner Pipeline (Test 00)](#runner-pipeline-test-00)
+  - [Core Lifecycle Tests (01-04)](#core-lifecycle-tests-01-04)
+  - [Verification Tests (03b, 04b, 10d)](#verification-tests-03b-04b-10d)
+  - [Install Scenario Tests (10, 10c)](#install-scenario-tests-10-10c)
+- [Dependency Chain](#dependency-chain)
+- [Special Pass/Fail Logic](#special-passfail-logic)
+- [Parameter Randomization](#parameter-randomization)
+  - [Convention Pools](#convention-pools)
+- [Execution Phases](#execution-phases)
+- [Convention Verification](#convention-verification)
+- [Vibe Effectiveness Audit](#vibe-effectiveness-audit)
+- [Quality Scoring](#quality-scoring)
+  - [Score Components](#score-components)
+  - [Sentiment Thresholds](#sentiment-thresholds)
+- [Test Results](#test-results)
+- [Widgets](#widgets)
+- [Log Artifacts](#log-artifacts)
+- [Example Test Flow](#example-test-flow)
+
+---
 
 ## Overview
 
@@ -38,7 +71,7 @@ The suite follows the strategy **"Runner creates ECM+MVM, unique ops + install s
 |-----|-------------------|----------------------------------------------------|-----------------------------------------------------------------|---------------------------------------------------|
 | 00  | 00_vibe_runner    | Vibe Runner (create ECM + MVM via runner pipeline) | Full runner pipeline: creates temp JSON, launches runner notebook, verifies both ECM and MVM catalogs exist with metamodel data, copies metamodel and volume files to test catalog | Both `{biz}_ecm_v1` and `{biz}_mvm_v1` catalogs created with populated `_metamodel.business` |
 
-### Core Lifecycle Tests (01--04)
+### Core Lifecycle Tests (01-04)
 
 | #    | Test Name                   | Label                            | What It Validates                                              | Expected Outcome                                 |
 |------|----------------------------|----------------------------------|----------------------------------------------------------------|--------------------------------------------------|
@@ -135,15 +168,15 @@ Each test ID seeds a distinct random draw so that results are reproducible acros
 
 The test suite executes in nine sequential phases.
 
-### Phase 1 -- Read Widgets
+### Phase 1 — Read Widgets
 
 Reads the four notebook widgets that parameterize the test run. See [Widgets](#widgets) for the full list.
 
-### Phase 2 -- Resolve Notebook Path
+### Phase 2 — Resolve Notebook Path
 
 Uses the hardcoded agent notebook path `./../agent/dbx_vibe_modelling_agent` (resolved relative to the tester notebook location).
 
-### Phase 3 -- Clean Slate (Fixture Setup)
+### Phase 3 — Clean Slate (Fixture Setup)
 
 Ensures a pristine environment before tests begin:
 
@@ -154,11 +187,11 @@ CREATE SCHEMA <test_catalog>._metamodel;
 -- Create vol_root volume and log output directory
 ```
 
-### Phase 4 -- Run All Tests
+### Phase 4 — Run All Tests
 
 Executes all 10 test definitions in sequence, respecting the dependency chain. Each test invokes the agent notebook with the test's parameter dictionary.
 
-### Phase 5 -- Merge All Logs
+### Phase 5 — Merge All Logs
 
 Consolidates per-test log files into unified artifacts:
 
@@ -167,19 +200,19 @@ Consolidates per-test log files into unified artifacts:
 
 Stack traces are stripped during the merge process.
 
-### Phase 6 -- Convention Verification and Vibe Effectiveness Audit
+### Phase 6 — Convention Verification and Vibe Effectiveness Audit
 
 Queries metamodel tables to check convention compliance and compares v1 vs v2 models to measure vibe effectiveness. See the dedicated sections below.
 
-### Phase 7 -- Quality Report
+### Phase 7 — Quality Report
 
 Computes the weighted quality score and writes `quality_report.log`. See [Quality Scoring](#quality-scoring).
 
-### Phase 8 -- Cleanup
+### Phase 8 — Cleanup
 
 Drops all test catalogs created during the run (runner ECM/MVM catalogs, ctx_install catalog, xconv catalogs, etc.) while preserving the base test catalog.
 
-### Phase 9 -- Final Results Summary
+### Phase 9 — Final Results Summary
 
 Prints the consolidated test results and overall pass/fail determination. Writes `test_summary.log`.
 
@@ -320,3 +353,7 @@ Phase 7  Compute weighted quality score
 Phase 8  Cleanup — drop all test catalogs except base
 Phase 9  Print final summary
 ```
+
+---
+
+[← Back to project root](../readme.md)

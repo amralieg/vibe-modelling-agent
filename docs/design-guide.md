@@ -1,5 +1,36 @@
 # Vibe Modelling Agent Design Guide
 
+> Technical design reference for the Vibe Modelling Agent: architecture, pipeline stages, quality rules, LLM ensemble, sizing, widgets, artifacts, and error-handling patterns.
+
+[← Back to project root](../readme.md) · [Integration guide](integration-guide.md) · [Whitepaper](whitepaper.md)
+
+---
+
+## Table of Contents
+
+- [1. Philosophy: Industry Data Models vs. Business Data Models](#1-philosophy-industry-data-models-vs-business-data-models)
+- [2. Architecture Overview](#2-architecture-overview)
+- [3. How Vibe Modelling Works — Pipeline Stages](#3-how-vibe-modelling-works--pipeline-stages)
+- [4. Core Principles and Governance](#4-core-principles-and-governance)
+- [5. Quality Assurance Rules Reference](#5-quality-assurance-rules-reference)
+- [6. LLM Architecture](#6-llm-architecture)
+- [7. Sizing and Configuration Constants](#7-sizing-and-configuration-constants)
+- [8. Operations Reference](#8-operations-reference)
+- [9. Metric Views](#9-metric-views)
+- [10. Sample Data Generation Rules](#10-sample-data-generation-rules)
+- [11. Column Templates](#11-column-templates)
+- [12. Semantic Distinction Rules (What Is NOT a Duplicate)](#12-semantic-distinction-rules-what-is-not-a-duplicate)
+- [13. Complete Prompt Reference (49 Prompts)](#13-complete-prompt-reference-49-prompts)
+- [14. Architecture Design Patterns](#14-architecture-design-patterns)
+- [15. Vibe System Architecture](#15-vibe-system-architecture)
+- [16. DAG Enforcement Deep Dive](#16-dag-enforcement-deep-dive)
+- [17. Static Analysis Checks](#17-static-analysis-checks)
+- [18. Complete Widget Reference (28 Widgets)](#18-complete-widget-reference-28-widgets)
+- [19. Output Artifacts (Complete Reference)](#19-output-artifacts-complete-reference)
+- [20. Error Handling Patterns](#20-error-handling-patterns)
+
+---
+
 ## 1. Philosophy: Industry Data Models vs. Business Data Models
 
 ### What is an Industry Data Model?
@@ -128,7 +159,7 @@ Note: Attribute depth (min/max) is the SAME for both MVM and ECM within each tie
 
 ---
 
-## 3. How Vibe Modelling Works -- Pipeline Stages
+## 3. How Vibe Modelling Works — Pipeline Stages
 
 The pipeline executes a series of stages, each with a specific purpose, quality checks, and output. Here is the complete stage reference:
 
@@ -1045,3 +1076,7 @@ The agent uses two mechanisms to prevent thread-related failures:
 ---
 
 *Built on Databricks Serverless Compute with Unity Catalog governance*
+
+---
+
+[← Back to project root](../readme.md)

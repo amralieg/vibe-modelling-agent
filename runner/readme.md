@@ -1,18 +1,35 @@
-# Vibe Runner Guide
+# Vibe Runner — Pipeline Orchestrator
+
+> Multi-industry data model pipeline orchestrator implemented as a Databricks notebook. Reads a batch input JSON and, for each business, runs a 4-task job that generates the ECM, installs it, shrinks to MVM, and installs the MVM.
+
+[← Back to project root](../readme.md) · [Tester guide](../tests/readme.md) · [Design guide](../docs/design-guide.md) · [Integration guide](../docs/integration-guide.md)
+
+---
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Widgets](#widgets)
 - [Batch Input JSON Format](#batch-input-json-format)
+  - [`widget_values` Section](#widget_values-section)
+  - [`businesses` Array](#businesses-array)
 - [Task DAG](#task-dag)
-- [How the Runner Works](#how-the-runner-works-internals)
+- [How the Runner Works (Internals)](#how-the-runner-works-internals)
+  - [Name Sanitization](#name-sanitization)
+  - [Pre-Launch Validation](#pre-launch-validation)
+  - [Job Lifecycle](#job-lifecycle)
+  - [Artifact Handling](#artifact-handling)
 - [Execution Flow](#execution-flow)
 - [Pipeline Flow per Business](#pipeline-flow-per-business)
 - [Catalog Naming](#catalog-naming)
+  - [Naming Conventions](#naming-conventions)
+  - [Clash Detection Exclusions](#clash-detection-exclusions)
 - [Job Tags](#job-tags)
 - [Dry-Run Mode](#dry-run-mode)
 - [Output Artifacts](#output-artifacts)
+  - [Summary Report](#summary-report)
+  - [Model Artifacts](#model-artifacts)
+  - [Unity Catalog Catalogs](#unity-catalog-catalogs)
 - [Error Handling](#error-handling)
 - [Constants](#constants)
 - [Dependencies](#dependencies)
@@ -407,3 +424,7 @@ The runner implements multiple layers of error handling:
 | Package | Purpose |
 |---|---|
 | `pandas` | Enhanced display of results tables |
+
+---
+
+[← Back to project root](../readme.md)
