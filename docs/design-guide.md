@@ -1075,6 +1075,104 @@ The agent uses two mechanisms to prevent thread-related failures:
 
 ---
 
+## 21. Vibe Compliance Architecture
+
+This section documents how user vibes flow through the pipeline and the fixes applied to close known compliance gaps.
+
+### Vibe Pipeline Flow
+
+```
+User Vibes (input)
+  │
+  ├─ 1. PARSE ──────────── VIBE_MASTER_PROMPT / VIBE_PARSE_PROMPT
+  │     Classify mode (surgical/holistic/generative)
+  │     Extract hard constraints ("do not", "must not", "never")
+  │     Parse into structured requirements (scope, intent, priority)
+  │     Identify special requirements: naming overrides, custom tags, negative rules
+  │
+  ├─ 2. ORCHESTRATE ─────── Vibe Orchestrator
+  │     Route requirements to action primitives (38+ types)
+  │     Assign mutation budgets by mode
+  │     Distribute vibes to pipeline workers:
+  │       ├── Domain-scope vibes → DOMAIN_GENERATE_PROMPT, DOMAIN_JUDGE_PROMPT
+  │       ├── Product-scope vibes → PRODUCT_GENERATE_PROMPT, MODEL_ARCHITECT_REVIEW_PROMPT
+  │       ├── Attribute-scope vibes → ATTRIBUTE_GENERATE_PROMPT
+  │       ├── Tag-scope vibes → TAG_CLASSIFY_PROMPT (via TAG routing)
+  │       └── Model-scope vibes → ALL prompts via _USER_VIBES_SECTION
+  │
+  ├─ 3. DISTRIBUTE ──────── Worker Pin
+  │     Each pipeline step receives its relevant vibes
+  │     HOLISTIC/SURGICAL modes preserve distributed vibes for all workers
+  │     Model-scope vibes reach ATTRIBUTE + TAG prompts (not just domain/product)
+  │
+  ├─ 4. EXECUTE ─────────── Pipeline Workers
+  │     Workers apply vibes during generation
+  │     Architect review follows vibes with soft compliance (justify deviations)
+  │     Custom tags injected at product + attribute level via _apply_vibe_custom_tags()
+  │
+  ├─ 5. FIX ─────────────── Deterministic Fixers (post-LLM)
+  │     _fix_bare_attribute_names() — prefix generic names with business context
+  │     _cleanup_phantom_domains() — remove phantom domains from JSON + install
+  │     Self-ref same-name FK guard — reject FK where column name = PK name
+  │     Bare-name fix runs in finalization AND physical schema stages
+  │
+  └─ 6. VERIFY ──────────── VIBE_AUDIT_PROMPT
+        Score fulfillment per requirement
+        Report unfulfilled requirements
+        Generate next_vibes for remaining gaps
+```
+
+### Known Pipeline Leaks and Fixes Applied (v0.3.3 - v0.3.5)
+
+Pipeline leaks are points where vibe instructions fail to reach the relevant worker or fixer. The following 17 leaks were identified and patched:
+
+| # | Leak | Fix | Version |
+|---|---|---|---|
+| 1 | NameError: `user_special_requirements` undefined in next_vibes | Renamed to `user_vibes` matching actual variable | v0.3.4 |
+| 2 | Phantom domains in JSON export and install | `_cleanup_phantom_domains()` in export + install paths | v0.3.3 |
+| 3 | Org contact data (facility address/phone) not tagged confidential | Added org contact PII tagging rule to TAG_CLASSIFY_PROMPT | v0.3.3 |
+| 4 | Architect ignoring vibes during review | Soft compliance: architect must follow vibes or explicitly justify deviation | v0.3.4 |
+| 5 | Self-ref FK using same name as PK | Self-ref FK naming rule in ATTRIBUTE + FK prompts | v0.3.3 |
+| 6 | Self-ref FK guard missed during deployment | Deterministic guard in physical deployment rejects PK=FK name | v0.3.3 |
+| 7 | Tag vibes not reaching TAG_CLASSIFY_PROMPT | Added TAG_CLASSIFY_PROMPT to vibe routing table | v0.3.4 |
+| 8 | HOLISTIC/SURGICAL modes dropping distributed vibes | Mode handlers now preserve distributed vibes for all workers | v0.3.4 |
+| 9 | Model-scope vibes not reaching ATTRIBUTE/TAG prompts | Model-scope vibes injected into ATTRIBUTE_GENERATE + TAG_CLASSIFY | v0.3.4 |
+| 10 | Custom tags from vibes lost before physical deployment | `_apply_vibe_custom_tags()` at product + attribute level | v0.3.4 |
+| 11 | Custom tags missing from ALTER TABLE SET TAGS SQL | Tag injection into physical ALTER TABLE SQL generation | v0.3.4 |
+| 12 | Bare attribute names (status, type, name) not prefixed | `_fix_bare_attribute_names()` deterministic fixer | v0.3.5 |
+| 13 | Bare-name fix not running before JSON write | Added to finalization stage before model.json serialization | v0.3.5 |
+| 14 | Bare-name fix not running in physical schema stage | Added to physical schema construction before CREATE TABLE | v0.3.5 |
+| 15 | Product tags field missing from consolidation | Added product tags field to consolidation StructType | v0.3.5 |
+| 16 | FK suffix override from vibes not detected | FK suffix detection from vibe text (e.g., _ref instead of _id) | v0.3.5 |
+| 17 | Attribute-level custom tags not supported | Attribute-level custom tag support in tag pipeline | v0.3.5 |
+
+### Tag Support at Domain/Product/Attribute Levels
+
+Tags flow through three distinct paths in the pipeline:
+
+**Domain-level tags** (applied to Unity Catalog schemas):
+- Division classification (operations, business, corporate)
+- Data tier classification
+- Applied via ALTER SCHEMA SET TAGS during physical deployment
+
+**Product-level tags** (applied to Unity Catalog tables):
+- Data type classification (master_data, reference_data, transactional_data, association_data)
+- Function classification (core, helper)
+- Custom user tags from vibes (e.g., `source=crm`, `tier=gold`)
+- Applied via ALTER TABLE SET TAGS during physical deployment
+
+**Attribute-level tags** (applied to Unity Catalog columns):
+- PII tags (pii_email, pii_phone, pii_name, etc.)
+- Classification levels (restricted, confidential, internal, public)
+- Custom user tags from vibes (e.g., `sensitivity=high`)
+- Applied via ALTER TABLE ALTER COLUMN SET TAGS during physical deployment
+
+Custom tags from vibes are injected at two points:
+1. During logical model generation (`_apply_vibe_custom_tags()`) -- ensures tags appear in model.json
+2. During physical deployment -- ensures tags appear as ALTER TABLE/COLUMN SET TAGS SQL statements
+
+---
+
 *Built on Databricks Serverless Compute with Unity Catalog governance*
 
 ---

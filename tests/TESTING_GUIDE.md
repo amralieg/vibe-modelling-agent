@@ -516,6 +516,219 @@ Track these metrics across runs:
 
 ---
 
+## 5-Industry Stress Test Procedure
+
+The 5-industry stress test validates pipeline stability and model quality across diverse industries in a single batch. Run this after any structural change to the agent.
+
+### Industries and Expected Sizing
+
+| Industry | Domains | Products | Key Quality Signals |
+|---|---|---|---|
+| Healthcare | 3 | 12 | PII tagging on patient data, HIPAA compliance tags |
+| Retail Banking | 4 | 18 | Cross-domain FKs between accounts/transactions/customer |
+| Logistics | 2 | 10 | Operational domain coverage, warehouse/shipment links |
+| University | 4 | 20 | Enrollment M:N, academic hierarchy |
+| Oil & Gas | 3 | 15 | Asset management, safety/compliance domains |
+
+### How to Run
+
+Submit each industry as a separate vibe_tester run (see "How to Submit a Test" above). All five can run in parallel on separate clusters.
+
+### What to Verify After Each Run
+
+```sql
+-- 1. Self-referencing FK guard: MUST be 0 violations
+SELECT a.domain, a.product, a.attribute, a.foreign_key_to
+FROM <catalog>._metamodel.attribute a
+WHERE a.foreign_key_to IS NOT NULL
+  AND a.foreign_key_to LIKE CONCAT('%', a.product, '.', a.attribute)
+  AND a.attribute = (
+    SELECT a2.attribute FROM <catalog>._metamodel.attribute a2
+    WHERE a2.domain = a.domain AND a2.product = a.product
+    AND a2.attribute LIKE '%_id' LIMIT 1
+  );
+
+-- 2. PII tagging coverage: expect near-zero missing tags
+SELECT a.domain, a.product, a.attribute
+FROM <catalog>._metamodel.attribute a
+WHERE (LOWER(a.attribute) LIKE '%email%'
+    OR LOWER(a.attribute) LIKE '%phone%'
+    OR LOWER(a.attribute) LIKE '%ssn%'
+    OR LOWER(a.attribute) LIKE '%address%'
+    OR LOWER(a.attribute) LIKE '%name%')
+  AND (a.tags IS NULL OR a.tags = '' OR a.tags NOT LIKE '%pii%')
+  AND LOWER(a.attribute) NOT LIKE '%_name' -- exclude product/domain names
+  AND a.attribute NOT LIKE '%_id';
+
+-- 3. Cross-domain FK count: expect 9-28 per model
+SELECT COUNT(*)
+FROM <catalog>._metamodel.attribute a
+WHERE a.foreign_key_to IS NOT NULL AND a.foreign_key_to != ''
+  AND a.domain != SUBSTRING_INDEX(a.foreign_key_to, '.', 1);
+
+-- 4. Phantom domain check: MUST be 0
+SELECT domain FROM <catalog>._metamodel.domain WHERE domain LIKE 'domain_%';
+```
+
+### Pass Criteria
+
+| Metric | Target |
+|---|---|
+| Pipeline completion | 100% (all 5 industries complete) |
+| Self-ref PK=FK violations | 0 |
+| Missing PII tags | <= 5 per model |
+| Cross-domain FKs | >= 9 per model |
+| Phantom domains | 0 |
+
+---
+
+## Vibe Compliance Test Suite (V1-V6 + ULTIMATE)
+
+These tests verify that user vibes are correctly parsed, distributed to pipeline workers, and enforced in the final model. Each test targets a specific vibe category.
+
+### Test Definitions
+
+| Test | Industry | Focus | Key Vibes |
+|---|---|---|---|
+| V1 | Pet Store | Explicit domain naming | "use these exact domains: ..." |
+| V2 | Construction | Rich multi-vibe | Domains + products + FKs + tags |
+| V3 | Food Delivery | Reverse engineer | Existing schema -> model reconstruction |
+| V4 | Insurance | Negative rules | "do NOT create ...", "never include ..." |
+| V5 | Gym | Naming conventions | Custom prefix (gym_), FK suffix override (_ref) |
+| V6 | Car Dealer | Rubbish schema cleanup | Messy input -> clean model with PII + tags |
+| ULTIMATE | Smart City | 50+ vibes | All vibe types combined in one run |
+
+### How to Verify Each Vibe Type
+
+**Domain vibes** — Check that all requested domain names appear exactly:
+```sql
+SELECT domain FROM <catalog>._metamodel.domain ORDER BY domain;
+-- Compare with the list of domains specified in the vibe text
+```
+
+**Product vibes** — Verify requested tables exist in the correct domains:
+```sql
+SELECT domain, product FROM <catalog>._metamodel.product
+WHERE product IN ('requested_table_1', 'requested_table_2')
+ORDER BY domain, product;
+```
+
+**FK vibes** — Confirm requested relationships were created:
+```sql
+SELECT a.domain, a.product, a.attribute, a.foreign_key_to
+FROM <catalog>._metamodel.attribute a
+WHERE a.foreign_key_to IS NOT NULL AND a.foreign_key_to != ''
+ORDER BY a.domain, a.product;
+```
+
+**Attribute vibes** — Check that specific columns exist on the right tables:
+```sql
+SELECT domain, product, attribute, type, tags
+FROM <catalog>._metamodel.attribute
+WHERE attribute IN ('requested_col_1', 'requested_col_2');
+```
+
+**Negative rule vibes** — Verify forbidden items do NOT exist:
+```sql
+-- Example: user said "do NOT create a billing domain"
+SELECT * FROM <catalog>._metamodel.domain WHERE domain = 'billing';
+-- Expect 0 rows
+```
+
+**Tag vibes** — Verify custom tags were applied at all levels:
+```sql
+-- Product-level tags
+SELECT domain, product, tags FROM <catalog>._metamodel.product
+WHERE tags IS NOT NULL AND tags != '';
+
+-- Attribute-level tags
+SELECT domain, product, attribute, tags FROM <catalog>._metamodel.attribute
+WHERE tags LIKE '%custom_tag%';
+
+-- Physical table tags (in Unity Catalog)
+DESCRIBE TABLE EXTENDED <catalog>.<schema>.<table>;
+-- Check the Tags section in output
+```
+
+### How to Check Bare Naming Violations
+
+Bare generic attribute names (status, type, name, description, date) without business-context prefixes are violations:
+
+```sql
+SELECT domain, product, attribute
+FROM <catalog>._metamodel.attribute
+WHERE attribute IN ('status', 'type', 'name', 'description', 'date',
+                    'code', 'category', 'level', 'priority', 'amount',
+                    'quantity', 'rate', 'score', 'value', 'count')
+  AND attribute NOT LIKE '%_%'  -- no prefix at all
+ORDER BY domain, product;
+-- Expect 0 rows. Each should be prefixed: order_status, account_type, etc.
+```
+
+### How to Check Custom Tags in Physical Tables
+
+After physical deployment, verify that custom tags from vibes persist to Unity Catalog:
+
+```sql
+-- Check table-level tags
+SELECT tag_name, tag_value
+FROM system.information_schema.table_tags
+WHERE catalog_name = '<catalog>'
+  AND schema_name = '<domain>'
+  AND table_name = '<product>';
+
+-- Check column-level tags
+SELECT column_name, tag_name, tag_value
+FROM system.information_schema.column_tags
+WHERE catalog_name = '<catalog>'
+  AND schema_name = '<domain>'
+  AND table_name = '<product>';
+```
+
+### How to Run a next_vibes Iteration Test
+
+1. Generate a base model (v1_ecm)
+2. Read the next_vibes.txt file from the volume
+3. Submit a new vibe_tester run with operation `vibe modeling of version`, setting model_vibes to the content of next_vibes.txt
+4. Verify the v2 model addresses the findings from v1
+5. Check that v2 next_vibes contains NEW findings (not repeats of v1)
+
+```bash
+# Read next_vibes from v1
+curl -s "https://<host>/api/2.0/fs/files/Volumes/<catalog>_ecm/_metamodel/vol_root/business/<name>/v1_ecm/vibes/next_vibes.txt" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Honesty Check Template
+
+After each vibe compliance test, fill in this template:
+
+| Vibe Category | Requested | Delivered | Compliant? | Notes |
+|---|---|---|---|---|
+| Domain naming | (list) | (list) | Y/N | |
+| Domain count | N | M | Y/N | |
+| Product list | (list) | (list) | Y/N | |
+| Product count | N | M | Y/N | |
+| FK relationships | (list) | (list) | Y/N | |
+| Negative rules | (list) | (verify absent) | Y/N | |
+| Custom tags | (list) | (verify present) | Y/N | |
+| Naming overrides | (list) | (verify applied) | Y/N | |
+| Bare name violations | 0 expected | (count) | Y/N | |
+
+### Known Vibe Compliance Results (v0.3.5)
+
+| Test | Score | Pass | Fail |
+|---|---|---|---|
+| V1 Pet Store | 100% | All domain names exact | - |
+| V2 Construction | 84% | Domains, products, FKs | Tags initially failed (fixed) |
+| V3 Food Delivery | 83% | 8/8 tables, 10/10 FKs | Source tags failed |
+| V5 Gym | 63% | gym_ prefix 100% | FK _ref override failed |
+| V6 Car Dealer | 73% | 5/6 tables, PII good | Source tags failed |
+| ULTIMATE Smart City | 84% | 18/18 products, 13/13 FKs | Bare naming initially failed |
+| ULTIMATE v2 (post-fix) | ~95% | Bare naming 0 violations, all physical tags applied | - |
+
+---
+
 ## TODO: Known Issues to Fix
 
 1. **Lost 3rd domain** — User requests 3 domains but only 2 survive deployment. Persistent across V7-V11. Root cause: dedup or consolidation merges domain contents.
@@ -524,3 +737,5 @@ Track these metrics across runs:
 4. **Job URL tracking** — Agent, runner, and tester should log their job URLs to the volume for monitoring.
 5. **TypeError in vibe modeling** — `cannot unpack non-iterable int object` in the vibe modeling path. Needs stack trace to fix.
 6. **MVM attribute depth** — MVM should have thinner attributes than ECM but currently produces the same depth. Needs parameter-based control, NOT variant-specific prompts.
+7. **FK suffix override** — User vibes requesting custom FK suffixes (e.g., `_ref` instead of `_id`) are not fully respected (V5 Gym test). Suffix detection from vibes is implemented but not all FK generation paths honor it.
+8. **Source tag persistence** — Custom source tags from vibes (e.g., `source=legacy_db`) fail to persist in some test scenarios (V3, V6). The tag injection path needs end-to-end verification.
