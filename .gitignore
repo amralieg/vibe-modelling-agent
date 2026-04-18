@@ -15,3 +15,7 @@ Thumbs.db
 .fseventsd
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
+
+# Model outputs are generated artifacts — stored in Databricks volumes
+models/*
+!models/.gitkeep
