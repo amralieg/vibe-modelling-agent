@@ -979,17 +979,172 @@ SELECT table_schema, COUNT(*) FROM <catalog>.information_schema.tables WHERE tab
 SELECT COUNT(*) FROM <catalog>.information_schema.table_constraints WHERE constraint_type = 'FOREIGN KEY'
 ```
 
-### Pulse Check Template
+### Pulse Check — Exact Commands
 
-```
-┌──────────────────────────────────────────────┐
-│ PULSE │ Xm elapsed │ N lines │ E:0 W:0      │
-├──────────────────────────────────────────────┤
-│ STEP: <current step from logs>               │
-└──────────────────────────────────────────────┘
+**One-shot pulse (run anytime during an ECM/MVM run):**
+```bash
+# Replace <profile>, <catalog>, <business>, <version> with actual values
+# Example: profile=emirates-gcp, catalog=airlines_temp, business=airlines, version=v1_ecm
+
+TOTAL=$(databricks -p <profile> fs cat "dbfs:/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/<version>/<business>_info_<version>.log" 2>/dev/null | wc -l | tr -d ' ')
+ERRORS=$(databricks -p <profile> fs cat "dbfs:/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/<version>/<business>_info_<version>.log" 2>/dev/null | grep -c " ERROR \| FAILED " || echo 0)
+WARNINGS=$(databricks -p <profile> fs cat "dbfs:/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/<version>/<business>_info_<version>.log" 2>/dev/null | grep -c "⚠️\| WARNING " || echo 0)
+STEP=$(databricks -p <profile> fs cat "dbfs:/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/<version>/<business>_info_<version>.log" 2>/dev/null | grep -i "Step\|✅.*Completed\|Generated\|Attempt\|Validation\|Starting\|TRACK" | tail -1 | sed 's/^[0-9-]* [0-9:]* - INFO - //')
+echo "PULSE | ${TOTAL} lines | E:${ERRORS} W:${WARNINGS} | ${STEP}"
 ```
 
-Read logs incrementally, track errors/warnings, watch for slowness, take notes.
+**Check errors only:**
+```bash
+databricks -p <profile> fs cat "dbfs:/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/<version>/<business>_info_<version>.log" 2>/dev/null | grep -i "ERROR\|FAILED\|Exception\|Traceback" | grep -v "0 failed"
+```
+
+**Progress table (real-time, works before logs flush):**
+```bash
+databricks -p <profile> api post /api/2.0/sql/statements --json '{
+  "warehouse_id": "<warehouse_id>",
+  "statement": "SELECT status, SUBSTRING(message, 1, 120) FROM <catalog>._metamodel._vibe_progress ORDER BY last_updated DESC LIMIT 5",
+  "wait_timeout": "30s"
+}'
+```
+
+**Task-level pipeline status (for multi-task runner jobs):**
+```bash
+databricks -p <profile> jobs get-run <RUN_ID> --output json | python3 -c "
+import sys, json, time
+d = json.load(sys.stdin)
+start = d.get('start_time', 0)
+elapsed = (time.time() * 1000 - start) / 60000 if start else 0
+print(f'Pipeline: {elapsed:.0f} min')
+for t in d.get('tasks', []):
+    ts = t.get('state', {})
+    print(f'  {t.get(\"task_key\",\"?\"):30s}: {ts.get(\"life_cycle_state\",\"?\")} {ts.get(\"result_state\",\"\")}')
+"
+```
+
+**Attribute generation progress (during the longest phase):**
+```bash
+databricks -p <profile> fs cat "dbfs:/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/<version>/<business>_info_<version>.log" 2>/dev/null | grep -c "✅ Completed:"
+# Compare against total: grep "Starting parallel execution of N" to find N
+```
+
+**Physical model verification (after deploy):**
+```bash
+# Table count per schema
+databricks -p <profile> api post /api/2.0/sql/statements --json '{
+  "warehouse_id": "<warehouse_id>",
+  "statement": "SELECT table_schema, COUNT(*) FROM <catalog>.information_schema.tables WHERE table_type = '\''MANAGED'\'' AND table_schema NOT IN ('\''_metamodel'\'', '\''_metrics'\'', '\''_files'\'', '\''information_schema'\'') GROUP BY table_schema ORDER BY table_schema",
+  "wait_timeout": "30s"
+}'
+
+# FK constraint count
+databricks -p <profile> api post /api/2.0/sql/statements --json '{
+  "warehouse_id": "<warehouse_id>",
+  "statement": "SELECT COUNT(*) FROM <catalog>.information_schema.table_constraints WHERE constraint_type = '\''FOREIGN KEY'\''",
+  "wait_timeout": "30s"
+}'
+
+# Verify model.json matches physical
+databricks -p <profile> fs cat "dbfs:/Volumes/<catalog>/_metamodel/vol_root/business/<business>/<version>/model.json" | python3 -c "
+import sys, json
+m = json.load(sys.stdin).get('model', {})
+domains = m.get('domains', [])
+total_p = sum(len(d.get('products', [])) for d in domains)
+total_a = sum(sum(len(p.get('attributes', [])) for p in d.get('products', [])) for d in domains)
+total_fk = sum(sum(1 for a in p.get('attributes', []) if a.get('foreign_key_to')) for d in domains for p in d.get('products', []))
+print(f'JSON: {len(domains)} domains, {total_p} products, {total_a} attrs, {total_fk} FKs')
+"
+```
+
+### How to Submit Runs
+
+**Direct agent run (for surgical iterations):**
+```bash
+databricks -p <profile> jobs submit --no-wait --json '{
+  "run_name": "<name>",
+  "timeout_seconds": 7200,
+  "tasks": [{
+    "task_key": "ecm_generate",
+    "notebook_task": {
+      "notebook_path": "<agent_notebook_path>",
+      "source": "WORKSPACE",
+      "base_parameters": {
+        "business_name": "<name>",
+        "business_description": "<description>",
+        "operation": "vibe modeling of version",
+        "model_version": "<version_number>",
+        "data_model_scopes": "Minimum Viable Model - MVM",
+        "model_vibes": "<vibes text>",
+        "deployment_catalog": "<catalog>",
+        ... other widget params ...
+      }
+    },
+    "timeout_seconds": 7200
+  }]
+}'
+```
+The outer job exits in ~45s after launching a background job. Find the real job:
+```bash
+databricks -p <profile> jobs list --output json
+```
+
+**Via vibe_runner (for full ECM+MVM pipeline):**
+```bash
+databricks -p <profile> jobs submit --no-wait --json '{
+  "run_name": "vibe_runner_<name>",
+  "timeout_seconds": 43200,
+  "tasks": [{
+    "task_key": "vibe_runner",
+    "notebook_task": {
+      "notebook_path": "<runner_notebook_path>",
+      "source": "WORKSPACE",
+      "base_parameters": {
+        "business_context": "<full_workspace_path_to_industries.json>",
+        "dry_run": "no",
+        "ping_interval": "1m"
+      }
+    },
+    "timeout_seconds": 43200
+  }]
+}'
+```
+The runner creates a multi-task DAG job (ECM generate → install → uninstall staging → MVM shrink → MVM install).
+
+### Cleanup Commands
+
+```bash
+# Drop all catalogs except protected ones
+KEEP="system samples lakehouse_data_models_feip_186"
+# Query SHOW CATALOGS, drop anything not in KEEP:
+# DROP CATALOG IF EXISTS <name> CASCADE
+
+# Delete all jobs
+databricks -p <profile> jobs list --output json | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+jobs = data if isinstance(data, list) else data.get('jobs', [])
+for j in jobs:
+    print(j.get('job_id', ''))
+" | while read jid; do
+  databricks -p <profile> api post /api/2.1/jobs/delete --json "{\"job_id\": $jid}"
+done
+
+# Clean workspace models folder
+databricks -p <profile> workspace delete <models_path> --recursive
+databricks -p <profile> workspace mkdirs <models_path>
+```
+
+### Key Tricks and Shortcuts
+
+1. **Log streaming works on serverless** — 30s daemon thread copies local logs to volume. Read mid-run, no need to wait for completion.
+2. **The outer notebook exits in ~45s** — it submits a background job. Find the real job via `jobs list`.
+3. **`information_schema` queries verify physical state** — don't trust log counts alone, verify with SQL.
+4. **Cancel and resubmit is free** — `databricks jobs cancel-run <RUN_ID>` then resubmit with fixes. No penalty.
+5. **Workspace repo sync conflicts** — if `repos update` fails due to conflicts, upload files directly via `workspace import`.
+6. **`my-industries.json` must have `model_vibes` key** in `widget_values` section (even if empty string).
+7. **Progress table is real-time** — logs may be 30s stale but progress table updates immediately.
+8. **Attribute generation is the bottleneck** — 60-90% of ECM runtime. Track with `grep -c "✅ Completed:"`.
+9. **False positive error count** — `grep "FAILED"` catches "0 failed" success messages. Filter with `grep -v "0 failed"`.
+10. **Tag application order** — tags are the last step. If run completes but tags fail, the model is still usable (tags are metadata-only).
 
 ### Version Tagging Convention
 
