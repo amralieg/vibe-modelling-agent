@@ -923,6 +923,82 @@ Note: LLM scores were 62, 88, 82, 62, 72, 82 across runs for the SAME model — 
 
 ---
 
+## CI/CD Pipeline — Autonomous Development Loop
+
+The agent development follows a strict CI/CD loop. Every code change goes through this cycle before being promoted to production.
+
+### The Loop
+
+```
+Run → Inspect → Fix → Honesty Report → if quality ≥ target → push main (new tag) → sync dev → repeat
+```
+
+### Step-by-Step
+
+1. **Run** — Submit a test run (surgical iteration on existing model, or fresh base model)
+2. **Inspect** — Read volume logs mid-run (30s streaming), check progress table, verify physical model via SQL
+3. **Fix** — If issues found: diagnose from logs, fix in `/tmp/agent_source.py`, rebuild notebook, deploy, resubmit
+4. **Honesty Report** — After run completes, produce a brutally honest assessment:
+   - Deterministic score + delta from previous version
+   - What worked, what didn't, what partially worked
+   - Physical integrity check (tables, columns, FKs match JSON artifacts)
+   - Static analysis findings (promoted to priorities, not hidden)
+5. **Push** — Only if quality meets target:
+   ```bash
+   git checkout main && git merge dev --no-edit
+   git tag v<X.Y.Z> -m "description"
+   git push origin main --tags
+   git checkout dev && git merge main --no-edit && git push origin dev
+   ```
+6. **Deploy** — Upload notebook to workspace:
+   ```bash
+   databricks -p <profile> workspace import <path> --file agent/dbx_vibe_modelling_agent.ipynb --format JUPYTER --overwrite
+   ```
+7. **Repeat** — Run next iteration with the fixed code
+
+### Rules
+
+- **NEVER push to main without inspection passing**
+- **NEVER claim success without verifying physical model** (query `information_schema.columns`, `information_schema.table_constraints`)
+- **NEVER report LLM score as headline** — use deterministic score only
+- **Score MUST go up when vibes are applied** — if it doesn't, the scoring formula is wrong, not the model
+- **All static analysis warnings MUST be visible** — never hide in "minor issues" appendix
+- **Artifacts MUST be complete for reinstallation** — `model.json` must match physical model exactly
+
+### Monitoring During Runs
+
+```bash
+# Live logs (30s refresh)
+databricks -p <profile> fs cat "dbfs:/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/<version>/<business>_info_<version>.log"
+
+# Progress table
+SELECT status, SUBSTRING(message, 1, 120) FROM <catalog>._metamodel._vibe_progress ORDER BY last_updated DESC LIMIT 5
+
+# Physical model verification
+SELECT table_schema, COUNT(*) FROM <catalog>.information_schema.tables WHERE table_type = 'MANAGED' GROUP BY table_schema
+SELECT COUNT(*) FROM <catalog>.information_schema.table_constraints WHERE constraint_type = 'FOREIGN KEY'
+```
+
+### Pulse Check Template
+
+```
+┌──────────────────────────────────────────────┐
+│ PULSE │ Xm elapsed │ N lines │ E:0 W:0      │
+├──────────────────────────────────────────────┤
+│ STEP: <current step from logs>               │
+└──────────────────────────────────────────────┘
+```
+
+Read logs incrementally, track errors/warnings, watch for slowness, take notes.
+
+### Version Tagging Convention
+
+- `v0.X.0` — Major feature (e.g., surgical mode, deterministic scoring)
+- `v0.X.Y` — Bug fix or optimization within the feature
+- After `v0.X.9` → `v0.(X+1).0`
+
+---
+
 ## TODO: Known Issues to Fix
 
 1. ~~**Lost 3rd domain**~~ — Resolved by balanced vibe protection in architect review.
