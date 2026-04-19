@@ -841,13 +841,98 @@ When testing surgical mode specifically, verify all of the above plus:
 
 ---
 
+## Surgical Iteration Test Results (v0.4.0 — v0.5.1)
+
+This section documents the full 11-iteration surgical test cycle run on a large airline MVM model (12 domains, 159 products).
+
+### Base Model (v1)
+- **Operation:** `new base model` (organic, no vibes)
+- **Runtime:** ~160 min
+- **Result:** 12 domains, 159 products, 7,621 attributes, 726 FKs
+- **Static analysis:** 36 warnings, 1 unlinked, 0 siloed, 0 cycles
+- **Next vibes score:** 62/100 (LLM, 15 priorities — self-ref FKs, orphan tables, missing links)
+
+### Surgical Iterations (v2-v11)
+
+All iterations used operation `vibe modeling of version` with 20 surgical instructions:
+- 10 self-ref FK renames
+- 6 create_link FKs (cross-domain connections)
+- 4 generic FK renames (role-specific naming)
+
+| Ver | Code | Runtime | Attrs | FKs | Phys FKs | Score | Key Finding |
+|-----|------|---------|-------|-----|----------|-------|-------------|
+| v2 | v0.3.10 | 39 min | 7,622 | 730 | — | 62 | Descriptive vibes — barely changed |
+| v3 | v0.3.10 | 40 min | 7,626 | 732 | — | 62 | Surgical vibes — actions executed but PK consistency reverted renames |
+| v4 | v0.4.0 | 19.5 min | 7,635 | 742 | — | 88 | Self-ref fix: CREATE new column. Bidirectional protection. Fast path |
+| v5 | v0.4.0 | 20.7 min | 7,635 | 742 | — | 88 | Key name fix: profile_id FK persisted |
+| v6 | v0.4.1 | 17.5 min | 7,635 | 742 | — | 82→87 | Tag batching (34%). Deterministic score replaced LLM score |
+| v7 | v0.4.2 | 16.8 min | 7,635 | 742 | — | 87 | SA promotion. LLM gave 62 (proves deterministic score was right) |
+| v8 | v0.4.3 | 18.4 min | 7,635 | 742 | — | 87 | No cap. Orphan distinction. SKIP filter |
+| v10 | v0.5.0 | 10.9 min | 7,635 | 742 | **145** | 87 | Surgical deploy: IF NOT EXISTS + surgical tags. BUT broke FK integrity |
+| v11 | v0.5.1 | 11.7 min | 7,635 | 742 | **742** | 87 | FK integrity restored. Surgical FK filter reverted |
+
+### Key Bugs Found and Fixed
+
+| Bug | Version Found | Version Fixed | Root Cause |
+|-----|--------------|---------------|-----------|
+| Self-ref FK renames PK column | v3 | v0.4.0 | Only column matching PK name is the PK itself. Now creates new FK column |
+| Bidirectional removal kills user-vibed FKs | v4 | v0.4.0 | `_dynamically_created` flag not checked. Now protected |
+| Key name mismatch (`_user_vibed_artifacts`) | v4 | v0.4.1 | Stored as `user_vibed_artifacts`, read as `_user_vibed_artifacts` |
+| Self-ref guard too aggressive | v3 | v0.4.0 | `merged_into_profile_id` removed because `merged_into_` not in prefix list |
+| Subdomain/metric views run in surgical mode | v3 | v0.4.2 | `if not _surgical_fast_path:` only guarded step setup, not execution |
+| LLM score non-deterministic (88→62 for same model) | v6 | v0.4.2 | LLM assigned random scores. Now deterministic formula |
+| SA warnings buried as "minor issues" | v1-v5 | v0.4.2 | 36 warnings in appendix, LLM picked different 20 each time |
+| LLM cap at 20 hides issues | v1-v8 | v0.4.3 | Issues cycled in/out of top 20. Cap removed |
+| Surgical FK filter breaks untouched tables | v10 | v0.5.1 | CREATE OR REPLACE invalidates incoming FK refs. Filter reverted |
+| Duplicate self-ref columns | v4-v8 | v0.5.0 | Original v1 column + new surgical column. Now renames existing |
+
+### Physical Integrity Verification (v11 — Final State)
+
+| Check | Result |
+|-------|--------|
+| Tables | 159/159 — all 12 schemas |
+| Columns | 7,635 — matches model.json |
+| Physical FK constraints | 742 — all 12 schemas have FKs |
+| Self-ref FK columns (10) | All 10 present |
+| Cross-domain FK links | All 6 present |
+| Renamed generic FKs (4) | All 4 present |
+| Broken/empty tables | 0 |
+| model.json completeness | Matches physical model exactly |
+
+### Runtime Progression
+
+```
+v1 base:     159.7 min (full generation)
+v3 surgical:  39.8 min (no fast path, all steps run)
+v4 surgical:  19.5 min (fast path: skip subdomain + metric views)
+v6 surgical:  17.5 min (+ tag batching)
+v10 surgical: 10.9 min (+ surgical deploy: IF NOT EXISTS + surgical tags)
+v11 surgical: 11.7 min (+ full FK re-application for integrity)
+```
+
+### Score Progression
+
+```
+v1:  ~84 (deterministic, 36 warnings)
+v4:  88 (deterministic, 26 warnings — surgical fixes applied)
+v7:  87 (deterministic, 25 warnings — stable)
+v11: 87 (deterministic, 25 warnings — FK integrity restored)
+```
+
+Note: LLM scores were 62, 88, 82, 62, 72, 82 across runs for the SAME model — proving LLM scoring is unreliable. Deterministic scoring (v0.4.2+) is based on weighted warning counts and is reproducible.
+
+---
+
 ## TODO: Known Issues to Fix
 
-1. **Lost 3rd domain** — User requests 3 domains but only 2 survive deployment. Persistent across V7-V11. Root cause: dedup or consolidation merges domain contents.
+1. ~~**Lost 3rd domain**~~ — Resolved by balanced vibe protection in architect review.
 2. **Product under-generation** — User asks for 5 per domain (15 total) but LLM generates 8-12. The MODEL_GENERATION_PARAMETER_PROMPT sets the correct bounds but PRODUCT_GENERATE_PROMPT doesn't always produce the exact count.
 3. **Log preservation** — Vibe tester destroys catalogs (and logs) after Phase 8 cleanup. Logs should be copied to a persistent location before cleanup.
 4. **Job URL tracking** — Agent, runner, and tester should log their job URLs to the volume for monitoring.
-5. **TypeError in vibe modeling** — `cannot unpack non-iterable int object` in the vibe modeling path. Needs stack trace to fix.
+5. ~~**TypeError in vibe modeling**~~ — Fixed in v0.4.0 (classification override + action handler improvements).
 6. **MVM attribute depth** — MVM should have thinner attributes than ECM but currently produces the same depth. Needs parameter-based control, NOT variant-specific prompts.
 7. **FK suffix override** — User vibes requesting custom FK suffixes (e.g., `_ref` instead of `_id`) are not fully respected (V5 Gym test). Suffix detection from vibes is implemented but not all FK generation paths honor it.
 8. **Source tag persistence** — Custom source tags from vibes (e.g., `source=legacy_db`) fail to persist in some test scenarios (V3, V6). The tag injection path needs end-to-end verification.
+9. **Duplicate self-ref columns not fully resolved** — Some tables still have both the original v1 self-ref column AND the surgical fix column (e.g., `supervisor_agent_id` + `parent_agent_id` on `ground.agent`). The dedup logic renames when possible but may miss cases where the existing column name doesn't match expectations.
+10. **Generic FK rename coverage** — 17 tables have generic `crew_member_id` columns that should be role-specific. Only 4 were addressed in the surgical vibes. The remaining 13 need additional iterations.
+11. **Score plateau at 87** — The model has maxed out what the current 20 surgical instructions can achieve. Further improvement requires new vibes targeting the remaining 25 warnings (generic FK names, PII tags, etc.).
