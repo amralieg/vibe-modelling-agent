@@ -28,6 +28,7 @@
 - [18. Complete Widget Reference (28 Widgets)](#18-complete-widget-reference-28-widgets)
 - [19. Output Artifacts (Complete Reference)](#19-output-artifacts-complete-reference)
 - [20. Error Handling Patterns](#20-error-handling-patterns)
+- [22. Surgical Mode Architecture (v0.4.0 — v0.5.1)](#22-surgical-mode-architecture-v040--v051)
 
 ---
 
@@ -1170,6 +1171,75 @@ Tags flow through three distinct paths in the pipeline:
 Custom tags from vibes are injected at two points:
 1. During logical model generation (`_apply_vibe_custom_tags()`) -- ensures tags appear in model.json
 2. During physical deployment -- ensures tags appear as ALTER TABLE/COLUMN SET TAGS SQL statements
+
+---
+
+## 22. Surgical Mode Architecture (v0.4.0 — v0.5.1)
+
+### Three Execution Modes
+
+The vibe interpreter classifies every vibe session into one of three execution modes. The mode determines mutation budgets, pipeline stages executed, and deployment strategy.
+
+| Mode | When Selected | Mutation Budget | Pipeline Behavior |
+|---|---|---|---|
+| **GENERATIVE** | `new base model` or vibe text that requests a complete rebuild | Highest (12 global rewrites, 100 domains, 1,000 products, 50,000 attributes) | Full pipeline: all stages from domain generation through artifacts |
+| **HOLISTIC** | Vibe text that touches multiple domains or requests broad changes (e.g., "rename all tables", "add PII tags everywhere") | Medium (4 global rewrites, 30 domains, 400 products, 12,000 attributes) | Full pipeline, but constrained mutation budgets prevent runaway changes |
+| **SURGICAL** | Vibe text that targets specific entities (e.g., "add email column to customer", "rename billing.invoice to billing.bill", "link order to warehouse") | Lowest (0 global rewrites, 4 domains, 80 products, 1,200 attributes) | **Fast path**: skips subdomain allocation and metric view generation |
+
+Mode classification is deterministic based on keyword analysis in the vibe text. Keywords like "add column", "rename", "drop attribute", "link X to Y" trigger surgical mode. Keywords like "rebuild", "regenerate all", "restructure" trigger generative mode. Everything else defaults to holistic.
+
+### Surgical Fast Path
+
+When surgical mode is active, the pipeline skips two expensive stages that are unnecessary for small targeted changes:
+
+1. **Subdomain Allocation (Stage 11)** -- Skipped because surgical changes to individual tables or columns do not affect the grouping of products into subdomains.
+2. **Metric View Generation (Stages 15/19)** -- Skipped because metric views are domain-level artifacts that are unaffected by column-level or single-table changes.
+
+This fast path reduces surgical vibe execution time by 30-50% compared to running the full pipeline.
+
+### Surgical Deploy: IF NOT EXISTS
+
+During physical deployment in surgical mode, the agent distinguishes between **touched** and **untouched** tables:
+
+- **Touched tables** (modified by the current vibe session): Deployed with full `CREATE TABLE` or `CREATE OR REPLACE TABLE` statements.
+- **Untouched tables** (no changes in the current session): Deployed with `CREATE TABLE IF NOT EXISTS` statements.
+
+This makes surgical deploy **idempotent and safe** for the existing physical schema. Untouched tables are created only if they do not already exist (e.g., first-time install), and existing data is never overwritten.
+
+### Self-Referencing FK Handling
+
+Self-referencing FKs (where a table points to itself, e.g., `category.parent_category_id -> category.category_id`) require special handling:
+
+1. **Creation rule (SURG-RUL-001):** When creating or renaming a self-referencing FK, the agent must create a **new column** with a hierarchical prefix (e.g., `parent_`, `manager_`, `reporting_`). It must never rename or overwrite the PK column.
+2. **Validation:** The self-ref FK column name must differ from the PK name. If `column_name == pk_name`, the FK is rejected.
+3. **Recognized prefixes:** The full prefix list is defined in REL-RUL-018 (Section 5). Only columns with recognized hierarchical prefixes are exempt from cycle and bidirectional detection.
+
+### Bidirectional FK Protection for User-Vibed Links
+
+The QA stage includes a bidirectional FK removal pass that detects A->B + B->A FK pairs and removes one direction. In v0.4.1+, any FK link that was **explicitly requested by the user via vibe instructions** is protected from this removal. The bidirectional check skips protected links, ensuring user intent is preserved even when the reverse direction also exists.
+
+### Deterministic Scoring Formula
+
+Starting in v0.5.0, model quality scoring is fully deterministic -- no LLM involvement. The score is computed from measurable model properties:
+
+| Dimension | Weight | What It Measures |
+|---|---|---|
+| FK Coverage | 20% | Percentage of tables with at least one FK relationship |
+| PII Tagging | 15% | Percentage of PII-candidate columns with correct tags |
+| Naming Compliance | 15% | Percentage of names passing all naming convention rules |
+| Domain Balance | 10% | How evenly products are distributed across domains |
+| Attribute Depth | 10% | Whether attribute counts fall within tier ranges |
+| Cross-Domain Connectivity | 10% | Number of cross-domain FK links relative to domain count |
+| DAG Integrity | 10% | Absence of cycles in the FK graph (binary: 100% or 0%) |
+| SSOT Compliance | 10% | Absence of duplicate products across domains |
+
+**Iteration Bonus (v0.5.1):** When the session is a vibe iteration (not a new base model), a bonus is added proportional to the vibe fulfillment rate. If 8 out of 10 vibes were successfully applied, the bonus is `(8/10) * bonus_weight`. This ensures the score directionally increases when user intent is realized.
+
+The formula produces a score from 0-100. Given the same model state and vibe fulfillment, the score is always identical across runs.
+
+### Tag Batching
+
+Starting in v0.5.0, the tag application stage batches multiple column-level tag operations into fewer SQL statements. Instead of issuing one `ALTER TABLE ALTER COLUMN SET TAGS` per column, the agent groups columns by table and issues combined statements. This reduces the total number of SQL calls by approximately 34%, significantly improving tag application performance on large models.
 
 ---
 

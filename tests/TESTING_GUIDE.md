@@ -1,6 +1,6 @@
 # Vibe Modelling Agent — Testing Guide
 
-**Last updated:** 2026-04-17
+**Last updated:** 2026-04-19
 **Author:** Testing learnings from iterative debugging session
 
 ---
@@ -726,6 +726,118 @@ After each vibe compliance test, fill in this template:
 | V6 Car Dealer | 73% | 5/6 tables, PII good | Source tags failed |
 | ULTIMATE Smart City | 84% | 18/18 products, 13/13 FKs | Bare naming initially failed |
 | ULTIMATE v2 (post-fix) | ~95% | Bare naming 0 violations, all physical tags applied | - |
+
+---
+
+## Surgical Mode Fixes (v0.4.0 — v0.5.1)
+
+The v0.4.0 through v0.5.1 releases introduced a series of targeted fixes to surgical mode, scoring, and deployment. This section documents each fix, its rationale, and how to verify it during testing.
+
+### Self-Referencing FK Rename Creates New Column (v0.4.0)
+
+**Problem:** When renaming a self-referencing FK column, the agent was renaming the PK column itself instead of creating a new FK column with the correct prefix.
+
+**Fix:** Self-referencing FK rename now creates a **new column** with the hierarchical prefix (e.g., `parent_category_id`) instead of renaming the existing PK (`category_id`). The PK is never touched.
+
+**How to verify:**
+```sql
+-- After deployment, confirm the PK still exists unchanged
+SELECT attribute, foreign_key_to
+FROM <catalog>._metamodel.attribute
+WHERE product = '<product>' AND attribute = '<product>_id';
+-- Expect: PK row with no foreign_key_to
+
+-- Confirm the self-ref FK is a separate column
+SELECT attribute, foreign_key_to
+FROM <catalog>._metamodel.attribute
+WHERE product = '<product>' AND foreign_key_to LIKE CONCAT('%', '<product>', '.', '<product>_id');
+-- Expect: a different column name (e.g., parent_<product>_id)
+```
+
+### Bidirectional FK Protection for User-Vibed Links (v0.4.1)
+
+**Problem:** The bidirectional FK removal pass was deleting FK links that the user explicitly requested via vibes. If a user vibed `link A to B`, the agent would later remove that link when it detected a reverse link from B to A.
+
+**Fix:** FK links that originate from user vibe instructions are now **protected from bidirectional removal**. The bidirectional check skips any link that is flagged as user-vibed.
+
+**How to verify:**
+```sql
+-- After vibing a specific link, confirm it survives
+SELECT a.domain, a.product, a.attribute, a.foreign_key_to
+FROM <catalog>._metamodel.attribute a
+WHERE a.foreign_key_to IS NOT NULL
+  AND a.attribute LIKE '%<user_vibed_fk>%';
+-- Expect: the user-vibed FK link is present
+```
+
+### Surgical Fast Path — Skip Subdomain + Metric Views (v0.4.2)
+
+**Problem:** Surgical mode was running the full pipeline including subdomain allocation and metric view generation, even though surgical vibes typically only modify a few tables or attributes.
+
+**Fix:** When the agent detects surgical mode, it now skips subdomain allocation (Stage 11) and metric view generation (Stage 15/19) entirely, taking a **fast path** through the pipeline. This reduces execution time significantly for small targeted changes.
+
+**How to verify:**
+- Monitor `_vibe_progress` during a surgical vibe run
+- Confirm no rows appear for `stage_name LIKE '%Subdomain%'` or `stage_name LIKE '%Metric%'`
+- Total pipeline time should be notably shorter than a holistic or generative run
+
+### Surgical Deploy — IF NOT EXISTS for Untouched Tables (v0.5.0)
+
+**Problem:** Surgical deploy was running full `CREATE TABLE` statements for every table in the model, even when only a few tables were modified. This caused unnecessary overhead and risked overwriting existing data.
+
+**Fix:** During surgical deploy, tables that were **not touched** by the current vibe iteration are deployed with `CREATE TABLE IF NOT EXISTS`. Only tables that were actually modified get a full redeploy. This makes surgical deploy safe and idempotent for untouched tables.
+
+**How to verify:**
+- Check the SQL DDL artifact for the surgical run
+- Untouched tables should use `IF NOT EXISTS`
+- Modified tables should use standard `CREATE TABLE` (or `CREATE OR REPLACE`)
+
+### Tag Batching — 34% Fewer SQL Calls (v0.5.0)
+
+**Problem:** The tag application stage was issuing individual `ALTER TABLE SET TAGS` and `ALTER TABLE ALTER COLUMN SET TAGS` SQL statements for each tag on each entity. For large models this resulted in thousands of SQL calls.
+
+**Fix:** Tags are now **batched** by table, combining multiple column-level tag operations into fewer SQL statements. This results in approximately 34% fewer SQL calls during the tag application stage.
+
+**How to verify:**
+- Compare the number of SQL statements in the tag application stage between v0.4.x and v0.5.x runs
+- Monitor `_vibe_progress` for the tag stage duration; expect it to be shorter
+
+### Deterministic Scoring — Not LLM-Based (v0.5.0)
+
+**Problem:** Model quality scoring was delegated to an LLM, which produced non-reproducible scores across runs for identical models. The same model could score 72/100 on one run and 85/100 on the next.
+
+**Fix:** Quality scoring is now **fully deterministic** using a formula-based approach. The score is computed from measurable model properties (FK coverage, PII tagging, naming compliance, domain balance, etc.) without any LLM involvement. Given the same model state, the score is always identical.
+
+**How to verify:**
+- Run the same model through scoring twice; expect identical scores
+- Check the progress log for `[SCORE]` entries showing the breakdown by dimension
+
+### Iteration Bonus Scoring (v0.5.1)
+
+**Problem:** When a user successfully applied vibes to improve a model, the quality score sometimes decreased or stayed flat, even though the model was objectively better. This created a confusing signal.
+
+**Fix:** The scoring formula now includes an **iteration bonus** that rewards successful vibe application. When vibes are parsed and successfully fulfilled, a bonus is added to the score proportional to the fulfillment rate. This ensures the score directionally increases when the user's intent is realized.
+
+**How to verify:**
+- Generate a base model (v1) and record the quality score
+- Apply vibes that fix known issues (v2)
+- The v2 score should be higher than the v1 score
+- Check the progress log for `[SCORE]` entries showing the iteration bonus component
+
+### Surgical Mode Test Checklist
+
+When testing surgical mode specifically, verify all of the above plus:
+
+| Check | Expected |
+|---|---|
+| Self-ref FK creates new column | PK unchanged, new FK column exists |
+| User-vibed links survive bidirectional check | Vibed FK present after QA |
+| Subdomain stage skipped | No subdomain rows in `_vibe_progress` |
+| Metric view stage skipped | No metric view rows in `_vibe_progress` |
+| Untouched tables use IF NOT EXISTS | Check DDL artifact |
+| Tag batching active | Fewer SQL calls in tag stage |
+| Score is deterministic | Identical score on re-run |
+| Score increases on successful vibe | v2 score > v1 score |
 
 ---
 
