@@ -81,6 +81,22 @@ Every organization can "vibe its own model" -- no two outputs are the same becau
 
 ## 2. Architecture Overview
 
+### Diagram: End-to-End Architecture
+
+```mermaid
+flowchart LR
+    BIZ["Business<br/>description"] --> CTX["Context<br/>builder"]
+    CTX --> DOM["Domain<br/>generator"]
+    DOM --> PRD["Product<br/>generator"]
+    PRD --> ARCH["Architect Review<br/>23 tests + 4 gates"]
+    ARCH --> ATT["Attribute<br/>generator"]
+    ATT --> FK["FK<br/>generator"]
+    FK --> SA["Static<br/>analysis"]
+    SA --> INST["Install<br/>(metamodel + physical, parallel)"]
+    INST --> NXT["Next_vibes<br/>generation"]
+    NXT --> ART["Artifacts<br/>(JSON, SQL, docs, samples)"]
+```
+
 ### The Four-Level Hierarchy
 Every Vibe model follows a strict four-level hierarchy: Divisions -> Domains -> Products (Tables) -> Attributes (Columns).
 
@@ -192,6 +208,27 @@ The pipeline executes a series of stages, each with a specific purpose, quality 
 - **Quality check:** Division balance (Ops+Business >=80%), forbidden name check, fragmentation test, SSOT pre-check, naming validation (1 word, lowercase, singular, max 20 chars)
 - **Progress budget:** 2.0%
 
+### Diagram: Architect Review Flow
+
+```mermaid
+flowchart TD
+    INV["Model inventory<br/>(domains, products, FKs)"] --> TESTS["23 quality tests<br/>(fragmentation, SSOT, DAG,<br/>org-chart, richness, etc.)"]
+    TESTS --> SCORES["Per-test scores<br/>+ composite score"]
+    SCORES --> GATES["4 production-readiness gates"]
+    GATES --> G1{"TRUST<br/>model?"}
+    GATES --> G2{"SUPPORT<br/>production?"}
+    GATES --> G3{"RECOMMEND<br/>to user?"}
+    GATES --> G4{"PROPOSE<br/>for deployment?"}
+    G1 -->|No| RA["required_actions<br/>piped into next_vibes.txt<br/>+ NEXT_VIBES collector"]
+    G2 -->|No| RA
+    G3 -->|No| RA
+    G4 -->|No| RA
+    G1 -->|Yes| PASS["Proceed"]
+    G2 -->|Yes| PASS
+    G3 -->|Yes| PASS
+    G4 -->|Yes| PASS
+```
+
 ### Stage 5: Creating Data Products
 - **Purpose:** Generate products per domain with architect review
 - **Duration:** 1-10 minutes
@@ -253,6 +290,33 @@ The pipeline executes a series of stages, each with a specific purpose, quality 
 - **Purpose:** Create Unity Catalog schemas + Delta tables
 - **Duration:** 1-10 minutes
 - **Progress budget:** 10.0%
+
+#### Diagram: Install Pipeline Phases
+
+```mermaid
+sequenceDiagram
+    participant I as Install
+    participant UC as Unity Catalog
+    participant MM as Metamodel
+    participant V as Volume
+    I->>UC: Catalog check (create if missing)
+    par Parallel schema creation
+        I->>UC: CREATE SCHEMA (per domain)
+    end
+    par Parallel table creation
+        I->>UC: CREATE TABLE (per product)
+    end
+    par Parallel FK application
+        I->>UC: ALTER TABLE ADD CONSTRAINT (FKs)
+    end
+    I->>UC: Apply tags (batched)
+    I->>UC: Create metric views
+    I->>MM: Insert _business/_domain/_product/_attribute rows
+    I->>I: Integrity check (rows == UC objects)
+    I->>V: Copy artifacts (JSON, SQL, docs) to volume
+```
+
+> The final **integrity check** is a post-install verification (new in v0.5.x) that reconciles metamodel row counts against Unity Catalog objects before marking the install successful.
 
 ### Stage 13: Applying Foreign Keys
 - **Purpose:** Create physical FK constraints on tables
@@ -557,6 +621,85 @@ See Section 13 for the complete prompt reference.
 
 ## 8. Operations Reference
 
+### Diagram: Version and Scope Model
+
+```mermaid
+erDiagram
+    BUSINESS ||--o{ DOMAIN : contains
+    DOMAIN ||--o{ PRODUCT : contains
+    PRODUCT ||--o{ ATTRIBUTE : contains
+
+    BUSINESS {
+        string business PK
+        int version PK
+        string model_scope PK
+        string description
+        int tier
+    }
+    DOMAIN {
+        string business PK
+        int version PK
+        string model_scope PK
+        string domain_name PK
+        string division
+    }
+    PRODUCT {
+        string business PK
+        int version PK
+        string model_scope PK
+        string domain_name PK
+        string product_name PK
+        string data_type
+    }
+    ATTRIBUTE {
+        string business PK
+        int version PK
+        string model_scope PK
+        string domain_name PK
+        string product_name PK
+        string attribute_name PK
+        string data_type_spark
+    }
+```
+
+> All four `_metamodel` tables share the composite key `(business, version, model_scope)` where `version` is a pure integer and `model_scope` is `ecm` or `mvm`.
+
+### Diagram: Folder Layout
+
+```
+/Volumes/{catalog}/_metamodel/vol_root/
+└── business/
+    └── {business}/
+        ├── mvm_v1/
+        │   ├── model.json
+        │   ├── domains/ products/ attributes/ fk_links/
+        │   ├── artifacts/ (README, Excel, DBML, ontology)
+        │   ├── samples/ (CSV per table)
+        │   └── next_vibes.txt
+        └── ecm_v1/
+            ├── model.json
+            ├── domains/ products/ attributes/ fk_links/
+            ├── artifacts/ (README, Excel, DBML, ontology)
+            ├── samples/ (CSV per table)
+            └── next_vibes.txt
+```
+
+### Diagram: Operation State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> NEW: new base model
+    NEW --> INSTALLED: install model
+    INSTALLED --> VIBED: vibe modeling of version
+    VIBED --> INSTALLED: install model
+    INSTALLED --> ENLARGED: enlarge mvm
+    INSTALLED --> SHRUNK: shrink ecm
+    ENLARGED --> INSTALLED: install model
+    SHRUNK --> INSTALLED: install model
+    INSTALLED --> UNINSTALLED: uninstall model version
+    UNINSTALLED --> [*]
+```
+
 | Operation | Purpose | Key Requirements |
 |---|---|---|
 | new base model | Generate brand-new model | Business name + description |
@@ -826,6 +969,19 @@ Every LLM interaction is logged: prompt name, model used, latency, honesty score
 
 ## 15. Vibe System Architecture
 
+### Diagram: Vibe Execution Pipeline
+
+```mermaid
+flowchart TD
+    U["User vibes<br/>(natural language)"] --> VREQ["VREQ parser<br/>(scope, intent, priority)"]
+    VREQ --> ORCH["VibeOrchestrator<br/>UNIFIED MASTER ANALYSIS"]
+    ORCH --> ACT["Actions<br/>(38+ primitives)"]
+    ACT --> MUT["Mutation engine<br/>(entity x operation matrix)"]
+    MUT --> VSW["Verification sweep<br/>(silent drops logged as telemetry)"]
+    VSW --> NV["Next_vibes<br/>(gaps + unfulfilled reqs)"]
+    VSW -.->|"pre-v0.3.4: silent drops"| TEL["Telemetry log<br/>(now captured)"]
+```
+
 ### Vibe Parsing and Execution
 
 The vibe system translates natural-language instructions into structured model modifications. A single vibe session can contain multiple requirements spanning different scopes and intent types.
@@ -848,47 +1004,86 @@ Fidelity gates are quality thresholds that must be satisfied after vibe executio
 | max_false_fulfilled | 0.10 | 0.01 | Maximum rate of falsely-reported-as-fulfilled requirements |
 | max_scope_leakage_rate | 0.10 | 0.02 | Maximum rate of mutations outside the declared scope |
 
-### Action Primitives (38+)
+### Action Primitives — Complete Catalog
 
-The vibe system supports the following atomic action primitives. Each maps to a dedicated prompt and execution path:
+The vibe system exposes actions at three layers. Understanding all three is necessary to know exactly what a vibe can trigger.
 
-| Primitive | Scope | Description |
-|---|---|---|
-| drop | domain, product, attribute | Remove an entity from the model |
-| create | domain, product, attribute | Add a new entity to the model |
-| rename | domain, product, attribute | Rename an entity |
-| alter_description | domain, product, attribute | Modify the description of an entity |
-| modify | product, attribute | General property modification |
-| merge | domain, product | Merge two or more entities into one, reconciling attributes |
-| split | domain, product | Split one entity into multiple entities |
-| transform_name | model | Transform naming patterns across entities |
-| set_property | product, attribute | Set metadata properties |
-| tag | product, attribute | Apply or modify tags |
-| add_columns_from_template | product | Add a pre-built column template set |
-| move | product | Move a product between domains |
-| generate_artifact | model | Generate a specific documentation artifact |
-| query | model | Answer analytical questions about the model |
-| link | product | Create a specific FK link between tables |
-| discover_links | model, domain | Discover missing FK links |
-| fix_links | model, domain | Fix broken or invalid FK references |
-| model_checkup | model | Run comprehensive model health check |
-| run_quality_checks | model | Execute QA checks on demand |
-| run_linking | model | Re-run the full linking pipeline |
-| normalize_to_3nf | domain, product | Normalize tables to Third Normal Form |
-| denormalize_for_analytics | domain, product | Denormalize tables for analytical workloads |
-| promote_to_table | product | Promote a helper/lookup to a full product table |
-| inline_table | product | Inline a table's attributes into its parent table |
-| swap_domains | domain | Swap products between two domains |
-| enlarge_model | model | Add domains and products (MVM->ECM direction) |
-| shrink_model | model | Remove domains and products (ECM->MVM direction) |
-| reverse_engineer_schema | model | Reverse-engineer a model from an existing schema |
-| remove_product_prefix | model | Strip domain prefixes from product names |
-| fix_fk_column_naming | model | Fix FK column names to match target PK naming |
-| connect_table | product | Create FK links for a disconnected/siloed table |
-| find_missing_fk_links | model | Identify tables that should be linked but are not |
-| standardize_naming | model | Apply naming conventions uniformly |
-| ensure_user_terminology | model | Replace generic terms with user's business terminology |
-| fix_user_specified_issues | model | Address specific issues called out in vibe text |
+#### Layer 1 — Mutation engine (entity × operation matrix)
+
+This is the lowest-level, most direct path. Accepted by the LLM fallback execution path via `_llm_fallback_apply_mutations`. Synonyms are normalized via `_MUT_ENTITY_SYNONYMS` and `_MUT_OPERATION_SYNONYMS` — any unrecognized combo is logged with a drop reason (since v0.5.6) rather than silently discarded.
+
+```mermaid
+mindmap
+  root((Mutation<br/>Engine))
+    attribute
+      add / create / insert / new / make
+      modify / update / change / set / rename / edit
+      remove / delete / drop / del
+    product
+      add / create / insert / new / make
+      modify / update / change / set / rename / edit
+      remove / delete / drop / del
+    domain
+      add / create / insert / new / make
+      modify / update / change / set / rename / edit
+      remove / delete / drop / del
+    link
+      add / create / insert / new / make
+      modify / update / change / set / rename / edit
+      remove / delete / drop / del
+```
+
+| Entity type | Synonyms accepted | add/create | modify | remove |
+|---|---|---|---|---|
+| **attribute** | `column`, `col`, `field`, `property` | new column with type + description | set attribute/type/description/tags/value_regex/foreign_key_to/nullable/column_name | remove column |
+| **product** | `table`, `entity` | new table with description | set product/description/tags/primary_key/table_name/subdomain | remove table + cascade attributes |
+| **domain** | `subject_area`, `schema` | new domain with description | set domain/description/tags/division/database_name | remove domain + cascade products + attributes |
+| **link** | `fk`, `foreign_key`, `relationship`, `relation`, `join`, `reference`, `connect_table`, `connect` | add new FK column (or set FK on existing column) — this is what `connect_table` vibe priorities map to | set FK target | clear FK target |
+
+**Drop telemetry (v0.5.6):** every mutation that does not apply is logged with its reason — `unknown_combo`, `no_match_or_parts`, or `exception:<msg>` — plus a per-reason count at the end of each batch.
+
+#### Layer 2 — Generic handlers
+
+Actions that route through `_GENERIC_HANDLER_DISPATCH`. Six handlers cover most non-structural operations:
+
+| Handler | Purpose |
+|---|---|
+| `add_columns_from_template` | Add a pre-built column template set (SCD2, audit, soft-delete, temporal, versioning, multi-tenancy, lineage, GDPR) |
+| `transform_name` | Apply a naming pattern across many entities at once |
+| `set_property` | Set any metadata property on an entity |
+| `tag` | Apply, remove, or clear tags |
+| `generate_artifact` | Generate a documentation artifact (README, ontology, DBML, release notes, Excel, data dictionary, test cases, ERD, report, JSON) |
+| `query` | Answer analytical questions about the model — read-only, no mutation |
+
+#### Layer 3 — Legacy / high-level action names (full registry)
+
+All of the following action names are accepted in vibe text. They route to the layer-2 handlers through `_LEGACY_ACTION_MAP`.
+
+**Structural primitives (direct, no mapping):**
+`create`, `rename`, `move`, `drop`, `merge`, `split`, `set_property`, `tag`, `query`, `create_table`, `create_attribute`, `create_link`, `move_product`, `ensure_user_terminology`
+
+**Template-column actions:**
+`add_scd_columns`, `add_audit_columns`, `add_soft_delete_columns`, `add_temporal_columns`, `add_versioning_columns`, `add_multitenancy_columns`, `add_lineage_columns`, `add_gdpr_columns`
+
+**Tag actions:**
+`add_tag_to_product`, `add_tag_to_domain`, `remove_tag_from_product`, `remove_tag_from_domain`, `clear_tags`
+
+**Property set actions:**
+`set_data_retention`, `set_data_owner`, `set_update_frequency`, `set_table_comment`, `mark_as_pii`, `mark_as_sensitive`, `mark_as_encrypted`, `mark_as_deprecated`, `set_fk_cardinality`, `set_fk_description`, `add_check_constraint`, `set_unique_constraint`, `classify_table_tier`, `set_nullable`, `set_default_value`, `set_table_type`
+
+**Artifact generation:**
+`generate_samples`, `generate_readme`, `generate_data_model_json`, `generate_ontology`, `generate_dbml`, `generate_release_notes`, `generate_excel`, `generate_data_dictionary`, `generate_test_cases`, `generate_erd_diagram`, `export_model_report`
+
+**Query / report actions:**
+`find_tables_with_column`, `find_unlinked_columns`, `list_all_fks`, `list_all_pks`, `list_all_tags`, `count_entities`, `search_model`, `report_domain_summary`, `report_model_stats`, `impact_analysis`, `analyze_fk_coverage`, `check_model_health`, `validate_model`, `estimate_storage`, `compare_domains`, `compare_tables`, `find_duplicate_column_names`, `find_similar_tables`, `find_merge_candidates`, `find_columns_by_pattern`, `find_by_tag`, `validate_required_columns`, `validate_fk_targets`, `find_tables_without_column`, `evaluate_column_overlap`, `cross_domain_column_audit`
+
+**Link / FK specialists:**
+`link`, `discover_links`, `fix_links`, `connect_table`, `find_missing_fk_links`, `fix_fk_column_naming`, `standardize_naming`, `remove_product_prefix`
+
+**Model-level transforms:**
+`model_checkup`, `run_quality_checks`, `run_linking`, `normalize_to_3nf`, `denormalize_for_analytics`, `promote_to_table`, `inline_table`, `swap_domains`, `enlarge_model`, `shrink_model`, `reverse_engineer_schema`, `fix_user_specified_issues`, `alter_description`
+
+**Authoritative source:** `_LEGACY_ACTION_MAP` and `_GENERIC_HANDLER_DISPATCH` in the agent source. Call `_get_available_action_catalog()` to enumerate the live, deduplicated list at runtime.
 
 ---
 
@@ -929,6 +1124,31 @@ A single round of cycle breaking can create residual cycles when multiple cycles
 ---
 
 ## 17. Static Analysis Checks
+
+### Diagram: Static Analysis Categories
+
+```mermaid
+mindmap
+  root((Static<br/>Analysis))
+    FK graph
+      FK cycles
+      Broken FKs
+      Unlinked _id columns
+      Self-FK on PK
+    Table health
+      Siloed tables
+      Missing PKs
+      Duplicate products
+      Namespace mismatch
+    Schema integrity
+      PK/FK name mismatch
+      Orphaned domain refs
+      Bidirectional FK pairs
+    Convention
+      snake_case violations
+      Product prefix in cols
+      FK suffix mismatch
+```
 
 The agent performs comprehensive code-based validation of the model without LLM involvement. This runs after every major pipeline stage and during QA. The checks are:
 
@@ -1178,6 +1398,19 @@ Custom tags from vibes are injected at two points:
 
 ### Three Execution Modes
 
+#### Diagram: Mode Decision Tree
+
+```mermaid
+flowchart TD
+    V["Vibe text"] --> CHK{"Classify<br/>keywords"}
+    CHK -->|"'new base model' or<br/>'rebuild', 'regenerate all',<br/>'restructure'"| GEN["GENERATIVE<br/>12 rewrites / 100 domains<br/>1,000 products / 50,000 attrs<br/>Full pipeline from scratch"]
+    CHK -->|"'rename all', 'add PII<br/>everywhere', broad patterns<br/>across many domains"| HOL["HOLISTIC<br/>4 rewrites / 30 domains<br/>400 products / 12,000 attrs<br/>Pattern-based, full pipeline"]
+    CHK -->|"'add column', 'rename X',<br/>'link A to B', targeted<br/>discrete actions"| SURG["SURGICAL<br/>0 rewrites / 4 domains<br/>80 products / 1,200 attrs<br/>Fast path: skip stages 11/15/19"]
+    GEN --> DEPLOY["Deploy: full CREATE"]
+    HOL --> DEPLOY2["Deploy: CREATE OR REPLACE"]
+    SURG --> DEPLOY3["Deploy: CREATE OR REPLACE (touched)<br/>+ CREATE IF NOT EXISTS (untouched)"]
+```
+
 The vibe interpreter classifies every vibe session into one of three execution modes. The mode determines mutation budgets, pipeline stages executed, and deployment strategy.
 
 | Mode | When Selected | Mutation Budget | Pipeline Behavior |
@@ -1187,6 +1420,32 @@ The vibe interpreter classifies every vibe session into one of three execution m
 | **SURGICAL** | Vibe text that targets specific entities (e.g., "add email column to customer", "rename billing.invoice to billing.bill", "link order to warehouse") | Lowest (0 global rewrites, 4 domains, 80 products, 1,200 attributes) | **Fast path**: skips subdomain allocation and metric view generation |
 
 Mode classification is deterministic based on keyword analysis in the vibe text. Keywords like "add column", "rename", "drop attribute", "link X to Y" trigger surgical mode. Keywords like "rebuild", "regenerate all", "restructure" trigger generative mode. Everything else defaults to holistic.
+
+### Diagram: Surgical Iteration Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant O as Orchestrator
+    participant ME as Mutation Engine
+    participant V as Verifier
+    participant D as Deployer
+    U->>O: Submit vibes on v1 model
+    O->>O: Load v1 metamodel
+    O->>O: Classify next_vibes -> SURGICAL
+    O->>O: Decompose into VREQs
+    loop for each VREQ
+        O->>ME: Apply mutation (add/modify/remove)
+        ME-->>O: Updated model state
+    end
+    O->>V: Verification sweep
+    V-->>O: Touched-tables set
+    O->>O: Write v2 metamodel (touched only)
+    O->>D: Deploy
+    D->>D: CREATE OR REPLACE (touched)
+    D->>D: CREATE IF NOT EXISTS (untouched)
+    D-->>U: v2 deployed
+```
 
 ### Surgical Fast Path
 

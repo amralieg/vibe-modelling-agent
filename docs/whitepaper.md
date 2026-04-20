@@ -160,6 +160,30 @@ The result is a set of domains, each classified into one of the three divisions.
 
 ### 1.4 — Filling Domains with Tables
 
+#### Diagram: ECM vs MVM Coverage
+
+```mermaid
+flowchart LR
+    subgraph ECM["ECM (Expanded Coverage Model)"]
+        direction TB
+        E1["All domains: Operations + Business + Corporate"]
+        E2["Full product breadth per domain"]
+        E3["Production-grade attributes"]
+        E4["100% coverage for Fortune 100"]
+    end
+    subgraph MVM["MVM (Minimum Viable Model)"]
+        direction TB
+        M1["Essential domains only"]
+        M2["30-50% of ECM table count"]
+        M3["SAME attribute depth as ECM"]
+        M4["Production-ready for SMBs / POCs"]
+    end
+    ECM -.shrink ecm.-> MVM
+    MVM -.enlarge mvm.-> ECM
+```
+
+> MVM is NOT a skeleton. It is a production-ready subset where every delivered table is fully-featured — lightness comes from fewer domains and fewer tables, never from thinner attributes.
+
 With domains established, the model enters its most prolific phase: filling each domain with data products -- the tables that will hold the business's data.
 
 All domains are populated simultaneously. For each domain, the model generates tables that naturally belong there. In "customer": profile, account, address, contact, preference, segment. In "billing": invoice, payment, charge, credit_note, dispute. In "operations": equipment, work_order, schedule, inspection, facility.
@@ -169,6 +193,22 @@ All domains are populated simultaneously. For each domain, the model generates t
 Every table must represent a genuine business concept that a domain expert would recognize. Technical artifacts like `etl_job_log` or `batch_control` are plumbing -- they belong in operational schemas, not the business model (**G12-R001**). Analytics tables like `churn_prediction` or `revenue_analysis` are derived insights that belong in the Gold layer (**G12-R002**). Speculative content like `blockchain_hash` or `quantum_encryption_key` represents what the business might do someday, not what it does today (**G12-R004**). All three are turned away.
 
 #### Single Source of Truth
+
+##### Diagram: SSOT Principle
+
+```mermaid
+graph TD
+    CUST["customer domain<br/>(AUTHORITATIVE owner<br/>of customer concept)"]
+    BILL["billing domain"]
+    ORD["sales domain"]
+    SUPP["support domain"]
+    CUST -->|owns| CT["customer table<br/>(single definition)"]
+    BILL -.FK customer_id.-> CT
+    ORD -.FK customer_id.-> CT
+    SUPP -.FK customer_id.-> CT
+```
+
+> One concept owns exactly one domain. Other domains reference via FK — never by duplicating the concept.
 
 After all domains have their tables, the model runs **global semantic deduplication**. It scans every table across every domain, looking for duplicates -- tables that represent the same business concept under different names. "invoice" and "bill" are the same thing. "customer" and "client" are the same thing. The SSOT principle (**G02-R001**) demands that each concept has exactly one authoritative home.
 

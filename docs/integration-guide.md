@@ -133,6 +133,18 @@ When the UI creates the job, it **MUST** set these exact tag keys. All values mu
 
 **End-of-run tag update:** When the pipeline completes successfully inside a job context (i.e., `vibe_session_id` was provided), the agent automatically updates the six count tags (`domains`, `products`, `attributes`, `foreign_keys`, `tags`, `metrics`) with actual values from the run. The UI does not need to do anything for this — it happens server-side.
 
+#### Diagram: Widget Value Resolution
+
+```mermaid
+flowchart LR
+    MF["model.json<br/>model_conventions"] --> MERGE["Merge rule<br/>(widget wins by default)"]
+    WG["Widget inputs<br/>_widget_raw_values"] --> MERGE
+    MERGE --> EMC["Effective<br/>_deploy_mc"]
+    EOK["EXPLICIT_OVERRIDE_KEYS<br/>{schema_prefix, schema_suffix,<br/>catalog_prefix, catalog_suffix,<br/>tag_prefix, tag_suffix}"] -.->|"empty widget<br/>OVERRIDES file"| MERGE
+```
+
+> For most keys, a blank widget value falls back to the model file. For the six `EXPLICIT_OVERRIDE_KEYS` (`schema_prefix`, `schema_suffix`, `catalog_prefix`, `catalog_suffix`, `tag_prefix`, `tag_suffix`), an **empty widget value explicitly overrides** the value in the model file — letting operators deliberately clear a prefix/suffix at install time without editing the file.
+
 ### Mode B — Notebook Auto-Launches Itself
 
 If the user runs the notebook interactively **without** providing a `vibe_session_id`, the notebook detects this and:
@@ -1481,6 +1493,33 @@ FUNCTION monitorVibeSession(businessName, version, modelScope, catalogSchema):
 ---
 
 ## 12. Operational Modes
+
+### Diagram: Runner 4-Task Pipeline
+
+```mermaid
+flowchart LR
+    T1["Task 1: ECM Generate<br/>op: new base model<br/>catalog: staging<br/>schema_prefix: (empty)"] --> T2["Task 2: ECM Install<br/>op: install model<br/>catalog: {biz}_ecm_v1<br/>volume: vol_root"]
+    T1 --> T3["Task 3: MVM Shrink<br/>op: shrink ecm<br/>catalog: staging<br/>schema_prefix: (empty)"]
+    T3 --> T4["Task 4: MVM Install<br/>op: install model<br/>catalog: {biz}_mvm_v1<br/>volume: vol_root"]
+```
+
+> Tasks 2 and 3 run in parallel once Task 1 completes. Task 4 runs after Task 3. Task 1 writes to a staging catalog (`{biz}_temp`); Tasks 2 and 4 install into separate permanent catalogs.
+
+### Diagram: Operation State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> NEW: new base model
+    NEW --> INST: install model
+    INST --> VIBE: vibe modeling of version
+    VIBE --> INST
+    INST --> ENL: enlarge mvm
+    INST --> SHR: shrink ecm
+    ENL --> INST
+    SHR --> INST
+    INST --> UNI: uninstall model version
+    UNI --> [*]
+```
 
 The agent supports multiple operations. Not all stages fire in every mode. The UI should handle the presence or absence of any stage gracefully.
 

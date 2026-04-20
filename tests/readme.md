@@ -695,11 +695,11 @@ databricks api get "/api/2.1/jobs/runs/get" --profile $DBX_PROFILE --json '{"run
 TOKEN=$(databricks auth token --profile $DBX_PROFILE | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
 
 # Read info log
-curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/v1_ecm/<business>_info_v1_ecm.log" \
+curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/ecm_v1/<business>_info_v1_ecm.log" \
   -H "Authorization: Bearer $TOKEN"
 
 # Read error log
-curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/v1_ecm/<business>_error_v1_ecm.log" \
+curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/ecm_v1/<business>_error_v1_ecm.log" \
   -H "Authorization: Bearer $TOKEN"
 
 # Read vibe_tester summary
@@ -707,9 +707,9 @@ curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>/_metamodel/
   -H "Authorization: Bearer $TOKEN"
 
 # Read next_vibes
-curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>_ecm_v1/_metamodel/vol_root/business/<business>/v1_ecm/vibes/next_vibes.txt" \
+curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>_ecm_v1/_metamodel/vol_root/business/<business>/ecm_v1/vibes/next_vibes.txt" \
   -H "Authorization: Bearer $TOKEN"
-curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>_mvm_v1/_metamodel/vol_root/business/<business>/v1_mvm/vibes/next_vibes.txt" \
+curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>_mvm_v1/_metamodel/vol_root/business/<business>/mvm_v1/vibes/next_vibes.txt" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -1314,7 +1314,7 @@ WHERE catalog_name = '<catalog>'
 
 #### next_vibes Iteration Test
 
-1. Generate a base model (v1_ecm)
+1. Generate a base model (ecm_v1)
 2. Read the next_vibes.txt file from the volume
 3. Submit a new vibe_tester run with operation `vibe modeling of version`, setting model_vibes to the content of next_vibes.txt
 4. Verify the v2 model addresses the findings from v1
@@ -1322,7 +1322,7 @@ WHERE catalog_name = '<catalog>'
 
 ```bash
 # Read next_vibes from v1
-curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>_ecm/_metamodel/vol_root/business/<name>/v1_ecm/vibes/next_vibes.txt" \
+curl -s "https://<workspace-host>/api/2.0/fs/files/Volumes/<catalog>_ecm/_metamodel/vol_root/business/<name>/ecm_v1/vibes/next_vibes.txt" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

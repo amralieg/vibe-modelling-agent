@@ -200,6 +200,24 @@ If copying fails via one method, a fallback copy mechanism is attempted automati
 
 ## Execution Flow
 
+### Diagram: Runner Orchestration
+
+```mermaid
+flowchart TD
+    J["industries.json<br/>(widget_values + businesses[])"] --> LOAD["Load + validate"]
+    LOAD --> LOOP{"For each<br/>business"}
+    LOOP --> DERIVE["Derive catalogs<br/>({biz}_temp, {biz}_ecm_v1, {biz}_mvm_v1)"]
+    DERIVE --> VAL["Pre-launch validation<br/>(clash check, required fields)"]
+    VAL --> SUBMIT["Submit 4-task job<br/>(ECM gen, ECM install, MVM shrink, MVM install)"]
+    SUBMIT --> MON["Monitor<br/>(poll at ping_interval)"]
+    MON --> OK{"Success?"}
+    OK -->|yes| COPY["Copy volume artifacts<br/>+ drop staging catalog"]
+    OK -->|no| LOG["Log failed tasks<br/>(preserve staging)"]
+    COPY --> LOOP
+    LOG --> LOOP
+    LOOP -->|done| AGG["Aggregate results<br/>(ASCII summary table)"]
+```
+
 The notebook executes in the following order:
 
 1. Prints an ASCII art banner.

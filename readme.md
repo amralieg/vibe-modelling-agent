@@ -64,6 +64,16 @@
 
 ## What Is Vibe Modelling?
 
+```mermaid
+flowchart LR
+    IN["Business description<br/>+ natural-language vibes"] --> AG["Vibe Modelling Agent<br/>(multi-model LLM ensemble)"]
+    AG --> MM["Metamodel<br/>(_business, _domain,<br/>_product, _attribute)"]
+    AG --> PS["Physical schemas<br/>(UC catalogs, schemas,<br/>tables, FKs, tags)"]
+    AG --> SM["Sample data<br/>(CSV per table)"]
+    AG --> DC["Docs + artifacts<br/>(README, Excel, DBML,<br/>ontology, dictionary)"]
+    AG --> NV["Next Vibes<br/>(self-suggested<br/>improvements)"]
+```
+
 Vibe Modelling is a Databricks-native, LLM-powered approach to generating enterprise data models from natural language. Instead of manually drawing ER diagrams, writing DDL, or importing pre-built industry templates, you describe your business in plain English and the agent builds a complete, production-grade data model — domains, tables, columns, foreign keys, tags, sample data, and documentation — end to end.
 
 The name **"Vibe"** reflects the core workflow:
@@ -71,6 +81,31 @@ The name **"Vibe"** reflects the core workflow:
 > **Generate a base model → review → vibe it with natural language → repeat → deploy**
 
 Each iteration produces a new version. The agent carries forward your context so nothing is lost between runs. You are never locked into a static template — the model evolves with your business.
+
+Current version: **v0.5.9** — see [Version history](#version-history) below.
+
+---
+
+## 🚀 Two Ways to Run
+
+### Quick mode (5-minute start)
+
+Fill only these 4 widgets and run the agent notebook:
+
+| Widget | Value |
+|---|---|
+| `business_name` | e.g. `Airlines` |
+| `business_description` | 2–3 sentences describing the business |
+| `data_model_scopes` | `Minimum Viable Model - MVM` (lean) or `Expanded Coverage Model - ECM` (full) |
+| `deployment_catalog` | Unity Catalog target, e.g. `industry_mvm_v1` |
+
+Everything else auto-fills. You get a complete metamodel + physical schemas + sample data + documentation + `next_vibes.txt` for iteration.
+
+### Full mode (every widget)
+
+Use the **[Widget Reference](#-widget-reference)** section below when you need fine control over naming conventions, tag prefixes, sample data volume, or installation behavior.
+
+**Widget semantics note (v0.5.8+):** for `schema_prefix`, `schema_suffix`, `catalog_prefix`, `catalog_suffix`, `tag_prefix`, `tag_suffix` — an **explicitly empty widget value overrides** whatever is in the model.json. For all other widgets, empty widget = "use file value if present".
 
 ---
 
@@ -380,7 +415,7 @@ After any pipeline run, find `next_vibes.txt` in the `vibes/` output folder. Cop
 |:---|:---|
 | 03. Operation | `install model` |
 | 09. Installation Catalog | `prod_catalog` |
-| 11. Model JSON File | `/Volumes/catalog/schema/volume/vibes/contoso/v1_ecm/model.json` |
+| 11. Model JSON File | `/Volumes/catalog/schema/volume/vibes/contoso/ecm_v1/model.json` |
 | 10. Sample Records | `0` *(or a number for test data)* |
 </details>
 
@@ -532,7 +567,7 @@ The Unity Catalog where physical schemas, tables, FK constraints, tags, and samp
 #### 11. Model JSON File
 *(Optional)* Path to a previously generated `model.json` file on a Unity Catalog Volume. Used when re-installing or continuing from a prior run. After every run, the agent generates `next_vibes.txt` in the `vibes/` folder — review it for recommended next vibe instructions.
 
-**Sample values:** `/Volumes/my_catalog/my_schema/vol/vibes/contoso/v1_ecm/model.json`
+**Sample values:** `/Volumes/my_catalog/my_schema/vol/vibes/contoso/ecm_v1/model.json`
 </details>
 
 ### Model Convention Widgets (12–24)
@@ -570,7 +605,7 @@ The `model.json` file includes session metadata:
 ```json
 {
   "_next_vibe_metadata": {
-    "generated_from_version": "v1_mvm",
+    "generated_from_version": "mvm_v1",
     "model_version": "1",
     "status": "needs_work",
     "confidence_score": 78,
@@ -915,6 +950,26 @@ Metric views are auto-generated per domain, focusing on KPIs that would appear i
 | **Tier** | Industry complexity classification (tier_1 = Ultra-Complex to tier_5 = Simple) |
 | **Vibe** | A natural language instruction provided to the agent to modify the model |
 | **Vibe Modelling** | The iterative process of generating and refining data models using natural language |
+
+---
+
+## Version history
+
+| Version | Change |
+|---|---|
+| **v0.5.9** | Scope-prefixed volume folders (`mvm_v1` / `ecm_v1`, not `v1_mvm`); post-install integrity check compares actual vs expected domain schemas; unbiased architect-gate example in prompt |
+| **v0.5.8** | Natural domain schema names — removed `ecm_`/`mvm_` schema_prefix injection from runner; agent now honours explicit-empty widget value for prefix/suffix keys (`_EXPLICIT_OVERRIDE_KEYS`) |
+| **v0.5.7** | Principal-engineer production-readiness gates added to architect review (trust / support / recommend / propose, each Yes-No + blockers + required_actions); "No" actions pipe into `next_vibes.txt`; verification-sweep truncations raised |
+| **v0.5.6** | Root-cause fix for silent vibe drops: `link+add/create` handler added to mutation engine; synonym map for entity_type and operation; per-drop telemetry; snapshot truncation raised from 6 KB → 60 KB; cross-domain FK target registry; metamodel `version` now pure integer + `model_scope` column |
+| **v0.5.5** | Hot-fix: guard `run_vibe_verification_sweep` against None LLM result |
+
+Full history: `git log --oneline v0.5.0..HEAD`.
+
+---
+
+## Legal Information
+
+This software is provided as-is and is not officially supported by Databricks through customer technical support channels. Support, questions, and feature requests can be communicated through the Issues page of this repo. Issues with the use of this code will not be answered or investigated by Databricks Support.
 
 ---
 
