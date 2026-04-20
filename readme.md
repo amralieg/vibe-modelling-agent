@@ -101,6 +101,23 @@ Fill only these 4 widgets and run the agent notebook:
 
 Everything else auto-fills. You get a complete metamodel + physical schemas + sample data + documentation + `next_vibes.txt` for iteration.
 
+### Runner mode (both ECM + MVM with test install)
+
+When you want **both** ECM and MVM produced and installed in one go — plus a staging round-trip to prove the install works before landing in the permanent catalogs — use the **vibe_runner** notebook instead of the agent directly.
+
+Runner launches a 4-task Databricks Job:
+
+1. **ECM generate** — builds the full ECM into a staging catalog
+2. **ECM install** — deploys the ECM into `{business}_ecm_v1`
+3. **MVM shrink** — derives MVM from ECM in a staging catalog (reuses the ECM so you don't regenerate from scratch)
+4. **MVM install** — deploys the MVM into `{business}_mvm_v1`
+
+Tasks 2 and 3 run in parallel once Task 1 is done; Task 4 waits for Task 3.
+
+**Inputs:** a single `my-industries.json` file listing one or more businesses (name + description + optional vibes) plus the standard widget defaults. Runner reads the file, auto-discovers the latest `dbx_vibe_modelling_agent_v*` notebook in the same directory, and orchestrates the job.
+
+See [runner/readme.md](runner/readme.md) for the exact file format and submit recipe.
+
 ### Full mode (every widget)
 
 Use the **[Widget Reference](#-widget-reference)** section below when you need fine control over naming conventions, tag prefixes, sample data volume, or installation behavior.
