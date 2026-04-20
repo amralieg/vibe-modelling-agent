@@ -1008,6 +1008,118 @@ Fidelity gates are quality thresholds that must be satisfied after vibe executio
 
 The vibe system exposes actions at three layers. Understanding all three is necessary to know exactly what a vibe can trigger.
 
+#### Quick reference — every action name, scope, and what it does
+
+Numbered catalog of every action name the vibe system accepts, with the entity types each action applies to. Applicable-to column uses: **D** = domain, **P** = product (table), **A** = attribute (column), **L** = link (FK), **M** = model-wide.
+
+| # | Action name | Applicable to | What it does |
+|---|---|---|---|
+| 1 | `create` | D, P, A | Add a new domain, product, or attribute |
+| 2 | `rename` | D, P, A | Rename a domain, product, or attribute |
+| 3 | `drop` | D, P, A | Remove an entity (cascades to children) |
+| 4 | `move` | P | Move a product to a different domain |
+| 5 | `merge` | D, P | Merge two or more domains or products into one |
+| 6 | `split` | D, P | Split one domain or product into multiple |
+| 7 | `set_property` | D, P, A | Set any metadata property on an entity |
+| 8 | `tag` | D, P, A | Apply, remove, or clear tags |
+| 9 | `query` | M | Answer an analytical question about the model (read-only) |
+| 10 | `create_table` | P | Alias of `create` on product |
+| 11 | `create_attribute` | A | Add a new attribute |
+| 12 | `create_link` | L | Add a new FK link between attributes |
+| 13 | `move_product` | P | Alias of `move` |
+| 14 | `alter_description` | D, P, A | Modify an entity's description |
+| 15 | `ensure_user_terminology` | M | Replace generic terms with user's business terminology |
+| 16 | `fix_user_specified_issues` | M | Address specific issues called out in vibe text |
+| 17 | `transform_name` | M | Apply a naming pattern across many entities at once |
+| 18 | `add_scd_columns` | P | Add SCD2 columns (effective_from, effective_to, current_flag) |
+| 19 | `add_audit_columns` | P | Add audit columns (created_at, updated_at, created_by, updated_by) |
+| 20 | `add_soft_delete_columns` | P | Add soft-delete column (is_deleted / deleted_at) |
+| 21 | `add_temporal_columns` | P | Add valid_from / valid_to temporal columns |
+| 22 | `add_versioning_columns` | P | Add version_number / version_is_current |
+| 23 | `add_multitenancy_columns` | P | Add tenant_id for multi-tenant isolation |
+| 24 | `add_lineage_columns` | P | Add source_system / source_record_id for lineage |
+| 25 | `add_gdpr_columns` | P | Add GDPR columns (consent_given_at, data_retention_until) |
+| 26 | `add_tag_to_product` | P | Add a tag to a product |
+| 27 | `add_tag_to_domain` | D | Add a tag to a domain |
+| 28 | `remove_tag_from_product` | P | Remove a specific tag from a product |
+| 29 | `remove_tag_from_domain` | D | Remove a specific tag from a domain |
+| 30 | `clear_tags` | D, P, A | Remove all tags from a target |
+| 31 | `set_data_retention` | P | Set data retention metadata |
+| 32 | `set_data_owner` | P | Set data owner |
+| 33 | `set_update_frequency` | P | Set update frequency (hourly / daily / weekly / …) |
+| 34 | `set_table_comment` | P | Set description on a product |
+| 35 | `mark_as_pii` | A | Mark attribute as containing PII |
+| 36 | `mark_as_sensitive` | A | Mark attribute as sensitive |
+| 37 | `mark_as_encrypted` | A | Mark attribute as encrypted at rest |
+| 38 | `mark_as_deprecated` | D, P, A | Mark entity deprecated |
+| 39 | `set_fk_cardinality` | L | Set FK cardinality metadata (1:1 / 1:N / M:N) |
+| 40 | `set_fk_description` | L | Set FK-specific description |
+| 41 | `add_check_constraint` | A | Attach a check-constraint to an attribute |
+| 42 | `set_unique_constraint` | A | Mark an attribute as unique |
+| 43 | `classify_table_tier` | P | Set product tier classification |
+| 44 | `set_nullable` | A | Set attribute nullable flag |
+| 45 | `set_default_value` | A | Set attribute default value |
+| 46 | `set_table_type` | P | Set product `data_type` (master / transactional / reference / …) |
+| 47 | `generate_samples` | M | Generate synthetic sample CSV data per table |
+| 48 | `generate_readme` | M | Generate README.md for the model |
+| 49 | `generate_data_model_json` | M | Regenerate model.json |
+| 50 | `generate_ontology` | M | Emit RDF/Turtle ontology file |
+| 51 | `generate_dbml` | M | Emit DBML diagram source |
+| 52 | `generate_release_notes` | M | Emit release notes for this version |
+| 53 | `generate_excel` | M | Emit Excel workbook of full model |
+| 54 | `generate_data_dictionary` | M | Emit data dictionary document |
+| 55 | `generate_test_cases` | M | Emit test-case catalog |
+| 56 | `generate_erd_diagram` | M | Emit ERD diagram |
+| 57 | `export_model_report` | M | Emit aggregate model report |
+| 58 | `find_tables_with_column` | M | Find tables that have a specific column |
+| 59 | `find_unlinked_columns` | M | List `_id`-suffix columns without FK target |
+| 60 | `list_all_fks` | M | List every FK in the model |
+| 61 | `list_all_pks` | M | List every PK in the model |
+| 62 | `list_all_tags` | M | List every tag used |
+| 63 | `count_entities` | M | Count domains / products / attributes |
+| 64 | `search_model` | M | Free-text search across the model |
+| 65 | `report_domain_summary` | D | Per-domain summary with counts + notes |
+| 66 | `report_model_stats` | M | Overall model statistics |
+| 67 | `impact_analysis` | D, P, A | What depends on a given entity |
+| 68 | `analyze_fk_coverage` | M | % of `_id` columns with FK target |
+| 69 | `check_model_health` | M | Run static analysis suite and summarize |
+| 70 | `validate_model` | M | Full validation pass |
+| 71 | `estimate_storage` | M | Estimate storage footprint |
+| 72 | `compare_domains` | D | Side-by-side comparison of 2 domains |
+| 73 | `compare_tables` | P | Side-by-side comparison of 2 tables |
+| 74 | `find_duplicate_column_names` | M | Columns with same name in different tables |
+| 75 | `find_similar_tables` | M | Tables with near-identical schemas |
+| 76 | `find_merge_candidates` | M | Pairs of tables that could be merged |
+| 77 | `find_columns_by_pattern` | M | Columns matching a regex/pattern |
+| 78 | `find_by_tag` | M | Entities with a specific tag |
+| 79 | `validate_required_columns` | M | Check every product has required columns |
+| 80 | `validate_fk_targets` | L | Check FK targets resolve |
+| 81 | `find_tables_without_column` | M | Tables missing a specific column |
+| 82 | `evaluate_column_overlap` | M | Cross-domain column overlap analysis |
+| 83 | `cross_domain_column_audit` | M | Alias of `evaluate_column_overlap` |
+| 84 | `link` | L | Create a specific FK link between two columns |
+| 85 | `discover_links` | M | LLM-driven FK discovery across the model |
+| 86 | `fix_links` | L | Fix broken or invalid FK references |
+| 87 | `connect_table` | P, L | Create FK columns + links for a disconnected/siloed table (v0.5.6+) |
+| 88 | `find_missing_fk_links` | M | Classify unlinked `_id` columns as LINK / CREATE / DROP / KEEP_AS_IS |
+| 89 | `fix_fk_column_naming` | L | Rename FK columns to match target PK naming |
+| 90 | `standardize_naming` | M | Apply naming conventions uniformly across the model |
+| 91 | `remove_product_prefix` | M | Strip redundant domain prefixes from product names |
+| 92 | `model_checkup` | M | Run comprehensive model health check |
+| 93 | `run_quality_checks` | M | Execute QA suite on demand |
+| 94 | `run_linking` | M | Re-run the full linking pipeline |
+| 95 | `normalize_to_3nf` | D, P | Normalize tables to 3NF |
+| 96 | `denormalize_for_analytics` | D, P | Denormalize for analytics / star schema use cases |
+| 97 | `promote_to_table` | P | Promote a helper/lookup to a full product table |
+| 98 | `inline_table` | P | Inline a small table's attributes into its parent |
+| 99 | `swap_domains` | D | Swap products between two domains |
+| 100 | `enlarge_model` | M | MVM → ECM expansion (add domains + products) |
+| 101 | `shrink_model` | M | ECM → MVM reduction (remove corporate/non-core) |
+| 102 | `reverse_engineer_schema` | M | Reverse-engineer a model from an existing UC schema |
+
+> **Scope legend:** D = domain, P = product (table), A = attribute (column), L = link (FK), M = model-wide.
+
+
 #### Layer 1 — Mutation engine (entity × operation matrix)
 
 This is the lowest-level, most direct path. Accepted by the LLM fallback execution path via `_llm_fallback_apply_mutations`. Synonyms are normalized via `_MUT_ENTITY_SYNONYMS` and `_MUT_OPERATION_SYNONYMS` — any unrecognized combo is logged with a drop reason (since v0.5.6) rather than silently discarded.
