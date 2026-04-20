@@ -86,9 +86,9 @@ Current version: **v0.5.9** — see [Version history](#version-history) below.
 
 ---
 
-## 🚀 Two Ways to Run
+## 🚀 Three Ways to Run
 
-### Quick mode (5-minute start)
+### 1. Quick mode (5-minute start)
 
 Fill only these 4 widgets and run the agent notebook:
 
@@ -101,7 +101,7 @@ Fill only these 4 widgets and run the agent notebook:
 
 Everything else auto-fills. You get a complete metamodel + physical schemas + sample data + documentation + `next_vibes.txt` for iteration.
 
-### Runner mode (both ECM + MVM with test install)
+### 2. Runner mode (both ECM + MVM with test install)
 
 When you want **both** ECM and MVM produced and installed in one go — plus a staging round-trip to prove the install works before landing in the permanent catalogs — use the **vibe_runner** notebook instead of the agent directly.
 
@@ -118,7 +118,7 @@ Tasks 2 and 3 run in parallel once Task 1 is done; Task 4 waits for Task 3.
 
 See [runner/readme.md](runner/readme.md) for the exact file format and submit recipe.
 
-### Full mode (every widget)
+### 3. Full mode (every widget)
 
 Use the **[Widget Reference](#-widget-reference)** section below when you need fine control over naming conventions, tag prefixes, sample data volume, or installation behavior.
 
