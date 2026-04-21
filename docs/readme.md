@@ -19,7 +19,7 @@
 | Document | Purpose |
 |:---|:---|
 | [whitepaper.md](whitepaper.md) | Philosophy, methodology, and the complete data modeling rules catalog (G01–G12, SUB). |
-| [design-guide.md](design-guide.md) | Technical design reference — architecture, 19 pipeline stages, LLM ensemble, sizing, widgets, artifacts, and error-handling patterns. |
+| [design-guide.md](design-guide.md) | Technical design reference — architecture, 19 pipeline stages (including Step 3.6 per-domain Domain Architect Review and Step 3.7 global Architect Review), LLM ensemble, sizing, widgets, artifacts, and error-handling patterns. |
 | [integration-guide.md](integration-guide.md) | Producer-consumer protocol for UIs and downstream consumers — handshake, progress events, `result_json` schemas, and SQL quick reference. |
 
 ---

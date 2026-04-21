@@ -683,21 +683,30 @@ Below is every stage the pipeline emits, in execution order. The `result_json` s
       {"product": "billing_account", "description": "...", "type": "Master", "primary_key": "billing_account_id"}
     ]
   },
+  "domain_architect_review": {
+    "domains_reviewed": 11,
+    "products_added": [{"domain": "<domain_name>", "products": ["<product_name>"]}],
+    "products_renamed": [{"domain": "<domain_name>", "old": "<old>", "new": "<new>"}],
+    "products_removed": [],
+    "descriptions_improved": 14,
+    "in_domain_fks_queued": 9,
+    "gates_failed_per_domain": {"<domain_name>": ["support_in_production"]}
+  },
   "architect_review_score": 85,
   "architect_review_changes": {
     "domains_added": [],
     "domains_removed": [],
     "domains_renamed": [],
-    "products_added": [{"domain": "compliance", "products": ["telecom_license"]}],
+    "products_added": [{"domain": "compliance", "products": ["<product_name>"]}],
     "products_removed": [],
     "products_renamed": [{"domain": "billing", "old": "account", "new": "billing_account"}],
     "products_moved": []
   },
-  "ai_honesty_check": "Architect review score: 85/100, 18 changes applied"
+  "ai_honesty_check": "Domain architect (Step 3.6): 11 domains reviewed, 9 in-domain FKs queued. Global architect (Step 3.7): score 85/100, 18 changes applied"
 }
 ```
 
-**UI action**: Replace the incremental product view with the final reviewed state. Apply any renames/additions/removals from `architect_review_changes` visually.
+**UI action**: Replace the incremental product view with the final reviewed state. Apply any within-domain renames/additions/removals from `domain_architect_review` first (Step 3.6, per-domain, parallel — dual persona Principal Data Architect + Senior Business SME for `{industry_alignment}`), then apply any cross-domain renames/additions/removals/moves from `architect_review_changes` (Step 3.7, global). The same 4 production-readiness gates (`trust_in_production`, `support_in_production`, `recommend_to_industry_peers`, `propose_for_global_standard`) run at both levels — failed-gate blockers and required_actions from either level are stashed in `widgets_values["_architect_gate_failures"]` for `next_vibes`.
 
 ---
 
@@ -1460,6 +1469,9 @@ FUNCTION monitorVibeSession(businessName, version, modelScope, catalogSchema):
                                 addProductToModel(domainName, product)
                         ELSE IF event.status = 'stage_succeeded':
                             replaceAllProducts(event.result_json.products_by_domain)
+                            // Step 3.6: per-domain architect (within-domain changes)
+                            showDomainArchitectChanges(event.result_json.domain_architect_review)
+                            // Step 3.7: global architect (cross-domain changes)
                             showArchitectChanges(event.result_json.architect_review_changes)
 
                     CASE 'Enriching Data Products with Attributes':

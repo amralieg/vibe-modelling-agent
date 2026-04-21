@@ -809,7 +809,7 @@ When you run the agent, it executes these progress stages in order (the `#` colu
 | 2 | **Interpreting Instructions** | 10–30s | *(Vibe mode only)* Parses vibes into structured action plan |
 | 3 | **Collecting Business Context** | 10–30s | LLM enriches your description across business/industry dimensions |
 | 4 | **Designing Domains** | 15–60s | Generates domains following division model + SSOT |
-| 5 | **Creating Data Products** | 1–10m | Products per domain with architect review |
+| 5 | **Creating Data Products** | 1–10m | Products per domain with domain-architect (Step 3.6) and global-architect (Step 3.7) review |
 | 6 | **Enriching Data Products with Attributes** | 5–40m | All columns for every product |
 | 7 | **Cross-Domain Linking** | 1–5m | In-domain → global sweep → pairwise comparison |
 | 8 | **Quality Assurance** | 30s–3m | 9 sub-checks (naming, PK/types, overlaps, topology, auto-remediation) |
@@ -976,7 +976,7 @@ Metric views are auto-generated per domain, focusing on KPIs that would appear i
 |---|---|
 | **v0.5.9** | Scope-prefixed volume folders (`mvm_v1` / `ecm_v1`, not `v1_mvm`); post-install integrity check compares actual vs expected domain schemas; unbiased architect-gate example in prompt |
 | **v0.5.8** | Natural domain schema names — removed `ecm_`/`mvm_` schema_prefix injection from runner; agent now honours explicit-empty widget value for prefix/suffix keys (`_EXPLICIT_OVERRIDE_KEYS`) |
-| **v0.5.7** | Principal-engineer production-readiness gates added to architect review (trust / support / recommend / propose, each Yes-No + blockers + required_actions); "No" actions pipe into `next_vibes.txt`; verification-sweep truncations raised |
+| **v0.5.7** | Principal-engineer production-readiness gates added to architect review (trust / support / recommend / propose, each Yes-No + blockers + required_actions); same 4 gates now run at BOTH the per-domain level (Step 3.6, **Domain Architect + Senior Business SME** for `{industry_alignment}`) and the global level (Step 3.7); "No" actions pipe into `next_vibes.txt`; verification-sweep truncations raised |
 | **v0.5.6** | Root-cause fix for silent vibe drops: `link+add/create` handler added to mutation engine; synonym map for entity_type and operation; per-drop telemetry; snapshot truncation raised from 6 KB → 60 KB; cross-domain FK target registry; metamodel `version` now pure integer + `model_scope` column |
 | **v0.5.5** | Hot-fix: guard `run_vibe_verification_sweep` against None LLM result |
 

@@ -233,6 +233,7 @@ The suite follows the strategy **"Runner creates ECM+MVM, unique ops + install s
 | Core lifecycle        | 4     | 01--04            | Vibe, enlarge, samples, uninstall        |
 | Verification          | 3     | 03b, 04b, 10d    | Physical artifact and cleanup validation |
 | Install scenarios     | 2     | 10, 10c           | Context-file and cross-convention install|
+| Architect scenarios   | 1     | A1                | Step 3.6 vs Step 3.7 separation of duties (domain architect catches missing within-domain product that the global architect would miss) |
 
 ### All 10 Test Cases
 
@@ -265,6 +266,12 @@ The suite follows the strategy **"Runner creates ECM+MVM, unique ops + install s
 |------|--------------------|-----------------------------------------------------|----------------------------------------------------------------|-----------------------------------------------------------|
 | 10   | 10_ctx_install     | Context-File Install (MVM v1)                       | Agent installs from a pre-existing model.json with random conventions | Install succeeds, schemas and tables created, cleanup uninstalls |
 | 10c  | 10c_xconv_install  | Cross-Convention Install (MVM v1 → different layout) | Agent installs with deliberately different conventions (PascalCase, `_key`, `dw_` prefix, Catalog per Division) | Install succeeds; 10d verifies physical layout |
+
+#### Architect Review Scenarios
+
+| #    | Test Name                      | Label                                                                                  | What It Validates                                                                                                                                                                                                                                                                                            | Expected Outcome                                                                                                                                                           |
+|------|--------------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| A1   | A1_domain_architect_catches_missing_product | Domain architect catches missing within-domain product that global architect would miss | Seeds a synthetic model in which one domain is missing an obvious, within-domain product that a Senior Business SME for `{industry_alignment}` would flag immediately, but that is invisible from a cross-domain viewpoint. Runs Step 3.6 (per-domain, parallel, Architect+SME, 4 gates) followed by Step 3.7 (global, 4 gates). Verifies: (1) the missing product is added by Step 3.6 and not by Step 3.7, (2) Step 3.7 does not add any within-domain product, (3) the same 4 production-readiness gates (`trust_in_production`, `support_in_production`, `recommend_to_industry_peers`, `propose_for_global_standard`) produce a domain-scoped result in Step 3.6 and a global-scoped result in Step 3.7, (4) any non-applicable outputs (merges/splits needing attribute-aware reconciliation, failed-gate blockers) are stashed in `widgets_values["_architect_gate_failures"]`. | Step 3.6 adds the missing product; Step 3.7 reports zero within-domain additions; both the per-domain and global gate payloads are present on the `Creating Data Products` `stage_succeeded` result_json; failed-gate blockers, if any, appear in `_architect_gate_failures`. |
 
 ### Dependency Chain
 
@@ -600,7 +607,8 @@ For a 3-domain, 10-15 product model:
 | 1-2 min | Business Context (Step 1) | LLM generates 12 Phase F fields |
 | 2-4 min | Domain Generation (Step 2) | 3 ensemble LLM calls + judge |
 | 4-5 min | Product Generation (Step 3) | Parallel across domains |
-| 5-6 min | Architect Review (Step 3.7) | Score + recommendations |
+| 5-6 min | Domain Architect Review (Step 3.6) | Per-domain, parallel; dual persona (Principal Data Architect + Senior Business SME for `{industry_alignment}`); within-domain concerns only (completeness from business POV, granularity, in-domain SSOT, naming, in-domain FKs, descriptions); runs the same 4 production-readiness gates scoped to the domain; actionable outputs applied immediately, blockers + non-applicable merges/splits stashed in `widgets_values["_architect_gate_failures"]` for next_vibes |
+| 6-7 min | Global Architect Review (Step 3.7) | Cross-domain SSOT, overall domain structure, essential cross-domain FKs, domain add/remove/rename, product moves between domains; same 4 gates at the global level; composite score + recommendations |
 | 6-15 min | Attribute Generation (Step 4) | 8 concurrent LLM calls |
 | 15-16 min | Normalization (Step 4.6) | Batched parallel |
 | 16-18 min | FK Linking (Steps 5-7) | In-domain + cross-domain + pairwise |

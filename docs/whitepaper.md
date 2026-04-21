@@ -16,6 +16,8 @@
   - [1.2 -- Segmenting the Organization into Three Divisions](#12--segmenting-the-organization-into-three-divisions)
   - [1.3 -- Segmenting Divisions into Domains](#13--segmenting-divisions-into-domains)
   - [1.4 -- Filling Domains with Tables](#14--filling-domains-with-tables)
+  - [1.4a -- Domain Architect Review (Per-Domain)](#14a--domain-architect-review-per-domain)
+  - [1.4b -- Global Architect Review (Cross-Domain)](#14b--global-architect-review-cross-domain)
   - [1.5 -- Filling Tables with Attributes](#15--filling-tables-with-attributes)
   - [1.6 -- In-Domain Linking](#16--in-domain-linking)
   - [1.7 -- Cross-Domain Linking and Pairwise Comparison](#17--cross-domain-linking-and-pairwise-comparison)
@@ -221,6 +223,34 @@ Tables are classified by nature (**G07-R008**). Master data (customer, product) 
 Table naming is strict: one to three words, lowercase, under thirty characters (**G01-R004**). Names never repeat the domain name as a prefix (**G01-R005**) -- in "customer," the table is "account," not "customer_account," because the full path `customer.account` already provides context.
 
 Each table receives a primary key following a sacred convention (**G04-R001**, **G01-R007**): the table name followed by `_id`. The "customer" table gets `customer_id`. When you see `customer_id` in any table, in any domain, you immediately know it references the customer table. The model is self-documenting by design.
+
+---
+
+### 1.4a — Domain Architect Review (Per-Domain)
+
+Before the model zooms out to the whole, it zooms in on each part. A first pass of tables has been drafted inside every domain, but "drafted" is not "reviewed." Each domain is now handed to a reviewer who has two voices at once.
+
+The system adopts a **dual persona**: a Principal Data Architect, who knows the rules of sound modeling, and a Senior Business Subject-Matter Expert for that specific domain in the user's industry. The Principal Data Architect asks: *is the set of tables internally coherent, is the single source of truth respected inside the domain, is the granularity consistent, do the in-domain foreign keys tell the right story, are the names and descriptions correct?* The Senior SME asks: *does a real practitioner from this domain in this industry recognize what they see, and is anything obviously missing from a business point of view?*
+
+All domains are reviewed in parallel -- one independent reasoning pass per domain, bounded by the same concurrency limit the model uses for in-domain linking. This is deliberate. Each reviewer focuses only on their assigned domain and nothing else; cross-domain concerns are explicitly out of scope and belong to the next step. If the domain is too large for a single LLM context, the reviewer internally batches the content rather than truncating.
+
+Each reviewer produces two kinds of output. The first is **actionable and applied immediately**: products to add, products to rename, products to remove, description improvements, and in-domain foreign key links (which are queued into the architect's essential-links queue rather than created directly, so the downstream linker can honor them with full rule enforcement). The second is **deferred**: merges or splits that need attribute-aware reconciliation, and any blockers or required actions surfaced by failed production-readiness gates. These are stashed alongside the model so the next vibe iteration can address them.
+
+Every reviewer -- one per domain -- runs the same four production-readiness gates, scoped to their domain: *would I trust this domain in production?* *would I support it in production?* *would I recommend it to industry peers?* *would I propose it for a global standard?* Each gate is a Yes/No with explicit blockers and required actions. A single "No" does not fail the pipeline; it feeds the next vibes.
+
+The prompt that drives this review is industry-agnostic. It speaks only in placeholders -- `{domain_name}`, `{industry_alignment}`, `{business}` -- so the same logic works for any organization in any sector the user describes.
+
+The outcome of step 1.4a is a set of domains that are, each one, internally sound: right products, right names, right in-domain relationships, right business voice. The next step takes those sound parts and looks at the whole.
+
+---
+
+### 1.4b — Global Architect Review (Cross-Domain)
+
+With every domain now internally reviewed, a single **global architect** reviews the model as one organism. Its scope is everything the per-domain reviewers deliberately could not touch: cross-domain single source of truth, the overall shape and balance of the domain structure, essential cross-domain foreign keys, and higher-level structural changes such as adding, removing, or renaming a domain, or moving a product from one domain to another.
+
+The division of labor is strict. The per-domain reviewer may add, rename, remove, merge, or split products within one domain. The global reviewer owns everything that crosses domain boundaries. This prevents a common failure mode, in which a global reviewer over-optimizes the shape of the model and accidentally loses a product that only made sense to the domain's own expert -- or, conversely, in which a domain reviewer invents a cross-cutting structural change that contradicts another domain.
+
+The global reviewer runs the same four production-readiness gates, now scoped to the whole model. Failures at either level -- per-domain or global -- flow into the same stash of blockers and required actions, and ultimately into the next-vibes recommendations. The two reviews are complementary, not redundant: the per-domain reviewer catches what only a practitioner inside one bounded context can see; the global reviewer catches what only an observer of the whole can see.
 
 ---
 

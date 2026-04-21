@@ -88,7 +88,8 @@ flowchart LR
     BIZ["Business<br/>description"] --> CTX["Context<br/>builder"]
     CTX --> DOM["Domain<br/>generator"]
     DOM --> PRD["Product<br/>generator"]
-    PRD --> ARCH["Architect Review<br/>23 tests + 4 gates"]
+    PRD --> DARCH["Step 3.6<br/>Domain Architect Review<br/>(per-domain, parallel,<br/>Architect + SME, 4 gates)"]
+    DARCH --> ARCH["Step 3.7<br/>Global Architect Review<br/>23 tests + 4 gates"]
     ARCH --> ATT["Attribute<br/>generator"]
     ATT --> FK["FK<br/>generator"]
     FK --> SA["Static<br/>analysis"]
@@ -210,15 +211,23 @@ The pipeline executes a series of stages, each with a specific purpose, quality 
 
 ### Diagram: Architect Review Flow
 
+The same 4 production-readiness gates run at **two levels** — first per-domain in parallel (Step 3.6, dual persona Principal Data Architect + Senior Business SME for `{industry_alignment}`), then globally (Step 3.7).
+
 ```mermaid
 flowchart TD
-    INV["Model inventory<br/>(domains, products, FKs)"] --> TESTS["23 quality tests<br/>(fragmentation, SSOT, DAG,<br/>org-chart, richness, etc.)"]
+    PROD["Products per domain"] --> S36["Step 3.6 — Domain Architect Review<br/>(parallel, per-domain,<br/>Architect + SME for {industry_alignment})"]
+    S36 --> S36OUT["Apply within-domain:<br/>add / rename / remove products,<br/>description fixes, in-domain FKs<br/>→ essential_links queue"]
+    S36 --> S36GATES["4 gates, domain-scoped<br/>TRUST · SUPPORT ·<br/>RECOMMEND · PROPOSE"]
+    S36OUT --> S37["Step 3.7 — Global Architect Review"]
+    S36GATES -->|Failed gate blockers /<br/>non-applicable merges / splits| STASH["widgets_values[<br/>'_architect_gate_failures']<br/>→ next_vibes"]
+    S37 --> INV["Model inventory<br/>(domains, products, FKs)"]
+    INV --> TESTS["23 quality tests<br/>(fragmentation, SSOT, DAG,<br/>org-chart, richness, etc.)"]
     TESTS --> SCORES["Per-test scores<br/>+ composite score"]
-    SCORES --> GATES["4 production-readiness gates"]
+    SCORES --> GATES["4 production-readiness gates<br/>(global scope)"]
     GATES --> G1{"TRUST<br/>model?"}
     GATES --> G2{"SUPPORT<br/>production?"}
-    GATES --> G3{"RECOMMEND<br/>to user?"}
-    GATES --> G4{"PROPOSE<br/>for deployment?"}
+    GATES --> G3{"RECOMMEND<br/>to industry peers?"}
+    GATES --> G4{"PROPOSE<br/>for global standard?"}
     G1 -->|No| RA["required_actions<br/>piped into next_vibes.txt<br/>+ NEXT_VIBES collector"]
     G2 -->|No| RA
     G3 -->|No| RA
@@ -229,11 +238,21 @@ flowchart TD
     G4 -->|Yes| PASS
 ```
 
+> **Split of duties.** Step 3.6 owns within-domain concerns (completeness from the business POV, granularity, in-domain SSOT, naming, in-domain FKs, descriptions, and product add/rename/remove/merge/split inside ONE domain). Step 3.7 owns cross-domain concerns (cross-domain SSOT, overall domain structure, essential cross-domain FKs, domain add/remove/rename, product moves between domains).
+
 ### Stage 5: Creating Data Products
-- **Purpose:** Generate products per domain with architect review
+- **Purpose:** Generate products per domain with a two-level architect review (Step 3.6 per-domain, then Step 3.7 global)
 - **Duration:** 1-10 minutes
-- **What happens:** Products generated per domain in parallel batches. Each product must pass the 5-point First-Class Entity Test. 3-tier entity selection (Core -> Supporting -> Reference). After generation, a Model Architect Review runs 15 holistic tests and scores the model.
-- **Quality check:** First-Class Entity Test, Anti-Bloat Self-Check, product count within tier range, forbidden product check, naming validation, architect review (score-based action thresholds)
+- **What happens:** Products generated per domain in parallel batches. Each product must pass the 5-point First-Class Entity Test. 3-tier entity selection (Core -> Supporting -> Reference).
+
+  **Step 3.6 — Domain Architect Review (NEW, per-domain, parallel):** One LLM call per domain, dispatched in parallel bounded by `MAX_CONCURRENT_BATCHES` (same pattern as in-domain linking). Each call adopts a **dual persona — Principal Data Architect + Senior Business SME** for that specific `{domain_name}` in the user's `{industry_alignment}`. Scope is strictly within-domain: business-point-of-view completeness, granularity, in-domain SSOT, naming, in-domain FKs, and descriptions. It does NOT touch cross-domain concerns (that is Step 3.7's job). The step runs the same four production-readiness gates as Step 3.7, scoped to the domain: `trust_in_production`, `support_in_production`, `recommend_to_industry_peers`, `propose_for_global_standard`. Actionable outputs (products to add, rename, remove, description improvements, in-domain FK links) are applied immediately; in-domain FK links are queued into the architect `essential_links` queue. Non-applicable outputs (merges/splits that need attribute-aware reconciliation; blockers and required_actions from failed gates) are stashed in `widgets_values["_architect_gate_failures"]` to feed `next_vibes`. If a domain is too large for the LLM context budget, Step 3.6 handles batching internally. The prompt is industry-agnostic — it uses only `{domain_name}`, `{industry_alignment}`, and `{business}` placeholders.
+
+  **Step 3.7 — Global (Model) Architect Review:** A single holistic LLM call runs 23 architecture tests, scores the overall model, and applies the same four production-readiness gates at the global level. Scope: cross-domain SSOT, overall domain structure, essential cross-domain FKs, domain add/remove/rename, and product moves between domains.
+
+  **Split of duties:**
+  - **Step 3.6 (Domain Architect):** within-domain completeness, granularity, SSOT, in-domain FKs, descriptions, and product add/rename/remove/merge/split within ONE domain.
+  - **Step 3.7 (Global Architect):** cross-domain SSOT, overall domain structure, essential cross-domain FKs, domain add/remove/rename, and product moves between domains.
+- **Quality check:** First-Class Entity Test, Anti-Bloat Self-Check, product count within tier range, forbidden product check, naming validation, Step 3.6 domain-scoped architect review (4 gates), Step 3.7 global architect review (score-based action thresholds + 4 gates)
 - **Progress budget:** 5.0%
 
 ### Stage 6: Enriching Data Products with Attributes
@@ -821,7 +840,8 @@ The agent uses 49 specialized LLM prompt templates. Each prompt is mapped to a m
 
 | # | Prompt Name | Model Type | Size | Temp | Purpose |
 |---|---|---|---|---|---|
-| 7 | MODEL_ARCHITECT_REVIEW_PROMPT | thinker | large | 0 | Holistic model review: runs 15 architecture tests, scores overall model, recommends structural changes |
+| 7 | MODEL_ARCHITECT_REVIEW_PROMPT | thinker | large | 0 | Step 3.7 global architect review: runs 23 architecture tests, scores overall model, recommends cross-domain structural changes, runs 4 production-readiness gates |
+| 7b | DOMAIN_ARCHITECT_REVIEW_PROMPT | thinker | large | 0 | Step 3.6 per-domain architect review (one call per domain, parallel-bounded by `MAX_CONCURRENT_BATCHES`). Dual persona — Principal Data Architect + Senior Business SME for `{domain_name}` in the user's `{industry_alignment}`. Scope: within-domain completeness (business POV), granularity, SSOT, in-domain FKs, naming, descriptions, and product add/rename/remove/merge/split within ONE domain. Runs the same 4 production-readiness gates (`trust_in_production`, `support_in_production`, `recommend_to_industry_peers`, `propose_for_global_standard`) scoped to the domain. Handles internal batching when a domain exceeds the LLM context budget. Prompt uses only `{domain_name}`, `{industry_alignment}`, and `{business}` placeholders |
 | 8 | PRODUCT_GENERATE_PROMPT | worker | large | 0 | Generate products per domain with First-Class Entity Test compliance, data_type and function classification |
 | 9 | PRODUCT_GLOBAL_DEDUP_PROMPT | thinker | large | 0 | Global deduplication: detect same-name and synonym products across all domains |
 | 10 | PRODUCT_DUPLICATE_DETECT_PROMPT | worker | large | 0 | Pairwise duplicate detection: compare two products for semantic overlap and recommend merge/keep |
