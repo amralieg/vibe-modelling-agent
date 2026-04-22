@@ -710,6 +710,92 @@ Below is every stage the pipeline emits, in execution order. The `result_json` s
 
 ---
 
+### Stage 5.6: Architect Review (iterative, v0.6.9+)
+
+Both Step 3.6 (domain-scoped) and Step 3.7 (global/holistic) emit lifecycle events under a single **shared `stage_name = "Architect Review"`**. Each runs up to `MAX_ARCHITECT_REVIEW_ITERATIONS` passes (default `3`, configurable). The loop early-exits as soon as all 4 production-readiness gates pass for every domain/model under review.
+
+| Field | Value |
+|---|---|
+| `stage_name` | `"Architect Review"` |
+| Emitters | Step 3.6 (`step_domain_architect_review`) + Step 3.7 (`step_architect_review`) |
+| Budget | `0.5` + `3 × 0.2` (3.6) + `2.0` + `3 × 0.3` (3.7) ≈ `4.0` total |
+
+#### Step 3.6 — Domain Architect Review
+
+Per-domain parallel review (bounded by `MAX_CONCURRENT_BATCHES`). Dual persona per call: Principal Data Architect + Senior Business SME for the domain's `{industry_alignment}`.
+
+| status | step_name | progress_increment |
+|---|---|---|
+| `stage_started` | `"Domain Architect Review (Step 3.6)"` | `0.5` |
+| `stage_in_progress` | `"Domain Architect Review — Iteration {N}/{M}"` (one per iteration) | `0.2` |
+| `stage_succeeded` | `"Domain Architect Review (Step 3.6)"` | `0.5` |
+
+**`stage_started` result_json:**
+```json
+{
+  "total_domains": 13,
+  "max_iterations": 3,
+  "max_workers": 8
+}
+```
+
+**`stage_in_progress` result_json** (emitted once per iteration):
+```json
+{
+  "iteration": 2,
+  "max_iterations": 3,
+  "domains": 13
+}
+```
+
+**`stage_succeeded` result_json:**
+```json
+{
+  "domains_reviewed": 13,
+  "products_added": 4,
+  "products_removed": 2,
+  "products_renamed": 3,
+  "descriptions_updated": 118,
+  "in_domain_links_queued": 481,
+  "next_vibes_queued": 158,
+  "gate_failures": 103,
+  "products_merged_deferred": 10,
+  "products_split_deferred": 1
+}
+```
+
+#### Step 3.7 — Principal Architect Review (global/holistic)
+
+Single-call holistic review over the entire model. Same 4 gates; iterative with previous-iteration feedback fed into the next prompt via `{previous_reviews_context}`.
+
+| status | step_name | progress_increment |
+|---|---|---|
+| `stage_started` | `"Principal Data Architect Review"` | `2.0` |
+| `stage_in_progress` | `"Principal Architect — Iteration {N}/{M}"` (one per iteration) | `0.3` |
+| `stage_succeeded` | `"Principal Data Architect Review"` | `2.0` |
+| `stage_warning` | `"Principal Data Architect Review"` (on LLM failure / JSON parse fail / no-valid-output — `step_id` reuses the started step's id so UI can mark it warning) | `2.0` |
+
+**`stage_in_progress` result_json** (per iteration):
+```json
+{
+  "iteration": 2,
+  "max_iterations": 3,
+  "total_products": 147,
+  "total_domains": 13
+}
+```
+
+**`stage_succeeded` result_json:** See `architect_review_score` and `architect_review_changes` blocks in the **Stage 5 Creating Data Products** `stage_succeeded` payload — they are also echoed inside the Principal Architect's own `stage_succeeded` event.
+
+#### UI handling
+
+- Progress bar advances monotonically: `+0.5` on 3.6 start, `+0.2` per 3.6 iteration, `+0.5` on 3.6 succeed, `+2.0` on 3.7 start, `+0.3` per 3.7 iteration, `+2.0` on 3.7 succeed.
+- Clients that filter by stage_name `"Architect Review"` see all events. Clients that filter by step_name can distinguish 3.6 vs 3.7 via the `"Domain Architect"` vs `"Principal"` prefix.
+- Early-exit is signalled by a `stage_succeeded` firing before iteration `{M}/{M}` has been emitted — UI should not assume a full 3 iterations will fire.
+- Failed gates surface in the final `stage_succeeded.result_json.gate_failures` (count) and the per-domain list inside Stage 5's combined payload under `domain_architect_review.gates_failed_per_domain` and `architect_review_changes.gates_failed`.
+
+---
+
 ### Stage 6: Enriching Data Products with Attributes
 
 | Field | Value |
