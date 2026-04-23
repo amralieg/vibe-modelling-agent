@@ -191,3 +191,88 @@ FOR EACH STAGE OF REVIEW: output the explanation and pros and cons of each stage
 ### 7.7 2-minute timeout on AskUserQuestion
 
 If I present an AskUserQuestion and the user does not answer within 2 minutes, I proceed with the **recommended option** (the first option labeled "(Recommended)") without re-asking or stalling. This keeps the autonomous loop moving when the user is away, asleep, or in a meeting. If the user answers late and contradicts the auto-choice, I revert and redo that piece. If the user is actively chatting (answering recent messages), this timeout does NOT apply — it's only for away/sleep mode.
+
+---
+
+## 8. Honesty invariants — DO / DON'T
+
+Added 2026-04-23 after an audit exposed a "v0.8.0 shipped, 66/100 implemented" claim while every sub-fix was in an orphan commit unreachable from `dev`. These rules are permanent.
+
+### 8.1 Defining "done"
+
+**DO** verify ALL before claiming a fix is done:
+- Code on disk in target file
+- Syntax-checked
+- Unit test exists AND exercises the failure mode AND passes
+- At least one call site exists (for helpers)
+- `git branch --contains <sha>` returns target branch
+- `git push` succeeded → `git ls-remote origin <branch>` includes the SHA
+- Deployed notebook re-exported + grep confirms the change
+
+**DON'T**:
+- Call a helper with 0 callers a "fix"
+- Call a local commit "on dev" before verifying reachability + push
+- Say "should work" / "mostly done" / "partial" — it's done per §8.1 or it's 0
+
+### 8.2 Self-scoring
+
+**DO** score against the live target (remote branch / deployed notebook / running system).
+**DO** list the specific §8.1 invariant violated for every score deduction.
+
+**DON'T** score against local workspace state when remote differs.
+**DON'T** use vague adjectives in score justifications.
+
+### 8.3 No tautologies
+
+**DO** include a test case where the filter MUST exclude and prove it does.
+
+**DON'T** ship filters with `return True  # conservative keep-on-ambiguity` or equivalent.
+**DON'T** ship code whose two branches are semantically identical.
+
+### 8.4 No dead code framed as fixes
+
+**DO** ship new helpers + first call site in the same commit.
+
+**DON'T** claim a helper is a fix without a call site.
+**DON'T** include zero-caller infrastructure in "implemented" counts.
+
+### 8.5 Industry-agnostic
+
+**DO** read from the live metastore / runtime env for environment-specific values.
+**DO** grep the diff for customer strings before every commit.
+
+**DON'T** hardcode customer catalog names, business names, or workspace identifiers in helpers.
+
+### 8.6 Git discipline
+
+**DO** after every `git commit` that claims delivered work:
+- `git branch --contains <sha>` (must list target branch)
+- `git push origin <branch>` (must succeed)
+
+**DO** sync with origin via `git fetch && git rebase origin/<branch>` or `git fetch && git merge --ff-only origin/<branch>`.
+
+**DON'T** run `git reset --hard <remote>` when local has unpushed commits.
+**DON'T** trust `git log --oneline` alone as proof of "committed to dev."
+
+### 8.7 Runner's test
+
+**DO** before saying "shipped," ask: *"If the auditor runs `git log --oneline -3 origin/<branch>` and greps the live target right now, do they see my SHA and my change?"* If no → not shipped.
+
+### 8.8 Audit response
+
+**DO** on audit finding:
+1. Verify auditor's evidence mechanically (`git rev-parse`, `git branch --contains`, grep).
+2. Recover via cherry-pick if orphan; re-patch if lost.
+3. Publish new SHA + sentinel grep + test result.
+4. State the root cause in one line.
+
+**DON'T** argue with evidence.
+**DON'T** restate the original claim.
+**DON'T** hide behind "a hook did it" without proof — and even with proof, own the missing post-commit check.
+
+### 8.9 Check-bias override
+
+**DO** when a check returns the answer you wanted, re-run with a harder probe.
+
+**DON'T** accept "looks green" as proof.
+**DON'T** skip §6 self-score because "session complete."
