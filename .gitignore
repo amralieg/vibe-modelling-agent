@@ -19,3 +19,4 @@ Thumbs.db
 # Model outputs are generated artifacts — stored in Databricks volumes
 models/*
 !models/.gitkeep
+__pycache__/
