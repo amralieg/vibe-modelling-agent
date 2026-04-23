@@ -18,6 +18,8 @@
 8. [Test Results](#test-results)
 9. [Common Failure Patterns](#common-failure-patterns)
 10. [Known Issues](#known-issues)
+11. [Unit tests](#unit-tests)
+12. [P-fix → vibe_tester mapping](#p-fix--vibe_tester-mapping)
 
 ---
 
@@ -1479,6 +1481,99 @@ databricks api get "/api/2.1/jobs/list" --profile $DBX_PROFILE
 9. **Duplicate self-ref columns not fully resolved** — Some tables still have both the original v1 self-ref column AND the surgical fix column. The dedup logic renames when possible but may miss cases where the existing column name doesn't match expectations.
 10. **Generic FK rename coverage** — Some tables have generic FK columns that should be role-specific. Only a subset were addressed in the surgical vibes. The remaining need additional iterations.
 11. **Score plateau at 87** — The model has maxed out what the current 20 surgical instructions can achieve. Further improvement requires new vibes targeting the remaining 25 warnings (generic FK names, PII tags, etc.).
+
+---
+
+## 11. Unit tests
+
+The `tests/unit-tests/` folder holds a pytest-based unit suite that exercises pure helper functions extracted from the agent notebook. It runs locally (no Databricks runtime) and catches regressions BEFORE the expensive Databricks end-to-end tests fire.
+
+### Why the unit suite exists
+
+The v0.6.x → v0.7.x burst (≈60 P-fixes in 48 hours) hit the agent so fast that several regressions slipped past the end-to-end tester. The unit suite gives us a cheap feedback loop for the small, pure helpers that are most fragile: parsers, sanitizers, regex, naming conventions. Every fix going forward MUST keep this suite green.
+
+### How to run
+
+```bash
+# From repo root
+python3 -m pytest tests/unit-tests/
+
+# Specific file
+python3 -m pytest tests/unit-tests/test_parse_ce_counts.py -v
+
+# With verbose output + stop on first failure
+python3 -m pytest tests/unit-tests/ -v -x
+```
+
+The harness (`tests/unit-tests/conftest.py`) AST-walks the agent source (either `agent/dbx_vibe_modelling_agent.ipynb` cell[1] or the in-flight `/tmp/agent_source.py`, whichever is newer) and exposes module-level functions as an `agent_helpers` module. Databricks-only globals (`spark`, `dbutils`, `displayHTML`, `SparkSession`, `WorkspaceClient`) are stubbed so no runtime is required.
+
+### Test files
+
+| File | What it covers | Fix anchor |
+|---|---|---|
+| `tests/unit-tests/test_parse_ce_counts.py` | `_parse_ce_counts` — parses the `COUNTS:` line from candidate_evaluation text (links_to_include, cross_domain_links_to_include, orphaned_fks, duplicate_fks, etc.). Covers empty input, non-string input, missing marker, single/multi pair, case-insensitive marker, whitespace tolerance, non-integer skip, newline termination, "first COUNTS line wins", trailing content ignored. | Protects against the "Created 0 FK(s)" regression caused by LINK-POSTPROCESS over-trimming when the counts dict is incomplete. |
+| `tests/unit-tests/test_sanitize_name.py` | `sanitize_name` — canonical naming helper (GEN-RUL-002). Two modes: `strip_stop_words=True` (catalog/schema naming — strips `corp`, `ltd`, `the`, `inc`) and `strip_stop_words=False` (literal preservation — keeps every token). Covers empty fallback, lowercasing, stop-word strip, special char strip, Unicode → ASCII folding, identifier-char invariant, idempotency. | Protects catalog/schema/table DDL, volume paths, log folder, tag namespace — a regression here silently rewrites physical names. Tied to **v0.7.5 P0.67 NamingConvention**. |
+| `tests/unit-tests/test_tag_merge_regex.py` | The tag-merge regex used by **v0.7.10 P0.99** + **v0.7.13 PE12** to coalesce ~9894 per-column `ALTER … SET TAGS` statements into ~500 multi-tag statements (~20× speedup). Covers `ALTER TABLE`, `ALTER SCHEMA`, `ALTER VIEW`, `ALTER COLUMN`, tag values containing commas (PE12), multi-pair KV lists, backtick-quoted targets, trailing whitespace, optional semicolons, and correctly rejects `UNSET TAGS` / non-tag ALTER statements. | Protects the install path — a regex bug produces malformed SQL and install crashes on every run. |
+
+### Rule of engagement
+
+- **Every new P-fix** that touches a pure helper, parser, or regex MUST come with a new test case (or extend an existing one) in this suite.
+- **Before committing** a fix, run `python3 -m pytest tests/unit-tests/ -v` locally.
+- **Before tagging to main**, CI MUST show green on this suite.
+- The suite is intentionally decoupled from `tests/vibe_tester.ipynb` — the E2E tester stays the authoritative end-to-end signal, but the unit suite is cheaper and catches 80% of parser/regex regressions in seconds rather than 45 minutes.
+
+---
+
+## 12. P-fix → vibe_tester mapping
+
+Which vibe_tester test exercises which P-fix? This table lets you pick the minimum E2E test to run when validating a specific fix. "Any" = every vibe_tester test exercises it implicitly (the fix is on the hot path of every run).
+
+| P-number | Version | Fix | Primary vibe_tester coverage |
+|---|---|---|---|
+| P0.11 | v0.6.7 | Mutation engine topo-sort | **Test 01** (MVM vibe evolution drives the mutation engine); **Test A1** (architect review triggers renames). |
+| P0.15 | v0.6.7 | Self-ref FK typing + role-label | **Test 01**, **Test 03b** (sample data on self-ref'd products). |
+| P0.16 | v0.6.7 | Ambiguous FK auto-rename | **Test 00** (runner ECM gen) — most ambiguous FKs live in large ECM models. |
+| P0.17 | v0.6.7 | Fidelity-gate demote when no VibeContract | **Test 00**, **Test 01** (neither supplies a VibeContract). |
+| P0.18 | v0.6.7 / v0.7.4 P0.62 | Install-clash soft-replace | **Test 10**, **Test 10c** (install scenarios). |
+| P0.20 | v0.6.9 | Pool-based sample engine | **Test 03** (sample gen), **Test 03b** (verify rows > 0). |
+| P0.22–P0.27 | v0.7.0 | Sample-pool schema + autofix family | **Test 03** + **Test 03b**. |
+| P0.30, P0.31 | v0.7.1 | Rename cascade + None-guard | **Test 01** (vibe evolution proposes renames). |
+| P0.41 | v0.7.2 | Response-schema hotfix (sample pool) | **Test 03**. |
+| P0.43, P0.48 | v0.7.2 | Gate-hierarchy INCLUSIVE normalize + early-exit | **Test A1** (architect), **Test 00** (full pipeline). |
+| P0.44 | v0.7.2 | Architect self-grading of previous iteration | **Test A1**. |
+| P0.45 | v0.7.2 | Tag autofix MERGES not overwrites | **Test 00** (tags on domain/product/attribute persist to UC). |
+| P0.46, P0.47 | v0.7.2 | FK rewrite post-rename + rename pre-scan | **Test 01**, **Test A1**. |
+| P0.49, P0.50, P0.54, P0.57 | v0.7.3 | Cap removal + mandatory observability logs | Any — all tests parse log markers. |
+| P0.52, P0.53 | v0.7.3 | `business_domains` widget IMMUTABLE end-to-end | **Test 00** (runner supplies widget domains), **Test A1**. |
+| P0.55 | v0.7.3 | Post-architect + post-QA autofix re-run | **Test 00**, **Test A1**. |
+| P0.56 | v0.7.3 | Isolated-product detection | **Test 00** (ECM has isolated candidates). |
+| P0.58 | v0.7.3 | Deepcopy of gate dicts | **Test A1** (multi-iteration architect). |
+| P0.60 | v0.7.4 | FORBIDDEN GENERIC domain-name rule disabled | **Test 00**, **Test 01**. |
+| P0.61 | v0.7.4 | Autofix sanity harness | Runs in `tests/unit-tests/` (future extension) + triggered in every run's log. |
+| P0.62 | v0.7.4 | `[AUTOFIX-P0.18]` install-clash observability | **Test 10**, **Test 10c**. |
+| P0.63 | v0.7.4 | Counter reset hardening | Any — repeated runs in the suite. |
+| P0.65 | v0.7.5 | USER-KING `sizing_directives` parse + gate | **Test 00** (runner widget_values include sizing signals). |
+| P0.67 | v0.7.5 | `NamingConvention` SSOT | Any + **unit test `test_sanitize_name.py`**. |
+| P0.68 | v0.7.5 | Faker Tier-2 restoration | **Test 03** (tier-2 pool columns), **Test 03b**. |
+| P0.70 (REVERT in v0.7.10) | v0.7.5 / v0.7.10 | In-domain chunking revert | **Test 00** (large ECM linking). |
+| P0.71 | v0.7.5 | EARLY + LATE `next_vibes` emission | Any — every run emits both. |
+| P0.72 | v0.7.5 | Metric-view ownership records AT CREATION | **Test 00** (metric views generated), **Test A1**. |
+| P0.73 | v0.7.5 | Word-boundary PII match | Any — PII autofix runs every run. |
+| P0.74 | v0.7.5 | Product-name collision guard | **Test 00** (ECM + MVM collision risk). |
+| P0.75 | v0.7.5 | FK column ends with target PK name | **Test 00**, **Test 10d** (cross-convention physical layout). |
+| P0.81 | v0.7.6 | Mirror-JSON resync | **Test 00**, **Test 10** (install reads JSON — stale JSON used to break this). |
+| P0.83 | v0.7.6 | Raw pool-spec log cap | **Test 03** (log volume inspection). |
+| P0.89 | v0.7.6 | VREQ-bleed product-name validator | **Test 01** (VREQ text flows back into product gen). |
+| P0.91 | v0.7.6 | Column/product prose-name validator | **Test 01**. |
+| P0.92, P0.95 | v0.7.7, v0.7.8 | Install logger fallback | **Test 10**, **Test 10c**. |
+| P0.96 | v0.7.10 | Post-install integrity check via `_metamodel.domain` COUNT | **Test 00** (runner install triggers integrity check). |
+| P0.99+PE12 | v0.7.13 | Tag SET TAGS merge (quoted values, commas) | **Test 00**, **Test 10**, **Test 10c** — AND **unit test `test_tag_merge_regex.py`**. |
+| P0.105+M6 | v0.7.13 | `_ensure_catalog_exists` managed-location discovery | **Test 00** (runner creates install catalogs — exercises the Default-Storage path when the metastore is configured that way). |
+| P0.106 | v0.7.11 | Install log tee to volume | **Test 10** (post-run log inspection). |
+
+### Minimum test set for "I touched only one P-fix"
+
+If your change is confined to a single P-number, run that P-number's primary test(s) from the column above PLUS the full `tests/unit-tests/` suite. Only run the full `tests/vibe_tester.ipynb` (all 10 + A1 tests) if your change touches shared infrastructure (naming, gating, autofix, install).
 
 ---
 

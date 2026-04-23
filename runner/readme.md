@@ -301,6 +301,20 @@ The following internal schemas are excluded from clash detection when checking e
 - `_metamodel`
 - `_metrics`
 
+### Install-Catalog Creation on Default-Storage Metastores (v0.7.13 P0.105+M6)
+
+When the runner asks the agent to install into a catalog that does not yet exist, the agent's `_ensure_catalog_exists` helper creates it. On Unity Catalog metastores configured with **Default Storage** (no account-level managed location), a bare `CREATE CATALOG <name>` is rejected by Databricks with `MANAGED_LOCATION_NOT_SPECIFIED`.
+
+The v0.7.13 patch (also tracked as the "v0.7.12" managed-location patch in intermediate commit messages — the single-digit semver rolled it forward to v0.7.13) teaches the helper to discover a managed location automatically, with NO hardcoded catalog-name allowlist:
+
+1. **Metastore-level storage root** — calls `SELECT current_metastore()` then `DESCRIBE METASTORE` and reads the `storage_root` column. If it starts with `abfss://`, `s3://`, or `gs://`, use it verbatim.
+2. **Borrowed storage root** — if the metastore itself doesn't expose one (Default Storage case), iterate every accessible catalog (excluding `_*`, `system`, `samples`, `main`, `hive_metastore`), call `DESCRIBE CATALOG EXTENDED`, and lift the `storage_root` of the first match. The trailing `/__unitystorage/<catalog-id>` segment is stripped so the location is reusable for a new catalog.
+3. **Bare create fallback** — if neither discovery step succeeded, issue `CREATE CATALOG` without a managed location. On Default-Storage metastores this will fail fast with a clear error message pointing the operator at UI catalog creation or an explicit MANAGED LOCATION.
+
+Consequence for runner users: **on Default-Storage metastores you no longer need to pre-create the install catalogs manually.** The runner's 4-task job will create them using a storage location borrowed from another catalog in the same metastore. On classic managed-location metastores nothing changes — step (1) fires and succeeds.
+
+Idempotency: if the catalog already exists (either directly or via a CATALOG_ALREADY_EXISTS race), the helper logs and proceeds without failing.
+
 ---
 
 ## Job Tags

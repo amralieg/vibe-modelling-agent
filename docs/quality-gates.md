@@ -425,4 +425,35 @@ Grep `NEXT-VIBES FEEDBACK` at the tail. BLOCKING items are the prioritised backl
 - **Architect gate 4 (`propose_for_global_standard`) is effectively unattainable for any single-industry model.** Across every tested run it's the only persistent failure at iter 3. Candidate v0.7.x: demote this gate from "all must pass" to "ambition score", or make it an opt-in strict mode.
 - **`passenger` domain has been observed stuck at all-4-gates-fail across iterations** in Airlines MVM runs. Root cause not fully understood — likely interacts with the PNR / ticket / itinerary SSOT tension (shared with distribution). Logged for next investigation.
 - **Sample-realism gate is missing.** Nothing currently asserts "does the generated data LOOK like real airline data?" — only that types coerce and FK integrity holds. A post-gen semantic-realism LLM check is queued for a future version.
-- **No unit tests** in the repo for gate functions themselves. Every gate is exercised only end-to-end via the test harness. Candidate work: isolated pytest for each `_check_*` / `validate_*` function.
+- ~~**No unit tests** in the repo for gate functions themselves.~~ **Partial coverage added in v0.7.x** — `tests/unit-tests/` now pytest-covers the pure helpers most prone to regression (`_parse_ce_counts`, `sanitize_name`, the tag-merge regex). Gate functions themselves (`_check_*`, `validate_*`) remain end-to-end-only; candidate work is extending the pytest harness to exercise them directly with synthetic model fixtures.
+
+## v0.6.x → v0.7.x fix roll-up affecting gates
+
+The fixes below changed gate behaviour directly. For the full P-number catalog see the repo-root [`readme.md` → Recent fixes](../readme.md#recent-fixes-v06x--v07x).
+
+| P-number | Version | Gate impact |
+|---|---|---|
+| P0.11 | v0.6.7 | Mutation engine is now topo-sorted — architect actions no longer silently drop because of in-batch ordering; visible as `[Gate Hierarchy] normalize` + autofix summary logs. |
+| P0.15, P0.16 | v0.6.7 | Self-ref FK role-label + ambiguous FK auto-rename upgraded from warnings to auto-applied fixes. |
+| P0.17 | v0.6.7 | Fidelity gates demote to INFO when no VibeContract is supplied — no more spurious WARNINGs in `new base model` runs. |
+| P0.20 | v0.6.9 | Sample generation now pool-based (Faker removed); gates in §8 apply. |
+| P0.43, P0.48 | v0.7.2 | Gate hierarchy is INCLUSIVE — if a harder gate passes, easier gates are force-promoted. Early-exit is keyed strictly on `_REQUIRED_GATES_FOR_EARLY_EXIT`. |
+| P0.44 | v0.7.2 | Architect self-grades its previous iteration's `priority_now`; schema now carries `prior_iteration_self_review`. Iter 1 is empty; iter 2+ is required. |
+| P0.52, P0.53 | v0.7.3 | User-specified `business_domains` is IMMUTABLE end-to-end — Step 3.6 Domain Architect, Step 3.7 Principal Architect, QA all treat it as protected. |
+| P0.55 | v0.7.3 | Pre-static-analysis autofix now re-runs AFTER Step 3.7 architect AND AFTER Step 7 QA, catching late mutations. |
+| P0.56 | v0.7.3 | Replaces fragile orphan heuristic with deterministic isolated-product detection. |
+| P0.58 | v0.7.3 | Gate dicts are deepcopied before normalisation — no more cross-iteration state leakage. |
+| P0.60 | v0.7.4 | FORBIDDEN GENERIC domain-name rule DISABLED — was overriding valid user vibes. |
+| P0.65 | v0.7.5 | USER-KING `sizing_directives` parsed from free-text user vibes and enforced as a HARD post-gen gate; overrides all heuristic min/max. |
+| P0.67 | v0.7.5 | `NamingConvention` is the single source of truth for PK + FK + suffix + case. All enforcement paths delegate to it. |
+| P0.70 **REVERTED** | v0.7.5 → v0.7.10 | Count-based in-domain chunking removed. Full domain is always sent to the LLM linker — chunking lobotomized context. |
+| P0.72 | v0.7.5 | Metric-view ownership records captured AT CREATION TIME — no `_unassigned` fallback; validator fails loud if any view lacks an owner. |
+| P0.73 | v0.7.5 | Word-boundary PII match — `order_id` no longer fires on the 2-letter `or` substring. |
+| P0.74 | v0.7.5 | Product-name collision guard runs BEFORE architect review. |
+| P0.75 | v0.7.5 | FK column names MUST end with the target PK column name (exact match). |
+| P0.89, P0.91 | v0.7.6 | VREQ-bleed product-name validator + column/product prose-name validator — rejects LLM responses where `<new_name>` is a sentence. |
+| P0.96 | v0.7.10 | Post-install integrity check uses `_metamodel.domain` COUNT instead of `SHOW SCHEMAS` row parsing (which returned 0 on serverless). |
+| P0.99+PE12 | v0.7.13 | `ALTER … SET TAGS` statements merged per target — ~20× faster install; regex tolerates quoted tag values containing commas. |
+| P0.105+M6 | v0.7.13 | `_ensure_catalog_exists` discovers a managed location from metastore or borrowed catalog on Default-Storage metastores. |
+
+Every P-number above is anchored in a `# v0.X.Y P0.NN` comment in `agent/dbx_vibe_modelling_agent.ipynb` cell[1] / `/tmp/agent_source.py`.

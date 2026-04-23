@@ -46,6 +46,7 @@
 - [Metric Views](#-metric-views)
 - [Troubleshooting](#-troubleshooting)
 - [Glossary](#-glossary)
+- [Recent fixes (v0.6.x → v0.7.x)](#recent-fixes-v06x--v07x)
 
 ---
 
@@ -82,7 +83,7 @@ The name **"Vibe"** reflects the core workflow:
 
 Each iteration produces a new version. The agent carries forward your context so nothing is lost between runs. You are never locked into a static template — the model evolves with your business.
 
-Current version: **v0.5.9** — see [Version history](#version-history) below.
+Current version: **v0.7.13** — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v07x) below.
 
 ---
 
@@ -981,6 +982,65 @@ Metric views are auto-generated per domain, focusing on KPIs that would appear i
 | **v0.5.5** | Hot-fix: guard `run_vibe_verification_sweep` against None LLM result |
 
 Full history: `git log --oneline v0.5.0..HEAD`.
+
+---
+
+## Recent fixes (v0.6.x → v0.7.x)
+
+The 48-hour burst from v0.6.0 through v0.7.13 (plus in-flight v0.7.x patches tracked in `/tmp/agent_source.py`) hardened every stage of the pipeline. The table below enumerates each version, the P-numbered fix(es) it ships, the theme, and the observable impact on the generated model or install.
+
+> **Sources of truth:**
+> - Committed versions: `git log --since=2026-04-18 --oneline` (51 commits).
+> - Uncommitted P-numbered patches (v0.7.x): `grep -oE "v0\.7\.[0-9]+ P0\.[0-9]+" /tmp/agent_source.py | sort -u`.
+> - Every P-number is anchored in a code comment — grep the notebook/source for `P0.NN` to jump to the enforcement site.
+>
+> Every fix listed here MUST continue to pass the unit-tests in `tests/unit-tests/` (see [tests/readme.md](tests/readme.md#unit-tests)) and the vibe_tester end-to-end suite.
+
+### v0.6.x — silent-failure class + architect + sample engine
+
+| Version | P-numbers | Theme | Impact |
+|---|---|---|---|
+| **v0.6.0** | — | Silent-failure class fixes — pairwise, logging, architect, metrics | Architect review, pairwise FK scan, metric views and logging no longer swallow failures; unrepairable items now surface as explicit gate failures. |
+| **v0.6.1** | — | Install path + widget rename | `install model` now only requires `model.json` (not the staging catalog); the old widget name was renamed to the current `Installation Catalog`. |
+| **v0.6.2** | — | 4 silent-failure fixes from v0.6.1 smoke | Ingestion path failures, link post-process drops, and architect-gate normalization bugs caught by the v0.6.1 run were root-caused and fixed. |
+| **v0.6.3** | — | Residual v0.6.2 smoke bugs | Further hardening on the v0.6.2 class of failures exposed by the follow-up smoke run. |
+| **v0.6.4** | — | Step 3.6 Domain Architect Review | Each domain now gets an independent Principal-Architect-plus-SME review with 4 production-readiness gates, run in parallel across domains. |
+| **v0.6.5** | — | `shared` domain strict rule + duplicate-FK prevention | `shared` is reserved exclusively for exact-name products shared by 2+ domains; duplicate FKs pointing at the same target are deduplicated before linking. |
+| **v0.6.6** | — | Reject case/separator-only renames from architect | Architect can no longer propose `order_line → orderLine` (or `_line ↔ -line`) — root-cause fix for architect drift that made no real schema change. |
+| **v0.6.7** | P0.11, P0.15, P0.16, P0.17, P0.18 | Greedy fix pack | Mutation engine topo-sort (P0.11); iterative architect review; metric-view grounding; self-ref FK typing + relaxation (P0.15); ambiguous FK auto-rename (P0.16); fidelity-gate noise demoted when no VibeContract (P0.17); install-clash soft-replace (P0.18); industry-agnostic prompt scrub + CLAUDE.md guardrails. |
+| **v0.6.9** | P0.20 | Pool-based sample engine (Faker removed) + observability completion + quality-gates doc | New pool engine replaces per-row LLM generation — deterministic N rows, FK integrity, correlated tuples; `docs/quality-gates.md` shipped. |
+
+### v0.7.x — schema, naming, widget authority, install hardening
+
+| Version | P-numbers | Theme | Impact |
+|---|---|---|---|
+| **v0.7.0** | P0.22, P0.23, P0.24, P0.25, P0.26, P0.27 | Sample-pool schema + autofix family | Structured-output `SAMPLE_POOL_RESPONSE_SCHEMA` (P0.22); type-branched coercion for BIGINT/INT/LONG/DECIMAL/DATE/TIMESTAMP (P0.23); self-FK cleared on PK attribute (P0.24); expanded PII classification autofix (P0.25); denormalized natural-key autofix (P0.26); standalone sample-helpers sanity harness (P0.27). |
+| **v0.7.1** | P0.30, P0.31 | Rename cascade + None-guard | Batch-rename cascade correctly handles 4-part attribute refs and cross-entity renames (P0.30); classification responses that return `null` no longer crash downstream stages (P0.31). |
+| **v0.7.2** | P0.41, P0.43, P0.44, P0.45, P0.46, P0.47, P0.48 | Response-schema hotfix + gate hierarchy + architect self-grading | Revert Foundation Model structured-output on sample gen (P0.41); gate hierarchy normalised INCLUSIVE — harder gate pass implies all easier gates pass (P0.43); architect self-grades the previous iteration's `priority_now` (P0.44); tag autofix now MERGES (never overwrites) existing tags (P0.45); FK rewrites follow attribute/product renames within the same batch (P0.46); mutation engine pre-scans ALL renames before applying any (P0.47); early-exit keyed on `_REQUIRED_GATES_FOR_EARLY_EXIT` only (P0.48). |
+| **v0.7.3** | P0.49, P0.50, P0.52, P0.53, P0.54, P0.55, P0.56, P0.57, P0.58 | Widget authority + observability + post-stage autofix | Per-iteration cap removed, only overall cap enforced (P0.49); mandatory observability — every autofix + gate emits summary log (P0.50); user-specified `business_domains` widget is IMMUTABLE end-to-end — ensemble, judge, architect, QA all protect (P0.52, P0.53); AUTOFIX markers always logged on every fire (P0.54); post-architect AND post-QA autofix re-runs (P0.55); isolated-product detection replaces fragile orphan heuristic (P0.56); mutation batch start/end log (P0.57); deepcopy of gate dicts so nested state can't leak across iterations (P0.58). |
+| **v0.7.4** | P0.60, P0.61, P0.62, P0.63, P0.73 (partial) | Blacklist retreat + autofix harness | FORBIDDEN GENERIC domain-name rule disabled — hard blacklist was overriding valid user vibes (P0.60); synthetic autofix harness (P0.61); install-clash soft-replace observability counters per-fire + summary (P0.62); counter reset hardening to prevent cross-run leakage (P0.63); initial PII-match regex (P0.73 — later superseded in v0.7.5). |
+| **v0.7.5** | P0.65, P0.67, P0.68, P0.70, P0.71, P0.72, P0.73, P0.74, P0.75 | USER-KING sizing + NamingConvention SSOT + Faker Tier-2 | Structured `sizing_directives` parsed from free-text user vibes and enforced as a HARD post-gen gate (P0.65); single-source `NamingConvention` class for all PK/FK/suffix/case (P0.67); Faker Tier-2 restored with per-column tuple-token provider map (P0.68); count-based in-domain-linking chunking (P0.70 — reverted in v0.7.10); EARLY + LATE `next_vibes` emission split (P0.71); metric-view ownership records captured AT CREATION TIME, no `_unassigned` fallback (P0.72); word-boundary PII match — `order_id` no longer matches `or` (P0.73); product-name collision guard (P0.74); FK column names MUST end with target PK column name (P0.75). |
+| **v0.7.6** | P0.81, P0.83, P0.89, P0.91 | Mirror JSON resync + VREQ prose bleed | Mirror JSONs resynced after in-memory mutations so install doesn't re-read stale files (P0.81); raw pool-spec log capped at 3 per run (P0.83); VREQ-bleed product-name validator rejects prose-bleed from Verification REQuirements (P0.89); column/product name validator rejects prose in `<new_name>` fields (P0.91). |
+| **v0.7.7** | P0.92 | Install logger fallback | Install path has no `logger` in scope — local fallback print used instead of crashing. |
+| **v0.7.8** | P0.95 | Bulletproof logger fallback | Install path runs before `step_setup_and_clean` initialises the logger — fully bulletproof fallback inserted. |
+| **v0.7.10** | P0.70-REVERT, P0.96 | Chunking revert + integrity check root-cause | Count-based chunking from v0.7.5 P0.70 lobotomized LLM context — full domain is now always sent (P0.70 revert); post-install integrity check now uses `_metamodel.domain` COUNT (same source as Cross-Validation); prior `SHOW SCHEMAS` row-parse returned 0 on serverless even with 11 schemas (P0.96). |
+| **v0.7.11** | P0.106 | Install log tee to volume | Install prints are tee-d to a local log file, then copied to the UC Volume at finalize so operators see the full install trace post-run. |
+| **v0.7.13** | P0.99+PE12, P0.105+M6 | Tag merge + managed-location discovery | `ALTER … SET TAGS` statements merged per target (~9894 calls → ~500, ~20× faster); regex now tolerates quoted tag values containing commas (PE12) (P0.99+PE12); `_ensure_catalog_exists` discovers a metastore managed location (via `DESCRIBE METASTORE` then any accessible catalog's `storage_root`) so `CREATE CATALOG` succeeds on Default-Storage metastores with no hardcoded allowlist (P0.105+M6). |
+
+### What a P-number comment looks like in source
+
+```python
+# v0.7.10 P0.96: use _metamodel.domain COUNT (same source as Cross-Validation).
+# Prior SHOW SCHEMAS row-parsing returned 0 on serverless even with 11 schemas.
+```
+
+Every P-number appearing in this table is anchored in at least one such comment. `grep -n "P0.NN" /tmp/agent_source.py` (or the notebook) jumps straight to the enforcement site.
+
+### Going-forward contract
+
+1. Each new P-fix MUST carry a stable `v0.X.Y P0.NN` comment at the enforcement site.
+2. Each P-fix MUST pass the pytest unit tests in `tests/unit-tests/` and the end-to-end `tests/vibe_tester.ipynb`.
+3. Each P-fix MUST be listed in this table at tag-to-main time with theme + impact.
 
 ---
 

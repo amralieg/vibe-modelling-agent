@@ -21,7 +21,7 @@
 | [whitepaper.md](whitepaper.md) | Philosophy, methodology, and the complete data modeling rules catalog (G01–G12, SUB). |
 | [design-guide.md](design-guide.md) | Technical design reference — architecture, 19 pipeline stages (including Step 3.6 per-domain Domain Architect Review and Step 3.7 global Architect Review), LLM ensemble, sizing, widgets, artifacts, and error-handling patterns. |
 | [integration-guide.md](integration-guide.md) | Producer-consumer protocol for UIs and downstream consumers — handshake, progress events, `result_json` schemas, and SQL quick reference. |
-| [quality-gates.md](quality-gates.md) | Every quality gate at every stage — what each gate asserts, the yes/no questions it asks, failure modes, and a per-run count of enforced checks. Start here to build confidence in a specific generated model. |
+| [quality-gates.md](quality-gates.md) | Every quality gate at every stage — what each gate asserts, the yes/no questions it asks, failure modes, and a per-run count of enforced checks. Also carries the **v0.6.x → v0.7.x fix roll-up affecting gates** table (P0.11, P0.20, P0.43, P0.52, P0.55, P0.67, P0.70 REVERT, P0.96, P0.99+PE12, P0.105+M6, …). Start here to build confidence in a specific generated model. |
 
 ---
 
