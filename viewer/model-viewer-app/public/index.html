@@ -386,6 +386,22 @@ function getStylesheet(showDomains=true,sizeScale=1){
       textBackgroundColor:'rgba(40,40,60,0.92)',textBackgroundOpacity:1,
       textBackgroundPadding:nd(3)+'px '+nd(6)+'px',textBackgroundShape:'roundrectangle',
     }},
+    // Product/table focus view: bigger node sizes (override .fk-source/.fk-target shrink)
+    {selector:'.domain-view-node.fk-source',style:{
+      width:nd(60),height:nd(60),borderWidth:4,borderColor:'#10B981',
+      fontSize:fs(16),fontWeight:'700',textMarginY:nd(12),
+      textBackgroundPadding:nd(5)+'px '+nd(10)+'px',
+    }},
+    {selector:'.domain-view-node.fk-target',style:{
+      width:nd(60),height:nd(60),borderWidth:4,borderColor:'#F87171',
+      fontSize:fs(16),fontWeight:'700',textMarginY:nd(12),
+      textBackgroundPadding:nd(5)+'px '+nd(10)+'px',
+    }},
+    {selector:'.domain-view-node.center-node',style:{
+      width:nd(85),height:nd(85),borderWidth:6,borderColor:'#FFD700',
+      fontSize:fs(18),fontWeight:'700',textMarginY:nd(14),
+      textBackgroundPadding:nd(6)+'px '+nd(12)+'px',
+    }},
     {selector:'edge',style:{
       width:2,lineColor:'rgba(150,150,170,0.5)',
       targetArrowColor:'rgba(150,150,170,0.7)',targetArrowShape:'triangle',
@@ -419,23 +435,23 @@ function getStylesheet(showDomains=true,sizeScale=1){
     }},
     {selector:'.subdomain-node',style:{
       shape:'round-rectangle',backgroundColor:'data(color)',backgroundOpacity:0.12,
-      borderWidth:2,borderColor:'data(color)',borderOpacity:0.5,borderStyle:'dashed',
+      borderWidth:3,borderColor:'data(color)',borderOpacity:0.5,borderStyle:'dashed',
       content:'data(label)',textValign:'top',textHalign:'center',
-      fontSize:'18px',fontWeight:'700',color:'#ffffff',
-      textOutlineWidth:0,textMarginY:-14,padding:'45px',
+      fontSize:'26px',fontWeight:'700',color:'#ffffff',
+      textOutlineWidth:0,textMarginY:-18,padding:'50px',
       textBackgroundColor:'rgba(30,30,50,0.95)',textBackgroundOpacity:1,
-      textBackgroundPadding:'8px 16px',textBackgroundShape:'roundrectangle',
+      textBackgroundPadding:'10px 18px',textBackgroundShape:'roundrectangle',
     }},
   ];
   const domainStyle=showDomains?{selector:'.domain-node',style:{
     shape:'round-rectangle',
     backgroundColor:'data(color)',backgroundOpacity:0.12,
-    borderWidth:2,borderColor:'data(color)',borderOpacity:0.4,
+    borderWidth:3,borderColor:'data(color)',borderOpacity:0.4,
     content:'data(label)',textValign:'top',textHalign:'center',
-    fontSize:'16px',fontWeight:'700',color:'#ffffff',
-    textOutlineWidth:0,textMarginY:-18,padding:'30px',
+    fontSize:'28px',fontWeight:'700',color:'#ffffff',
+    textOutlineWidth:0,textMarginY:-22,padding:'50px',
     textBackgroundColor:'rgba(30,30,50,0.95)',textBackgroundOpacity:1,
-    textBackgroundPadding:'10px 16px',textBackgroundShape:'roundrectangle',
+    textBackgroundPadding:'12px 20px',textBackgroundShape:'roundrectangle',
   }}:{selector:'.domain-node',style:{
     backgroundOpacity:0,borderWidth:0,content:'',padding:0,
   }};
@@ -831,6 +847,9 @@ function App(){
   const [graphIndexes,setGraphIndexes]=useState(null);
   const cyRef=useRef(null);
   const containerRef=useRef(null);
+  // Track last fit-worthy view fingerprint so we skip auto-fit on drag/resize
+  // re-renders (user-driven state changes should preserve user's viewport).
+  const lastFitKeyRef=useRef('');
 
   // UI state
   const [layout,setLayout]=useState('circle');
@@ -1031,10 +1050,17 @@ function App(){
         relDomains.add(n.data.domain);
         result.push({...n,classes:outIds.has(id)?'table-node domain-view-node fk-target':'table-node domain-view-node fk-source'});
       });
-      // Add domain compound parents so every involved table sits inside its domain box
+      // Add domain compound parents so every involved table sits inside its domain
+      // box. STRIP the width/height from data so cytoscape auto-sizes the compound
+      // parent to wrap its circular child cluster (like subdomain boxes do in
+      // domain view). Otherwise the box defaults to 500x400 which looks tiny/huge
+      // depending on how many children are inside.
       [...relDomains].filter(Boolean).forEach(d=>{
         const n=domainByName[d];
-        if(n) result.push({...n,classes:'domain-node fk-domain'});
+        if(n){
+          const {width,height,...data}=n.data||{};
+          result.push({...n,data,classes:'domain-node fk-domain'});
+        }
       });
       outEdges.forEach(e=>result.push({...e,classes:'fk-edge outgoing-edge'}));
       inEdges.forEach(e=>result.push({...e,classes:'fk-edge incoming-edge'}));
@@ -1061,13 +1087,18 @@ function App(){
       const subs=dh.subdomains||{};
       const hasSubs=Object.keys(subs).length>0;
       const domColor=(domainByName[dname]||{data:{}}).data.color||'#888';
+      // Distinct colors for each subdomain within a domain view. Keeps the domain
+      // color palette idea but rotates hues so each subdomain box is visually
+      // differentiated. Industry-agnostic, deterministic per subdomain name.
+      const SUBDOMAIN_PALETTE=['#4ECDC4','#FFB74D','#BB8FCE','#F67280','#45B7D1','#FFE66D','#95E1D3','#F38181','#AED581','#FCB7AF','#84C4E4','#D4A5A5','#9ED9CC','#F7C873','#B39DDB'];
       const result=[];
       const subNodeIds=new Set();
       if(hasSubs){
-        Object.keys(subs).sort().forEach(sdname=>{
+        Object.keys(subs).sort().forEach((sdname,sdi)=>{
           const sdId=`subdomain_${dname}_${sdname}`;
           subNodeIds.add(sdId);
-          result.push({data:{id:sdId,label:sdname.replace(/_/g,' ').replace(/-/g,' '),type:'subdomain',color:domColor},classes:'subdomain-node'});
+          const sdColor=SUBDOMAIN_PALETTE[sdi%SUBDOMAIN_PALETTE.length];
+          result.push({data:{id:sdId,label:sdname.replace(/_/g,' ').replace(/-/g,' '),type:'subdomain',color:sdColor,domain:dname,domain_color:domColor},classes:'subdomain-node'});
         });
       } else {
         const dn=domainByName[dname];
@@ -1190,16 +1221,26 @@ function App(){
     } else if(type==='attribute'||type==='edge'||type==='domain'){
       cy.layout({name:'preset',animate:false,fit:true,padding:60}).run();
     } else if(type==='table'){
-      // Circular grouped by domain — center table at origin, FK neighbors arranged around it
+      // Product focus view: SAME global-circle layout as main view. Related
+      // tables sorted by domain on ONE big ring, center (focused) table at
+      // origin. Compound domain boxes auto-wrap each domain's contiguous arc.
+      // Large radius + domain sort minimises cross-domain box overlap.
       const centerNode=cy.nodes('.center-node');
       if(centerNode.length) centerNode.position({x:0,y:0});
       const ringNodes=cy.nodes('.domain-view-node').difference(centerNode).sort((a,b)=>{
         const da=(a.data('domain')||''), db=(b.data('domain')||'');
-        return da<db?-1:da>db?1:0;
+        if(da!==db) return da<db?-1:1;
+        const la=(a.data('label')||''), lb=(b.data('label')||'');
+        return la<lb?-1:la>lb?1:0;
       });
       const cnt=ringNodes.length;
       if(cnt>0){
-        const r=Math.max(280, cnt*40);
+        // Arc-length-based radius: keep ~75px arc between neighbours so nodes
+        // never touch, but DO NOT inflate radius with count linearly (which
+        // makes fit-to-viewport zoom out and shrink everything on screen).
+        // r = arc_chord / (2*sin(pi/n)) guarantees non-overlapping nodes.
+        const arc=75;
+        const r=cnt<=1?200:Math.max(420, arc/(2*Math.sin(Math.PI/cnt)));
         ringNodes.forEach((node,i)=>{
           const angle=(2*Math.PI*i/cnt)-(Math.PI/2);
           node.position({x:r*Math.cos(angle), y:r*Math.sin(angle)});
@@ -1210,8 +1251,17 @@ function App(){
       const layoutCfg={...(LAYOUT_CONFIGS[layout]||LAYOUT_CONFIGS.circle)};
       cy.layout(layoutCfg).run();
     }
-    // Fit to screen — multiple passes to handle large graphs that settle slowly
-    const doFit=()=>{cy.fit(60);if(cy.zoom()>1.8)cy.zoom(1.8);cy.center();};
+    // Fit to screen — ONLY on first render of a new view (filter/layout change).
+    // Skip auto-fit when user drags/resizes boxes (which triggers re-render via
+    // domainSizes state update but user wants their viewport preserved).
+    // Always auto-fit after any re-render (initial load, drag, resize, view
+    // change). fit() only adjusts zoom + viewport — it preserves the node
+    // positions chosen by the user (drags stick).
+    const doFit=()=>{
+      cy.fit(60);
+      if(cy.zoom()>1.8) cy.zoom(1.8);
+      cy.center();
+    };
     setTimeout(doFit,200);
     setTimeout(doFit,1000);
     setTimeout(doFit,3000);
