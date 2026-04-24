@@ -276,3 +276,172 @@ Added 2026-04-23 after an audit exposed a "v0.8.0 shipped, 66/100 implemented" c
 
 **DON'T** accept "looks green" as proof.
 **DON'T** skip §6 self-score because "session complete."
+## 9. Model-level validation methodology — what to check, how to check it, what to report
+
+This section captures the **model-level validation protocol** used to audit every pipeline run (new base model, vibe-modeling-of-version, shrink, enlarge, install). It is distinct from §7 (code review). Apply §9 after every pipeline terminal state before claiming "run looks good."
+
+### 9.1 Intent — validate the *output* of the agent, not the code
+
+The agent produces data models (model.json) + physical schemas + metric views + tags. §9 audits THESE ARTIFACTS. Code quality matters (§7) but only insofar as it produced a correct model.
+
+### 9.2 Inputs to collect BEFORE running any check
+
+1. **User vibe string** — verbatim from `model_vibes` widget / `business_description`. Save the exact text so §3c comparisons are evidence-based, not paraphrased.
+2. **Widget params** — business_name, business_domains, data_model_scopes, operation, model_version, naming_convention, generate_samples, cataloging_style.
+3. **JobTags snapshot at terminal** — `{'dbx_vibe_modelling_domains': N, '_products': N, '_attributes': N, '_foreign_keys': N, '_tags': N, '_metrics': N}`.
+4. **model.json snapshot** for EVERY sub-version produced (ecm_v1, mvm_v1, mvm_v2, mvm_v3, ecm_v2, ...). Save to `/tmp/<run>_models/<version>/model.json` with its sibling `vibes/next_vibes.txt`.
+5. **All info + error logs** from `/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/<version>/<business>_{info,error}_v{N}_{ecm|mvm}.log` and the merged tester logs `logs/vibe_tester/<ts>/{test_summary,merged_info,merged_error,quality_report}.log`.
+6. **Physical catalog state** via `databricks schemas list` and `databricks tables list` on the deployment catalog to verify R2 install parity.
+
+### 9.3 Per-model checks (run for EVERY sub-version produced)
+
+#### 9.3.1 Counts table
+Counts to extract from model.json + cross-check with JobTags:
+
+| Metric | How to compute from model.json | Expected behaviour |
+|---|---|---|
+| Domains | `len(model['domains'])` | Matches user `business_domains` widget (§3b) |
+| Products | `sum(len(d['products']) for d in domains)` | Close to user vibe "~N products" target (§3c). Tolerance ±20% for soft targets, 0% for "exactly N" |
+| Attributes | `sum(len(p['attributes']) for d,p in iter_all_products)` | Typical range 30–50 per product. Trim if >60, augment if <12 |
+| Foreign keys | `sum(1 for a in all_attrs if a.get('foreign_key_to'))` | Healthy density: 30–70 FKs for 15-product tiny; 500–900 for 160-product airlines. Overlinked >25% FKs-per-product is red flag |
+| Tags | `len(model.get('metric_views', []))` cross with JobTags `_tags` | Cross-check — if physical `_tags` count diverges from model.json, R2-class drop |
+| Metric views | `len(model.get('metric_views', []))` vs physical `SHOW TABLES IN <cat>._metrics` | MATCHES — if physical < declared, R2 regression |
+| Quality score | Parse from `vibes/next_vibes.txt` `**Model Quality Score: N/100**` | Trend matters: should monotonically improve v1→v2→...; dropping is a signal |
+
+#### 9.3.2 §3b / §3c user-vibe authority compliance
+
+For EVERY model:
+- **§3b domain check:** Every name in user's `business_domains` widget MUST appear verbatim in `[d['name'] for d in domains]`. No renames, no merges. Additional domains allowed ONLY if user vibe explicitly permits.
+- **§3c product-count check:** Against user vibe phrase pattern (`~N products`, `exactly N products`, `intentionally tiny`, `do not expand`, etc.). "Exactly N" → ±0. "~N" → ±20%. "Do not expand" → no growth vs baseline.
+- **§3c domain-count check:** If user said "exactly 3 domains", the model MUST have exactly 3 — no judge-added domains (like `reference`, `shared`, `analytics`) unless user permits.
+- **Enlarge tests are the hardest §3c probe** — agent's default instinct is to scale; user vibe must override. If enlarge produces 10× products ignoring "intentionally tiny", that's a critical §3c violation (seen in v0.8.1, fixed in v0.8.3).
+
+#### 9.3.3 Structural integrity checks (grep the info + error logs)
+
+| Check | Log pattern | Pass | Fail |
+|---|---|---|---|
+| FK cycles | `[CYCLE DETECTION]` | `✅ No cycles detected in FK relationships` | `Found N cycle(s)` — list each cycle path; any >0 = R8 present |
+| Bidirectional FKs | `[BIDIRECTIONAL DETECTION]` | `✅ No direct bidirectional links found` | `🚨 Found N DIRECT BIDIRECTIONAL LINK(S)` — identify the A↔B pair |
+| Siloed products | `SILOED TABLES DETECTED` / `silo` | 0 warnings | product has zero FK in and zero FK out — F4 present |
+| SSOT violations | `cross_domain_duplicate` | 0 | Two domains own same entity name |
+| Self-FKs on PKs | grep model.json where `foreign_key_to == "{same_domain}.{same_product}.{same_pk}"` | 0 | Each self-FK = 1 anti-pattern violation (F2-era pattern) |
+| Denormalized natural keys | `[SA:denormalized_natural_key]` | 0 | FK + natural key for same entity coexist |
+| Fidelity gates | `Fidelity gates FAILED` | precision ≥ 0.85 | `precision < 0.85 — rollback recommended` = Memory/JSON drift (N2) |
+| Post-normalization unlinked `_id` | `Step 4.8: N unlinked _id columns remain` | 0-5 | >10 = IDL or CDL dropped too many candidates |
+
+#### 9.3.4 Per-domain breakdown
+
+Build a per-domain table with products, attrs, FKs-out. Red flags:
+- One domain has >2× the FKs of any other (over-hubby)
+- Domain with zero FKs-out AND zero FKs-in (isolated subgraph)
+- FK-out count > attribute count (nonsensical)
+- "shared" / "reference" domain with >5 products (should be lookup-only, see `feedback_shared_domain_strict`)
+
+#### 9.3.5 Metric view parity (R2 probe)
+
+After install tests:
+- `databricks tables list <catalog> _metrics --profile <profile>` → count N_physical
+- Compare to `len(model.metric_views)` = N_declared
+- If N_physical < N_declared → R2 regression. Identify which metric views dropped and why (usually UNRESOLVED_COLUMN class R6 — grep error log for `Failed metric view '<name>'`).
+
+#### 9.3.6 Vibe adherence (for any `vibe modeling of version` output)
+
+If v→v+1 operation produced a new model from `next_vibes.txt` input:
+1. Parse v1 `next_vibes.txt` — enumerate every PRIORITY (`PRIORITY N — <action>: <target>`) and every SA finding (`[SA:<class>] <detail>`).
+2. For each PRIORITY, search v2 logs for `[MUTATION-BATCH]`, `[MUTATION-SUMMARY]`, and `action '{action}'` outputs. Map: applied (count in mutation summary), skipped (by_reason), or absent (no mention).
+3. For each SA finding, check whether v2's static analysis still shows the same finding (run post-v2 static analysis or compare static-analysis output logs).
+4. Adherence % = (applied SA findings + applied PRIORITIES) / total. Soft-accept bias: don't count "Max retries exhausted, proceeding with errors" as applied — those are silent drops.
+
+#### 9.3.7 Cross-version delta (v1 vs v2, or ECM vs MVM from shrink/enlarge)
+
+Compute and report:
+- ΔD, ΔP, ΔA, ΔFK, ΔMV
+- Products added / removed (set diff of `(domain, product)` tuples)
+- FKs added / removed (set diff of `(domain, product, attribute, foreign_key_to)` tuples)
+- Renames (products with same position but different name — heuristic: positional index in domain's products list)
+- Domain-description semantic shift (if Memory/JSON descriptions diverge)
+
+### 9.4 Pattern-based failure signatures to watch for
+
+Keep this watchlist in the monitor prompt on every run. If a signature is detected, report as PRESENT / ABSENT / NEW-SITE and cite the verbatim log line.
+
+| ID | Signature (grep pattern) | Class |
+|---|---|---|
+| F1 | `/tmp/.*_model_data.*PermissionError` or `[Errno 13] Permission denied` on `/tmp/` | Serverless /tmp anti-pattern |
+| F2 | `Max retries (3) exhausted. Proceeding with last response despite validation errors` | Soft-accept hatch |
+| F4 | `SILOED TABLES DETECTED` | Graph-integrity |
+| F6 | `KeyError '0,62'` or similar format-string KeyError | Prompt template bug |
+| F7 | Parent run exits SUCCESS while child FAILED; 30–60s parent durations | Launch-gate fake-success |
+| F10 / R2 | Physical `_metrics` count < declared `metric_views` | Install-time metric-view drop |
+| R1 | `SELECT version FROM _metamodel.business` returns only v=1 after "vibe modeling of version" | In-place overwrite |
+| R3 | `wc -l info.log` returns 0 after SUCCESS | Log truncation on final merge |
+| R6 | `[Metrics] Failed metric view '<name>'.*UNRESOLVED_COLUMN` | Metric-view ↔ normalizer contract mismatch |
+| R7 | `[MODEL-PARAMS] <field> missing from LLM output — using midpoint N` | LLM JSON-schema non-compliance |
+| R8 | `[CYCLE DETECTION] Found N cycle(s)` where N > 0 after finalization | FK cycle recurrence |
+| N1 | install test failure at ~50-60s with `Workload failed, see run output for details` + no info log on volume | Install early-exit, no diagnostics |
+| N2 | `Fidelity gates FAILED: precision < 0.85 — rollback recommended` | Memory/JSON attribute-name drift |
+| N3 | `⚠️ DBML FK SCRUB: Skipping dangling ref` (cosmetic) | DBML exporter naming drift |
+
+### 9.5 Positive signals to look for (don't regress what works)
+
+Equally important — affirmatively detect and record these, because absence over time signals regression:
+
+- `[VALIDATOR] User vibes detected (N chars) — count limits will be relaxed` → §3c authority firing at validator
+- `USER-KING AUTHORITY` in LLM judge/architect prompts and AI logs → §3c authority at LLM level
+- `✅ Step N: <name> - PASSED validation` → each step self-verified
+- `Architect Self-Review iter N landed=K regressed=0 blocked=0` → corrective actions landing cleanly
+- `🛡️ BLOCKED product move: '<name>' is protected` → defense-in-depth guard working even when LLM pushes against it
+- `[NORM-FIX] BLOCKED semantic mismatch` → normalizer correctly rejecting a bad join
+- LLM health: all models `0 timeouts, 0 errors, ✅ healthy` in the runtime-profile summary
+
+### 9.6 Reporting structure (what to write after every pipeline run)
+
+Two documents, saved to `/Users/amr.ali/claude/vibe-agent/`:
+
+**A. Validation report (`<run-id>-validation-report.md`):**
+1. Summary (commit, run_id, duration, PASSED/FAILED/SKIPPED if via vibe_tester)
+2. Per-test or per-phase timeline table with concrete timestamps
+3. Complete error inventory — EVERY ERROR verbatim + WARNINGs grouped by tag with counts
+4. F1-F10 + R1-R8 + N1-N3 regression table (PRESENT / ABSENT / NEW-SITE + evidence log line)
+5. NEW regressions not in the catalogue
+6. Positive signals (fixes confirmed, §3a/b/c compliance, honest_score highlights)
+7. Recommendations for next version
+8. Brutal honesty score for the tested version (§6)
+
+**B. Model quality audit (`<run-id>-model-quality-audit.md`):**
+1. Counts table across all sub-versions
+2. §3b / §3c compliance verdict per model
+3. Per-domain breakdown per model
+4. Structural integrity (cycles / silos / self-FKs / SSOT / fidelity gates) per model
+5. Metric-view parity per model
+6. Vibe adherence (for any "vibe modeling of version" output)
+7. Cross-version delta
+8. Honest model-quality score (0-100) per sub-version with justification
+9. Best model of the N produced — production-usability ranking
+10. Comparison vs previous-version baseline (e.g. v0.8.4 audit cites v0.8.3's ecm_v2 = 80/100)
+11. Archival paths table
+12. Brutal honesty score for the audit itself
+
+### 9.7 What to save for posterity (per run)
+
+| Artifact | Path |
+|---|---|
+| model.json (per sub-version) | `/tmp/<run_tag>_models/<version>/model.json` |
+| next_vibes.txt (per sub-version) | `/tmp/<run_tag>_models/<version>/next_vibes.txt` |
+| info + error logs (per sub-version) | `/tmp/<run_tag>_logs/<version>/{info,error}.log` |
+| merged tester logs + test_summary | `/tmp/<run_tag>_logs/{merged_info,merged_error,test_summary,quality_report}.log` |
+| Physical catalog state dump | `/tmp/<run_tag>_logs/_metamodel_dump.json` (via a small extractor notebook) |
+| Validation + audit reports | `/Users/amr.ali/claude/vibe-agent/<run-tag>-{validation-report,model-quality-audit}.md` |
+
+### 9.8 Anti-rules — never do this during model-level audit
+
+- **DON'T** trust JobTags alone — always cross-check against `_metamodel.business/domain/product/attribute` tables when possible.
+- **DON'T** trust terminal SUCCESS as proof the model is usable — §8.7 runner's test: grep the deployed catalog for real tables before claiming "install worked."
+- **DON'T** skip the vibe-adherence analysis because it "seems fine" — compute PRIORITY-level mapping. Soft adherence claims get exposed on the next audit.
+- **DON'T** treat `Max retries exhausted → proceeding` as applied — it's a silent drop.
+- **DON'T** accept structural warnings as "cosmetic" without tracing their downstream effects. (R8 cycles looked cosmetic until a customer hit JOIN divergence.)
+- **DON'T** claim "§3c compliance" based on the domain list alone — product count, attribute count, and scope-creep-on-enlarge all matter.
+
+### 9.9 Update cadence
+
+Append a new regression signature or positive signal to §9.4/§9.5 whenever a novel pattern appears in a production run. The catalogue is the memory — keep it fresh.
