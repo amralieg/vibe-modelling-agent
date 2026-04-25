@@ -567,3 +567,135 @@ The tester is "clean" only when ALL of these are true at run terminal:
 - All §9.5 positive signals firing where applicable.
 
 If even one of these is non-zero, you have NOT completed the iteration — go back to step 6 in §10.2.
+
+---
+
+### 10.7 TESTING PROTOCOL — STEP-BY-STEP RECIPE (NEVER SKIP)
+
+This is the canonical cookbook. NEVER skip a step. NEVER take shortcuts. NEVER assume any state from a prior run carries over correctly.
+
+**Inputs you need:**
+- A version number `NN` (single-digit semver per §3a; never 2-digit segments).
+- The Databricks workspace profile (e.g., `emirates-gcp`).
+- The canonical tester JOB id (e.g., `191701398472200`).
+- The target run scope (tiny tester / airline MVM no-vibe / etc.).
+
+**Step 1 — Code change + commit + push.**
+- Apply the fix in `agent/dbx_vibe_modelling_agent.ipynb` and any related notebook.
+- Run `python3 -m pytest tests/unit-tests/` and verify all NEW tests pass; pre-existing failures unchanged.
+- Each fix MUST self-report a `[<alias> FIRED]` log line at runtime (no silent fixes).
+- Commit with the §10.5 commit-message template. Push to `origin/dev`.
+- `git ls-remote origin dev | grep <sha>` — if not present, you didn't ship.
+
+**Step 2 — DROP all non-system catalogs (no exceptions).**
+```bash
+databricks catalogs list --profile <profile> -o json \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);
+[print(c['name']) for c in (d.get('catalogs',d) if isinstance(d,dict) else d)
+ if c.get('catalog_type','')!='SYSTEM_CATALOG'
+ and c.get('name') not in ('hive_metastore','samples','system','__databricks_internal')]" \
+  | while read CAT; do
+      databricks catalogs delete "$CAT" --force --profile <profile>
+    done
+```
+Verify: `databricks catalogs list` shows ONLY system catalogs.
+
+**Step 3 — DELETE all prior runs of the canonical JOB.**
+```bash
+databricks jobs list-runs --job-id <JOB_ID> --limit 25 --profile <profile> \
+  | tail -n +2 | awk '{print $2}' \
+  | while read RID; do
+      [[ "$RID" =~ ^[0-9]+$ ]] || continue
+      databricks jobs delete-run "$RID" --profile <profile>
+    done
+```
+Verify: `databricks jobs list-runs --job-id <JOB_ID>` shows empty.
+
+**Step 4 — DELETE all OTHER jobs (keep ONLY the canonical JOB).**
+```bash
+databricks jobs list --profile <profile> | grep -E "^[0-9]+\s" | awk '{print $1}' \
+  | while read JID; do
+      [ "$JID" = "<JOB_ID>" ] && continue
+      databricks jobs delete "$JID" --profile <profile>
+    done
+```
+Verify: `databricks jobs list` shows ONLY the canonical JOB.
+
+**Step 5 — Upload agent + tester + runner to VERSIONED paths at user-root.**
+```bash
+WS="/Users/<user>@databricks.com"
+databricks workspace import "$WS/dbx_vibe_modelling_agent_v<NN>" --file agent/dbx_vibe_modelling_agent.ipynb --format JUPYTER --language PYTHON --overwrite --profile <profile>
+databricks workspace import "$WS/vibe_tester_v<NN>" --file tests/vibe_tester.ipynb --format JUPYTER --language PYTHON --overwrite --profile <profile>
+databricks workspace import "$WS/vibe_runner_v<NN>" --file runner/vibe_runner.ipynb --format JUPYTER --language PYTHON --overwrite --profile <profile>
+```
+NEVER deploy to canon path `agent/dbx_vibe_modelling_agent`. NEVER skip the version suffix. Each version archive has a unique workspace `object_id` so the executor cache cannot serve a stale version.
+
+**Step 6 — Verify versioned archive content.**
+```bash
+databricks workspace export "$WS/dbx_vibe_modelling_agent_v<NN>" --format JUPYTER --profile <profile> --file /tmp/v<NN>_check.ipynb
+for marker in <list-of-aliases>; do
+  count=$(grep -c "$marker" /tmp/v<NN>_check.ipynb)
+  echo "  $marker: $count"
+done
+```
+Every alias from this version's commit MUST appear ≥1 in the deployed archive. If any is 0 — STOP and re-deploy.
+
+**Step 7 — Patch the JOB definition to point at the versioned agent.**
+```bash
+databricks jobs get <JOB_ID> --profile <profile> > /tmp/job.json
+python3 -c "
+import json
+d=json.load(open('/tmp/job.json'))
+js=d['settings']
+NEW='${WS}/dbx_vibe_modelling_agent_v<NN>'
+for t in js.get('tasks',[]):
+    nbk=t.get('notebook_task',{})
+    if 'dbx_vibe_modelling_agent' in nbk.get('notebook_path',''):
+        nbk['notebook_path']=NEW
+json.dump({'job_id':d['job_id'],'new_settings':js}, open('/tmp/job_patch.json','w'))
+"
+databricks jobs reset --json @/tmp/job_patch.json --profile <profile>
+```
+Verify: `databricks jobs get <JOB_ID>` shows every task `notebook_path` = `dbx_vibe_modelling_agent_v<NN>`.
+
+**Step 8 — Submit the run.**
+- For the canonical tiny tester pipeline: `databricks jobs run-now <JOB_ID> --profile <profile>`.
+- For a custom one-off run (different business / no-vibe): `databricks jobs submit --json @/tmp/<run_spec>.json --profile <profile>` where the JSON specifies a single task with `notebook_task.notebook_path = "$WS/dbx_vibe_modelling_agent_v<NN>"`.
+- Capture the new `run_id`. Add it to your tracking task (`TaskUpdate`).
+
+**Step 9 — Start the autonomous poller.**
+- Background bash (NOT `Monitor` — needs approvals): every ~120s, `databricks fs cp` every log file under `/Volumes/<catalog>/_metamodel/vol_root/logs/...` to a local mirror; categorize new lines; append a PULSE block to `/Users/amr.ali/claude/vibe-agent/error_NN.txt`.
+- Start a 5-minute pulse loop that prints `state + per-task progress + last 10 log lines + commentary` to stdout.
+
+**Step 10 — Wait for terminate.**
+- `until [ "$(databricks jobs get-run <run_id> ...)" = "TERMINATED" ]; do sleep 600; done` — background bash.
+- Do NOT prematurely poll. Do NOT use `Monitor`. Do NOT spawn redundant until-loops.
+
+**Step 11 — On terminate: full audit per §9 + §10.6.**
+- `databricks fs cp` ALL log files (info, error, ai_logs, install) to `/tmp/v<NN>_logs/`.
+- Run `wc -l /tmp/v<NN>_logs/*.log` — record total lines.
+- Categorize warnings + errors. Group by signature. Cross-reference against §9.4 / §10.6.
+- For each `[<alias> FIRED]` from this version: `grep -c` to confirm the fix actually fired.
+- Inspect `model.json` for each sub-version: counts (domains/products/attrs/FKs/MV).
+- Per §9.6: write `<run-tag>-validation-report.md` + `<run-tag>-model-quality-audit.md`.
+- Honest 0-100 score per sub-version; back EVERY deduction with a §8.1 invariant violation OR §9.4 signature OR §10.6 criterion.
+
+**Step 12 — If terminal != SUCCESS or any §10.6 criterion non-zero → iterate.**
+- Identify root cause. NEVER ship a workaround for a real bug.
+- Bump version to `NN+1` per §3a (single-digit segments).
+- Go back to Step 1.
+
+**Step 13 — If terminal == SUCCESS AND all §10.6 criteria zero → next scope.**
+- Tiny tester clean → submit airline MVM no-vibe (§10.3).
+- Airline MVM clean → submit airline ECM, then vibe iterations.
+- Each new scope STARTS at Step 2 (full cleanup).
+
+### 10.8 Anti-shortcuts (HARD invariants)
+
+- ❌ NEVER deploy to canon path `agent/dbx_vibe_modelling_agent` directly. ALWAYS use `_v<NN>` suffix.
+- ❌ NEVER reuse a catalog from a prior version's run. ALWAYS drop catalogs first.
+- ❌ NEVER skip Step 6 (deployed-archive grep). Even if you "just deployed" — workspace eventual-consistency means the archive may not have the new content for several seconds.
+- ❌ NEVER submit a run before ALL prior runs of this JOB are deleted (Step 3). Stale runs pollute audit triage.
+- ❌ NEVER claim a fix is "verified" without a `[<alias> FIRED]` grep hit on the LIVE run's volume info.log.
+- ❌ NEVER inflate honesty scores. If a fix didn't fire live, score it 0 for that iteration.
+- ❌ NEVER skip writing the validation-report + model-quality-audit (§9.6) for a SUCCESS run. The audit IS the verification.
