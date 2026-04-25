@@ -214,3 +214,101 @@ class TestUpdateBusinessContextBroaden:
             "orgnaization_divisions",
         ]:
             assert f in window, f"{f} missing from broadened update list"
+
+
+class TestMetricViewJoinsRedesign:
+    """v0.9.7 metric view redesign: multi-table JOINs in metric views."""
+
+    def test_render_alias_present(self, agent_src):
+        """The renderer FIRED alias is the primary signal that the join code is wired."""
+        assert "metric-view-joins-render FIRED" in agent_src
+
+    def test_schema_includes_joins(self, agent_src):
+        """The _AI_DOMAIN_METRICS_SCHEMA_BASE must declare a `joins` array."""
+        idx = agent_src.find("_AI_DOMAIN_METRICS_SCHEMA_BASE")
+        assert idx > 0
+        schema_window = agent_src[idx:idx + 3000]
+        assert '"joins"' in schema_window, "joins field must be in schema"
+        # joins items must include alias, target_domain, target_product, on, type
+        for required_field in ("alias", "target_domain", "target_product", '"on"', '"type"'):
+            assert required_field in schema_window, (
+                f"joins schema must include {required_field}"
+            )
+
+    def test_required_list_includes_joins(self, agent_src):
+        """Strict mode requires joins to be in the required array of the metric_view item."""
+        idx = agent_src.find("_AI_DOMAIN_METRICS_SCHEMA_BASE")
+        schema_window = agent_src[idx:idx + 3000]
+        # The item-level required list (not the outer one)
+        # Should look like: "required":["view_name","source_product","comment","filter","joins","dimensions","measures"]
+        assert '"filter","joins","dimensions"' in schema_window or '"joins",' in schema_window, (
+            "joins must be in the required array (strict mode)"
+        )
+
+    def test_prompt_has_kpi_first_section(self, agent_src):
+        """The DOMAIN_METRICS_PROMPT must include the new MULTI-TABLE JOINS section."""
+        assert "MULTI-TABLE JOINS — KPI-FIRST DESIGN" in agent_src
+        assert "KPI-FIRST MINDSET" in agent_src
+
+    def test_renderer_validates_target_product(self, agent_src):
+        """The renderer must validate that join target_domain.target_product
+        exists in the model — not blindly emit any LLM-proposed join."""
+        idx = agent_src.find("metric-view-joins-render FIRED")
+        # Look in a wider window for the validation logic
+        window = agent_src[max(0, idx - 200):idx + 3500]
+        assert "products_by_name.get" in window, "must look up target product"
+        assert "Skipping join" in window or "not found in model" in window, (
+            "must skip joins to non-existent products"
+        )
+
+    def test_renderer_emits_joins_yaml_block(self, agent_src):
+        """The YAML output must include `joins:` block when valid joins present."""
+        idx = agent_src.find("metric-view-joins-render FIRED")
+        window = agent_src[max(0, idx - 200):idx + 3500]
+        assert 'joins:' in window or '\\"joins:\\"' in window or '"  joins:"' in window, (
+            "renderer must emit YAML joins: line"
+        )
+
+    def test_simulation_join_validation(self):
+        """Simulate: malformed joins should be skipped, valid ones kept."""
+        products_by_name = {
+            "fleet.aircraft": {"product": "aircraft", "table_name": "aircraft"},
+            "flight.leg": {"product": "leg", "table_name": "leg"},
+        }
+
+        def validate(joins):
+            valid = []
+            for j in joins:
+                if not isinstance(j, dict):
+                    continue
+                alias = (j.get("alias") or "").strip()
+                td = (j.get("target_domain") or "").strip()
+                tp = (j.get("target_product") or "").strip()
+                on = (j.get("on") or "").strip()
+                if not (alias and td and tp and on):
+                    continue
+                if f"{td}.{tp}".lower() not in products_by_name:
+                    continue
+                valid.append(j)
+            return valid
+
+        # Positive: valid join
+        v = validate([{
+            "alias": "ac", "target_domain": "fleet", "target_product": "aircraft",
+            "on": "leg.aircraft_id = ac.aircraft_id", "type": "INNER"
+        }])
+        assert len(v) == 1
+
+        # Negative: missing alias
+        v = validate([{
+            "target_domain": "fleet", "target_product": "aircraft",
+            "on": "leg.aircraft_id = ac.aircraft_id", "type": "INNER"
+        }])
+        assert len(v) == 0, "missing alias must be rejected"
+
+        # Negative: target product doesn't exist
+        v = validate([{
+            "alias": "x", "target_domain": "nonexistent", "target_product": "fake",
+            "on": "leg.x = x.id", "type": "INNER"
+        }])
+        assert len(v) == 0, "non-existent target must be rejected"
