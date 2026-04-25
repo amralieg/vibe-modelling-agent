@@ -475,7 +475,14 @@ For EACH iteration:
    - How to verify (the exact grep pattern that proves the fix is live)
    - Co-authored-by: Isaac
 10. **Verify push reachability** — `git ls-remote origin dev | grep <sha>` and `git branch --contains <sha>` per §8.6/§8.7. NEVER claim "shipped" without this verification.
-11. **Re-deploy + re-submit** — push the agent notebook archive to workspace as `dbx_vibe_modelling_agent_v<NN>`, then submit a fresh `vibe_tester` tiny run via `databricks jobs run-now` or `submit`.
+11. **Re-deploy + re-submit — VERSIONED PATHS ONLY**:
+    a. Upload agent to `/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v<NN>` (NOT canon path — canon-cache renders post-deploy fixes invisible).
+    b. Upload tester to `/Users/amr.ali@databricks.com/vibe_tester_v<NN>` (versioned).
+    c. Upload runner to `/Users/amr.ali@databricks.com/vibe_runner_v<NN>` (versioned).
+    d. **Patch the JOB definition** so every task's `notebook_task.notebook_path` points at the versioned agent: `databricks jobs reset --json @<patch>` after editing `notebook_path` to `/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v<NN>`.
+    e. Verify the JOB now points at the versioned path: `databricks jobs get <job_id> | python3 -c "..."` shows all tasks → `dbx_vibe_modelling_agent_v<NN>`.
+    f. Then submit a fresh run via `databricks jobs run-now <job_id>`. Each unique versioned path has a UNIQUE workspace `object_id`, so the executor pool's notebook cache CANNOT serve a stale version.
+    g. NEVER trust the canon path for deploy verification — always export the versioned archive and grep for the new aliases.
 12. **Tail logs aggressively** — start a background poll-and-tail loop (Bash run_in_background, NOT Monitor) that pulls `/Volumes/<catalog>/_metamodel/vol_root/logs/...` every 60s and appends new lines to a sliding `error_NN.txt`. Do NOT stay silent: every PULSE INGEST must surface counts by category.
 13. **Repeat from step 2** — until the tester run produces ZERO errors AND ZERO non-positive warnings. "Mostly clean" is NOT acceptable.
 
