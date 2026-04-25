@@ -93,26 +93,31 @@ Violations seen in prior runs (all must never happen again):
 
 ## 3a-bis. Count-fixation guidance (added 2026-04-25 from user feedback)
 
-**Real users don't fixate on exact domain or product counts.** §3b ("exact-domain-name preservation") and §3c ("user-vibe count clamp") were originally added so a TEST RUN with `model_vibes="exactly 3 domains and ~15 products"` could finish in ~30 min instead of producing a 200-product behemoth. They are TEST INSTRUMENTATION, not product requirements.
+**Real users don't fixate on exact domain or product counts in the FREE-TEXT VIBE.** §3c (`model_vibes` natural-language count clamp) was originally added so a TEST RUN with `model_vibes="exactly 3 domains and ~15 products"` could finish in ~30 min instead of producing a 200-product behemoth. The vibe-derived count clamping is TEST INSTRUMENTATION, not a product requirement for vibe-based usage.
+
+**HARD CARVEOUT — `business_domains` WIDGET is NOT relaxed.** §3b stays absolute:
+- If the user POPULATES the `business_domains` widget, the agent MUST produce EXACTLY those domains, verbatim. No additions, no removals, no renames. This is contractual, not a soft target.
+- This applies regardless of what the free-text vibe says. The widget OUTRANKS the vibe.
 
 **The PRIMARY goals are:**
 1. **Quality models** — correct domain boundaries, healthy FK density, attribute completeness, accurate types, working metric views, no orphan tables, structural integrity (no cycles, no bidirectional FKs, no SSOT violations).
 2. **Zero errors** — no NameError / NoneType / ValueError, no fidelity-gate failure, no install crash, no DDL [COLUMN_ALREADY_EXISTS], no unhandled exception path.
 
-**De-prioritize:**
-- VIBE COUNT VIOLATION enforcement (already de-tautologized in v0.8.9 NEW-2)
-- Per-domain product-count clamps that fight the LLM
-- Anything that adds code complexity to enforce "exactly N"
+**De-prioritize (vibe-only):**
+- VIBE COUNT VIOLATION enforcement when the count comes from FREE-TEXT vibes (not the widget). Already de-tautologized in v0.8.9 NEW-2.
+- Vibe-derived product-count clamps that fight the LLM.
+- Anything that adds code complexity to enforce "exactly N" from natural-language vibes.
 
-**Relax:**
-- Architect-gate failures for "tier-inappropriate" tiny vibes (v0.8.9 NEW-4 covers global; v0.9.4+ should NOT also patch per-domain — let those gates emit a warning, that's fine)
-- §3c product-count over/undershoot — log INFO, do not error or trim aggressively
+**Relax (vibe-only):**
+- Architect-gate failures for "tier-inappropriate" tiny vibes (v0.8.9 NEW-4 covers global; v0.9.4+ should NOT also patch per-domain — let those gates emit a warning, that's fine).
+- §3c product-count over/undershoot when source is vibe — log INFO, do not error or trim aggressively.
 
-**Keep:**
-- §3b domain-name preservation (cheap, prevents the LLM from drifting "customer" → "fulfillment")
-- Structural-integrity invariants (no cycles, no orphans, no broken FKs) — these are quality, not count
+**Keep absolute (widget-driven):**
+- §3b `business_domains` widget — verbatim preservation (HARD).
+- `must_have_data_products` widget — verbatim preservation (HARD).
+- Structural-integrity invariants (no cycles, no orphans, no broken FKs) — these are quality, not count.
 
-When triaging logs, PASS the count-related warnings unless they correlate with a structural-integrity failure. Burn cycles on NameErrors, install failures, fidelity drift, and unlinked _id columns first.
+When triaging logs, PASS the count-related warnings ONLY if they originated from a FREE-TEXT vibe directive. Widget-driven count violations are still HARD failures. Burn cycles on NameErrors, install failures, fidelity drift, and unlinked _id columns first.
 
 ---
 
