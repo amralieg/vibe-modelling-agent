@@ -91,6 +91,31 @@ Violations seen in prior runs (all must never happen again):
 - Judge substituted user's `business_domains="customer, order, product"` with `fulfillment, inventory` based on its own preferences.
 - Architect review proposed removing user-specified domains because "SSOT violation" outweighed user intent.
 
+## 3a-bis. Count-fixation guidance (added 2026-04-25 from user feedback)
+
+**Real users don't fixate on exact domain or product counts.** §3b ("exact-domain-name preservation") and §3c ("user-vibe count clamp") were originally added so a TEST RUN with `model_vibes="exactly 3 domains and ~15 products"` could finish in ~30 min instead of producing a 200-product behemoth. They are TEST INSTRUMENTATION, not product requirements.
+
+**The PRIMARY goals are:**
+1. **Quality models** — correct domain boundaries, healthy FK density, attribute completeness, accurate types, working metric views, no orphan tables, structural integrity (no cycles, no bidirectional FKs, no SSOT violations).
+2. **Zero errors** — no NameError / NoneType / ValueError, no fidelity-gate failure, no install crash, no DDL [COLUMN_ALREADY_EXISTS], no unhandled exception path.
+
+**De-prioritize:**
+- VIBE COUNT VIOLATION enforcement (already de-tautologized in v0.8.9 NEW-2)
+- Per-domain product-count clamps that fight the LLM
+- Anything that adds code complexity to enforce "exactly N"
+
+**Relax:**
+- Architect-gate failures for "tier-inappropriate" tiny vibes (v0.8.9 NEW-4 covers global; v0.9.4+ should NOT also patch per-domain — let those gates emit a warning, that's fine)
+- §3c product-count over/undershoot — log INFO, do not error or trim aggressively
+
+**Keep:**
+- §3b domain-name preservation (cheap, prevents the LLM from drifting "customer" → "fulfillment")
+- Structural-integrity invariants (no cycles, no orphans, no broken FKs) — these are quality, not count
+
+When triaging logs, PASS the count-related warnings unless they correlate with a structural-integrity failure. Burn cycles on NameErrors, install failures, fidelity drift, and unlinked _id columns first.
+
+---
+
 ## 3b. User-specified business_domains is HARD, NON-NEGOTIABLE
 
 IF THE USER SETS THE `business_domains` WIDGET (OR ANY EQUIVALENT INPUT SPECIFYING DOMAIN NAMES), THOSE DOMAINS MUST APPEAR IN THE FINAL MODEL VERBATIM. THE AGENT MAY ADD MORE DOMAINS IF THE MODEL SCOPE REQUIRES IT, BUT MAY NEVER REMOVE, RENAME, OR SUBSTITUTE A USER-SPECIFIED DOMAIN.
