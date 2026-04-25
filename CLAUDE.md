@@ -445,3 +445,88 @@ Two documents, saved to `/Users/amr.ali/claude/vibe-agent/`:
 ### 9.9 Update cadence
 
 Append a new regression signature or positive signal to §9.4/§9.5 whenever a novel pattern appears in a production run. The catalogue is the memory — keep it fresh.
+
+---
+
+## 10. HOW TO TEST — autonomous fix-and-verify loop (MUST follow on every task)
+
+This is the canonical loop the user expects every coding task to follow. Do NOT ask the user to repeat any of these steps — execute them yourself and report progress.
+
+### 10.1 Inputs the user provides
+1. A previous run's log/error file (e.g. `/Users/amr.ali/claude/vibe-agent/error_NN.txt`).
+2. Optionally, a Databricks job-run URL whose terminal logs you must collect.
+3. A target business and vibe (or "no vibe" for default behaviour).
+
+### 10.2 The loop — repeat until ZERO errors / warnings
+
+For EACH iteration:
+
+1. **Wait for run terminal state** before triaging — `databricks jobs get-run <run_id> --profile <profile>` until `life_cycle_state == TERMINATED`. Use `Bash run_in_background` (NOT Monitor — it requires approvals) to poll.
+2. **Collect ALL logs verbatim** — every file under `/Volumes/<catalog>/_metamodel/vol_root/logs/<business>/<version>/` AND `/Volumes/<catalog>/_metamodel/vol_root/logs/vibe_tester/<ts>/` AND any `_install_audit/` mirror. Save to `/tmp/<run_tag>_logs/`.
+3. **Read EVERY line** — do not skim. `info`, `error`, AND any `ailogs/*` outputs. Watch for §9.4 signatures (F1–F10, R1–R8, N1–N3) AND §9.5 positive signals.
+4. **Watch the progress table** — `_metamodel.progress` (or whatever the live progress sink is) — confirm each step transitions through `stage_started → stage_succeeded`. Any `stage_warning` or `stage_failed` must be triaged.
+5. **Triage every emitted warning + error** — root-cause each one. NEVER mark anything as "cosmetic" without tracing its downstream effect (per §9.8). Group by class.
+6. **Apply root-cause fixes** in the agent / runner / tester source — NOT symptom patches. Follow §3 (root cause), §3c (user-vibe authority), §3d (search-first/reuse-first/DRY), §3a (single-digit semver). For each fix, place a sentinel comment with the version + alias so future audits can grep for it.
+7. **Bump the version** per §3a (single-digit semver) — update readme.md, version-history table, and any embedded version markers in the agent notebook header.
+8. **Add unit tests** — every fix gets at least one test in `tests/unit-tests/test_v<version>_<topic>.py` exercising the failure mode. No fix without a test.
+9. **Commit + push to `dev`** — one commit per version bump. Commit message MUST list:
+   - Each issue (ID, severity, file:line, root cause one-liner)
+   - The fix (what changed, with sentinel/alias for grep)
+   - How to verify (the exact grep pattern that proves the fix is live)
+   - Co-authored-by: Isaac
+10. **Verify push reachability** — `git ls-remote origin dev | grep <sha>` and `git branch --contains <sha>` per §8.6/§8.7. NEVER claim "shipped" without this verification.
+11. **Re-deploy + re-submit** — push the agent notebook archive to workspace as `dbx_vibe_modelling_agent_v<NN>`, then submit a fresh `vibe_tester` tiny run via `databricks jobs run-now` or `submit`.
+12. **Tail logs aggressively** — start a background poll-and-tail loop (Bash run_in_background, NOT Monitor) that pulls `/Volumes/<catalog>/_metamodel/vol_root/logs/...` every 60s and appends new lines to a sliding `error_NN.txt`. Do NOT stay silent: every PULSE INGEST must surface counts by category.
+13. **Repeat from step 2** — until the tester run produces ZERO errors AND ZERO non-positive warnings. "Mostly clean" is NOT acceptable.
+
+### 10.3 After the tiny tester is clean — airline MVM no-vibe judge
+
+Once tiny is 100% clean:
+1. Submit an airline MVM run with `model_vibes=""` (no vibe) and the standard widget defaults.
+2. Apply §9 model-level validation methodology to the artifacts.
+3. Produce the two reports per §9.6 (validation-report + model-quality-audit) under `/Users/amr.ali/claude/vibe-agent/<run-tag>-{validation-report,model-quality-audit}.md`.
+4. Honest 0–100 score per sub-version (§9.6 B.8) — back every deduction with a §8.1 invariant or §9.4 signature. The user expects 100% honesty; cover-ups will be caught and called out.
+
+### 10.4 Autonomous-mode invariants (when the user is asleep / away)
+
+- Never use `Monitor` — it requires approval and stalls the loop. Use `Bash run_in_background` for every long-running poll/tail.
+- Never `git reset --hard` or `--force-push`.
+- If a decision is needed via `AskUserQuestion`, wait 2 minutes and pick the **first / Recommended** option (per §7.7).
+- Never fabricate a "fixed" claim — every fix must satisfy §8.1 (code on disk + syntax-checked + unit test + first call site + reachability + push verified + deployed grep).
+- Never skip §6 brutal honesty score on any iteration. If you skipped it on iteration N, ship it on N+1 with the missed score retroactively recorded.
+
+### 10.5 Commit-message template (HARD requirement)
+
+```
+v<version>: <N> root-cause fixes from <previous>-<run_id> tester audit (<class-list>)
+
+ISSUE 1 — <ID> <one-line title> [<severity>]
+  ROOT CAUSE: <one-line>
+  FILE: <path>:<line>
+  FIX: <what changed> (alias=<sentinel-grep-anchor>)
+  VERIFY: <grep pattern> — must return >=1 hit on origin/dev
+
+ISSUE 2 — ...
+...
+
+TESTS: <N> new unit tests in tests/unit-tests/test_v<version>_*.py
+README: version-history row added; alias-table updated.
+DEPLOY: workspace archive renamed dbx_vibe_modelling_agent_v<NN>.
+
+Co-authored-by: Isaac
+```
+
+### 10.6 What "no errors at all" means (NON-NEGOTIABLE)
+
+The tester is "clean" only when ALL of these are true at run terminal:
+- 0 lines matching `ERROR` in any error log.
+- 0 lines matching §9.4 F1–F10/R1–R8/N1–N3 signatures.
+- 0 `Max retries (3) exhausted` lines (R7/F2 silent-drop hatch).
+- 0 `[CYCLE DETECTION] Found N cycle(s)` where N>0.
+- 0 `Fidelity gates FAILED` lines.
+- 0 `name '<X>' is not defined` `NameError` lines.
+- 0 `[Metrics] Failed metric view` lines.
+- 0 `Workload failed, see run output for details` parent-task lines (with no info log).
+- All §9.5 positive signals firing where applicable.
+
+If even one of these is non-zero, you have NOT completed the iteration — go back to step 6 in §10.2.

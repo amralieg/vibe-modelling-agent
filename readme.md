@@ -83,7 +83,7 @@ The name **"Vibe"** reflects the core workflow:
 
 Each iteration produces a new version. The agent carries forward your context so nothing is lost between runs. You are never locked into a static template — the model evolves with your business.
 
-Current version: **v0.8.8** — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v08x) below.
+Current version: **v0.8.9** — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v08x) below.
 
 ---
 
@@ -975,6 +975,7 @@ Metric views are auto-generated per domain, focusing on KPIs that would appear i
 
 | Version | Change |
 |---|---|
+| **v0.8.9** | 7 root-cause fixes from v0.8.8 tester audit (run 1040628110723326): NEW-1-DIAG (alias=mv-artifact-failure-traceback) — surface full Python traceback for products_data NameError that v0.8.7/v0.8.8 left masked under bare WARNING, unblocking diagnosis on next run; BC1-FIX (alias=install-audit-mirror-multisource) — derive install audit catalog from `business_context_file_path` ∪ `context_file` ∪ `model_folder` ∪ `deployment_catalog` so the BC1 mirror actually writes (v0.8.8 was reading a single never-populated widget key); R7-SCHEMA (alias=model-params-subdomain-required) — add `min/max_business_subdomains` + `min_products_per_subdomain` to `_AI_MODEL_GENERATION_PARAMETER_SCHEMA_BASE` so the LLM can finally emit them under `additionalProperties:False` (root cause of 3-retry validation failures + midpoint silent fallback); NEW-2 (alias=vibe-count-respect-sizing-directives) — VIBE COUNT VIOLATION false-positive: only warn when post-architect product count is OUTSIDE user `sizing_directives.{min,max}_total_products` range, not when architect honours user vibe by trimming; NEW-3 (alias=arch-domain-skip-empty-quietly) — empty `shared` domain architect review is now logged INFO not WARNING; NEW-4 (alias=arch-gate-tier-aware) — drop `propose_for_global_standard` + `recommend_to_industry_peers` gates for INTENTIONALLY TINY vibes (sizing_directives.max_total_products ≤ 30 OR max_domains ≤ 5) so 15-product demo models do not get bogus required_actions queued; NEW-5 (alias=ext-system-prefix-string-parse) — `_is_system_identifier_column` now parses `operational_systems_of_records` correctly when it arrives as a comma-separated string (LLM output), unblocking shopify_*/klaviyo_*/stripe_* prefix detection so external IDs are no longer flagged as unlinked _id columns. |
 | **v0.8.8** | 10 root-cause fixes from v0.8.7 tester audit: products_data NameError (NEW-1, MV silent loss), BC1 widget-key (NEW-2, install audit-mirror enabled), §3b empty-domain protection via DRY helper extension (NEW-3), §3c enlarge target_fit user-vibe clamp (NEW-4), DELTA_MISSING_DELTA_TABLE precheck + plain-INSERT fallback (NEW-5), stale-convention schema pre-clean (NEW-6), pool-spec parser case-insensitive top-level keys + tightened SAMPLE_POOL_PROMPT (NEW-7), shrink-path pre-handoff cycle break (R8 mitigation), architect mutation engine case-insensitive name resolution (F2 mitigation) |
 | **v0.8.7** | Install-breadcrumb-audit-mirror (BC1) + 6-phase structured-LLM refactor + tester typo fix |
 | **v0.8.6** | De-bias v0.8.5 prompts (industry-agnostic vocabulary across M1/M3+M4/M5) + N5-FIX (R3 sentinels routed to volume `info.log` so audits actually see `SHRUNK`/`SAFE-FLUSH`/`FINAL-FLUSH`) + 7 anti-bias guard tests |
