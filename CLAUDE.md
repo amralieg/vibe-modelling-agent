@@ -690,6 +690,168 @@ Verify: `databricks jobs get <JOB_ID>` shows every task `notebook_path` = `dbx_v
 - Airline MVM clean → submit airline ECM, then vibe iterations.
 - Each new scope STARTS at Step 2 (full cleanup).
 
+### 10.9 POST-MVM VIBE-ITERATION + EXTENSIVE QUALITY AUDIT (NEW MANDATORY PHASE)
+
+After every successful MVM run (Step 13 reports `SUCCESS`), the work is NOT done. The MVM is the FIRST artifact; the agent's value is in the iteration. Run this 8-step audit + iteration phase EVERY TIME without skipping.
+
+**Phase A — Line-by-line log audit of the MVM run** (right after terminate)
+
+A.1 Download every log file from the volume:
+```bash
+mkdir -p /tmp/<run_tag>_logs
+for F in tiny_info_v1_mvm.log tiny_error_v1_mvm.log tiny_ai_logs_v1_mvm.log install_v1_mvm.log ; do
+  databricks fs cp "dbfs:/Volumes/<catalog>/_metamodel/vol_root/logs/<biz>/mvm_v1/$F" "/tmp/<run_tag>_logs/$F" --overwrite --profile <profile>
+done
+```
+
+A.2 Read EVERY line. Not skim. Not grep-only. **Every line.**
+- Group warnings + errors by category.
+- Cross-reference each category against §9.4 F1–F10/R1–R8/N1–N3.
+- For each `[<alias> FIRED]` marker from this version, confirm it actually fired. If not, root-cause why.
+- Look at LLM `ai_logs` honesty scores per stage. Score < 80 = quality concern, log it.
+
+A.3 Decide: are there fixes required BEFORE proceeding to next vibes?
+- If YES → bump version, repeat §10.7 (full clean reset + re-run MVM).
+- If NO → proceed to Phase B.
+
+**Phase B — Run "vibe modeling of version" (next-vibes iteration)**
+
+B.1 Read the v1 model's `next_vibes.txt` artifact:
+```bash
+databricks fs cp "dbfs:/Volumes/<catalog>/_metamodel/vol_root/business/<biz>/mvm_v1/vibes/next_vibes.txt" /tmp/<run_tag>_next_vibes_v1.txt --overwrite --profile <profile>
+```
+Enumerate every PRIORITY (`PRIORITY N — <action>: <target>`) and every SA finding (`[SA:<class>] <detail>`).
+
+B.2 Submit a `vibe modeling of version` run with:
+- `operation = "vibe modeling of version"`
+- `model_version = "1"`
+- `model_vibes = ""` (no NEW user-vibes — just consume the auto-generated next_vibes from v1)
+- Same business + catalog as v1.
+
+B.3 Use the §10.7 protocol: cleanup the prior runs (but NOT the catalog — vibe-of-version reads v1 from it), upload versioned, patch JOB notebook_path, submit.
+
+B.4 Wait for v2 terminate.
+
+**Phase C — Adherence verification (v1.next_vibes → v2)**
+
+C.1 For each PRIORITY from v1.next_vibes:
+- Search v2 logs for `[MUTATION-BATCH]` and `[MUTATION-SUMMARY]` blocks.
+- Map: applied (count in mutation summary), skipped (by reason), or absent (no mention).
+- A "soft accept" (`Max retries (3) exhausted, proceeding`) does NOT count as applied.
+
+C.2 For each `[SA:<class>]` finding from v1:
+- Run static-analysis post-v2 against v2's model.json.
+- Compare: did the finding still appear? If yes, the iteration failed to fix it.
+
+C.3 Compute: **adherence % = (applied PRIORITIES + applied SA findings) / total**.
+- ≥ 80% → high adherence (good)
+- 50–79% → medium
+- < 50% → low (vibe-iteration failure)
+
+C.4 Did v2 IMPROVE vs v1?
+- Counts (D, P, A, FK, MV) — should change in the direction priorities asked.
+- Quality score in v2's next_vibes header — should be > v1's score.
+- Structural integrity (cycles / silos / bidirectional) — should not regress.
+
+**Phase D — EXTENSIVE QUALITY AUDIT for BOTH models (v1 + v2)**
+
+This is a deep audit, not a skim. The auditor is a Principal Data Architect with 20+ years of production experience. They WILL NOT run a model in production unless every concern is satisfied. Bias toward FINDING flaws, not justifying them.
+
+For EACH sub-version (v1 and v2 separately):
+
+D.1 **Counts table** (§9.3.1) — exact numbers from `model.json`. Match against tier expectations + user vibes.
+
+D.2 **§3b / §3c compliance** (§9.3.2) — verbatim widget-driven domain names preserved? Vibe-driven counts within tolerance?
+
+D.3 **Per-domain breakdown** (§9.3.4) — products, attrs, FKs-in/FKs-out per domain. Flag:
+   - One domain >2× the FK count of any other (over-hubby)
+   - Domain with zero FKs in or out (subgraph isolated)
+   - FK-out > attribute count (nonsensical)
+   - "shared"/"reference" domain with >5 products
+
+D.4 **Structural integrity** (§9.3.3):
+   - Cycles? Bidirectional FKs? Self-FKs on PKs? Siloed products?
+   - SSOT violations (same entity name in two domains)?
+   - Denormalized natural keys (FK + business-key pair on same product)?
+   - Fidelity gates precision >= 0.85?
+   - Post-norm unlinked _id columns ≤ 5?
+
+D.5 **Metric view parity** (§9.3.5):
+   - `len(model.metric_views)` vs physical `SHOW TABLES IN <cat>._metrics`?
+   - If physical < declared → R2 regression. Identify which views dropped + why.
+
+D.6 **Real-world architect review (the 20-year-veteran filter)**:
+   For each domain, ask:
+   - Could a real airline operations engineer use this domain end-to-end?
+   - Are the FKs RIGHT — not just structurally valid, but business-correct (passenger.booking → flight.leg, NOT flight.leg → passenger.booking)?
+   - Is the cardinality correct (1:N vs N:1 vs M:N)?
+   - Is each product worth being a separate entity, OR is it a denormalization that should be inlined?
+   - Are key attributes missing (e.g. flight.aircraft_id but no flight.aircraft_tail_number)?
+   - Are the attribute types reasonable (BIGINT for monetary? SHOULD be DECIMAL with precision)?
+   - PII / classification correctness?
+   - Reference data (lookup tables) properly modeled?
+
+   For each issue, classify severity:
+   - **CRITICAL** → would break a production query / cause corruption / violate a constraint
+   - **HIGH** → would break a downstream consumer / mislead an analyst
+   - **MEDIUM** → would require a workaround in production
+   - **LOW** → cosmetic / style preference
+
+D.7 **Industry-specific checks** (per business):
+   - Airlines: aircraft → maintenance lineage, crew rest periods (FDP), revenue allocation, IATA codes, codeshare
+   - Healthcare: encounter → diagnosis → procedure → claim, ICD/CPT lookup, HIPAA tagging
+   - Banking: trade → settlement → custody → reconciliation, regulatory reporting
+   - Manufacturing: BOM hierarchy, work order → operation → resource, quality lots
+   - Retail: SKU → inventory → reservation → fulfillment, channel attribution
+
+   List every industry-canonical pattern the model FAILS to capture.
+
+D.8 **Honest model-quality score** per sub-version (0-100):
+   - Document each deduction with the §8.1 invariant violated, the §9.4 signature, the architect-veteran finding, or the structural defect.
+   - No vague adjectives. Each deduction = N points + 1-line evidence.
+
+**Phase E — Compile fix plan**
+
+E.1 Group flaws by FILE + ROOT-CAUSE-CLASS.
+- "Symptom in 12 metric views" → likely 1 root cause in MV prompt or LLM-spec parser.
+- "Multiple bidirectional FKs" → likely a missing reverse-direction guard.
+
+E.2 For each root cause, propose:
+- File + line of the fix site
+- The fix (one-liner)
+- Verification grep pattern for the next run
+
+E.3 Order by impact / risk / effort:
+- HIGH IMPACT + LOW EFFORT → ship FIRST
+- HIGH IMPACT + HIGH EFFORT → schedule, isolate, behavioral-test
+- LOW IMPACT → defer
+
+E.4 Each fix gets its own version bump + behavioral test + `[FIRED]` self-report.
+
+**Phase F — Honesty report of everything done in this audit cycle**
+
+The honesty report MUST cover:
+
+F.1 What was DONE (commits, deploys, runs, audits) with concrete artifact paths.
+
+F.2 What was FIXED (root causes located + patched) — separate from "covered up" / "deferred" / "observability-only".
+
+F.3 What was COVERED UP or rationalized away. Be brutal:
+- Did you skip any line of any log? (Phase A.2 violation)
+- Did you accept any honesty-score adjective without evidence?
+- Did you let a `Max retries (3) exhausted` count as "applied"?
+- Did you mark a fix "shipped" without a `[FIRED]` grep on the live run?
+
+F.4 What was NOT FIXED (the unhonest deferred items) — name each one, the file:line, the root-cause hypothesis, and the reason for deferral.
+
+F.5 Brutal honest score for THE AUDIT WORK ITSELF (separate from the model-quality scores). 0–100.
+
+F.6 Final verdict: would a 20-year-veteran architect deploy v1 or v2 to production? If neither, why?
+
+This phase is non-negotiable. Skipping it is a §8.4 / §8.7 violation.
+
+---
+
 ### 10.8 Anti-shortcuts (HARD invariants)
 
 - ❌ NEVER deploy to canon path `agent/dbx_vibe_modelling_agent` directly. ALWAYS use `_v<NN>` suffix.
