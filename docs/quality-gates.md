@@ -427,7 +427,7 @@ Grep `NEXT-VIBES FEEDBACK` at the tail. BLOCKING items are the prioritised backl
 - **Sample-realism gate is missing.** Nothing currently asserts "does the generated data LOOK like real airline data?" — only that types coerce and FK integrity holds. A post-gen semantic-realism LLM check is queued for a future version.
 - ~~**No unit tests** in the repo for gate functions themselves.~~ **Partial coverage added in v0.7.x** — `tests/unit-tests/` now pytest-covers the pure helpers most prone to regression (`_parse_ce_counts`, `sanitize_name`, the tag-merge regex). Gate functions themselves (`_check_*`, `validate_*`) remain end-to-end-only; candidate work is extending the pytest harness to exercise them directly with synthetic model fixtures.
 
-## v0.6.x → v0.7.x fix roll-up affecting gates
+## v0.6.x → v0.8.x fix roll-up affecting gates
 
 The fixes below changed gate behaviour directly. For the full P-number catalog see the repo-root [`readme.md` → Recent fixes](../readme.md#recent-fixes-v06x--v07x).
 
@@ -455,5 +455,36 @@ The fixes below changed gate behaviour directly. For the full P-number catalog s
 | P0.96 | v0.7.10 | Post-install integrity check uses `_metamodel.domain` COUNT instead of `SHOW SCHEMAS` row parsing (which returned 0 on serverless). |
 | P0.99+PE12 | v0.7.13 | `ALTER … SET TAGS` statements merged per target — ~20× faster install; regex tolerates quoted tag values containing commas. |
 | P0.105+M6 | v0.7.13 | `_ensure_catalog_exists` discovers a managed location from metastore or borrowed catalog on Default-Storage metastores. |
+| D1, §3b EXHAUSTIVE | v0.8.0 | User vibes (widgets, `model_vibes`, `business_description`) are the SUPREME authority across every gate; `business_domains` is treated as an EXHAUSTIVE list — judge/architect/QA may neither rename nor substitute (sentinel: `[VALIDATOR] User vibes detected (N chars)`). |
+| HeartbeatWatchdog, MV pre-filter, MAX_CONCURRENT_BATCHES=20 | v0.8.0 | Long-running stages emit a heartbeat (no more silent stalls); metric-view candidates are pre-filtered before LLM call; concurrency is unified at 20 to bound LLM rate-limits deterministically. |
+| G1-FIX | v0.8.1 | IDL chunking gracefully falls back when batches exceed token limits — no more `[Gate] IDL FAILED` cascades on large domains. |
+| G8-FIX | v0.8.1 | `run_with_context_ladder` is now wired into the call sites that were silently bypassing it; the ladder fires on any `model demoted` or rate-limit error. |
+| G9 | v0.8.1 | Non-rate-limit errors and heartbeat coverage are now surfaced — `_unhandled_llm_error` no longer hides under "rate limit". |
+| G10-FIX | v0.8.1 | Per-model token + cost telemetry surfaced in run summary (`[TOKEN-TELEMETRY] model=… in=… out=… cost=…`). |
+| G11-FIX, MV-FILTER | v0.8.1 | Metric-view filter is no longer a tautology (`return True # conservative keep-on-ambiguity`) — semantic predicate now actually excludes mismatched candidates. |
+| C2-FIX MV15 | v0.8.1 | Halving on `[Metrics][LLM]` re-run merges sub-batches back together — no more lost half on the second batch. |
+| C6-FIX | v0.8.1 | `vibe-prune` `NameError` fixed — the prune step no longer silently aborts on referencing the wrong variable. |
+| Config-guard sweep | v0.8.1 follow-up | 10 functions accepting `config=None` now `config = config or {}` defensively — eliminates `AttributeError: 'NoneType'` on the architect/judge paths. |
+| `VALIDATOR_REGISTRY` populated | v0.8.1 follow-up | The validator registry is now actually populated and used (was a dead dict before); audit can `grep VALIDATOR_REGISTRY` to enumerate active validators. |
+| P1 (scratch path) | v0.8.2 | `_resolve_business_scratch_path` uses `tempfile.mkdtemp()` — `/tmp` foreign-UID reuse no longer permission-denies on Serverless. |
+| P2 (domain-name mismatch CRITICAL) | v0.8.2 | `domain name mismatch` added to `critical_error_patterns` — parallel domain-enrich no longer soft-accepts a payload describing a different domain (alias=`domain-name-mismatch-critical`). |
+| P3 (decimal coercion) | v0.8.2 | `_coerce_decimal_to_float()` runs before `spark.createDataFrame` so `decimal.Decimal` values no longer get rejected by `DOUBLE`/`FLOAT` columns in the pool engine. |
+| P4 (no siloed after shrink) | v0.8.2 | `RESIZE_SHRINK_DOMAIN_PROMPT` carries `CRITICAL — NO SILOED TABLES`; `_detect_post_shrink_silos()` validates and rejects shrink output that leaves disconnected products. |
+| P6 (prompt brace-escape) | v0.8.2 | The `KeyError '0,62'` class of bugs killed — prompt templates now properly escape `{...}` literals not meant for `.format()`. |
+| P7 (Job Launch Gate) | v0.8.2 | `JobLauncher.wait_for_run_terminal()` polls until the child run reaches a terminal state and propagates `FAILED`/`TIMEDOUT` to the parent — no more parent-SUCCESS over child-FAIL. |
+| P8 (managed-location accessibility) | v0.8.2 | `_validate_storage_accessible()` probes candidates with `dbutils.fs.ls`; `_resolve_managed_location` only returns reachable URLs; `_ensure_catalog_exists` retries with bare `CREATE CATALOG` on `PERMISSION_DENIED`. |
+| P10 (MV install count validation) | v0.8.2 | After install, declared `metric_views` count is compared to physical `_metrics` table count; mismatch fails the install gate. |
+| R1 (vibe-version-must-advance) | v0.8.3 / v0.8.4 | `_assert_vibe_version_advances` is invoked at FOUR write barriers; in-place overwrite of `v=base` during `vibe modeling of version` is now impossible (alias=`vibe-version-must-advance`). |
+| F2-regression (immutable violation CRITICAL) | v0.8.3 | `immutable violation` added to `critical_error_patterns`; `model_architect_review` no longer soft-accepts payloads that touch user-protected products (alias=`immutable-violation-critical`). |
+| R3 (log-no-truncate-on-success) | v0.8.3 / v0.8.4 / v0.8.6 | `_safe_volume_flush` skips copy if local `info.log` shrunk; emits sentinels `SHRUNK` / `SAFE-FLUSH` / `FINAL-FLUSH`. v0.8.6 N5-FIX appends those sentinels to `_vl_local_info` so they reach the UC volume `info.log` (alias=`r3-sentinels-to-volume`). |
+| R6 (metric-view bare-name resolve) | v0.8.3 | Metric-view bare-name references resolved via `DESCRIBE METRIC VIEW` candidate scan instead of free-text guessing — eliminates `UNRESOLVED_COLUMN` class of metric-view install failures (alias=`metric-view-bare-via-describe`). |
+| R7 (subdomain mandatory) | v0.8.3 | `subdomain_required` is now mandatory in LLM `model_params` JSON output; if absent the response is rejected (alias=`model-params-subdomain-required`). |
+| R8 (deterministic Pass-2 cycle breaker) | v0.8.3 | Residual cycles after Pass-1 normalisation get a deterministic Pass-2 heuristic; logs `[CYCLE-BREAKER-PASS2][TRIGGERED]` / `[RESOLVED]` / `[NO-PROGRESS]` (alias=`cycle-breaker-deterministic-pass2`). |
+| M1 (FK `IdId` double-suffix) | v0.8.5 | `normalize_fk_column_name` now reads from `attribute|column_name|name`; `FK_EDGE_SYNTHESIS_PROMPT` rule #1 rewritten with VERBATIM-match + explicit `IdId` ban. |
+| M2 (PK casing collapse) | v0.8.5 | `NamingConvention._compose()` pre-runs `apply_convention(snake_case, dedup=False)` so PascalCase boundaries survive the lowercase round-trip (`CatalogItem` → `CatalogItemId`, not `CatalogitemId`). |
+| M3+M4+N1 (FK semantic gate) | v0.8.5 | `user_sizing_directives` passed to every `.format()` call in `run_fk_semantic_correctness_gate` (no more silent `KeyError` bypass); four new classification rules added: TEMPORAL PRECEDENCE (rule 6), CARDINALITY CORRECTNESS (rule 7), HEADER↔LINE INTEGRITY (rule 8), JUNCTION TABLE PURITY (rule 9). Sentinel: `[MV15] [N1-FIX] semantic gate prompt rendered alias=fk-semantic-gate-no-keyerror`. |
+| M5 (canonical attrs HARD) | v0.8.5 | `ATTRIBUTE_GENERATE_PROMPT` "FUNDAMENTAL ATTRIBUTES BY ENTITY ROLE" is now HARD MINIMUMS (alias=`canonical-attrs-enforced`); explicit enforcement block prioritises canonical fields over marketing/source-system flags during truncation. |
+| N6 (metric_views char-iter) | v0.8.5 | `metric_views` JSON-string-blob is parsed at top-level + per-domain; no more `len(blob)`-many `[Metrics][LLM] skipping non-dict` warnings (alias=`metric-views-no-char-iter`). |
+| Industry-agnostic prompt rewrite | v0.8.6 | M1/M3+M4/M5 rule text rewritten in abstract semantic vocabulary (`<EntityEarlier>`, `<Container>`, `<Owner>` patterns); explicit anti-industry-bias warning block in M5; 7 new bias-guard tests fail on retail-specific tokens (`product`, `order`, `cart`, `inventory`, etc.) appearing in rule text. |
 
 Every P-number above is anchored in a `# v0.X.Y P0.NN` comment in `agent/dbx_vibe_modelling_agent.ipynb` cell[1] / `/tmp/agent_source.py`.

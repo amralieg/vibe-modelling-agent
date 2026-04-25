@@ -1424,7 +1424,28 @@ When vibing an existing model, artifacts from the previous version are carried o
 The agent uses two mechanisms to prevent thread-related failures:
 
 - **Nested parallelism detection** — All parallel execution blocks are guarded to detect and prevent nested thread pool creation, which would cause deadlocks.
-- **Global thread ceiling** — A cross-stage coordinator enforces a ceiling on concurrent threads. Even when multiple pipeline stages attempt parallel execution, the total thread count never exceeds the configured limit (default: 20).
+- **Global thread ceiling** — A cross-stage coordinator enforces a ceiling on concurrent threads. Even when multiple pipeline stages attempt parallel execution, the total thread count never exceeds the configured limit (default: `MAX_CONCURRENT_BATCHES=20`, unified across stages in v0.8.0).
+
+### Observability and Audit Hardening (v0.8.0 → v0.8.6)
+
+A new family of utilities was added to prevent silent stalls, lost telemetry, and audit-evidence gaps:
+
+- **`HeartbeatWatchdog` (v0.8.0)** — Long-running stages emit a heartbeat at a fixed cadence so operators can distinguish "still running" from "stalled". Missing heartbeats elevate to a hard failure rather than an indefinite hang.
+- **`run_with_context_ladder` (v0.8.0, wired in v0.8.1 G8-FIX)** — Auto-shrinks the LLM context window down a deterministic ladder of context-budget steps when the model demotes itself, rate-limits, or returns a context-overflow error.
+- **`run_parallel_with_rate_limit_backoff` (v0.8.0)** — Parallel-execution helper that distinguishes rate-limit errors (back off, retry on the same model) from non-rate-limit errors (escalate immediately).
+- **Per-model token + cost telemetry (v0.8.0 scaffold, v0.8.1 G10-FIX surfaced)** — Every model emits `[TOKEN-TELEMETRY] model=… in=… out=… cost=…` per call; aggregated in the run summary.
+- **Volume log durability (v0.7.11 P0.106 → v0.8.3 R3 → v0.8.4 sentinels → v0.8.6 N5-FIX)** — Install logs are tee'd to a local file and copied to the UC Volume `info.log` periodically. `_safe_volume_flush` skips the copy if the local file shrunk (no truncation-on-success). Audit sentinels (`SHRUNK`, `SAFE-FLUSH`, `FINAL-FLUSH`) are appended to both `sys.stderr` AND the local `_vl_local_info` so they reach the volume `info.log` (alias `r3-sentinels-to-volume`).
+- **Vibe-version write barriers (v0.8.3 R1 / v0.8.4 4th callsite)** — `_assert_vibe_version_advances` is invoked at FOUR write barriers; in-place overwrite of `v=base` during `vibe modeling of version` is impossible (alias `vibe-version-must-advance`).
+- **Critical-error pattern hard-reject list (v0.8.2 P2 / v0.8.3 F2-regression)** — `domain name mismatch` and `immutable violation` are added to `critical_error_patterns`; payloads matching these are hard-rejected at the smart-worker layer rather than soft-accepted with downstream guards. Sentinels: `alias=domain-name-mismatch-critical`, `alias=immutable-violation-critical`.
+- **Job Launch Gate (v0.8.2 P7)** — `JobLauncher.wait_for_run_terminal()` polls until child runs reach a terminal state and propagates `FAILED`/`TIMEDOUT` to the parent — eliminates "parent SUCCESS over child FAILED" reports.
+- **Managed-location accessibility probe (v0.8.2 P8)** — `_validate_storage_accessible()` probes candidates with `dbutils.fs.ls`; `_resolve_managed_location` only returns reachable URLs; `_ensure_catalog_exists` retries with bare `CREATE CATALOG` on `PERMISSION_DENIED`.
+- **Metric-view bare-name resolution (v0.8.3 R6)** — Bare metric-view references are resolved via `DESCRIBE METRIC VIEW` candidate scan; eliminates the `UNRESOLVED_COLUMN` class of metric-view install failures (alias `metric-view-bare-via-describe`).
+- **Deterministic Pass-2 cycle breaker (v0.8.3 R8)** — Residual cycles after Pass-1 normalisation get a deterministic Pass-2 heuristic with explicit `[CYCLE-BREAKER-PASS2][TRIGGERED]` / `[RESOLVED]` / `[NO-PROGRESS]` log lines (alias `cycle-breaker-deterministic-pass2`).
+- **`metric_views` JSON-string-blob defence (v0.8.5 N6)** — Top-level and per-domain `metric_views` JSON-string-blobs are parsed before iteration; eliminates the `len(blob)`-many `[Metrics][LLM] skipping non-dict` warning explosion (alias `metric-views-no-char-iter`).
+
+### Industry-Agnostic Prompt Vocabulary (v0.8.6)
+
+The agent serves 100+ industries. Prompt rules introduced in v0.8.5 (M1, M3+M4, M5) inadvertently used retail-specific examples (`product`, `order`, `cart`, `inventory`, `sku`) which biased the LLM towards retail-shaped models for non-retail businesses (a §3c violation). v0.8.6 rewrote those rules in **abstract semantic vocabulary** — `<EntityEarlier>`, `<EntityLater>`, `<Owner>`, `<Owned>`, `<Container>`, `<Item>`, `<A>`/`<B>` — and added an explicit anti-industry-bias warning block to the canonical-attributes prompt. Seven new bias-guard tests in `tests/unit-tests/test_v085_model_quality_fixes.py::TestPromptsAreIndustryAgnostic` scan the rendered rule text and fail on any retail-specific token leaking back in.
 
 ---
 

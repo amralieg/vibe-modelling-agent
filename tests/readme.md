@@ -1490,7 +1490,7 @@ The `tests/unit-tests/` folder holds a pytest-based unit suite that exercises pu
 
 ### Why the unit suite exists
 
-The v0.6.x → v0.7.x burst (≈60 P-fixes in 48 hours) hit the agent so fast that several regressions slipped past the end-to-end tester. The unit suite gives us a cheap feedback loop for the small, pure helpers that are most fragile: parsers, sanitizers, regex, naming conventions. Every fix going forward MUST keep this suite green.
+The v0.6.x → v0.7.x burst (≈60 P-fixes in 48 hours) hit the agent so fast that several regressions slipped past the end-to-end tester, and the v0.8.x burst added another ≈60 fixes (D1, G1–G11, P1–P10, R1/R3/R6/R7/R8, F2-regression, M1–M5, N1, N5, N6) plus 250+ new unit tests. The unit suite gives us a cheap feedback loop for the small, pure helpers that are most fragile: parsers, sanitizers, regex, naming conventions, log tee/flush utilities, ladder helpers, write barriers. Every fix going forward MUST keep this suite green.
 
 ### How to run
 
@@ -1514,6 +1514,22 @@ The harness (`tests/unit-tests/conftest.py`) AST-walks the agent source (either 
 | `tests/unit-tests/test_parse_ce_counts.py` | `_parse_ce_counts` — parses the `COUNTS:` line from candidate_evaluation text (links_to_include, cross_domain_links_to_include, orphaned_fks, duplicate_fks, etc.). Covers empty input, non-string input, missing marker, single/multi pair, case-insensitive marker, whitespace tolerance, non-integer skip, newline termination, "first COUNTS line wins", trailing content ignored. | Protects against the "Created 0 FK(s)" regression caused by LINK-POSTPROCESS over-trimming when the counts dict is incomplete. |
 | `tests/unit-tests/test_sanitize_name.py` | `sanitize_name` — canonical naming helper (GEN-RUL-002). Two modes: `strip_stop_words=True` (catalog/schema naming — strips `corp`, `ltd`, `the`, `inc`) and `strip_stop_words=False` (literal preservation — keeps every token). Covers empty fallback, lowercasing, stop-word strip, special char strip, Unicode → ASCII folding, identifier-char invariant, idempotency. | Protects catalog/schema/table DDL, volume paths, log folder, tag namespace — a regression here silently rewrites physical names. Tied to **v0.7.5 P0.67 NamingConvention**. |
 | `tests/unit-tests/test_tag_merge_regex.py` | The tag-merge regex used by **v0.7.10 P0.99** + **v0.7.13 PE12** to coalesce ~9894 per-column `ALTER … SET TAGS` statements into ~500 multi-tag statements (~20× speedup). Covers `ALTER TABLE`, `ALTER SCHEMA`, `ALTER VIEW`, `ALTER COLUMN`, tag values containing commas (PE12), multi-pair KV lists, backtick-quoted targets, trailing whitespace, optional semicolons, and correctly rejects `UNSET TAGS` / non-tag ALTER statements. | Protects the install path — a regex bug produces malformed SQL and install crashes on every run. |
+| `tests/unit-tests/test_managed_location.py` | The borrow-storage-root scan introduced by **v0.7.13 P0.105+M6** and hardened by **v0.8.1 G4-FIX** (industry-agnostic) + **v0.8.2 P8** (`_validate_storage_accessible()` probe). Covers exclusion list (`_*`, `system`, `samples`, `main`, `hive_metastore`), order independence, no customer/industry-name preference, and the `PERMISSION_DENIED` retry path. | Protects the install-catalog creation path on Default-Storage metastores. Tied to **v0.7.13 P0.105+M6**, **v0.8.1 G4-FIX**, **v0.8.2 P8**. |
+| `tests/unit-tests/test_resolve_managed_location_v2.py` | Companion to `test_managed_location.py` — focuses on `_resolve_managed_location` decision tree (metastore-level → borrowed → bare-fallback) and ensures the validator runs at every step. | **v0.8.2 P8**. |
+| `tests/unit-tests/test_normalize_fk_column_name.py` | `normalize_fk_column_name` reads `attribute|column_name|name` (M1 widen) and produces a single-suffix FK name (no `IdId` double-suffix). | **v0.8.5 M1** (`alias=fk-name-helper-field-widen`). |
+| `tests/unit-tests/test_context_ladder.py` | `run_with_context_ladder` correctly walks the deterministic context-budget ladder on demote/rate-limit/context-overflow signals. | **v0.8.0 / v0.8.1 G8-FIX**. |
+| `tests/unit-tests/test_heartbeat.py` | `HeartbeatWatchdog` emits at the configured cadence and elevates missing heartbeats to a hard failure. | **v0.8.0 / v0.8.1 G9**. |
+| `tests/unit-tests/test_user_domain_exhaustive.py` | `business_domains` widget treated as the EXHAUSTIVE source-of-truth for required domains (no judge-side substitution; no architect-side rename). | **v0.8.0 §3b EXHAUSTIVE** (also enforces `CLAUDE.md §3b`). |
+| `tests/unit-tests/test_v081_fixes.py` | 40 tests covering every v0.8.1 fix — IDL chunking fallback (G1), MV-FILTER de-tautologise (G11), context-ladder wiring (G8), heartbeat coverage (G9), token+cost telemetry (G10), MV15 sub-batch merge (C2), description ladder (C4), vibe-prune NameError (C6), industry-agnostic managed location (G4-FIX), config-guard sweep, VALIDATOR_REGISTRY populated, `_is_system_identifier_column` config thread. | **v0.8.1 + 9 EXP follow-ups**. |
+| `tests/unit-tests/test_v082_failure_report_fixes.py` | 60+ tests covering v0.8.2 P1–P10 — scratch-path tempfile (P1), domain-name-mismatch CRITICAL (P2), decimal-to-float coercion (P3), no-siloed-after-shrink (P4), jobtags skip deleted job (P5), prompt brace-escape (P6), JobLauncher waits for child terminal (P7), managed-location accessibility (P8), MV install count validation (P10). | **v0.8.2 P1–P10**. |
+| `tests/unit-tests/test_v082_model_json_any_name.py` | Model.json accepts any `name` shape (P9). | **v0.8.2 P9**. |
+| `tests/unit-tests/test_v083_regression_fixes.py` | 27 tests covering v0.8.3 R1/R3/R6/R7/R8 + F2-regression — vibe-version-must-advance (R1), log-no-truncate-on-success (R3), metric-view bare-via-describe (R6), model-params subdomain mandatory (R7), deterministic Pass-2 cycle breaker (R8), immutable-violation CRITICAL (F2-regression). | **v0.8.3 + v0.8.4 hardening + 4th R1 callsite**. |
+| `tests/unit-tests/test_v085_model_quality_fixes.py` | 25 tests covering v0.8.5 M1–M5 + N1 — FK `IdId` double-suffix (M1), PK casing preservation (M2), FK semantic gate KeyError (N1), TEMPORAL/CARDINALITY/HEADER↔LINE/JUNCTION rules (M3+M4), canonical-attrs HARD MINIMUMS (M5). Also includes the `TestPromptsAreIndustryAgnostic` block (v0.8.6) — 7 anti-bias guard tests scanning rendered rule text for retail-specific tokens. | **v0.8.5 M1–M5 + v0.8.6 industry-agnostic rewrite**. |
+| `tests/unit-tests/test_v085_n6_metric_views_no_char_iter.py` | `metric_views` JSON-string-blob is parsed at top level + per-domain (no `len(blob)`-many `[Metrics][LLM] skipping non-dict` warnings). | **v0.8.5 N6** (`alias=metric-views-no-char-iter`). |
+| `tests/unit-tests/test_v086_n5_r3_sentinels_to_volume.py` | R3 sentinels (`SHRUNK`, `SAFE-FLUSH`, `FINAL-FLUSH`) appended to `_vl_local_info` so they reach the UC volume `info.log` (not just `sys.stderr`). | **v0.8.6 N5-FIX** (`alias=r3-sentinels-to-volume`). |
+| `tests/unit-tests/test_ce_helpers.py` | Companion to `test_parse_ce_counts.py` — covers the candidate-evaluation header parsing helpers. | Various v0.7/v0.8 candidate-evaluation paths. |
+| `tests/unit-tests/test_misc_helpers.py` | A grab-bag of small pure helpers (decimal coercion, system-id detection, etc.) covered alongside their owning fix. | **v0.8.2 P3** + various. |
+| `tests/unit-tests/test_replace_single_quote.py` | SQL string sanitiser. | Install path. |
 
 ### Rule of engagement
 
@@ -1570,6 +1586,39 @@ Which vibe_tester test exercises which P-fix? This table lets you pick the minim
 | P0.99+PE12 | v0.7.13 | Tag SET TAGS merge (quoted values, commas) | **Test 00**, **Test 10**, **Test 10c** — AND **unit test `test_tag_merge_regex.py`**. |
 | P0.105+M6 | v0.7.13 | `_ensure_catalog_exists` managed-location discovery | **Test 00** (runner creates install catalogs — exercises the Default-Storage path when the metastore is configured that way). |
 | P0.106 | v0.7.11 | Install log tee to volume | **Test 10** (post-run log inspection). |
+| §3b EXHAUSTIVE, D1 | v0.8.0 | User vibes supreme authority + `business_domains` widget exhaustive | **Test 00**, **Test 01**, **Test A1** + **unit `test_user_domain_exhaustive.py`**. |
+| HeartbeatWatchdog, ladder, MAX_CONCURRENT_BATCHES=20, telemetry | v0.8.0 | Observability scaffold | Any — every long-running run hits the heartbeat + ladder + telemetry. |
+| G1-FIX | v0.8.1 | IDL chunking fallback | **Test 00** (large ECM linking). |
+| G8-FIX | v0.8.1 | `run_with_context_ladder` wired | Any large run + **unit `test_context_ladder.py`**. |
+| G9 | v0.8.1 | Heartbeat coverage + non-rate-limit error surface | Any + **unit `test_heartbeat.py`**. |
+| G10-FIX | v0.8.1 | Per-model token + cost telemetry | Any (run summary). |
+| G11-FIX, MV-FILTER | v0.8.1 | Metric-view filter de-tautologise | **Test 00** + **unit `test_v081_fixes.py`**. |
+| C2-FIX MV15, C4-FIX, C6-FIX | v0.8.1 | MV15 sub-batch merge + description ladder + vibe-prune NameError | **Test 00**, **Test A1** + **unit `test_v081_fixes.py`**. |
+| G4-FIX | v0.8.1 | Industry-agnostic managed location (runner/tester) | **Test 00** + **unit `test_managed_location.py`**. |
+| Config-guard sweep, VALIDATOR_REGISTRY | v0.8.1 follow-up | Defensive `config = config or {}` + populated registry | **unit `test_v081_fixes.py`** (40 tests). |
+| P1 | v0.8.2 | `_resolve_business_scratch_path` uses `tempfile.mkdtemp()` | Serverless smoke + **unit `test_v082_failure_report_fixes.py`**. |
+| P2 | v0.8.2 | `domain name mismatch` CRITICAL | Parallel domain-enrich smoke + **unit `test_v082_failure_report_fixes.py`**. |
+| P3 | v0.8.2 | `_coerce_decimal_to_float` for pool engine | **Test 03** + **unit `test_misc_helpers.py`**. |
+| P4 | v0.8.2 | Shrink prompt forbids siloed + `_detect_post_shrink_silos()` | **Test 02** (MVM shrink) + **unit `test_v082_failure_report_fixes.py`**. |
+| P5 | v0.8.2 | jobtags skip deleted job | Runner test 00. |
+| P6 | v0.8.2 | Prompt brace-escape (`KeyError '0,62'`) | Any + **unit `test_v082_failure_report_fixes.py`**. |
+| P7 | v0.8.2 | `JobLauncher.wait_for_run_terminal()` blocks on child | **Test 10** (install) + runner DAG. |
+| P8 | v0.8.2 | Managed-location accessibility probe | **Test 00** + **unit `test_managed_location.py`** + **unit `test_resolve_managed_location_v2.py`**. |
+| P9 | v0.8.2 | model.json any `name` shape | **unit `test_v082_model_json_any_name.py`**. |
+| P10 | v0.8.2 | MV install count validation | **Test 10** + **unit `test_v082_failure_report_fixes.py`**. |
+| R1 | v0.8.3 / v0.8.4 | `_assert_vibe_version_advances` at 4 write barriers | **Test 01** (vibe-modeling-of-version) + **unit `test_v083_regression_fixes.py`**. |
+| F2-regression | v0.8.3 | `immutable violation` CRITICAL | **Test A1** + **unit `test_v083_regression_fixes.py`**. |
+| R3 | v0.8.3 / v0.8.4 / v0.8.6 | log-no-truncate-on-success + sentinels to volume | **Test 10** (install log) + **unit `test_v083_regression_fixes.py`** + **unit `test_v086_n5_r3_sentinels_to_volume.py`**. |
+| R6 | v0.8.3 | Metric-view bare-name via DESCRIBE | **Test 10** (metric views install) + **unit `test_v083_regression_fixes.py`**. |
+| R7 | v0.8.3 | `subdomain_required` mandatory in LLM JSON | Any + **unit `test_v083_regression_fixes.py`**. |
+| R8 | v0.8.3 | Deterministic Pass-2 cycle breaker | **Test 00** (large FK graphs) + **unit `test_v083_regression_fixes.py`**. |
+| M1 | v0.8.5 | FK `IdId` double-suffix root cause | **Test 00**, **Test 10d** + **unit `test_normalize_fk_column_name.py`** + **unit `test_v085_model_quality_fixes.py`**. |
+| M2 | v0.8.5 | PK casing preservation through round-trip | Any (PascalCase + snake_case naming convs) + **unit `test_v085_model_quality_fixes.py`**. |
+| M3+M4+N1 | v0.8.5 | FK semantic gate KeyError fix + 4 new classification rules (TEMPORAL/CARDINALITY/HEADER↔LINE/JUNCTION) | **Test 00** (FK semantic gate runs on full models) + **unit `test_v085_model_quality_fixes.py`**. |
+| M5 | v0.8.5 | Canonical attributes HARD MINIMUMS | **Test 00**, **Test 02** + **unit `test_v085_model_quality_fixes.py`**. |
+| N6 | v0.8.5 | `metric_views` JSON-string-blob char-iter | **Test 00** + **unit `test_v085_n6_metric_views_no_char_iter.py`**. |
+| Industry-agnostic prompt rewrite | v0.8.6 | M1/M3+M4/M5 rules in abstract vocabulary | Any + **unit `test_v085_model_quality_fixes.py::TestPromptsAreIndustryAgnostic`** (7 anti-bias tests). |
+| N5-FIX | v0.8.6 | R3 sentinels routed to volume info.log | **Test 10** (install log audit) + **unit `test_v086_n5_r3_sentinels_to_volume.py`**. |
 
 ### Minimum test set for "I touched only one P-fix"
 

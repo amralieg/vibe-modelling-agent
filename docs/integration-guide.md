@@ -1685,6 +1685,21 @@ Some `stage_succeeded` events have `result_json = {}`. This is normal for stages
 ### Auto-Closed Steps
 When a pipeline error occurs, any stages still in `stage_started` state are auto-closed with `stage_failed` before the final `Vibe Session` / `Session Ended` event.
 
+### Vibe-Version Write Barriers (v0.8.3 R1 / v0.8.4)
+For the `vibe modeling of version` operation the agent invokes `_assert_vibe_version_advances` at FOUR write barriers (sentinel `alias=vibe-version-must-advance`). If `current_version == base_version_for_review` at any of those barriers, the pipeline aborts with a critical error rather than overwriting the base version in place. UIs MUST treat this as a hard failure and surface a "version did not advance" diagnostic.
+
+### Job Launch Gate Now Blocks Until Child Terminal (v0.8.2 P7)
+When a parent run launches a child job (e.g. install-test from runner), `JobLauncher.wait_for_run_terminal()` now polls until the child reaches a terminal state and propagates `FAILED` / `TIMEDOUT` to the parent. Prior to v0.8.2 the parent could report `SUCCESS` while the child silently failed — UIs that depended on parent status alone would miss the failure. UIs SHOULD now trust parent status; if extra defence-in-depth is desired, also check `result_json.child_run_terminal_state`.
+
+### Critical Error Patterns (v0.8.2 P2 / v0.8.3 F2-regression)
+If `result_json.message` (or stage-error payloads) contains any of `domain name mismatch`, `immutable violation`, the worker hard-rejected the LLM payload at the smart-worker layer (alias sentinels `domain-name-mismatch-critical`, `immutable-violation-critical`). UIs SHOULD render these as user-facing errors rather than retryable transients.
+
+### Token + Cost Telemetry (v0.8.0 / v0.8.1 G10-FIX)
+Every model emits per-call telemetry (`[TOKEN-TELEMETRY] model=… in=… out=… cost=…`) which is aggregated into the run summary. The aggregated payload is published to the final `Session Ended` `result_json` under `token_telemetry: { <model>: { input_tokens, output_tokens, cost_usd } }` (when available). UIs MAY surface this in a "cost summary" panel.
+
+### Volume Log Sentinels (v0.7.11 P0.106 / v0.8.3 R3 / v0.8.6 N5-FIX)
+Install logs are tee'd to a local file and copied to the UC Volume `info.log` periodically. `_safe_volume_flush` skips the copy when the local file shrunk; sentinels `[VolumeLogFlush][SHRUNK]`, `[VolumeLogFlush][SAFE-FLUSH]`, `[VolumeLogFlush][FINAL-FLUSH]` (alias `log-no-truncate-on-success`) appear in BOTH `sys.stderr` and the volume `info.log` (since v0.8.6 N5-FIX, alias `r3-sentinels-to-volume`). UIs that surface the install log MAY filter or highlight these sentinels.
+
 ---
 
 ## 15. SQL Quick Reference

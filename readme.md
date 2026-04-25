@@ -46,7 +46,7 @@
 - [Metric Views](#-metric-views)
 - [Troubleshooting](#-troubleshooting)
 - [Glossary](#-glossary)
-- [Recent fixes (v0.6.x → v0.7.x)](#recent-fixes-v06x--v07x)
+- [Recent fixes (v0.6.x → v0.8.x)](#recent-fixes-v06x--v08x)
 
 ---
 
@@ -83,7 +83,7 @@ The name **"Vibe"** reflects the core workflow:
 
 Each iteration produces a new version. The agent carries forward your context so nothing is lost between runs. You are never locked into a static template — the model evolves with your business.
 
-Current version: **v0.7.13** — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v07x) below.
+Current version: **v0.8.8** — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v08x) below.
 
 ---
 
@@ -975,6 +975,15 @@ Metric views are auto-generated per domain, focusing on KPIs that would appear i
 
 | Version | Change |
 |---|---|
+| **v0.8.8** | 10 root-cause fixes from v0.8.7 tester audit: products_data NameError (NEW-1, MV silent loss), BC1 widget-key (NEW-2, install audit-mirror enabled), §3b empty-domain protection via DRY helper extension (NEW-3), §3c enlarge target_fit user-vibe clamp (NEW-4), DELTA_MISSING_DELTA_TABLE precheck + plain-INSERT fallback (NEW-5), stale-convention schema pre-clean (NEW-6), pool-spec parser case-insensitive top-level keys + tightened SAMPLE_POOL_PROMPT (NEW-7), shrink-path pre-handoff cycle break (R8 mitigation), architect mutation engine case-insensitive name resolution (F2 mitigation) |
+| **v0.8.7** | Install-breadcrumb-audit-mirror (BC1) + 6-phase structured-LLM refactor + tester typo fix |
+| **v0.8.6** | De-bias v0.8.5 prompts (industry-agnostic vocabulary across M1/M3+M4/M5) + N5-FIX (R3 sentinels routed to volume `info.log` so audits actually see `SHRUNK`/`SAFE-FLUSH`/`FINAL-FLUSH`) + 7 anti-bias guard tests |
+| **v0.8.5** | M1 (FK `IdId` double-suffix root cause) + M2 (PK casing collapse) + M3+M4+N1 (FK semantic gate KeyError fix + four new classification rules: TEMPORAL PRECEDENCE, CARDINALITY CORRECTNESS, HEADER↔LINE INTEGRITY, JUNCTION TABLE PURITY) + M5 (canonical attributes HARD MINIMUMS) + N6 (`metric_views` char-iter explosion fix) + 34 unit tests |
+| **v0.8.4** | Hardening + runtime LOG SIGNALS for v0.8.3 R/F/N fixes (alias-tagged so audits can grep) + 4th R1 vibe-version write-barrier callsite + 13 new unit tests |
+| **v0.8.3** | R1 (`_assert_vibe_version_advances`) + R3 (log-no-truncate-on-success) + R6 (metric-view bare-name via DESCRIBE) + R7 (subdomain mandatory in LLM JSON) + R8 (deterministic Pass-2 cycle breaker) + F2-regression (`immutable violation` is CRITICAL) + 27 unit tests |
+| **v0.8.2** | P1–P10: scratch-path tempfile, domain-name-mismatch CRITICAL, decimal-to-float coercion, shrink forbids siloed products, jobtags skip deleted job, prompt brace-escape fix, JobLauncher waits for child terminal (no parent-SUCCESS-over-child-FAIL), managed-location accessibility probe, model.json any-name shape, MV install count validation + 60+ unit tests |
+| **v0.8.1** | 11 root-cause fixes (G1/G5/G8/G9/G10/G11/C2/C4/C6 + runner/tester G4-FIX industry-agnostic managed location) + 9 self-audit closure EXP fixes + 40 unit tests |
+| **v0.8.0** | 33-fix bundle: D1 widget authority, MAX_CONCURRENT_BATCHES=20 unified, `run_with_context_ladder`, `run_parallel_with_rate_limit_backoff`, `HeartbeatWatchdog`, per-model token telemetry scaffold, MV pre-filter, chunking widening, PE10/PE12, B8 atexit, §3b `business_domains` EXHAUSTIVE + 75 unit tests + full audit |
 | **v0.5.9** | Scope-prefixed volume folders (`mvm_v1` / `ecm_v1`, not `v1_mvm`); post-install integrity check compares actual vs expected domain schemas; unbiased architect-gate example in prompt |
 | **v0.5.8** | Natural domain schema names — removed `ecm_`/`mvm_` schema_prefix injection from runner; agent now honours explicit-empty widget value for prefix/suffix keys (`_EXPLICIT_OVERRIDE_KEYS`) |
 | **v0.5.7** | Principal-engineer production-readiness gates added to architect review (trust / support / recommend / propose, each Yes-No + blockers + required_actions); same 4 gates now run at BOTH the per-domain level (Step 3.6, **Domain Architect + Senior Business SME** for `{industry_alignment}`) and the global level (Step 3.7); "No" actions pipe into `next_vibes.txt`; verification-sweep truncations raised |
@@ -985,9 +994,9 @@ Full history: `git log --oneline v0.5.0..HEAD`.
 
 ---
 
-## Recent fixes (v0.6.x → v0.7.x)
+## Recent fixes (v0.6.x → v0.8.x)
 
-The 48-hour burst from v0.6.0 through v0.7.13 (plus in-flight v0.7.x patches tracked in `/tmp/agent_source.py`) hardened every stage of the pipeline. The table below enumerates each version, the P-numbered fix(es) it ships, the theme, and the observable impact on the generated model or install.
+The burst from v0.6.0 through v0.8.6 hardened every stage of the pipeline. The tables below enumerate each version, the P-numbered (and G/M/N/R/F-classed) fix(es) it ships, the theme, and the observable impact on the generated model or install.
 
 > **Sources of truth:**
 > - Committed versions: `git log --since=2026-04-18 --oneline` (51 commits).
@@ -1026,6 +1035,19 @@ The 48-hour burst from v0.6.0 through v0.7.13 (plus in-flight v0.7.x patches tra
 | **v0.7.10** | P0.70-REVERT, P0.96 | Chunking revert + integrity check root-cause | Count-based chunking from v0.7.5 P0.70 lobotomized LLM context — full domain is now always sent (P0.70 revert); post-install integrity check now uses `_metamodel.domain` COUNT (same source as Cross-Validation); prior `SHOW SCHEMAS` row-parse returned 0 on serverless even with 11 schemas (P0.96). |
 | **v0.7.11** | P0.106 | Install log tee to volume | Install prints are tee-d to a local log file, then copied to the UC Volume at finalize so operators see the full install trace post-run. |
 | **v0.7.13** | P0.99+PE12, P0.105+M6 | Tag merge + managed-location discovery | `ALTER … SET TAGS` statements merged per target (~9894 calls → ~500, ~20× faster); regex now tolerates quoted tag values containing commas (PE12) (P0.99+PE12); `_ensure_catalog_exists` discovers a metastore managed location (via `DESCRIBE METASTORE` then any accessible catalog's `storage_root`) so `CREATE CATALOG` succeeds on Default-Storage metastores with no hardcoded allowlist (P0.105+M6). |
+
+### v0.8.x — observability, audit, industry-agnostic, model-quality
+
+| Version | Fix IDs | Theme | Impact |
+|---|---|---|---|
+| **v0.8.0** | 33 fixes (D1, M5-tee, MAX_CONCURRENT_BATCHES=20, run_with_context_ladder, run_parallel_with_rate_limit_backoff, HeartbeatWatchdog, token-telemetry scaffold, MV pre-filter, chunking widening, PE10/PE12, B8 atexit, §3b `business_domains` EXHAUSTIVE) + 75 unit tests + full audit | Bundle release: widget-authority enforced end-to-end (D1); unified `MAX_CONCURRENT_BATCHES=20`; ladder + parallel-rate-limit helpers; `HeartbeatWatchdog` for long-running stages; per-model token telemetry scaffold; metric-view pre-filter; chunking thresholds widened; `business_domains` widget treated as an EXHAUSTIVE list (no judge-side substitution). |
+| **v0.8.1** | 11 root-cause fixes (G1-FIX IDL chunking fallback, G5-FIX sample-gen log finalize+tee, G8-FIX context_ladder wired, G9 surface non-rate-limit + heartbeat coverage, G10-FIX per-model token+cost telemetry, G11-FIX MV-FILTER de-tautologise, C2-FIX MV15 halving merges sub-batches, C4-FIX description ladder, C6-FIX vibe-prune NameError, runner/tester G4-FIX industry-agnostic managed location) | Observability + ladder wiring + tester/runner industry-agnostic | IDL no longer fails on oversized batches (graceful chunking); MV-FILTER tautology removed (real semantic filter now); ladder helpers wired into the call sites that were silently bypassing them; per-model token + cost telemetry surfaced; MV15 halving recursively merges sub-batches; runner/tester managed-location discovery is industry-agnostic (no hardcoded customer strings). |
+| **v0.8.1 follow-up** | 9 EXP closures + 40 unit tests | Self-audit closure | Aliases standardised; `clear_active` wired everywhere; ambiguous-FK resolution flags propagated; `config-guard` sweep added defensive `config = config or {}` to 10 call sites; `VALIDATOR_REGISTRY` populated; `_is_system_identifier_column` config thread; comprehensive unit tests covering every v0.8.1 fix. |
+| **v0.8.2** | P1–P10 (10 fixes) + 60+ unit tests | Serverless `/tmp` + parallel correctness + install gate + managed-location accessibility | P1 `_resolve_business_scratch_path` uses `tempfile.mkdtemp()` (foreign-UID `/tmp` reuse no longer permission-denies); P2 `domain name mismatch` is now CRITICAL (parallel domain-enrich no longer soft-accepts wrong-domain payload); P3 `_coerce_decimal_to_float` for pool-spec assembly (no more `Decimal` rejection by `spark.createDataFrame`); P4 shrink prompt forbids siloed products + `_detect_post_shrink_silos()`; P5 jobtags skip deleted job; P6 prompt brace-escape (`KeyError '0,62'` killed); P7 `JobLauncher.wait_for_run_terminal()` blocks parent until child terminal — no more parent-SUCCESS-over-child-FAIL; P8 `_validate_storage_accessible()` probes managed-location candidates, retries `CREATE CATALOG` bare on permission errors; P9 model.json accepts any `name` shape; P10 metric-view install count validation. |
+| **v0.8.3** | R1, R3, R6, R7, R8, F2-regression (6 fixes) + 27 unit tests | Vibe-version write barriers + log durability + cycle determinism | R1 `_assert_vibe_version_advances` aborts in-place overwrites at three (then four — see v0.8.4) write barriers; R3 `_safe_volume_flush` skips copy if local log shrunk (no more truncation-on-success); R6 metric-view bare-name resolution via `DESCRIBE`; R7 `model_params.subdomain_required` mandatory in LLM JSON output; R8 deterministic Pass-2 cycle breaker; F2-regression makes `immutable violation` a CRITICAL (no soft-accept poisoning model_architect_review). |
+| **v0.8.4** | hardening + runtime LOG SIGNALS for R1/F2-reg/R3/R6/R7/R8 + 4th R1 callsite + 13 new tests | Audit signal coverage + 4th vibe-version barrier | Every R/F/N fix from v0.8.3 now emits a runtime LOG SIGNAL (e.g. `alias=immutable-violation-critical`, `alias=log-no-truncate-on-success`, `alias=metric-view-bare-via-describe`) so post-run audit can grep them; 4th R1 write-barrier callsite added; 13 new unit tests cover the runtime signals. |
+| **v0.8.5** | M1, M2, M3+M4+N1, M5, N6 (6 model-quality fixes) + 34 unit tests | mvm_v4 audit fixes — naming + FK semantics + canonical attrs + metric-views char-iter | M1 FK-name `IdId` double-suffix root cause (`normalize_fk_column_name` widened to read `attribute|column_name|name`; FK rule rewritten with VERBATIM-match); M2 PK casing preservation (`_compose` pre-runs `apply_convention(snake_case)`); M3+M4+N1 `FK_SEMANTIC_CORRECTNESS_GATE_PROMPT` rules 6–9 (TEMPORAL PRECEDENCE, CARDINALITY CORRECTNESS, HEADER↔LINE INTEGRITY, JUNCTION TABLE PURITY) + `user_sizing_directives` no longer raises `KeyError` (gate no longer silently bypassed); M5 canonical attributes promoted from soft guidelines to **HARD MINIMUMS** (`alias=canonical-attrs-enforced`); N6 `metric_views` JSON-string-blob char-iteration explosion fixed (parsed at top level + per-domain). |
+| **v0.8.6** | de-bias prompts + N5-FIX (R3 sentinels routed to volume info.log) + 7 anti-bias tests | Industry-agnostic prompt vocabulary + audit signal durability | M1/M3+M4/M5 prompt rules rewritten in abstract semantic vocabulary (`<EntityEarlier>`, `<Container>`, `<Owner>` patterns) — agent no longer biases retail-shaped models for non-retail industries; explicit anti-industry-bias warning block added to M5; N5-FIX appends R3 sentinels (`SHRUNK`, `SAFE-FLUSH`, `FINAL-FLUSH`) to local `_vl_local_info` so they reach the UC volume `info.log` (alias=`r3-sentinels-to-volume`). |
 
 ### What a P-number comment looks like in source
 

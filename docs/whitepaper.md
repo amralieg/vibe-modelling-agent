@@ -52,7 +52,7 @@ Whether the result is called an industry data model, a business data model, a ca
 
 Vibe data modeling is a faster, more natural way to build that content.
 
-It does not produce an industry data model -- a generic template that approximates a sector. It produces a business data model: a structure that is specific, authentic, and representative of how one particular organization actually works. It is built through natural language, refined through iteration, and governed by one hundred and sixty-two enforceable rules that ensure consistency, accuracy, and production readiness.
+It does not produce an industry data model -- a generic template that approximates a sector. It produces a business data model: a structure that is specific, authentic, and representative of how one particular organization actually works. It is built through natural language, refined through iteration, and governed by over two hundred enforceable rules that ensure consistency, accuracy, and production readiness.
 
 The process has two distinct steps.
 
@@ -110,7 +110,7 @@ Once the modeler provides this widget configuration, the system does something a
 
 This enrichment is not decoration. It is the foundation that every subsequent step will consult. A model that does not know what a SKU is will generate useless column names in retail. A model that cannot distinguish an ICD code from a CPT code will fail in healthcare. The enriched context ensures the model speaks the business's language from its very first table.
 
-Before moving on, one thing must be clear: nothing that follows is random. Every step in the model's lifecycle is governed by a catalog of **one hundred and sixty-two documented rules**, organized into twelve groups covering naming conventions, semantic deduplication, foreign keys, primary keys, normalization, domain structure, data types, tags, graph topology, quality, product design, and semantic distinction. Each rule has an ID, a rationale, and an example. They are enforceable constraints, not suggestions. The modeler provides the soul; the rules provide the skeleton. The complete catalog appears in the [Appendix](#appendix-data-modeling-rules-catalog), and rules are referenced by ID throughout this paper.
+Before moving on, one thing must be clear: nothing that follows is random. Every step in the model's lifecycle is governed by a catalog of **over two hundred documented rules**, organized into thirteen groups covering naming conventions, semantic deduplication, foreign keys, primary keys, normalization, domain structure, data types, tags, graph topology, quality, product design, semantic distinction, vibe governance, surgical mode, scoring, and install/observability hardening. Each rule has an ID, a rationale, and an example. They are enforceable constraints, not suggestions. The modeler provides the soul; the rules provide the skeleton. The complete catalog appears in the [Appendix](#appendix-data-modeling-rules-catalog), and rules are referenced by ID throughout this paper.
 
 And every step -- from this enrichment to the last foreign key constraint -- follows the same disciplined cycle: **generate, validate against the rules, and if validation fails, feed the errors back and retry**. This four-beat rhythm is the heartbeat of quality. Nothing moves forward until it passes scrutiny.
 

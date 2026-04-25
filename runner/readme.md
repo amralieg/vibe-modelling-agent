@@ -315,6 +315,18 @@ Consequence for runner users: **on Default-Storage metastores you no longer need
 
 Idempotency: if the catalog already exists (either directly or via a CATALOG_ALREADY_EXISTS race), the helper logs and proceeds without failing.
 
+### Managed-Location Accessibility Probe (v0.8.2 P8)
+
+v0.8.2 added a hardening step on top of the v0.7.13 P0.105+M6 discovery: every candidate `storage_root` returned by step 1 or step 2 is now probed with `dbutils.fs.ls(<candidate>)` via `_validate_storage_accessible()` BEFORE it is used in `CREATE CATALOG ... MANAGED LOCATION '<candidate>'`. If the probe fails (e.g. the cluster's run-as identity has no `READ FILES` on the borrowed catalog's storage root), the candidate is discarded and the next discovery step runs. As a final defence-in-depth, when `CREATE CATALOG ... MANAGED LOCATION '<x>'` returns `PERMISSION_DENIED`, the helper retries with bare `CREATE CATALOG <name>` (no managed location) so a metastore-default fallback can still kick in. Net effect: the runner no longer fails install with `PERMISSION_DENIED` on a "discovered" path the agent could not actually read.
+
+### Industry-Agnostic Managed-Location Discovery (v0.8.1 G4-FIX)
+
+The original v0.7.13 implementation was scrubbed in v0.8.1 to ensure the borrowed-catalog scan does NOT favour any specific catalog name (no `airlines`, `retail`, `healthcare` substrings, no customer/workspace identifiers). The exclusion list (`_*`, `system`, `samples`, `main`, `hive_metastore`) is the ONLY hardcoded list — every other catalog is probed in the order returned by `SHOW CATALOGS`. This is a §3c (industry-agnostic) hard requirement enforced by `tests/unit-tests/test_v081_fixes.py::test_managed_location_no_industry_strings`.
+
+### Job Launch Gate Awaits Child Terminal State (v0.8.2 P7)
+
+The runner orchestrates a 4-task DAG in which task 2 (ECM Install) and task 4 (MVM Install) launch the agent notebook with `operation = install model`. v0.8.2 changed the launch gate so it now blocks the parent task until the child run reaches a terminal state and propagates `FAILED`/`TIMEDOUT` to the parent. Prior to v0.8.2 the parent could report `SUCCESS` while the child silently failed. The behaviour is implemented by `JobLauncher.wait_for_run_terminal()` and verified by `tests/unit-tests/test_v082_p7_job_launch_gate.py`.
+
 ---
 
 ## Job Tags
