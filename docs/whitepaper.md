@@ -451,8 +451,8 @@ It is not perfect. No model ever is. But it is honest about its imperfections, a
 | Property | Value |
 |:---|:---|
 | **Rule Format** | `GXX-RYYY` (G = Group, R = Rule within Group) |
-| **Total Groups** | 12 (plus subdomain rules) |
-| **Total Rules** | 162 (plus 8 subdomain rules) |
+| **Total Groups** | 12 documented here (plus subdomain rules). See [docs/quality-gates.md](quality-gates.md) for G10/G13/G14/G15 runtime gates. |
+| **Documented Rules** | 170 (162 core + 8 subdomain). Additional runtime enforcement (G10 Sample Data, G13 Sample Data QA, G14 Vibe Governance, G15 Physical Deployment) brings the enforced rule set to 200+ total. |
 
 ---
 
