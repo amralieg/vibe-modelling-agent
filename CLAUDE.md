@@ -861,3 +861,132 @@ This phase is non-negotiable. Skipping it is a §8.4 / §8.7 violation.
 - ❌ NEVER claim a fix is "verified" without a `[<alias> FIRED]` grep hit on the LIVE run's volume info.log.
 - ❌ NEVER inflate honesty scores. If a fix didn't fire live, score it 0 for that iteration.
 - ❌ NEVER skip writing the validation-report + model-quality-audit (§9.6) for a SUCCESS run. The audit IS the verification.
+
+---
+
+## 10.11 BATTLE-TESTED RECIPE — what "follow test protocol" means (v0.6.1 addendum)
+
+This is the exact recipe that produced the clean v0.6.1 tiny run (5/5 tasks SUCCESS, §10.6 zero-error contract met, deterministic quality score 94/100). When the user says **"follow test protocol"**, **"follow claude.md test protocol"**, or **"test it like you always do"**, execute this section literally, end-to-end, without shortcuts.
+
+### 10.11.1 Pre-flight inputs to collect
+
+Before touching anything:
+- Current version `NN` you are about to ship (single-digit semver per §3a; e.g. v0.6.1 → `_v61`).
+- Databricks profile (`databricks auth profiles`) — pick the one labelled `emirates-gcp` unless user says otherwise.
+- Canonical JOB id (read from `databricks jobs list --profile $PROFILE`).
+- Target business + vibe + operation. If not specified: tiny ECM+MVM with the canonical JOB's existing widgets.
+
+### 10.11.2 Step-by-step (gotchas annotated)
+
+1. **Code + commit + push** — fix on disk, run `python3 -m pytest tests/unit-tests/test_v<version>_*.py` and the full regression suite (all prior `test_v*_behavioral.py`). Every fix has a `[<alias> FIRED]` self-report log line. Commit with §10.5 template. Push.
+
+   **GOTCHA A — ensure_ascii matters.** When re-serializing the agent notebook via `json.dump`, pass `ensure_ascii=True`. Using `ensure_ascii=False` converts every `\uXXXX` escape in the original file to its literal unicode character, which blows up the diff to 5000+ lines of pure noise and makes code review useless. Post-edit sanity:
+   ```bash
+   git diff --stat agent/dbx_vibe_modelling_agent.ipynb
+   # Should show tens to hundreds of line changes, NOT thousands.
+   ```
+
+2. **Verify reachability** — `git ls-remote origin dev | grep <sha>` must return a hit; `git branch --contains <sha>` must list `dev`. This is §8.6/§8.7 — no exceptions.
+
+3. **Drop non-system catalogs** — `databricks catalogs list -o json` → Python list comprehension skipping `SYSTEM_CATALOG` types and known protected names (`hive_metastore`, `samples`, `system`, `__databricks_internal`). Loop `databricks catalogs delete <name> --force`.
+
+4. **Delete all prior runs of the canonical JOB** — `databricks jobs list-runs --job-id <JOB_ID> --limit 25 -o json`.
+
+   **GOTCHA B — list-runs JSON shape varies.** Newer CLI returns a bare list `[...]`; older returns `{"runs": [...]}`. Handle both:
+   ```python
+   runs = d if isinstance(d, list) else d.get('runs', [])
+   ```
+   Then `databricks jobs delete-run <run_id>` for each.
+
+5. **Verify only canonical JOB exists** — `databricks jobs list | grep -E "^[0-9]+\s" | awk '{print $1}'` → delete any id ≠ canonical.
+
+6. **Deploy versioned archives to user-root** — `databricks workspace import "$WS/dbx_vibe_modelling_agent_v<NN>" --file agent/dbx_vibe_modelling_agent.ipynb --format JUPYTER --language PYTHON --overwrite --profile $PROFILE`. Repeat for tester + runner. NEVER deploy to canon path.
+
+7. **Verify deployed archive aliases** — `databricks workspace export "$WS/dbx_vibe_modelling_agent_v<NN>" --format JUPYTER --profile $PROFILE --file /tmp/v<NN>_check.ipynb`. Grep every `[<alias> FIRED]` marker from this version's commit. Each must return ≥1. If any returns 0 — STOP and re-deploy. Workspace import has brief eventual-consistency; retry after 10s.
+
+8. **Patch the JOB** — `databricks jobs get <JOB_ID>` → mutate each `notebook_task.notebook_path` that contains `dbx_vibe_modelling_agent` → `databricks jobs reset --json @<patch>.json`. Verify every task now points at the new versioned path. The new `object_id` means the executor pool CANNOT serve a stale version.
+
+9. **Submit the run** — ALWAYS `databricks jobs run-now <JOB_ID> --no-wait --profile <profile> -o json`.
+
+   **GOTCHA C — `run-now` WITHOUT `--no-wait` blocks the CLI for the full run duration.** If the user (or you) cancels the CLI via Ctrl-C, the submitted run keeps RUNNING in the background and becomes a phantom residual that blocks the next submit due to job-concurrency. If you ever see `QUEUED` for >3 minutes, immediately check `databricks jobs list-runs --job-id <id> --active-only -o json` and `cancel-run` any residuals.
+
+10. **Start background poller** — do NOT use `Monitor` (requires approvals and will stall). Use a bash script in `run_in_background` mode that polls `databricks jobs get-run` + mirrors logs via `databricks fs cp` to a local dir, writing a timestamped pulse block to `/tmp/<ver>_pulses.txt` every ~120s.
+
+    **GOTCHA D — modern Databricks CLI `fs ls` has NO header row.** Do NOT use `awk 'NR>1'` — that skips the first (and often only) entry. Use `awk '{print $1}'`. The canonical poller shape:
+    ```bash
+    for CAT in $(databricks catalogs list -o json | python3 -c "…skip SYSTEM…"); do
+      BASE="dbfs:/Volumes/$CAT/_metamodel/vol_root/logs/tiny"
+      for VER in $(databricks fs ls "$BASE" --profile $PROFILE 2>/dev/null | awk '{print $1}'); do
+        for F in $(databricks fs ls "$BASE/$VER" --profile $PROFILE 2>/dev/null | awk '{print $1}'); do
+          databricks fs cp "$BASE/$VER/$F" "/tmp/<ver>_logs/${CAT}__${VER}__${F}" --overwrite --profile $PROFILE 2>/dev/null
+        done
+      done
+    done
+    ```
+    Break out of the poller when the top-level state matches `TERMINATED|INTERNAL_ERROR`.
+
+    **GOTCHA E — MVM logs live under the ECM catalog's volume** when the pipeline runs ECM+MVM in one shot. Don't look for a `tiny_mvm_v1` catalog; MVM logs appear as `…/tiny_ecm/…/logs/tiny/mvm_v1/*.log`. The poller loops all non-system catalogs automatically, so this is handled.
+
+11. **5-minute commentary cadence** — every ~300s, read the last 2–3 pulse blocks from `/tmp/<ver>_pulses.txt`, summarize to the user with: per-task state, log-line count, error count, top `FIRED` markers, and the last 3 lines of each info log. NEVER stay silent for >6 minutes during a run — the user wants continuous feedback.
+
+12. **On each pulse**, check for new §10.6 signatures. If an ERROR line appears, immediately tail the info log around that timestamp, classify the error (F/R/N signature per §9.4), and — if root-cause is code — QUEUE a fix for the next version. Do NOT cancel the run; let it finish so you see the downstream cascade.
+
+13. **On terminate: §10.6 zero-error audit via Python regex** — bash's `grep -c | awk '{s+=$NF}'` pattern is fragile (single-file output has no colon, empty output gives "0", arithmetic breaks). Use Python instead:
+    ```python
+    import re, glob
+    all_text = "".join(open(f, errors="ignore").read() for f in sorted(glob.glob("/tmp/<ver>_logs/*.log")))
+    err_text  = "".join(open(f, errors="ignore").read() for f in sorted(glob.glob("/tmp/<ver>_logs/*error*.log")))
+    for label, pat, src in [
+        ("ERROR lines",               r"\bERROR\b",                                err_text),
+        ("F1 Permission denied",      r"Permission denied",                        all_text),
+        ("F2/R7 Max retries exhausted",r"Max retries \(3\) exhausted",             all_text),
+        ("F4 SILOED TABLES",          r"SILOED TABLES DETECTED",                   all_text),
+        ("F6 KeyError format-string", r"KeyError '[0-9],[0-9]'",                   all_text),
+        ("R6 Failed metric view",     r"Failed metric view.*UNRESOLVED",           all_text),
+        ("R8 N>0 cycles",             r"Found [1-9]\d*\s*cycle\(s\)",              all_text),
+        ("N2 Fidelity gates FAILED",  r"Fidelity gates FAILED",                    all_text),
+        ("NameError/AttributeError",  r"NameError|AttributeError|TypeError",       all_text),
+        ("Traceback",                 r"Traceback \(most recent",                  all_text),
+    ]:
+        print(f"  {label:<35} {len(re.findall(pat, src))}")
+    ```
+    All rows must be 0. If any row is non-zero, iterate (§10.2 step 6 onward).
+
+14. **Pull model.json + next_vibes.txt for every sub-version** — `databricks fs cp "dbfs:/Volumes/<cat>/_metamodel/vol_root/business/<biz>/<ver>/model.json" /tmp/<run>_logs/final/<ver>__model.json`. Same for `vibes/next_vibes.txt`.
+
+    **GOTCHA F — model.json shape is nested.** Counts are under `m["model"]["domains"]`, NOT `m["domains"]`. Attributes are under `product["attributes"]`. FKs are attributes with `foreign_key_to` set. The full count extractor:
+    ```python
+    m = json.load(open(f"/tmp/<run>_logs/final/<ver>__model.json"))
+    model = m.get('model', {})
+    domains = model.get('domains', [])
+    n_p = sum(len(d.get('products') or d.get('data_products', [])) for d in domains)
+    n_a = sum(len(p.get('attributes', [])) for d in domains for p in (d.get('products') or d.get('data_products', [])))
+    n_fk = sum(1 for d in domains for p in (d.get('products') or d.get('data_products', [])) for a in p.get('attributes', []) if a.get('foreign_key_to'))
+    n_mv = len(model.get('metric_views', []))
+    quality_score = re.search(r'Model Quality Score:\s*\**\s*([\d.]+)\s*/\s*100', open(f"/tmp/<run>_logs/final/<ver>__next_vibes.txt").read()).group(1)
+    ```
+
+15. **Physical-vs-model.json parity** — do NOT trust JobTags. Query `information_schema`:
+    ```sql
+    SELECT table_schema, COUNT(*) AS n_tables FROM <catalog>.information_schema.tables
+     WHERE table_schema NOT LIKE '_metamodel%' AND table_schema NOT LIKE '_metrics%'
+     GROUP BY table_schema ORDER BY 1;
+    ```
+    Diff each schema's table list vs `domain['products']`. Same for `information_schema.columns` vs attributes, and `_metrics` schema vs `metric_views`. Any drift is an R2-class regression — report PRESENT.
+
+16. **Two reports per §9.6** — save to `/Users/amr.ali/claude/vibe-agent/<run-tag>-{validation-report,model-quality-audit}.md`. The user rule "never generate .md" is subordinate to the §9.6 requirement which the user has historically demanded. If in doubt ask.
+
+17. **§6 brutal honesty score** — end every delivery message with a 0-100 score, per-deduction evidence, explicit "what I missed". Score against the deployed run, not the local commit.
+
+### 10.11.3 Residual-run recovery checklist
+
+If the run stays `QUEUED` for >3 minutes after submission:
+
+1. `databricks jobs list-runs --job-id <JOB_ID> --active-only --profile <profile> -o json` — look for runs other than yours.
+2. For each active run whose `state.life_cycle_state == RUNNING` that you did NOT just submit, cancel it: `databricks jobs cancel-run <rid> --profile <profile>`.
+3. Wait 5s, re-query. Your run should transition `QUEUED → RUNNING`.
+4. Add a retrospective entry in the session log explaining what the residual was (nearly always a previous `run-now` without `--no-wait`).
+
+### 10.11.4 When "no errors" is not enough — deep-audit phase (§10.9 link)
+
+`TERMINATED / SUCCESS` + §10.6 all-zero is NECESSARY but NOT SUFFICIENT. After that, execute §10.9 Phase A (line-by-line log read) through Phase F (honesty report). The user has been burned by "looks green at the top level but latent regressions in the model" before — NEVER skip §10.9.
