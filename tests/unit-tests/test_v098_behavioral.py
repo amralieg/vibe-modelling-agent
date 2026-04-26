@@ -263,11 +263,48 @@ class TestNotebookIntegrity:
         assert not errors, f"Syntax errors in cells: {errors}"
 
     def test_all_v098_aliases_grep_at_least_once(self, agent_src):
-        for alias in [
-            "mv-valid-columns-merge-joins",
-            "mv-attrs-by-key-stash",
-            "ai-agent-call-fix",
-            "mv-fallback-emit-live",
-            "vibe-metadata-honest",
-        ]:
-            assert agent_src.count(alias) >= 2, f"{alias} not present (need >=2 hits)"
+           for alias in [
+                   "mv-valid-columns-merge-joins",
+                   "mv-attrs-by-key-stash",
+                   "ai-agent-call-fix",
+                   "mv-fallback-emit-live",
+                   "vibe-metadata-honest",
+                   "valid-joins-init-unconditional",
+                   "domain-to-db-from-config",
+               ]:
+                   assert agent_src.count(alias) >= 2, f"{alias} not present (need >=2 hits)"
+
+
+# ----------------------------------------------------------------------
+# 8. v0.9.9 hotfixes — _valid_joins UnboundLocal + domain_to_db_map NameError
+# ----------------------------------------------------------------------
+class TestV099Hotfixes:
+    def test_valid_joins_initialized_unconditionally(self, agent_src):
+        """`_valid_joins = []` must appear BEFORE the `if isinstance(_mv_joins_raw...` guard."""
+        idx_init = agent_src.find("[valid-joins-init-unconditional FIRED]")
+        assert idx_init > 0, "valid-joins-init-unconditional alias missing"
+        window = agent_src[idx_init:idx_init + 800]
+        assert "_valid_joins = []" in window
+
+    def test_domain_to_db_map_from_config(self, agent_src):
+        """The renderer must read `domain_to_db_map` from config keys."""
+        idx = agent_src.find("[domain-to-db-from-config FIRED]")
+        assert idx > 0, "domain-to-db-from-config alias missing"
+        window = agent_src[idx:idx + 1500]
+        assert "_kpi_first_domain_to_db_map" in window
+        assert "_per_domain_domain_to_db_map" in window
+
+    def test_per_domain_caller_stashes_domain_to_db_map(self, agent_src):
+        """Per-domain caller must setdefault the per-domain map on config before invoking renderer."""
+        assert "_per_domain_domain_to_db_map" in agent_src
+        assert "setdefault('_per_domain_domain_to_db_map'" in agent_src
+
+    def test_no_unbound_valid_joins_pattern(self, agent_src):
+        """Sanity: ensure `_valid_joins` is referenced AFTER an init line in renderer."""
+        idx_fn = agent_src.find("def _render_metric_sql_for_domain_from_llm_spec")
+        assert idx_fn > 0
+        body = agent_src[idx_fn:idx_fn + 30000]
+        init_pos = body.find("_valid_joins = []\n")
+        ref_pos = body.find("if _valid_joins and isinstance")
+        assert init_pos > 0 and ref_pos > 0, "init or ref not found"
+        assert init_pos < ref_pos, "_valid_joins init must precede unconditional ref"
