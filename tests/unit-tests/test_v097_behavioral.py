@@ -312,3 +312,73 @@ class TestMetricViewJoinsRedesign:
             "on": "leg.x = x.id", "type": "INNER"
         }])
         assert len(v) == 0, "non-existent target must be rejected"
+
+
+class TestKpiFirstRedesign:
+    """v0.9.7 batch 4: full top-N KPI-first metric view redesign.
+
+    The user explicitly requested: "the LLM should say what are the top
+    100 metrics of an Airline (for example), and then it try to satisfy
+    these metric form existing model, joining all required tables".
+    """
+
+    def test_kpi_first_step_alias(self, agent_src):
+        assert "kpi-first-step FIRED" in agent_src
+
+    def test_kpi_first_summary_alias(self, agent_src):
+        assert "kpi-first-summary FIRED" in agent_src
+
+    def test_kpi_first_wiring_alias(self, agent_src):
+        assert "kpi-first-wiring FIRED" in agent_src
+
+    def test_new_prompt_template_present(self, agent_src):
+        """KPI_FIRST_GLOBAL_PROMPT must be registered in PROMPT_TEMPLATES."""
+        assert 'PROMPT_TEMPLATES["KPI_FIRST_GLOBAL_PROMPT"]' in agent_src
+
+    def test_new_schema_present(self, agent_src):
+        """_AI_KPI_FIRST_GLOBAL_SCHEMA_BASE must be defined + wrapped with honesty."""
+        assert "_AI_KPI_FIRST_GLOBAL_SCHEMA_BASE" in agent_src
+        assert "AI_KPI_FIRST_GLOBAL_SCHEMA = wrap_schema_with_honesty(_AI_KPI_FIRST_GLOBAL_SCHEMA_BASE)" in agent_src
+
+    def test_new_step_function_present(self, agent_src):
+        """step_generate_kpi_first_metric_views must be defined."""
+        assert "def step_generate_kpi_first_metric_views" in agent_src
+
+    def test_summary_helper_present(self, agent_src):
+        """_build_compact_global_model_summary must be defined."""
+        assert "def _build_compact_global_model_summary" in agent_src
+
+    def test_pipeline_wiring_runs_kpi_first_first(self, agent_src):
+        """Pipeline must call step_generate_kpi_first_metric_views BEFORE
+        step_generate_metric_view_artifacts so KPI-first runs first."""
+        idx_kpi = agent_src.find("step_generate_kpi_first_metric_views(widgets_values)")
+        idx_per_dom = agent_src.find("current_step_func = step_generate_metric_view_artifacts")
+        assert idx_kpi > 0, "KPI-first must be wired into pipeline"
+        assert idx_per_dom > 0, "per-domain must still be wired"
+        assert idx_kpi < idx_per_dom, "KPI-first must be called BEFORE per-domain step"
+
+    def test_prompt_asks_for_top_n_kpis(self, agent_src):
+        """Prompt must ask LLM for top-N KPIs (the user's explicit ask)."""
+        idx = agent_src.find('PROMPT_TEMPLATES["KPI_FIRST_GLOBAL_PROMPT"]')
+        window = agent_src[idx:idx + 8000]
+        assert "top {target_kpi_count} KPIs" in window or "top_kpi" in window.lower(), (
+            "prompt must ask for top-N KPIs"
+        )
+        assert "joins" in window.lower(), "prompt must mention joins"
+        assert "KPI-FIRST" in window or "KPI" in window, "prompt must use KPI-first language"
+
+    def test_schema_includes_joins_and_dim_measures(self, agent_src):
+        """The KPI-first schema must allow LLM to express joins + dims + measures."""
+        idx = agent_src.find("_AI_KPI_FIRST_GLOBAL_SCHEMA_BASE")
+        window = agent_src[idx:idx + 3000]
+        for required in ('"view_name"', '"primary_product"', '"joins"', '"dimensions"', '"measures"'):
+            assert required in window, f"schema must include {required}"
+
+    def test_summary_helper_groups_by_domain(self, agent_src):
+        """The model summary helper must group products by domain."""
+        idx = agent_src.find("def _build_compact_global_model_summary")
+        window = agent_src[idx:idx + 3000]
+        assert "products_by_domain" in window or "Domain:" in window, (
+            "summary must group by domain"
+        )
+        assert "FKs" in window, "summary must include FKs for join discovery"
