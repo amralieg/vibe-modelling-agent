@@ -263,16 +263,17 @@ class TestNotebookIntegrity:
         assert not errors, f"Syntax errors in cells: {errors}"
 
     def test_all_v098_aliases_grep_at_least_once(self, agent_src):
-           for alias, min_hits in [
-                   ("mv-valid-columns-merge-joins", 2),
-                   ("mv-attrs-by-key-stash", 2),
-                   ("ai-agent-call-fix", 2),
-                   ("mv-fallback-emit-live", 2),
-                   ("vibe-metadata-honest", 2),
-                   ("valid-joins-init-unconditional", 1),
-                   ("domain-to-db-from-config", 2),
-               ]:
-                   assert agent_src.count(alias) >= min_hits, f"{alias} not present (need >={min_hits} hits)"
+       for alias, min_hits in [
+               ("mv-valid-columns-merge-joins", 2),
+               ("mv-attrs-by-key-stash", 2),
+               ("ai-agent-call-fix", 2),
+               ("mv-fallback-emit-live", 2),
+               ("vibe-metadata-honest", 2),
+               ("valid-joins-init-unconditional", 1),
+               ("domain-to-db-from-config", 2),
+               ("mv-yaml-no-type-field", 2),
+           ]:
+               assert agent_src.count(alias) >= min_hits, f"{alias} not present (need >={min_hits} hits)"
 
 
 # ----------------------------------------------------------------------
@@ -308,3 +309,28 @@ class TestV099Hotfixes:
         ref_pos = body.find("if _valid_joins and isinstance")
         assert init_pos > 0 and ref_pos > 0, "init or ref not found"
         assert init_pos < ref_pos, "_valid_joins init must precede unconditional ref"
+
+
+# ----------------------------------------------------------------------
+# 9. v1.0.0 hotfix — drop `type:` field from metric-view YAML joins
+# ----------------------------------------------------------------------
+class TestV100MetricViewYamlNoTypeField:
+    def test_renderer_does_not_emit_type_field(self, agent_src):
+        """The metric-view YAML renderer must NOT emit `type: <kind>` lines.
+        Databricks metric views reject the `type` field on joins; emitting it
+        causes [METRIC_VIEW_INVALID_VIEW_DEFINITION] and the view fails to install.
+        """
+        idx_fn = agent_src.find("def _render_metric_sql_for_domain_from_llm_spec")
+        assert idx_fn > 0
+        body = agent_src[idx_fn:idx_fn + 30000]
+        offending = "type: {_vj['type']}"
+        assert offending not in body, (
+            "v1.0.0 regression: metric-view YAML still emits `type:` field — "
+            "Databricks metric-view spec rejects this and the install fails."
+        )
+
+    def test_alias_self_reports_at_runtime(self, agent_src):
+        """`mv-yaml-no-type-field` must self-report `[FIRED]` on every join emission."""
+        assert "[mv-yaml-no-type-field FIRED]" in agent_src, (
+            "v1.0.0 alias not present — no runtime evidence of fix execution."
+        )
