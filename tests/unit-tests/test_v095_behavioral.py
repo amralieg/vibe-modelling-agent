@@ -82,9 +82,14 @@ class TestN2FidelityCountSoftPass:
         assert "fidelity-count-soft-pass FIRED" in agent_src
 
     def test_count_shape_only_fires_in_else_branch(self, agent_src):
-        """Sanity: the count-shape soft pass MUST be inside the else branch
-        of the mapped check, NOT replacing it."""
-        idx_alias = agent_src.find("fidelity-count-soft-pass")
+        """Sanity: the v0.9.5 generic-verifier count-shape soft pass MUST be inside
+        the else branch of the mapped check, NOT replacing it. (v1.0.2 added a
+        separate `fidelity-count-soft-pass-deterministic` alias at a different
+        site, which is intentional; this test targets the v0.9.5 generic pass.)"""
+        idx_alias = agent_src.find("fidelity-count-soft-pass FIRED")
+        while idx_alias != -1 and "-deterministic" in agent_src[idx_alias:idx_alias + 60]:
+            idx_alias = agent_src.find("fidelity-count-soft-pass FIRED", idx_alias + 1)
+        assert idx_alias != -1, "v0.9.5 fidelity-count-soft-pass alias missing"
         idx_mapped = agent_src.find('req.get("status") == "mapped"', idx_alias - 5000)
         assert 0 < idx_mapped < idx_alias, (
             "fidelity-count-soft-pass should appear AFTER the mapped check"
