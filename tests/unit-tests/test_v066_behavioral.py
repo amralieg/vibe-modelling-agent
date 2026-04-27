@@ -208,10 +208,21 @@ def test_v066_new8_stem_score_logic_industry_agnostic():
 
 def test_v066_new8_handles_no_match_gracefully():
     src = _agent_src()
-    # When no stem match is found, the validator must still produce actionable
-    # guidance rather than just rejecting silently.
-    assert "NO STEM-MATCH FOUND — change decision to CREATE/DROP/KEEP_AS_IS" in src, (
-        "No-match-found guidance missing from validator feedback"
+    # v0.6.8 NEW-13 evolved this behavior: when stem suggestions are empty, the
+    # validator no longer just rejects with a "change your decision" message —
+    # which caused the LLM to loop until Max retries (3) exhausted. Instead the
+    # validator now AUTO-COERCES the LINK decision to KEEP_AS_IS deterministically
+    # via [fmfl-auto-coerce-keep FIRED]. This is a strict improvement on the
+    # graceful-handling contract: the no-match path still resolves cleanly, but
+    # without burning retries or polluting the run with soft-accept hatches.
+    assert "fmfl-auto-coerce-keep" in src, (
+        "No-match-found graceful handling missing — expected v0.6.8 NEW-13 auto-coerce path"
+    )
+    assert "[fmfl-auto-coerce-keep FIRED]" in src, (
+        "Auto-coerce FIRED marker missing — auditor cannot verify fix landed"
+    )
+    assert "dec['decision'] = 'KEEP_AS_IS'" in src, (
+        "Auto-coerce branch must mutate dec to KEEP_AS_IS"
     )
 
 
