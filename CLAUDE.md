@@ -132,6 +132,47 @@ Violations to prevent:
 
 The user's `business_domains` list is the SINGLE SOURCE OF TRUTH for minimum required domains. Treat every name in it as IMMUTABLE across the whole pipeline (like `must_have_data_products` today). The ensemble + judge MUST preserve them; if they don't appear in any ensemble variant, the judge MUST inject them; Step 3.7 Principal Architect and Step 3.6 Domain Architect MUST treat them as protected.
 
+## 3a-bis. Global `__AGENT_VERSION__` constant — HARD RULE (added 2026-04-27)
+
+EVERY VERSION OF THE AGENT MUST EXPOSE THE RUNNING VERSION AT TWO PLACES, OR THE FIX IS NOT DONE:
+
+1. **First non-comment line of code in `agent/dbx_vibe_modelling_agent.ipynb` Cell 1:**
+   ```python
+   __AGENT_VERSION__ = "<single-digit-semver>"  # alias=agent-version-global
+   ```
+   - The literal MUST be the FIRST statement after the cell-header comment, BEFORE any other constant, import, or class definition.
+   - The string value MUST follow §3a single-digit semver (e.g. `"0.6.9"`, `"0.7.0"`, `"1.0.0"` — never `"0.6.10"`, `"0.10.0"`).
+
+2. **First top-level property of every generated `model.json`:**
+   ```json
+   {
+     "agent_version": "<same-value-as-__AGENT_VERSION__>",
+     "model_requirements": { ... },
+     "_vibe_session_metadata": { ... },
+     "model": { ... }
+   }
+   ```
+   - The key is `agent_version` (snake_case, no leading underscore).
+   - The value MUST equal `__AGENT_VERSION__` verbatim — no derivation, no prefix, no suffix.
+   - Every model.json rewrite path (metric-view writeback, install metric-view cleanup, install location update) MUST refresh `agent_version` to the running agent's value so an older model.json gets re-stamped on rewrite. NEVER leave stale `agent_version`.
+
+**Pre-deploy mutation rule:**
+- BEFORE EVERY TEST CYCLE: bump `__AGENT_VERSION__` to the new single-digit semver, commit, deploy. The deployed notebook archive name MUST match (`dbx_vibe_modelling_agent_v<NN>` where `NN` is `__AGENT_VERSION__` minus dots — e.g. `0.6.9` → `_v69`, `1.0.0` → `_v100`).
+- BEFORE EVERY TAG-TO-MAIN: decide the next semver, write it into `__AGENT_VERSION__` in the SAME commit that updates `readme.md`, then push. The tag and the constant must agree.
+- The audit grep `grep -E '__AGENT_VERSION__\s*=\s*"<expected>"' agent/dbx_vibe_modelling_agent.ipynb` is part of §10.7 Step 6 deployed-archive verification.
+- Behavioural test in `tests/unit-tests/test_v<NN>_behavioral.py` MUST assert: (a) constant equals expected, (b) it is the first non-comment code statement in Cell 1, (c) generated `model.json` has `agent_version` as the first key with the same value, (d) every rewrite path refreshes/prepends the key.
+
+**Why this rule exists:**
+- Audit cannot tell which agent version produced a given `model.json` from filename alone (versioned volume paths can be re-overwritten by a `vibe modeling of version` operation).
+- Every regression report must cite the agent version that produced the artifact; a missing `agent_version` field is a §8.1 invariant violation that blocks honest scoring.
+- The constant being the FIRST line of code makes a stale-deploy detectable by visual inspection without grep.
+
+Violations that are §8.1 hard fails:
+- Bumping `__AGENT_VERSION__` AFTER the deploy and forgetting to re-deploy → live notebook reports the OLD version while local says the NEW one.
+- Forgetting to update `agent_version` in `model.json` rewrite paths → stale value persists across surgical/install passes.
+- Two-digit semver segment (`"0.6.10"`) → §3a violation that propagates into model.json.
+- Using `version` or `__version__` instead of the canonical `__AGENT_VERSION__` constant → audit grep fails.
+
 ## 3a. Single-digit semver — HARD RULE
 
 EVERY SEGMENT OF THE VERSION NUMBER IS A SINGLE DIGIT 0-9. NEVER TWO OR MORE DIGITS IN ANY SEGMENT. WHEN A SEGMENT REACHES 9, THE NEXT BUMP ROLLS IT TO 0 AND CARRIES +1 TO THE SEGMENT TO ITS LEFT.
