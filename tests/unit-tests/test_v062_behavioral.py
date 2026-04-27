@@ -240,7 +240,8 @@ def test_v062_version_marker_v062_in_notebook_and_readme():
     src = _agent_src()
     assert "v0.6.2" in src
     readme = open("/Users/amr.ali/Documents/projects/vibe-modelling-agent/readme.md").read()
-    assert "Current version: **v0.6.2**" in readme
+    # v0.6.2 must remain in the version-history table even after later releases
+    assert "**v0.6.2**" in readme
 
 
 # =============================================================================
