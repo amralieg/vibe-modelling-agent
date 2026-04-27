@@ -135,8 +135,11 @@ def _readme_src() -> str:
 
 
 def test_v064_readme_current_version_bumped():
+    """v0.6.4 must be reachable from the readme — either as Current version OR as a
+    history-table entry. Once a later version bumps the Current pointer, the v0.6.4
+    history row is the surviving evidence that v0.6.4 shipped."""
     rd = _readme_src()
-    assert "Current version: **v0.6.4**" in rd, "readme Current version line must read v0.6.4"
+    assert "**v0.6.4**" in rd, "readme must reference v0.6.4 (current or history row)"
 
 
 def test_v064_readme_history_entry_present():
