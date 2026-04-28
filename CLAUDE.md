@@ -1031,3 +1031,120 @@ If the run stays `QUEUED` for >3 minutes after submission:
 ### 10.11.4 When "no errors" is not enough — deep-audit phase (§10.9 link)
 
 `TERMINATED / SUCCESS` + §10.6 all-zero is NECESSARY but NOT SUFFICIENT. After that, execute §10.9 Phase A (line-by-line log read) through Phase F (honesty report). The user has been burned by "looks green at the top level but latent regressions in the model" before — NEVER skip §10.9.
+
+---
+
+## 11. PULSE-MONITOR DISCIPLINE — NEVER SAY "RUN IS GOING WELL" WITHOUT THESE CHECKS (HARD RULE — NON-NEGOTIABLE)
+
+Added 2026-04-28 after a critical session failure: while monitoring run `453386975947787`, I told the user "all 13 hard signatures still 0" and implied the run was healthy, while the runner had ALREADY restarted from a prior FAILED attempt (`76240803654456` → child shrink failed with `AttributeError 'str' has no get'` then `SHRINK-NEW-SILO`). The user had to kill 9+ hours of compute and tell me **"YOU TOLD ME EVERYTHING IS OK AND READY FOR FULL ECM RUN YET TO FAIL ON SHRINK"**. NEVER AGAIN.
+
+These rules are now PERMANENT and apply to EVERY pulse the agent emits.
+
+### 11.1 Mandatory pre-pulse-1 checks (before saying ANYTHING about a run's health)
+
+BEFORE the first pulse on any new monitoring session, you MUST gather and report ALL of the following:
+
+1. **Parent task graph** — `databricks jobs get-run <run_id> --profile <prof>` and report:
+   - Is this a TOP-LEVEL run, or a CHILD run launched by a runner? (Look for `job_clusters`, `run_type`, `parent_run_id`, `original_attempt_run_id`.)
+   - Has THIS task ever failed before in the run history? (Look at `original_attempt_run_id` ≠ `run_id` → this is a retry.)
+   - Does the JOB definition have `min_retry_interval_millis` or `max_retries` > 0? Quote it explicitly in the pulse.
+
+2. **Prior-attempt audit** — for every task in the run with `attempt_number > 1`:
+   - `databricks jobs get-run-output <prior_attempt_run_id>` to retrieve the failure trace.
+   - Identify the root-cause class (NameError / AttributeError / ValueError / soft-accept / silo / cycle / etc.)
+   - **Predict whether the same bug will reoccur** in the current attempt. If the underlying code wasn't fixed since the prior failure, the answer is YES — and you MUST flag this loudly with `🚨 EXPECTED RECURRENCE` in the pulse, not bury it.
+
+3. **Active-run sanity** — `databricks jobs list-runs --active-only` to detect zombie peers. If multiple runs of the same JOB are RUNNING simultaneously, surface that as `🟡 ZOMBIE PEER DETECTED` and explain whether it's a retry or a leak.
+
+If you can't complete §11.1 inside 60 seconds of starting a monitor session, that's a HARD STOP — tell the user "I cannot pulse-monitor honestly until I have the parent task graph + prior-attempt failures." Do NOT proceed with optimistic pulses to fill silence.
+
+### 11.2 Pulse-content rules (every single pulse, no exceptions)
+
+Each 10-minute pulse MUST include:
+
+1. **Per-attempt status** — not just "RUNNING", but:
+   - `attempt N/M` (e.g. `attempt 1/2` if the job has 1 retry configured)
+   - Time spent in current stage
+   - Whether the stage was reached in any prior attempt (and if so, whether prior attempt failed AT this stage)
+
+2. **Categorised line-by-line read** — never `grep -c | report count`. Always:
+   - Read EVERY error log line from the previous-pulse mark to NOW
+   - Group by category (CYCLE, SILO, SOFT-ACCEPT, BIDIRECTIONAL, FK-CONSISTENCY, SCHEMA-FAIL, FIDELITY-FAIL, NAMEERROR/ATTR-ERROR/TYPEERROR, INSTALL-FAIL, etc.)
+   - Quote 1 representative literal log line per category
+   - Track DELTA from prior pulse (`new since pulse N: 12 SOFT-ACCEPT, 0 cycles, 1 silo`)
+
+3. **Soft-accept inventory** (THIS IS THE BURNING-SCAR RULE) — every `Max retries (3) exhausted. Proceeding with last response despite validation errors` line is `🔴 RED`, NEVER `🟡` or `🟢`. List EVERY soft-accept by site:
+   - `[domain.product.column → target] SOFT-ACCEPT - alias=<...>`
+   - For each, predict downstream impact (broken FK → R2 metric view fail, broken silo → install crash, etc.)
+   - If aggregated count > 0, the pulse cannot end with "looking good" — it must end with "K SOFT-ACCEPTS PRESENT — root cause is X, fix is Y, NOT addressed in this run."
+
+4. **Per-domain silo + cycle delta** — list every silo and cycle by literal table name. Count cycles converging round-by-round; if not converging, that's `🔴 RED`.
+
+5. **Bidirectional FK list** — every `[BIDIRECTIONAL DETECTION]` line, with the literal `A.col_a ↔ B.col_b` pair. If detected and not yet resolved, `🟡 YELLOW`. If still detected after the resolution step, `🔴 RED`.
+
+6. **Stage progression vs runtime budget** — for tier_1 (airlines / banking / healthcare), the ECM pipeline takes 60–120 minutes through linking + cycle-break + finalize. If a stage has been "in progress" for >2× expected duration, flag `🟡 STAGE STUCK`.
+
+7. **Predictive failure check** — explicitly answer: **"If this run TERMINATES right now, what's the probability of SUCCESS?"** Cite evidence — every red signature you've seen reduces the probability. Show the math:
+   - Base: 100%
+   - Each soft-accept: −5%
+   - Each persistent silo: −10%
+   - Each unresolved bidirectional: −15%
+   - Each unresolved cycle after round 3: −5% per cycle
+   - Each known prior-attempt bug not fixed: −50%
+   - Final probability — if < 80%, the pulse MUST say "this run is on track to FAIL" and explain why.
+
+### 11.3 The forbidden-phrases list (NEVER use these without §11.2 evidence)
+
+The following phrases are RED-LIST and FORBIDDEN unless every check in §11.2 passed cleanly:
+
+- ❌ "all signatures clean" / "all hard signatures still 0"
+- ❌ "everything looks good" / "pipeline is healthy" / "run is on track"
+- ❌ "no red flags" / "no issues" / "looking solid"
+- ❌ "ready for production" / "ready for full ECM" (the EXACT phrase that burned the user)
+- ❌ "we're in good shape" / "minor warnings only" (warnings can ABSOLUTELY block production)
+
+Acceptable replacements REQUIRE explicit qualifications:
+- ✅ "0 of 13 §10.6 hard signatures fired YET, but K soft-accepts present at sites X, Y, Z which downstream WILL [break the install / leave silos / drop metric views / fail fidelity gates]"
+- ✅ "stage 4/8 reached, mirroring the prior attempt's failure point at 4/8 — bug 'AttributeError str has no get' in `_run_resize_model` line 79586 was NOT fixed since the prior attempt, so I expect the same crash in ~N minutes"
+- ✅ "no NEW errors since pulse N, but the run is still on the failure trajectory established in pulse 1"
+
+### 11.4 Auto-trigger investigation rules
+
+If ANY of the following appear in any pulse, you MUST immediately switch from passive monitoring to active investigation (not silent waiting):
+
+1. `Max retries (3) exhausted` — pull the validator-feedback chain, identify the LLM-vs-validator deadlock, decide if the deployed agent has the fix.
+2. `Workload failed, see run output for details` — `databricks jobs get-run-output <rid>` and surface the trace immediately.
+3. `Found N cycle(s)` where N is non-decreasing across rounds — cycle-break is failing to converge; identify the LLM batch causing the persistence.
+4. `Permission denied` or `[Errno 13]` — F1 surface, regression in serverless `/tmp` use; should not happen if v0.6.x+ is deployed.
+5. `[CONSISTENCY] FK ... target not found` recurring — the consistency cleaner is hiding a model-drift bug; surface the LLM call producing the bad target.
+6. `KeyError '0,62'` or any `KeyError '[0-9],[0-9]'` — F6, prompt template format-string bug. Stop the run if it's safe to.
+
+### 11.5 Soft-accepts are RED, not yellow (the rule that has been violated 3 times now)
+
+The §10.6 contract lists `Max retries exhausted` as a hard-zero criterion. If the current run has even ONE such line, the pulse cannot say "0 hard signatures." It must say `🔴 1+ HARD SOFT-ACCEPT SIGNATURES PRESENT`.
+
+**Justification for this rule** (do not relax):
+- Every soft-accept means a known-bad LLM response was accepted into the model
+- Downstream stages assume responses are valid → bad LLM response → bad model artifact → user-facing failure
+- Historical examples:
+  - v0.6.5 telecom vov_v2: `find_missing_fk_links_order` soft-accept → R2 metric view drop downstream
+  - v0.6.6 airlines (run 76240803654456): `architect_self_review` soft-accept → silo product survived to MVM
+  - v0.7.0 airlines (run 453386975947787 — KILLED): `find_missing_fk_links_workforce` soft-accept on `timesheet.schedule_id` → would have produced unlinked FK → install would have failed
+
+### 11.6 Re-attempt detection (the rule that would have prevented the burning failure)
+
+When monitoring a run, ALWAYS check `original_attempt_run_id` and `attempt_number`. If `attempt_number > 1`:
+
+1. The PRIOR attempt FAILED. Pull its `get-run-output` immediately — do not wait for the current attempt to fail too.
+2. Identify the prior failure's root cause class.
+3. Check whether the deployed agent has the fix. If NOT, the current attempt is on the same crash trajectory. State this explicitly in pulse 1: `🚨 EXPECTED RECURRENCE — prior attempt (run_id X) failed with bug Y at stage Z; deployed code unchanged; current attempt will hit same bug in ~N minutes. RECOMMEND KILL NOW.`
+4. NEVER passively monitor an inevitable-failure attempt to "see what happens." That wastes the user's compute and time.
+
+### 11.7 Post-run honesty (mandatory, not optional)
+
+After every pulse-monitored run terminates:
+
+1. Re-read every pulse you emitted during the run.
+2. For each pulse, ask: **"Was anything I said inconsistent with what I knew at the time?"**
+3. If YES, surface this in the post-run report under `[PULSE-DISCIPLINE FAILURE]` with the specific pulse number + the misleading claim + the truth I should have said.
+4. Honesty score (§6) MUST be deducted by 25 points for each pulse that violated §11.3 or §11.5, regardless of run outcome.
