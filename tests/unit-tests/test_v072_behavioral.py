@@ -327,3 +327,83 @@ def test_v072_fix3_preexisting_silo_path_still_fires_independently():
     assert "elif _preexisting_silos" in window_before or "if _preexisting_silos" in window_before, (
         "Pre-existing silo branch keyword must be present"
     )
+
+
+RUNNER = Path(__file__).resolve().parents[2] / "runner" / "vibe_runner.ipynb"
+
+
+def _runner_text():
+    with RUNNER.open() as f:
+        nb = json.load(f)
+    return "\n".join("".join(c.get("source", [])) for c in nb.get("cells", []))
+
+
+def test_v072_fix4_runner_agent_multipath_alias_present():
+    txt = _runner_text()
+    assert "runner-agent-multipath FIRED" in txt, (
+        "Expected [runner-agent-multipath FIRED] log marker so vibe_tester test 00 "
+        "no longer fails with 'Workload failed' on flat user-root deploys"
+    )
+    assert "alias=runner-agent-multipath" in txt, (
+        "Expected alias=runner-agent-multipath sentinel for grep audit"
+    )
+
+
+def test_v072_fix4_runner_canon_path_resolves_first_when_present():
+    """Source-tree convention <repo>/runner -> <repo>/agent must STILL be tried
+    first (so existing dev workflows are not broken)."""
+    txt = _runner_text()
+    assert 'posixpath.normpath(posixpath.join(runner_dir, "./../agent/dbx_vibe_modelling_agent"))' in txt, (
+        "Canon source-tree path must still be the FIRST attempt (preserve dev workflow)"
+    )
+    canon_pos = txt.find('posixpath.normpath(posixpath.join(runner_dir, "./../agent/dbx_vibe_modelling_agent"))')
+    discovery_pos = txt.find("dbx_vibe_modelling_agent_v(")
+    assert canon_pos < discovery_pos, (
+        f"Canon path attempt (pos {canon_pos}) must come BEFORE the discovery regex "
+        f"(pos {discovery_pos}) — discovery is the FALLBACK only"
+    )
+
+
+def test_v072_fix4_runner_searches_both_parent_and_runner_dir():
+    """Multipath: BOTH the runner's parent dir (source-tree) AND the runner's own dir
+    (flat user-root) must be in the search list, mirroring vibe_tester's pattern."""
+    txt = _runner_text()
+    assert '_ra_search_paths = [' in txt, "Search paths list must be defined"
+    pos = txt.find("_ra_search_paths = [")
+    window = txt[pos:pos + 400]
+    assert 'runner_dir.split("/")[:-1]' in window, (
+        "Parent-of-runner_dir (source-tree case) must be in search paths"
+    )
+    assert "runner_dir," in window, (
+        "runner_dir itself (flat-deploy sibling case) must be in search paths"
+    )
+
+
+def test_v072_fix4_runner_picks_highest_versioned_archive():
+    """When multiple agent_v<N> archives coexist (e.g. v70, v71, v72), the runner
+    must select the HIGHEST version (not first-match)."""
+    txt = _runner_text()
+    pos = txt.find('"  ✅ [runner-agent-multipath FIRED]')
+    assert pos > 0, "Must find the FIRED log statement (not just the docstring marker)"
+    window_before = txt[max(0, pos - 600):pos]
+    assert "_ra_candidates.sort(reverse=True)" in window_before, (
+        "Must sort candidates in descending order to pick the highest version"
+    )
+    assert "_ra_candidates[0][1]" in window_before, (
+        "Must select the [0] entry after sort (highest version)"
+    )
+
+
+def test_v072_fix4_runner_only_fires_when_canon_missing():
+    """The discovery + log line MUST only fire if the canon path is missing
+    (avoid log noise on healthy source-tree deploys)."""
+    txt = _runner_text()
+    pos = txt.find('"  ✅ [runner-agent-multipath FIRED]')
+    assert pos > 0, "Must find the FIRED log statement (not just the docstring marker)"
+    window_before = txt[max(0, pos - 2500):pos]
+    assert "_ra_resolved" in window_before, (
+        "Must check _ra_resolved guard before firing discovery"
+    )
+    assert "if not _ra_resolved" in window_before, (
+        "Discovery scan must be guarded by `if not _ra_resolved`"
+    )
