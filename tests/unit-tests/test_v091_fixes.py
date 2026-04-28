@@ -47,23 +47,27 @@ class TestShrinkInputSiloPassThrough:
         assert "_new_silos" in agent_src
         assert "_preexisting_silos" in agent_src
 
-    def test_only_new_silos_raise(self, agent_src):
-        # The new code raises ValueError ONLY when _new_silos is non-empty.
-        # Find the alias and verify the raise is inside an `if _new_silos:`.
+    def test_only_new_silos_trigger_recovery(self, agent_src):
         idx = agent_src.find("shrink-input-silo-pass-through")
         assert idx > 0
-        snippet = agent_src[idx:idx + 4000]
+        snippet = agent_src[idx:idx + 12000]
         assert "if _new_silos:" in snippet
-        # The raise should be inside the if-new-silos branch.
+        assert "shrink-orphan-drop FIRED" in snippet, (
+            "v0.7.4: new-silos branch must auto-drop orphans (alias=shrink-orphan-drop) "
+            "instead of raising"
+        )
         assert (
-            "v0.9.1 SHRINK-NEW-SILO" in snippet
-            and "raise ValueError" in snippet
+            "shrink-fk-densest-fallback" in snippet
+            or "shrink-cascade-iterate" in snippet
+        ), (
+            "v0.7.4 R2-1/R2-2: when auto-drop empties or cascades, recovery must engage "
+            "(no raise on recoverable shrink failures)"
         )
 
     def test_preexisting_logs_warning_and_next_vibes(self, agent_src):
         idx = agent_src.find("shrink-input-silo-pass-through")
         assert idx > 0
-        snippet = agent_src[idx:idx + 4000]
+        snippet = agent_src[idx:idx + 30000]
         assert "elif _preexisting_silos:" in snippet
         assert "Shrink plan PASS-THROUGH" in snippet
         assert 'rule_id="PREEXISTING_INPUT_SILO"' in snippet
