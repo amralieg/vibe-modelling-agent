@@ -18,7 +18,7 @@ AGENT = Path(__file__).resolve().parents[2] / "agent" / "dbx_vibe_modelling_agen
 README = Path(__file__).resolve().parents[2] / "readme.md"
 CLAUDE_MD = Path(__file__).resolve().parents[2] / "CLAUDE.md"
 
-EXPECTED_VERSION = "0.6.9"
+EXPECTED_VERSION_INTRODUCED = "0.6.9"
 
 
 def _agent_cells():
@@ -48,12 +48,19 @@ def _first_code_cell_source():
 
 
 def test_v069_constant_value_matches_expected():
+    """The v0.6.9 contract: a single-digit-semver __AGENT_VERSION__ constant
+    must exist. The exact value naturally bumps each release (v0.6.9 was the
+    introducing version; v0.7.0 onward keep the contract). Any conformant
+    single-digit semver passes; pinning to a specific value would force this
+    test to break on every release bump, which is not the intent."""
     txt = _agent_text()
     pat = re.compile(r'__AGENT_VERSION__\s*=\s*"([^"]+)"')
     m = pat.search(txt)
     assert m is not None, "__AGENT_VERSION__ constant not found in agent notebook"
-    assert m.group(1) == EXPECTED_VERSION, (
-        f"__AGENT_VERSION__ value '{m.group(1)}' != expected '{EXPECTED_VERSION}'"
+    val = m.group(1)
+    assert re.fullmatch(r"\d\.\d\.\d", val), (
+        f"__AGENT_VERSION__ value '{val}' must be single-digit semver "
+        f"(introduced in v{EXPECTED_VERSION_INTRODUCED}, evolves per release)"
     )
 
 
@@ -69,9 +76,6 @@ def test_v069_constant_is_first_code_line_in_cell1():
 
 
 def test_v069_constant_is_single_digit_semver():
-    assert re.fullmatch(r"\d\.\d\.\d", EXPECTED_VERSION), (
-        f"EXPECTED_VERSION '{EXPECTED_VERSION}' violates §3a single-digit semver"
-    )
     txt = _agent_text()
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', txt)
     assert m and re.fullmatch(r"\d\.\d\.\d", m.group(1)), (
@@ -149,16 +153,37 @@ def test_v069_no_two_digit_semver_in_constant():
 
 
 def test_v069_readme_current_version_matches():
+    """The readme 'Current version' line must reference the same version as
+    the agent's __AGENT_VERSION__ constant (whatever the current value is).
+    The introducing version was v0.6.9; subsequent releases bump both in
+    lock-step per the v0.6.9 contract."""
     text = README.read_text(encoding="utf-8")
-    assert f"Current version: **v{EXPECTED_VERSION}**" in text, (
-        f"readme.md 'Current version' line must reference v{EXPECTED_VERSION}"
+    txt = _agent_text()
+    m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', txt)
+    assert m is not None, "__AGENT_VERSION__ constant not found in agent notebook"
+    cur_version = m.group(1)
+    assert f"Current version: **v{cur_version}**" in text, (
+        f"readme.md 'Current version' line must match agent __AGENT_VERSION__ "
+        f"(expected v{cur_version})"
     )
 
 
 def test_v069_readme_history_row_present():
+    """The readme version-history table must have a row for the introducing
+    version (v0.6.9) AND for the current version. The introducing-version
+    row preserves the historical record; the current-version row proves the
+    bump-and-document discipline is honoured."""
     text = README.read_text(encoding="utf-8")
-    assert f"| **v{EXPECTED_VERSION}** |" in text, (
-        f"readme.md Version-history table must have a row for v{EXPECTED_VERSION}"
+    assert f"| **v{EXPECTED_VERSION_INTRODUCED}** |" in text, (
+        f"readme.md must preserve the v{EXPECTED_VERSION_INTRODUCED} history row "
+        "(version that introduced the __AGENT_VERSION__ contract)"
+    )
+    txt = _agent_text()
+    m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', txt)
+    cur_version = m.group(1) if m else None
+    assert cur_version, "__AGENT_VERSION__ not found"
+    assert f"| **v{cur_version}** |" in text, (
+        f"readme.md must have a Version-history row for current v{cur_version}"
     )
 
 
@@ -175,9 +200,9 @@ def test_v069_claude_md_documents_rule():
 def test_v069_simulated_model_json_serializes_agent_version_first():
     """Simulate the model_json_root assembly and confirm json.dump preserves
     insertion order with agent_version first."""
-    __AGENT_VERSION__ = EXPECTED_VERSION
+    cur = _current_agent_version()
     model_json_root = {
-        "agent_version": __AGENT_VERSION__,
+        "agent_version": cur,
         "model_requirements": {"business_name": "test"},
         "_vibe_session_metadata": {"status": "test"},
         "model": {"type": "business", "name": "test", "domains": []},
@@ -188,35 +213,43 @@ def test_v069_simulated_model_json_serializes_agent_version_first():
     assert keys[0] == "agent_version", (
         f"agent_version must be the FIRST top-level key; got {keys}"
     )
-    assert parsed["agent_version"] == EXPECTED_VERSION
+    assert parsed["agent_version"] == _current_agent_version()
+
+
+def _current_agent_version():
+    """Read __AGENT_VERSION__ value from the agent notebook."""
+    txt = _agent_text()
+    m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', txt)
+    assert m, "__AGENT_VERSION__ constant not found in agent notebook"
+    return m.group(1)
 
 
 def test_v069_simulated_rewrite_path_refreshes_stale_agent_version():
     """Simulate the rewrite-path logic that an older model.json gets re-stamped."""
-    __AGENT_VERSION__ = EXPECTED_VERSION
+    cur = _current_agent_version()
     stale = {
         "agent_version": "0.6.5",
         "model_requirements": {},
         "model": {},
     }
     if "agent_version" in stale:
-        stale["agent_version"] = __AGENT_VERSION__
+        stale["agent_version"] = cur
     else:
-        stale = {"agent_version": __AGENT_VERSION__, **stale}
-    assert stale["agent_version"] == EXPECTED_VERSION
+        stale = {"agent_version": cur, **stale}
+    assert stale["agent_version"] == cur
     keys = list(stale.keys())
     assert keys[0] == "agent_version"
 
 
 def test_v069_simulated_rewrite_path_prepends_when_missing():
-    __AGENT_VERSION__ = EXPECTED_VERSION
+    cur = _current_agent_version()
     legacy = {"model_requirements": {}, "model": {}}
     if "agent_version" in legacy:
-        legacy["agent_version"] = __AGENT_VERSION__
+        legacy["agent_version"] = cur
     else:
-        legacy = {"agent_version": __AGENT_VERSION__, **legacy}
+        legacy = {"agent_version": cur, **legacy}
     assert list(legacy.keys())[0] == "agent_version"
-    assert legacy["agent_version"] == EXPECTED_VERSION
+    assert legacy["agent_version"] == cur
 
 
 def test_v069_prior_aliases_preserved():
