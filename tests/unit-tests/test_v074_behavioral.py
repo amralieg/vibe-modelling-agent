@@ -302,7 +302,6 @@ def test_v074_readme_current_version_matches():
 def test_v074_readme_version_history_row_exists():
     rd = (REPO_ROOT / "readme.md").read_text()
     assert "| **v0.7.4** |" in rd, "readme version-history must include a v0.7.4 row"
-    # Each NEW-* alias must be documented.
     for alias in (
         "runner-single-biz-fallback",
         "shrink-fk-densest-fallback",
@@ -310,5 +309,132 @@ def test_v074_readme_version_history_row_exists():
         "ensemble-singleshot-fallback",
         "install-ddl-retry-skip",
         "runner-failure-manifest",
+        "runner-folder-path-discovery",
+        "fidelity-deterministic-attr-count",
+        "fidelity-deterministic-fk-density",
+        "vibe-tester-inner-workflow-error-capture",
     ):
         assert alias in rd, f"v0.7.4 readme entry must mention alias=`{alias}`"
+
+
+TESTER_NB = REPO_ROOT / "tests" / "vibe_tester.ipynb"
+
+
+def test_v074_runner_folder_path_discovery_alias_present():
+    src = _load_nb_source(RUNNER_NB)
+    assert "runner-folder-path-discovery" in src, (
+        "NEW-7 alias must appear in vibe_runner.ipynb (folder_path discovery)"
+    )
+
+
+def test_v074_runner_folder_path_discovery_anchors_under_user_home():
+    src = _load_nb_source(RUNNER_NB)
+    assert "vibe_runner_models" in src, (
+        "NEW-7 fix must use the discovered runner workspace path to anchor folder_path "
+        "(e.g. /Workspace/Users/<user>/vibe_runner_models) instead of './../models'"
+    )
+    assert "/tmp/vibe_runner_models" in src, (
+        "NEW-7 must include /tmp fallback so non-/Users/ deploys (or notebook-context unavailable) still work"
+    )
+
+
+def test_v074_runner_folder_path_discovery_fires_before_makedirs():
+    src = _load_nb_source(RUNNER_NB)
+    discovery_pos = src.find("[runner-folder-path-discovery FIRED]")
+    assert discovery_pos > -1, "Discovery FIRED marker must exist"
+    makedirs_pos = src.find("os.makedirs(folder_path", discovery_pos)
+    assert makedirs_pos > discovery_pos, (
+        "folder_path discovery must run before os.makedirs(folder_path) so the resolved "
+        "path (not the './../models' default) is materialised"
+    )
+
+
+def test_v074_runner_folder_path_makedirs_is_wrapped_in_try():
+    src = _load_nb_source(RUNNER_NB)
+    pos = src.find("os.makedirs(folder_path, exist_ok=True)")
+    assert pos > -1, "os.makedirs call must remain"
+    window_before = src[max(0, pos - 200): pos]
+    assert "try:" in window_before, (
+        "os.makedirs(folder_path) MUST be wrapped in try/except so a permission failure "
+        "on the discovered path falls back to /tmp instead of crashing the runner"
+    )
+
+
+def test_v074_fidelity_deterministic_attr_count_alias_present():
+    src = _load_nb_source(AGENT_NB)
+    assert "fidelity-deterministic-attr-count" in src, (
+        "NEW-8 alias must appear in dbx_vibe_modelling_agent.ipynb (deterministic attr-count verifier)"
+    )
+
+
+def test_v074_fidelity_deterministic_attr_count_uses_attrs_by_product():
+    src = _load_nb_source(AGENT_NB)
+    pos = src.find("[fidelity-deterministic-attr-count FIRED]")
+    assert pos > -1
+    block = src[max(0, pos - 4000): pos + 1500]
+    assert "attrs_by_product" in block, (
+        "Verifier must use the existing per-product attribute index; do NOT recompute"
+    )
+    assert "between" in block.lower() and "attributes" in block.lower(), (
+        "Verifier regex must accept 'between N and M attributes per product' phrasing"
+    )
+
+
+def test_v074_fidelity_deterministic_fk_density_alias_present():
+    src = _load_nb_source(AGENT_NB)
+    assert "fidelity-deterministic-fk-density" in src, (
+        "NEW-9 alias must appear in dbx_vibe_modelling_agent.ipynb (deterministic FK-density verifier)"
+    )
+
+
+def test_v074_fidelity_deterministic_fk_density_counts_inbound_and_outbound():
+    src = _load_nb_source(AGENT_NB)
+    pos = src.find("[fidelity-deterministic-fk-density FIRED]")
+    assert pos > -1
+    block = src[max(0, pos - 5000): pos + 1500]
+    assert "_v074_fk_inbound" in block and "_v074_fk_outbound" in block, (
+        "FK density check must consider BOTH inbound and outbound FK relationships per product"
+    )
+
+
+def test_v074_fidelity_verifiers_run_before_fallthrough_partial():
+    """The new verifiers MUST execute BEFORE the 'no specific pattern matched' fall-through,
+    otherwise they're dead code."""
+    src = _load_nb_source(AGENT_NB)
+    attr_pos = src.find("[fidelity-deterministic-attr-count FIRED]")
+    fk_pos = src.find("[fidelity-deterministic-fk-density FIRED]")
+    fallthrough_pos = src.rfind("Deterministic verification: no specific pattern matched for this requirement")
+    assert attr_pos < fallthrough_pos, "attr-count verifier must precede fall-through"
+    assert fk_pos < fallthrough_pos, "fk-density verifier must precede fall-through"
+
+
+def test_v074_vibe_tester_inner_workflow_error_capture_alias_present():
+    src = _load_nb_source(TESTER_NB)
+    assert "vibe-tester-inner-workflow-error-capture" in src, (
+        "NEW-10 alias must appear in tests/vibe_tester.ipynb (inner workflow error capture)"
+    )
+
+
+def test_v074_vibe_tester_inner_workflow_capture_uses_workflow_run_type():
+    src = _load_nb_source(TESTER_NB)
+    pos = src.find("[vibe-tester-inner-workflow-error-capture FIRED]")
+    assert pos > -1
+    window = src[max(0, pos - 3000): pos + 800]
+    assert "WORKFLOW_RUN" in window, (
+        "Inner-workflow capture must enumerate jobs via run_type='WORKFLOW_RUN' "
+        "(dbutils.notebook.run produces hidden workflow runs not in default list)"
+    )
+    assert "get_run_output" in window, (
+        "Capture must call get_run_output() to retrieve the inner notebook's error_trace"
+    )
+
+
+def test_v074_vibe_tester_inner_workflow_capture_filters_by_runner_path():
+    src = _load_nb_source(TESTER_NB)
+    pos = src.find("[vibe-tester-inner-workflow-error-capture FIRED]")
+    assert pos > -1
+    window = src[max(0, pos - 3000): pos + 800]
+    assert "runner_notebook" in window, (
+        "Capture must filter workflow runs by notebook_path matching `runner_notebook` "
+        "to avoid grabbing an unrelated failed workflow run"
+    )
