@@ -313,6 +313,10 @@ def test_v074_readme_version_history_row_exists():
         "fidelity-deterministic-attr-count",
         "fidelity-deterministic-fk-density",
         "vibe-tester-inner-workflow-error-capture",
+        "mv-stale-catalog-rewrite",
+        "run-test-inner-workflow-error-capture",
+        "vibe-attr-cap-override",
+        "mv-date-interval-autofix",
     ):
         assert alias in rd, f"v0.7.4 readme entry must mention alias=`{alias}`"
 
@@ -437,4 +441,128 @@ def test_v074_vibe_tester_inner_workflow_capture_filters_by_runner_path():
     assert "runner_notebook" in window, (
         "Capture must filter workflow runs by notebook_path matching `runner_notebook` "
         "to avoid grabbing an unrelated failed workflow run"
+    )
+
+
+def test_v074_run_test_inner_workflow_error_capture_alias_present():
+    src = _load_nb_source(TESTER_NB)
+    assert "run-test-inner-workflow-error-capture" in src, (
+        "NEW-12 alias must appear in tests/vibe_tester.ipynb — extends inner-workflow capture into run_test() helper"
+    )
+
+
+def test_v074_run_test_inner_workflow_capture_uses_workflow_run_type():
+    src = _load_nb_source(TESTER_NB)
+    pos = src.find("[run-test-inner-workflow-error-capture FIRED]")
+    assert pos > -1, "FIRED marker for run-test-inner-workflow-error-capture must exist"
+    window = src[max(0, pos - 3500): pos + 800]
+    assert "WORKFLOW_RUN" in window, (
+        "run_test() inner-workflow capture must enumerate run_type='WORKFLOW_RUN'"
+    )
+    assert "get_run_output" in window, (
+        "run_test() inner-workflow capture must use get_run_output() for error_trace"
+    )
+
+
+def test_v074_mv_stale_catalog_rewrite_alias_present():
+    src = _load_nb_source(AGENT_NB)
+    assert "mv-stale-catalog-rewrite" in src, (
+        "NEW-11 alias must appear in agent/dbx_vibe_modelling_agent.ipynb (MV stale catalog rewrite guard)"
+    )
+
+
+def test_v074_mv_stale_catalog_rewrite_runs_before_execute():
+    """The rewrite guard must execute BEFORE execute_metric_views_in_parallel_no_halt.
+    Otherwise stale catalog refs (e.g., MVM_v2 inheriting ecomm_ecm) reach the executor and fail."""
+    src = _load_nb_source(AGENT_NB)
+    fired_pos = src.find("[mv-stale-catalog-rewrite FIRED]")
+    assert fired_pos > -1
+    exec_pos = src.find("execute_metric_views_in_parallel_no_halt(", fired_pos)
+    assert exec_pos > fired_pos, (
+        "mv-stale-catalog-rewrite must rewrite stmts BEFORE execute_metric_views_in_parallel_no_halt is invoked"
+    )
+
+
+def test_v074_mv_stale_catalog_rewrite_excludes_protected_catalogs():
+    src = _load_nb_source(AGENT_NB)
+    pos = src.find("[mv-stale-catalog-rewrite FIRED]")
+    assert pos > -1
+    window = src[max(0, pos - 4000): pos + 500]
+    for protected in ("system", "samples", "hive_metastore", "__databricks_internal"):
+        assert protected in window, (
+            f"Catalog '{protected}' must be in the protected-list and never rewritten"
+        )
+
+
+def test_v074_mv_stale_catalog_rewrite_respects_existing_catalogs():
+    src = _load_nb_source(AGENT_NB)
+    pos = src.find("[mv-stale-catalog-rewrite FIRED]")
+    assert pos > -1
+    window = src[max(0, pos - 4000): pos + 500]
+    assert "SHOW CATALOGS" in window, (
+        "Rewrite guard must enumerate live catalogs (SHOW CATALOGS) so it only rewrites STALE refs, not legit cross-catalog refs to existing catalogs"
+    )
+
+
+def test_v074_vibe_attr_cap_override_alias_present():
+    src = _load_nb_source(AGENT_NB)
+    assert "vibe-attr-cap-override" in src, (
+        "NEW-13 alias must appear in agent/dbx_vibe_modelling_agent.ipynb (user-vibe attribute cap override)"
+    )
+
+
+def test_v074_vibe_attr_cap_override_modifies_prompt_variables():
+    src = _load_nb_source(AGENT_NB)
+    pos = src.find("[vibe-attr-cap-override FIRED]")
+    assert pos > -1
+    window = src[max(0, pos - 4000): pos + 500]
+    assert "min_attributes_per_product" in window and "max_attributes_per_product" in window, (
+        "vibe-attr-cap-override must mutate PROMPT_VARIABLES.min/max_attributes_per_product so the generation prompt reflects the user cap"
+    )
+
+
+def test_v074_vibe_attr_cap_override_after_authority_init():
+    """The cap override must run AFTER apply_vibe_authority_overrides so it is part of the
+    user-king authority chain, not a parallel system."""
+    src = _load_nb_source(AGENT_NB)
+    auth_pos = src.find("apply_vibe_authority_overrides(config, widgets_values")
+    cap_pos = src.find("[vibe-attr-cap-override FIRED]")
+    assert auth_pos > -1
+    assert cap_pos > auth_pos, (
+        "vibe-attr-cap-override must run AFTER apply_vibe_authority_overrides() to compose with §3c authority chain (CLAUDE.md §3d)"
+    )
+
+
+def test_v074_mv_date_interval_autofix_alias_present():
+    src = _load_nb_source(AGENT_NB)
+    assert "mv-date-interval-autofix" in src, (
+        "NEW-14 alias must appear in agent/dbx_vibe_modelling_agent.ipynb (date-interval cast autofix)"
+    )
+
+
+def test_v074_mv_date_interval_autofix_emits_datediff():
+    src = _load_nb_source(AGENT_NB)
+    pos = src.find("[mv-date-interval-autofix FIRED]")
+    assert pos > -1
+    window = src[max(0, pos - 3000): pos + 500]
+    assert "DATEDIFF" in window, (
+        "Date-interval autofix must rewrite (date - date) expressions to DATEDIFF(date1, date2) "
+        "to avoid INTERVAL DAY → DOUBLE cast failures"
+    )
+
+
+def test_v074_mv_date_interval_autofix_in_sanitizer():
+    """The autofix must live INSIDE _sanitize_metric_measure_expr so EVERY MV measure
+    expression is normalized — not in a one-off helper that isn't invoked everywhere."""
+    src = _load_nb_source(AGENT_NB)
+    sani_pos = src.find("def _sanitize_metric_measure_expr(")
+    fired_pos = src.find("[mv-date-interval-autofix FIRED]")
+    assert sani_pos > -1
+    assert fired_pos > sani_pos, (
+        "mv-date-interval-autofix must be inside the _sanitize_metric_measure_expr function "
+        "(invoked by every measure-expression sanitization path)"
+    )
+    block = src[sani_pos: sani_pos + 5000]
+    assert "[mv-date-interval-autofix FIRED]" in block, (
+        "FIRED marker must be inside the sanitizer function body"
     )
