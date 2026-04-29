@@ -30,10 +30,10 @@ def _load_notebook_source():
     return "\n\n".join(parts)
 
 
-def test_v073_agent_version_is_073():
+def test_v073_agent_version_is_071_release():
     src = _load_notebook_source()
-    assert '__AGENT_VERSION__ = "0.7.3"' in src, (
-        "v0.7.3 deploy must bump __AGENT_VERSION__ to '0.7.3' (CLAUDE.md §3a single-digit semver)"
+    assert '__AGENT_VERSION__ = "0.7.1"' in src, (
+        "v0.7.1 release tag (consolidates dev iterations v0.7.1\u2192v0.7.4) must stamp __AGENT_VERSION__ = '0.7.1'"
     )
 
 
