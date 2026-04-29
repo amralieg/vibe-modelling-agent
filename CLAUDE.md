@@ -628,18 +628,36 @@ This is the canonical cookbook. NEVER skip a step. NEVER take shortcuts. NEVER a
 - Commit with the §10.5 commit-message template. Push to `origin/dev`.
 - `git ls-remote origin dev | grep <sha>` — if not present, you didn't ship.
 
-**Step 2 — DROP all non-system catalogs (no exceptions).**
+**Step 2 — DROP catalogs ONLY when §12 authorises (default = SKIP).**
+
+This step now defers to §12 (CATALOG-DROP OWNERSHIP RULE). The previous "no exceptions" wording was REPLACED 2026-04-29 because the rule produced unauthorised drops on shared workspaces. The new contract:
+
+1. If the current user message did NOT include an explicit cleanup trigger (per §12.7 table), SKIP this step entirely. Move to Step 3.
+2. If cleanup WAS authorised, run the §12.2 ownership-filtered loop:
+
 ```bash
-databricks catalogs list --profile <profile> -o json \
-  | python3 -c "import json,sys;d=json.load(sys.stdin);
-[print(c['name']) for c in (d.get('catalogs',d) if isinstance(d,dict) else d)
- if c.get('catalog_type','')!='SYSTEM_CATALOG'
- and c.get('name') not in ('hive_metastore','samples','system','__databricks_internal')]" \
+PROFILE=<profile>
+ME=$(databricks current-user me --profile "$PROFILE" -o json | python3 -c "import json,sys;print(json.load(sys.stdin)['userName'])")
+databricks catalogs list --profile "$PROFILE" -o json \
+  | python3 -c "
+import json, sys
+me = '$ME'
+d = json.load(sys.stdin)
+cats = d if isinstance(d, list) else d.get('catalogs', [])
+for c in cats:
+    if c.get('catalog_type','') == 'SYSTEM_CATALOG': continue
+    if c.get('name') in ('hive_metastore','samples','system','__databricks_internal'): continue
+    if c.get('owner','') != me:
+        print(f'SKIP {c[\"name\"]} (owner={c.get(\"owner\",\"<none>\")} != me={me})', file=sys.stderr)
+        continue
+    print(c['name'])
+" \
   | while read CAT; do
-      databricks catalogs delete "$CAT" --force --profile <profile>
+      databricks catalogs delete "$CAT" --force --profile "$PROFILE"
     done
 ```
-Verify: `databricks catalogs list` shows ONLY system catalogs.
+
+Verify (when authorised): every catalog still on the workspace is either a system catalog OR owned by another user. No user-owned catalog remains.
 
 **Step 3 — DELETE all prior runs of the canonical JOB.**
 ```bash
@@ -896,7 +914,7 @@ This phase is non-negotiable. Skipping it is a §8.4 / §8.7 violation.
 ### 10.8 Anti-shortcuts (HARD invariants)
 
 - ❌ NEVER deploy to canon path `agent/dbx_vibe_modelling_agent` directly. ALWAYS use `_v<NN>` suffix.
-- ❌ NEVER reuse a catalog from a prior version's run. ALWAYS drop catalogs first.
+- ❌ NEVER reuse a catalog from a prior version's run **WHEN the user authorised cleanup per §12**. If the user did NOT authorise cleanup, the new run runs IN-PLACE on the existing catalog OR on a fresh-named one — never auto-drop.
 - ❌ NEVER skip Step 6 (deployed-archive grep). Even if you "just deployed" — workspace eventual-consistency means the archive may not have the new content for several seconds.
 - ❌ NEVER submit a run before ALL prior runs of this JOB are deleted (Step 3). Stale runs pollute audit triage.
 - ❌ NEVER claim a fix is "verified" without a `[<alias> FIRED]` grep hit on the LIVE run's volume info.log.
@@ -929,7 +947,7 @@ Before touching anything:
 
 2. **Verify reachability** — `git ls-remote origin dev | grep <sha>` must return a hit; `git branch --contains <sha>` must list `dev`. This is §8.6/§8.7 — no exceptions.
 
-3. **Drop non-system catalogs** — `databricks catalogs list -o json` → Python list comprehension skipping `SYSTEM_CATALOG` types and known protected names (`hive_metastore`, `samples`, `system`, `__databricks_internal`). Loop `databricks catalogs delete <name> --force`.
+3. **Drop non-system catalogs (ONLY if §12 authorises)** — defer to §12 ownership rule. SKIP when no cleanup trigger present in user message. When authorised, use §12.2's ownership-filtered loop (filter on `owner == me`).
 
 4. **Delete all prior runs of the canonical JOB** — `databricks jobs list-runs --job-id <JOB_ID> --limit 25 -o json`.
 
@@ -1148,3 +1166,113 @@ After every pulse-monitored run terminates:
 2. For each pulse, ask: **"Was anything I said inconsistent with what I knew at the time?"**
 3. If YES, surface this in the post-run report under `[PULSE-DISCIPLINE FAILURE]` with the specific pulse number + the misleading claim + the truth I should have said.
 4. Honesty score (§6) MUST be deducted by 25 points for each pulse that violated §11.3 or §11.5, regardless of run outcome.
+
+---
+
+## 12. CATALOG-DROP OWNERSHIP RULE — HARD, NON-NEGOTIABLE (added 2026-04-29)
+
+**THE AGENT MUST NEVER DROP, DELETE, OR DESTROY ANY UNITY CATALOG, SCHEMA, TABLE, VOLUME, JOB, OR RUN UNLESS:**
+
+1. **The user has EXPLICITLY requested cleanup** in the current message (or an unambiguous predecessor in the same session). Trigger phrases the user MUST use:
+   - "do a clean up" / "do a cleanup" / "clean up the workspace"
+   - "drop catalogs" / "delete catalogs"
+   - "wipe / reset the workspace"
+   - "fresh start" combined with explicit destructive intent
+   - Any phrase that names the destructive action verbatim (`drop`, `delete`, `destroy`, `wipe`, `reset`, `purge`)
+   
+   **AND**
+
+2. **The catalog/object is OWNED BY THE USER** as confirmed by `databricks catalogs list -o json` `owner` field == the authenticated user's email/principal. NEVER drop a catalog whose `owner` is another user, a service principal, a group, or `account users`. NEVER drop ANY catalog whose ownership cannot be programmatically confirmed.
+
+### 12.1 The default-deny invariant
+
+If the user did NOT explicitly ask for cleanup in the current task, the agent MUST:
+- Skip Step 2 of §10.7 entirely.
+- Skip §10.8's "NEVER reuse a catalog" anti-rule (it does not apply when the user wants to keep prior state).
+- Run the new pipeline IN-PLACE on the existing catalog, OR provision a fresh-named catalog (e.g. `<biz>_<run_tag>`) without touching anything else.
+- Surface in the first pulse: `[CATALOG-DROP RULE §12] No cleanup requested → all existing catalogs preserved. Run will use catalog '<name>'.`
+
+### 12.2 Mandatory ownership filter (when cleanup IS authorised)
+
+Even when the user EXPLICITLY asked for cleanup, the destructive loop MUST filter on `owner` field:
+
+```bash
+PROFILE=<profile>
+ME=$(databricks current-user me --profile "$PROFILE" -o json | python3 -c "import json,sys;print(json.load(sys.stdin)['userName'])")
+databricks catalogs list --profile "$PROFILE" -o json \
+  | python3 -c "
+import json, sys
+me = '$ME'
+d = json.load(sys.stdin)
+cats = d if isinstance(d, list) else d.get('catalogs', [])
+for c in cats:
+    if c.get('catalog_type','') == 'SYSTEM_CATALOG': continue
+    if c.get('name') in ('hive_metastore','samples','system','__databricks_internal'): continue
+    if c.get('owner','') != me:
+        print(f'SKIP {c[\"name\"]} (owner={c.get(\"owner\",\"<none>\")} != me={me})', file=sys.stderr)
+        continue
+    print(c['name'])
+" \
+  | while read CAT; do
+      databricks catalogs delete "$CAT" --force --profile "$PROFILE"
+    done
+```
+
+### 12.3 Forbidden destructive actions WITHOUT explicit cleanup request
+
+The following are §12 hard violations regardless of how convenient they seem:
+- ❌ `databricks catalogs delete` on ANY catalog
+- ❌ `databricks schemas delete` on ANY schema not previously created in this session
+- ❌ `databricks tables delete` on ANY table not previously created in this session
+- ❌ `databricks fs rm -r` on volumes
+- ❌ `databricks jobs delete` on jobs not created in this session
+- ❌ `databricks jobs delete-run` on runs the user did not authorise removal of
+- ❌ Truncating, dropping, or replacing model.json artefacts owned by other users
+
+### 12.4 Job/run cleanup — same rule
+
+§10.7 Steps 3 and 4 (delete prior runs of canonical JOB; delete other jobs) are §12 destructive actions. Only execute when:
+- The user explicitly asked for cleanup, AND
+- The job's `creator_user_name` == the authenticated user
+
+For other users' jobs, the rule is: leave them alone. If a job-id collision blocks the new run, ask the user before deleting.
+
+### 12.5 What §12 does NOT block
+
+The agent CAN freely:
+- CREATE new catalogs, schemas, tables, volumes (the agent is supposed to)
+- WRITE to volumes the agent created
+- LIST anything (read-only operations)
+- SUBMIT new jobs / runs without deleting prior ones (concurrency permitting; surface zombie peers per §11.1.3)
+- READ prior model.json artefacts for analysis
+
+### 12.6 Audit / honesty
+
+Every pulse on a customer-facing run MUST include:
+- `[CATALOG-DROP RULE §12]` line — confirming whether cleanup was authorised, and if not, what was preserved.
+- If cleanup WAS authorised: list of every catalog dropped + owner check evidence.
+
+Violation of §12 (any unauthorised destructive action) is a §6 honesty-score automatic 0 for that iteration AND requires a written apology to the user explaining what was destroyed and how to recover.
+
+### 12.7 Trigger detection rules
+
+To avoid ambiguity, "explicit cleanup request" means the user message contains one of these tokens (case-insensitive, whole-word match):
+
+| Allowed trigger | Scope |
+|---|---|
+| `clean up`, `cleanup`, `clean-up` | Full destructive cleanup OK |
+| `drop catalog(s)`, `delete catalog(s)` | Catalogs only |
+| `drop schema(s)`, `delete schema(s)` | Schemas only |
+| `drop table(s)`, `delete table(s)` | Tables only |
+| `wipe workspace`, `reset workspace` | Full destructive cleanup OK |
+| `fresh start` + (cleanup|reset|wipe) | Full destructive cleanup OK |
+| `purge`, `destroy` | Full destructive cleanup OK |
+
+Phrases that DO NOT qualify and therefore MUST NOT trigger a destructive loop:
+- `start a new run` (could be in-place)
+- `run again` (could reuse existing catalog)
+- `try this vibe` (no destructive intent)
+- `test it` / `test it like you always do` (test protocol §10.7 still defers to §12 for Step 2)
+- `MVM run` / `ECM run` / `vibe modeling of version` (operations, not cleanup)
+
+When in doubt, ASK the user via `AskQuestion` with the recommended option being "Preserve all existing catalogs" (per §7.7 default-recommended).
