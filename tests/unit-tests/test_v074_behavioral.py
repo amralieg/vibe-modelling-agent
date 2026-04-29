@@ -30,10 +30,10 @@ def _load_nb_source(path: Path) -> str:
     return "\n\n".join(parts)
 
 
-def test_v074_agent_version_is_071_release():
+def test_v074_agent_version_is_074_release():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "0.7.1"' in src, (
-        "v0.7.1 release tag (consolidates dev iterations v0.7.1\u2192v0.7.4) must stamp __AGENT_VERSION__ = '0.7.1'"
+    assert '__AGENT_VERSION__ = "0.7.4"' in src, (
+        "v0.7.4 active-SA-autofix-dispatcher release must stamp __AGENT_VERSION__ = '0.7.4'"
     )
 
 
@@ -44,8 +44,8 @@ def test_v074_agent_version_is_first_non_comment_line_of_first_code_cell():
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
     assert code_lines, "First code cell must contain at least one code line"
-    assert '__AGENT_VERSION__ = "0.7.1"' in code_lines[0], (
-        "First non-comment code line of first code cell must declare __AGENT_VERSION__ = \"0.7.1\" (CLAUDE.md §3a-bis)"
+    assert '__AGENT_VERSION__ = "0.7.4"' in code_lines[0], (
+        "First non-comment code line of first code cell must declare __AGENT_VERSION__ = \"0.7.4\" (CLAUDE.md §3a-bis)"
     )
 
 
