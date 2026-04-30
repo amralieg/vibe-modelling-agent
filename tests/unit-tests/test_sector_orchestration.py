@@ -167,9 +167,9 @@ def test_orchestrator_constants_match_user_directives():
     )
 
 
-def test_orchestrator_pulse_interval_is_one_hour():
+def test_orchestrator_pulse_interval_is_10_minutes():
     src = ORCHESTRATOR.read_text()
-    assert "PULSE_INTERVAL_S = 3600" in src, "pulse cadence must be 1 hour per CLAUDE.md §F.6"
+    assert "PULSE_INTERVAL_S = 600" in src, "pulse cadence must be 10 minutes (per user directive 2026-04-30)"
 
 
 def test_orchestrator_supports_kill_switch():

@@ -18,7 +18,7 @@ DEFAULT_STATE_FILE = os.path.expanduser("~/claude/vibe-agent/global_run_state.js
 DEFAULT_JOB_NAME = "dbx_vibe_modelling_sector_runner_v71"
 
 KILL_FILE_NAME = "_kill.json"
-PULSE_INTERVAL_S = 3600
+PULSE_INTERVAL_S = 600
 POLL_INTERVAL_S = 120
 SECTOR_TIMEOUT_S = 6 * 3600
 SUBMIT_RETRY_COUNT = 2
