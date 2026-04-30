@@ -13,7 +13,7 @@ import unittest
 REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 NB_PATH = os.path.join(REPO_ROOT, "agent", "dbx_vibe_modelling_agent.ipynb")
 
-EXPECTED_VERSION = "0.8.0"
+EXPECTED_VERSION = "0.8.1"
 
 
 def _load_notebook_text():
@@ -55,10 +55,12 @@ class TestV080AgentVersion(unittest.TestCase):
         text = _load_notebook_text()
         v_line = [l for l in text.splitlines() if "__AGENT_VERSION__" in l and "alias=agent-version-global" in l]
         self.assertTrue(v_line, "version line not found")
-        # Must mention all 3 fixes
         first = v_line[0]
         self.assertIn("user-vibe-tag-applier", first, "Fix 1 alias not in version comment")
         self.assertIn("mv-product-dedup-guard", first, "Fix 2 alias not in version comment")
+        self.assertIn("mv-column-llm-repair", first, "Fix 3 alias not in version comment")
+        self.assertIn("mv-joins-reenabled", first, "Fix 4a alias not in version comment")
+        self.assertIn("mv-prompt-joins-enabled", first, "Fix 4d alias not in version comment")
 
 
 class TestV080Fix2MVProductDedup(unittest.TestCase):
