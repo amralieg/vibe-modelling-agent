@@ -131,7 +131,13 @@ def find_or_create_job(profile, runner_path, job_name, pulse_file):
 
 
 def upload_sector_to_volume(local_path, profile, remote_volume_dir):
-    remote_path = f"dbfs:{remote_volume_dir}/{os.path.basename(local_path)}"
+    remote_dir = f"dbfs:{remote_volume_dir}"
+    try:
+        db(["fs", "mkdir", remote_dir], profile, timeout=60)
+    except Exception as _mke:
+        if "RESOURCE_ALREADY_EXISTS" not in str(_mke) and "already exists" not in str(_mke).lower():
+            raise
+    remote_path = f"{remote_dir}/{os.path.basename(local_path)}"
     db(["fs", "cp", str(local_path), remote_path, "--overwrite"], profile)
     return f"{remote_volume_dir}/{os.path.basename(local_path)}"
 
@@ -381,6 +387,17 @@ def preflight(profile, runner_path, global_volume, pulse_file):
     except Exception as e:
         log_pulse(f"  [preflight] FAILED: global volume unreachable {global_volume}: {str(e)[:200]}", pulse_file)
         return False
+
+    sectors_subdir = f"{global_volume.rstrip('/')}/_sectors"
+    try:
+        db(["fs", "mkdir", f"dbfs:{sectors_subdir}"], profile, timeout=60)
+        log_pulse(f"  [preflight FIRED] sectors upload subdir ready: {sectors_subdir}", pulse_file)
+    except Exception as e:
+        if "RESOURCE_ALREADY_EXISTS" in str(e) or "already exists" in str(e).lower():
+            log_pulse(f"  [preflight FIRED] sectors upload subdir already present: {sectors_subdir}", pulse_file)
+        else:
+            log_pulse(f"  [preflight] FAILED: cannot create sectors upload subdir {sectors_subdir}: {str(e)[:200]}", pulse_file)
+            return False
 
     try:
         active = db_json(["jobs", "list-runs", "--active-only", "--limit", "25"], profile)
