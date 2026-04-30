@@ -26,8 +26,8 @@ def agent_notebook_obj():
 
 
 def test_agent_version_constant_is_077(agent_code_text):
-    assert '__AGENT_VERSION__ = "0.7.9"' in agent_code_text, \
-        '__AGENT_VERSION__ must be exactly "0.7.9" per CLAUDE.md §3a-bis'
+    assert '__AGENT_VERSION__ = "0.8.0"' in agent_code_text, \
+        '__AGENT_VERSION__ must be exactly "0.8.0" per CLAUDE.md §3a-bis'
 
 
 def test_no_v07x_identifiers_in_agent_code(agent_code_text):
@@ -218,7 +218,7 @@ def test_agent_version_first_non_comment_code_line(agent_notebook_obj):
         first_code_line = s
         break
     assert first_code_line is not None, 'No non-comment code line found in first code cell'
-    assert first_code_line.startswith('__AGENT_VERSION__ = "0.7.9"'), (
+    assert first_code_line.startswith('__AGENT_VERSION__ = "0.8.0"'), (
         f'__AGENT_VERSION__ must be the first non-comment code line of the first code cell. '
         f'Found: {first_code_line[:120]}'
     )

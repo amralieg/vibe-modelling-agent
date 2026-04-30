@@ -51,7 +51,7 @@ from pathlib import Path
 
 AGENT = Path(__file__).resolve().parents[2] / "agent" / "dbx_vibe_modelling_agent.ipynb"
 
-EXPECTED_VERSION = "0.7.9"
+EXPECTED_VERSION = "0.8.0"
 
 
 def _agent_cells():

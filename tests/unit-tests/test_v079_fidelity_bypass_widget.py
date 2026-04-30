@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 NB_PATH = Path(__file__).resolve().parents[2] / "agent" / "dbx_vibe_modelling_agent.ipynb"
-EXPECTED_VERSION = "0.7.9"
+EXPECTED_VERSION = "0.8.0"
 EXPECTED_ALIAS = "fidelity-bypass-widget-live"
 WIDGET_NAME = "vibe_fidelity_gate_halt_disabled"
 

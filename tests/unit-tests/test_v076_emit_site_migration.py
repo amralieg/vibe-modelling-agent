@@ -117,7 +117,7 @@ def _exec_namespace():
 
 def test_agent_version_is_076():
     src = _agent_text()
-    assert '__AGENT_VERSION__ = "0.7.9"' in src, (
+    assert '__AGENT_VERSION__ = "0.8.0"' in src, (
         "must stamp __AGENT_VERSION__ = '0.7.7' (CLAUDE.md §3a-bis)"
     )
 
@@ -127,7 +127,7 @@ def test_agent_version_first_non_comment_line():
     first_code_cell = next(c for c in nb["cells"] if c.get("cell_type") == "code")
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
-    assert '__AGENT_VERSION__ = "0.7.9"' in code_lines[0], (
+    assert '__AGENT_VERSION__ = "0.8.0"' in code_lines[0], (
         "First non-comment line must be __AGENT_VERSION__ = \"0.7.6\""
     )
 

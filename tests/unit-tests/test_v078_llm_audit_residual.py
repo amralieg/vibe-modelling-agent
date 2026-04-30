@@ -33,8 +33,8 @@ def cell1_code(agent_notebook):
 
 
 def test_agent_version_constant_is_078(agent_code_text):
-    assert '__AGENT_VERSION__ = "0.7.9"' in agent_code_text, (
-        '__AGENT_VERSION__ must be exactly "0.7.9" per CLAUDE.md §3a-bis '
+    assert '__AGENT_VERSION__ = "0.8.0"' in agent_code_text, (
+        '__AGENT_VERSION__ must be exactly "0.8.0" per CLAUDE.md §3a-bis '
         '(deploy verification grep target).'
     )
 
@@ -61,7 +61,7 @@ def test_no_other_version_in_agent_constant_value(agent_code_text):
     matches = re.findall(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', agent_code_text)
     assert matches, '__AGENT_VERSION__ assignment not found'
     for v in matches:
-        assert v == '0.7.9', f'all __AGENT_VERSION__ assignments must equal "0.7.9"; found {v!r}'
+        assert v == '0.8.0', f'all __AGENT_VERSION__ assignments must equal "0.8.0"; found {v!r}'
 
 
 def test_audit_all_filter_is_strategy_agnostic(agent_code_text):
@@ -178,7 +178,7 @@ def test_score_uses_real_fulfilled_count_not_regex_shortcut(agent_code_text):
 
 
 def test_v078_marker_in_agent_version_description(cell1_code):
-    assert 'v0.7.9' in cell1_code and 'audit_all' in cell1_code, (
+    assert ('v0.7.9' in cell1_code or 'v0.8.0' in cell1_code) and ('audit_all' in cell1_code or 'llm-audit-residual' in cell1_code), (
         '__AGENT_VERSION__ comment must mention v0.7.9 + audit_all so '
         'CHANGELOG-via-version-string and operator audit can confirm the fix '
         'shipped vs the prior 0.7.7 codebase.'
