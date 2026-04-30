@@ -192,6 +192,16 @@ def test_orchestrator_preflight_creates_sectors_subdir():
     )
 
 
+def test_orchestrator_submit_uses_no_wait():
+    src = ORCHESTRATOR.read_text()
+    submit_fn = src.split("def submit_sector_run", 1)[1].split("\ndef ", 1)[0]
+    assert '"--no-wait"' in submit_fn, (
+        "submit_sector_run MUST pass --no-wait to `databricks jobs run-now` "
+        "(per CLAUDE.md §10.11.2 GOTCHA C — without --no-wait the CLI blocks for the "
+        "full run duration, defeating the orchestrator's polling loop)"
+    )
+
+
 def test_orchestrator_supports_kill_switch():
     src = ORCHESTRATOR.read_text()
     assert 'KILL_FILE_NAME = "_kill.json"' in src
