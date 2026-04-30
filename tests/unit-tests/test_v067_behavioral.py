@@ -37,20 +37,20 @@ def _helper_body() -> str:
 # NEW-11 — surgical-mv-rewrite SENTINEL + LOGGING
 # =============================================================================
 
-def test_v067_new11_alias_present():
+def test_new11_alias_present():
     src = _agent_src()
     assert "alias=surgical-mv-rewrite" in src, "surgical-mv-rewrite sentinel missing"
 
 
-def test_v067_new11_fired_marker_present():
+def test_new11_fired_marker_present():
     src = _agent_src()
     assert "[surgical-mv-rewrite FIRED]" in src, (
         "[surgical-mv-rewrite FIRED] runtime log marker missing"
     )
 
 
-def test_v067_new10_always_emits_fired_even_on_drop():
-    """v0.6.6 only logged FIRED on success; on full-drop it logged a non-FIRED
+def test_new10_always_emits_fired_even_on_drop():
+    """only logged FIRED on success; on full-drop it logged a non-FIRED
     warning. v0.6.7 must emit FIRED on the all-dropped branch too so the
     audit can prove the helper executed."""
     body = _helper_body()
@@ -65,21 +65,21 @@ def test_v067_new10_always_emits_fired_even_on_drop():
 # NEW-11 — RENAME INFERENCE
 # =============================================================================
 
-def test_v067_new11_loads_baseline_products():
+def test_new11_loads_baseline_products():
     body = _helper_body()
     assert '_baseline_products = _model.get("products"' in body, (
         "Helper must load v1 products for rename inference"
     )
 
 
-def test_v067_new11_builds_v1_set():
+def test_new11_builds_v1_set():
     body = _helper_body()
     assert "_v1_set" in body and "_v1_doms" in body, (
         "v1 product set + domains needed for rename inference"
     )
 
 
-def test_v067_new11_uses_p074_qualified_rename():
+def test_new11_uses_p074_qualified_rename():
     body = _helper_body()
     assert "_p074_qualified_rename(_op_old, _od_old)" in body, (
         "Must call _p074_qualified_rename with (product, domain) — signature is "
@@ -87,7 +87,7 @@ def test_v067_new11_uses_p074_qualified_rename():
     )
 
 
-def test_v067_new11_applies_naming_convention():
+def test_new11_applies_naming_convention():
     body = _helper_body()
     assert "apply_convention(_q_pascal" in body, (
         "Pascal qualified rename must be canonicalised via apply_convention "
@@ -95,13 +95,13 @@ def test_v067_new11_applies_naming_convention():
     )
 
 
-def test_v067_new11_rename_map_built():
+def test_new11_rename_map_built():
     body = _helper_body()
     assert "_rename_map = {}" in body
     assert "_rename_map[_old]" in body, "Rename map must be populated from candidates"
 
 
-def test_v067_new11_uses_stem_heuristics():
+def test_new11_uses_stem_heuristics():
     body = _helper_body()
     assert '_np.endswith("_" + _op_old)' in body, "suffix stem heuristic missing"
     assert "_op_old in _np" in body, "contains stem heuristic missing"
@@ -111,14 +111,14 @@ def test_v067_new11_uses_stem_heuristics():
 # NEW-11 — SQL REWRITER
 # =============================================================================
 
-def test_v067_new11_rewrite_helper_defined():
+def test_new11_rewrite_helper_defined():
     body = _helper_body()
     assert "def _rewrite_sql_via_rename_map(" in body, (
         "_rewrite_sql_via_rename_map helper missing"
     )
 
 
-def test_v067_new11_rewrite_returns_hits_count():
+def test_new11_rewrite_returns_hits_count():
     body = _helper_body()
     # Helper must return both rewritten SQL AND hit count for tracking.
     assert "return sql_txt, 0" in body
@@ -127,7 +127,7 @@ def test_v067_new11_rewrite_returns_hits_count():
     )
 
 
-def test_v067_new11_rewrite_skips_string_literals():
+def test_new11_rewrite_skips_string_literals():
     body = _helper_body()
     # Rewriter must split on string literals so it doesn't substitute
     # inside quoted strings.
@@ -135,13 +135,13 @@ def test_v067_new11_rewrite_skips_string_literals():
     assert "'[^'" in body and '"[^"' in body, "must skip both single+double quoted literals"
 
 
-def test_v067_new11_rewrite_handles_backticks():
+def test_new11_rewrite_handles_backticks():
     body = _helper_body()
     # Pattern must accept optional backticks around domain.product.
     assert "`?" in body, "rewriter regex must handle backtick-quoted identifiers"
 
 
-def test_v067_new11_rewrite_case_insensitive():
+def test_new11_rewrite_case_insensitive():
     body = _helper_body()
     assert "(?i)" in body, "rewriter must be case-insensitive"
 
@@ -150,7 +150,7 @@ def test_v067_new11_rewrite_case_insensitive():
 # NEW-11 — INTEGRATION INTO PROCESSING LOOP
 # =============================================================================
 
-def test_v067_new11_owner_rewritten_on_rename():
+def test_new11_owner_rewritten_on_rename():
     body = _helper_body()
     # When owner is in rename_map, update owner_domain + owner_product on the MV.
     assert "_new_owner = _rename_map.get((_od, _op))" in body
@@ -158,7 +158,7 @@ def test_v067_new11_owner_rewritten_on_rename():
     assert '_mv_out["owner_product"] = _new_owner[1]' in body
 
 
-def test_v067_new11_sql_rewritten_before_validation():
+def test_new11_sql_rewritten_before_validation():
     body = _helper_body()
     # SQL rewrite must happen BEFORE _all_refs_valid so renamed products
     # resolve in v2.
@@ -171,7 +171,7 @@ def test_v067_new11_sql_rewritten_before_validation():
     )
 
 
-def test_v067_new11_tracks_rewritten_count():
+def test_new11_tracks_rewritten_count():
     body = _helper_body()
     assert "_rewritten_count" in body
     assert "_preserved_unchanged" in body
@@ -185,7 +185,7 @@ def test_v067_new11_tracks_rewritten_count():
 # NEW-11 — INDUSTRY AGNOSTIC
 # =============================================================================
 
-def test_v067_new11_industry_agnostic():
+def test_new11_industry_agnostic():
     body = _helper_body()
     forbidden = ["telecom", "airline", "airlines", "healthcare", "banking",
                  "retail", "manufacturing", "insurance", "customer_account",
@@ -231,7 +231,7 @@ def _extract_rewriter():
     return _rewrite_sql_via_rename_map
 
 
-def test_v067_new11_rewrite_simple_case():
+def test_new11_rewrite_simple_case():
     rewrite = _extract_rewriter()
     rename = {("customer", "case"): ("customer", "customer_case")}
     sql = "SELECT * FROM customer.case WHERE id = 1"
@@ -241,7 +241,7 @@ def test_v067_new11_rewrite_simple_case():
     assert "customer.case " not in out and not out.endswith("customer.case")
 
 
-def test_v067_new11_rewrite_with_backticks():
+def test_new11_rewrite_with_backticks():
     rewrite = _extract_rewriter()
     rename = {("billing", "account"): ("billing", "billing_account")}
     sql = "SELECT * FROM `billing`.`account` a JOIN `billing`.`account` b"
@@ -250,7 +250,7 @@ def test_v067_new11_rewrite_with_backticks():
     assert "billing.billing_account" in out
 
 
-def test_v067_new11_rewrite_case_insensitive_match():
+def test_new11_rewrite_case_insensitive_match():
     rewrite = _extract_rewriter()
     rename = {("customer", "case"): ("customer", "customer_case")}
     sql = "SELECT * FROM Customer.CASE"
@@ -259,7 +259,7 @@ def test_v067_new11_rewrite_case_insensitive_match():
     assert "customer.customer_case" in out
 
 
-def test_v067_new11_rewrite_skips_string_literal():
+def test_new11_rewrite_skips_string_literal():
     rewrite = _extract_rewriter()
     rename = {("customer", "case"): ("customer", "customer_case")}
     sql = "SELECT * FROM customer.case WHERE label = 'old name customer.case'"
@@ -268,7 +268,7 @@ def test_v067_new11_rewrite_skips_string_literal():
     assert "'old name customer.case'" in out, "string literal must be preserved verbatim"
 
 
-def test_v067_new11_rewrite_word_boundary():
+def test_new11_rewrite_word_boundary():
     """Must not match substrings of identifiers (e.g. customer.case_history)."""
     rewrite = _extract_rewriter()
     rename = {("customer", "case"): ("customer", "customer_case")}
@@ -278,7 +278,7 @@ def test_v067_new11_rewrite_word_boundary():
     assert out == sql
 
 
-def test_v067_new11_rewrite_no_rename_no_op():
+def test_new11_rewrite_no_rename_no_op():
     rewrite = _extract_rewriter()
     sql = "SELECT * FROM customer.case"
     out, n = rewrite(sql, {})
@@ -286,7 +286,7 @@ def test_v067_new11_rewrite_no_rename_no_op():
     assert out == sql
 
 
-def test_v067_new11_rewrite_multiple_renames_same_sql():
+def test_new11_rewrite_multiple_renames_same_sql():
     rewrite = _extract_rewriter()
     rename = {
         ("customer", "case"): ("customer", "customer_case"),
@@ -299,7 +299,7 @@ def test_v067_new11_rewrite_multiple_renames_same_sql():
     assert "billing.billing_account" in out
 
 
-def test_v067_new11_rewrite_three_part_path_unchanged():
+def test_new11_rewrite_three_part_path_unchanged():
     """Rewriter only handles 2-part `domain.product`. catalog.domain.product
     references are unrelated and should pass through unchanged so they don't
     accidentally collide."""
@@ -314,38 +314,38 @@ def test_v067_new11_rewrite_three_part_path_unchanged():
 # README + VERSION
 # =============================================================================
 
-def test_v067_readme_current_version_bumped():
+def test_readme_current_version_bumped():
     with open(README) as f:
         rd = f.read()
-    assert "**v0.6.7**" in rd, "v0.6.7 not in readme"
+    assert "**v0.6.7**" in rd, "not in readme"
 
 
 # =============================================================================
 # Regression — v0.6.x aliases preserved
 # =============================================================================
 
-def test_v067_no_regression_v066_aliases_present():
+def test_no_regression_v066_aliases_present():
     src = _agent_src()
     for alias in [
         "collision-naming-canonical",
         "fmfl-canonical-target",
         "surgical-mv-preserve",
     ]:
-        assert alias in src, f"v0.6.6 alias {alias} dropped — regression"
+        assert alias in src, f"alias {alias} dropped — regression"
 
 
-def test_v067_no_regression_v065_aliases_present():
+def test_no_regression_v065_aliases_present():
     src = _agent_src()
     for alias in ["immutable-early-exit", "ssot-stem-autofix"]:
-        assert alias in src, f"v0.6.5 alias {alias} dropped — regression"
+        assert alias in src, f"alias {alias} dropped — regression"
 
 
-def test_v067_no_regression_v064_aliases_present():
+def test_no_regression_v064_aliases_present():
     src = _agent_src()
     for alias in ["perf-cap-16", "perf-mv15-parallel", "perf-llm-throttle-16"]:
-        assert alias in src, f"v0.6.4 alias {alias} dropped — regression"
+        assert alias in src, f"alias {alias} dropped — regression"
 
 
-def test_v067_no_regression_v063_alias_present():
+def test_no_regression_v063_alias_present():
     src = _agent_src()
-    assert "det-priority-parse" in src, "v0.6.3 deterministic priority parser dropped"
+    assert "det-priority-parse" in src, "deterministic priority parser dropped"

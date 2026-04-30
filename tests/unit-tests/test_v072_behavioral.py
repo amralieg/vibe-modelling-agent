@@ -51,7 +51,7 @@ from pathlib import Path
 
 AGENT = Path(__file__).resolve().parents[2] / "agent" / "dbx_vibe_modelling_agent.ipynb"
 
-EXPECTED_VERSION = "0.7.6"
+EXPECTED_VERSION = "0.7.7"
 
 
 def _agent_cells():
@@ -78,7 +78,7 @@ def _first_code_cell_source():
     raise AssertionError("No non-empty code cell found in agent notebook")
 
 
-def test_v072_constant_bumped_to_expected():
+def test_constant_bumped_to_expected():
     txt = _agent_text()
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', txt)
     assert m is not None, "__AGENT_VERSION__ constant not found"
@@ -87,7 +87,7 @@ def test_v072_constant_bumped_to_expected():
     )
 
 
-def test_v072_constant_first_line_of_cell1():
+def test_constant_first_line_of_cell1():
     src = _first_code_cell_source()
     code_lines = [
         ln for ln in src.splitlines()
@@ -98,13 +98,13 @@ def test_v072_constant_first_line_of_cell1():
     )
 
 
-def test_v072_single_digit_semver():
+def test_single_digit_semver():
     assert re.fullmatch(r"\d\.\d\.\d", EXPECTED_VERSION), (
         f"EXPECTED_VERSION '{EXPECTED_VERSION}' violates CLAUDE.md §3a single-digit semver"
     )
 
 
-def test_v072_readme_current_version_matches():
+def test_readme_current_version_matches():
     rd = AGENT.parents[1] / "readme.md"
     with rd.open() as f:
         txt = f.read()
@@ -120,7 +120,7 @@ def test_v072_readme_current_version_matches():
 # ============================================================================
 
 
-def test_v072_fix1_alias_present():
+def test_fix1_alias_present():
     txt = _agent_text()
     assert "self-ref-mem-json-sync FIRED" in txt, (
         "Expected at least one [self-ref-mem-json-sync FIRED] log marker"
@@ -130,22 +130,22 @@ def test_v072_fix1_alias_present():
     )
 
 
-def test_v072_fix1_writes_back_to_attributes_file_path():
+def test_fix1_writes_back_to_attributes_file_path():
     """The fix must read ATTRIBUTES_FILE_PATH, compare counts, and rewrite the
     JSON from in-memory `widgets_values["attributes"]` when they differ."""
     txt = _agent_text()
-    assert "_v72_attrs_path = (config or {}).get('ATTRIBUTES_FILE_PATH')" in txt, (
+    assert "_attrs_path = (config or {}).get('ATTRIBUTES_FILE_PATH')" in txt, (
         "Fix must read ATTRIBUTES_FILE_PATH from config"
     )
-    assert "_v72_mem_attrs = widgets_values.get(\"attributes\", []) or []" in txt, (
+    assert "_mem_attrs = widgets_values.get(\"attributes\", []) or []" in txt, (
         "Fix must read in-memory attrs from widgets_values"
     )
-    assert "json.dump(_v72_mem_attrs, _v72_wf, indent=2, default=str)" in txt, (
+    assert "json.dump(_mem_attrs, _wf, indent=2, default=str)" in txt, (
         "Fix must rewrite the JSON file from Memory state"
     )
 
 
-def test_v072_fix1_runs_after_self_ref_fix_block():
+def test_fix1_runs_after_self_ref_fix_block():
     """The mem-json sync MUST run AFTER the SELF-REF-FIX try/except so it sees
     the mutated attrs list, not the pre-mutation state."""
     txt = _agent_text()
@@ -161,17 +161,17 @@ def test_v072_fix1_runs_after_self_ref_fix_block():
     )
 
 
-def test_v072_fix1_no_tautology_actually_writes_on_drift():
+def test_fix1_no_tautology_actually_writes_on_drift():
     """Anti-tautology: the sync MUST be conditional on count drift AND it MUST
     perform the write (not just log)."""
     txt = _agent_text()
     pos = txt.find("self-ref-mem-json-sync FIRED")
     assert pos > 0
     window_before = txt[max(0, pos - 600):pos]
-    assert "if _v72_mem_count != _v72_json_count" in window_before, (
+    assert "if _mem_count != _json_count" in window_before, (
         "Sync must be guarded by count-drift check (not unconditional write)"
     )
-    assert "json.dump(_v72_mem_attrs" in window_before, (
+    assert "json.dump(_mem_attrs" in window_before, (
         "Sync must actually write to JSON, not just log"
     )
 
@@ -181,14 +181,14 @@ def test_v072_fix1_no_tautology_actually_writes_on_drift():
 # ============================================================================
 
 
-def test_v072_fix2_alias_present():
+def test_fix2_alias_present():
     txt = _agent_text()
     assert "mv-prevalidate-keywords-extend" in txt, (
         "Expected the mv-prevalidate-keywords-extend alias comment in the SQL_KW extension block"
     )
 
 
-def test_v072_fix2_keywords_include_between_and_current_date():
+def test_fix2_keywords_include_between_and_current_date():
     """The exact tokens that triggered v0.7.1 false-positive drops MUST be in the keyword set."""
     txt = _agent_text()
     pos = txt.find("mv-prevalidate-keywords-extend")
@@ -201,7 +201,7 @@ def test_v072_fix2_keywords_include_between_and_current_date():
         )
 
 
-def test_v072_fix2_keywords_cover_common_window_and_aggregate_funcs():
+def test_fix2_keywords_cover_common_window_and_aggregate_funcs():
     """Defense-in-depth: window functions and common aggregates MUST be in the set."""
     txt = _agent_text()
     pos = txt.find("mv-prevalidate-keywords-extend")
@@ -219,7 +219,7 @@ def test_v072_fix2_keywords_cover_common_window_and_aggregate_funcs():
 # ============================================================================
 
 
-def test_v072_fix3_alias_present():
+def test_fix3_alias_present():
     txt = _agent_text()
     assert "shrink-orphan-drop FIRED" in txt, (
         "Expected at least one [shrink-orphan-drop FIRED] log marker"
@@ -229,24 +229,24 @@ def test_v072_fix3_alias_present():
     )
 
 
-def test_v072_fix3_cascade_detection_present():
+def test_fix3_cascade_detection_present():
     txt = _agent_text()
     assert "shrink-orphan-drop-cascade FIRED" in txt, (
         "Cascade detection (auto-drop introducing additional silos) MUST be aliased"
     )
-    assert "_v72_postdrop_silos" in txt, (
+    assert "_postdrop_silos" in txt, (
         "Cascade check must re-run silo detection on the trimmed tables_to_keep"
     )
 
 
-def test_v072_fix3_clears_log_on_success():
+def test_fix3_clears_log_on_success():
     txt = _agent_text()
     assert "shrink-orphan-drop-cleared FIRED" in txt, (
         "On clean post-drop validation, must emit [shrink-orphan-drop-cleared FIRED]"
     )
 
 
-def test_v072_fix3_no_lying_validator_message():
+def test_fix3_no_lying_validator_message():
     """The OLD lying message 'Re-run shrink (validator will retry the LLM)' MUST be gone.
     The validator does not actually retry the LLM — that text was the §8.3 tautology root
     cause of the Phase 6 Retailer report."""
@@ -257,25 +257,25 @@ def test_v072_fix3_no_lying_validator_message():
     )
 
 
-def test_v072_fix3_no_tautology_actually_mutates_tables_to_keep():
+def test_fix3_no_tautology_actually_mutates_tables_to_keep():
     """Anti-tautology: the orphan-drop MUST actually mutate `tables_to_keep`
     (different sizes before vs after) — not just log."""
     txt = _agent_text()
     pos = txt.find("shrink-orphan-drop FIRED")
     assert pos > 0
     window_before = txt[max(0, pos - 1200):pos]
-    assert "_v72_keep_before = len(tables_to_keep)" in window_before, (
+    assert "_keep_before = len(tables_to_keep)" in window_before, (
         "Must capture the BEFORE count to prove mutation"
     )
     assert "tables_to_keep = {(d, p) for (d, p) in tables_to_keep" in window_before, (
         "Must filter tables_to_keep with set-comprehension excluding orphans"
     )
-    assert "_v72_new_silo_set" in window_before, (
+    assert "_new_silo_set" in window_before, (
         "Must use the new-silo set (not phantom-set or input-silo-set) for filtering"
     )
 
 
-def test_v072_fix3_files_next_vibes_for_user_decision():
+def test_fix3_files_next_vibes_for_user_decision():
     """Auto-drop is not a silent decision — the dropped product MUST be filed
     in NEXT_VIBES so the next vibe iteration can revisit it."""
     txt = _agent_text()
@@ -290,11 +290,11 @@ def test_v072_fix3_files_next_vibes_for_user_decision():
     )
 
 
-def test_v072_fix3_handles_degenerate_empty_plan():
+def test_fix3_handles_degenerate_empty_plan():
     """If after auto-drop tables_to_keep is empty, raise an INSTRUCTIVE error
     (not a generic ValueError) suggesting the next vibe text the user should provide."""
     txt = _agent_text()
-    assert "v0.7.2 SHRINK-NEW-SILO-ALL-ORPHANS" in txt, (
+    assert "SHRINK-NEW-SILO-ALL-ORPHANS" in txt, (
         "Empty-plan path must raise an instructive error with the canonical alias"
     )
     assert "shrink-orphan-drop-emptied" in txt, (
@@ -302,8 +302,8 @@ def test_v072_fix3_handles_degenerate_empty_plan():
     )
 
 
-def test_v072_fix3_phantom_drop_still_runs_first():
-    """v0.7.1 shrink-phantom-drop is a complementary fix — phantom-name filter
+def test_fix3_phantom_drop_still_runs_first():
+    """shrink-phantom-drop is a complementary fix — phantom-name filter
     MUST still run BEFORE orphan-drop (which only handles real-product silos)."""
     txt = _agent_text()
     phantom_pos = txt.find("shrink-phantom-drop FIRED")
@@ -315,7 +315,7 @@ def test_v072_fix3_phantom_drop_still_runs_first():
     )
 
 
-def test_v072_fix3_preexisting_silo_path_still_fires_independently():
+def test_fix3_preexisting_silo_path_still_fires_independently():
     """The pre-existing-silo PASS-THROUGH path must run via `if _preexisting_silos`
     (NOT `elif`) so it fires correctly on plans that have pre-existing input silos
     but no NEW silos (the elif structure would have masked it after my orphan-drop
@@ -338,7 +338,7 @@ def _runner_text():
     return "\n".join("".join(c.get("source", [])) for c in nb.get("cells", []))
 
 
-def test_v072_fix4_runner_agent_multipath_alias_present():
+def test_fix4_runner_agent_multipath_alias_present():
     txt = _runner_text()
     assert "runner-agent-multipath FIRED" in txt, (
         "Expected [runner-agent-multipath FIRED] log marker so vibe_tester test 00 "
@@ -349,7 +349,7 @@ def test_v072_fix4_runner_agent_multipath_alias_present():
     )
 
 
-def test_v072_fix4_runner_canon_path_resolves_first_when_present():
+def test_fix4_runner_canon_path_resolves_first_when_present():
     """Source-tree convention <repo>/runner -> <repo>/agent must STILL be tried
     first (so existing dev workflows are not broken)."""
     txt = _runner_text()
@@ -364,7 +364,7 @@ def test_v072_fix4_runner_canon_path_resolves_first_when_present():
     )
 
 
-def test_v072_fix4_runner_searches_both_parent_and_runner_dir():
+def test_fix4_runner_searches_both_parent_and_runner_dir():
     """Multipath: BOTH the runner's parent dir (source-tree) AND the runner's own dir
     (flat user-root) must be in the search list, mirroring vibe_tester's pattern."""
     txt = _runner_text()
@@ -379,7 +379,7 @@ def test_v072_fix4_runner_searches_both_parent_and_runner_dir():
     )
 
 
-def test_v072_fix4_runner_picks_highest_versioned_archive():
+def test_fix4_runner_picks_highest_versioned_archive():
     """When multiple agent_v<N> archives coexist (e.g. v70, v71, v72), the runner
     must select the HIGHEST version (not first-match)."""
     txt = _runner_text()
@@ -394,7 +394,7 @@ def test_v072_fix4_runner_picks_highest_versioned_archive():
     )
 
 
-def test_v072_fix4_runner_only_fires_when_canon_missing():
+def test_fix4_runner_only_fires_when_canon_missing():
     """The discovery + log line MUST only fire if the canon path is missing
     (avoid log noise on healthy source-tree deploys)."""
     txt = _runner_text()

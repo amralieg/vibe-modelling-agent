@@ -235,7 +235,7 @@ class TestM3M4SemanticGate:
 # =====================================================================
 
 class TestM5CanonicalAttributesEnforced:
-    """v0.8.6: rules now enforce SEMANTIC CATEGORIES per ENTITY ROLE
+    """rules now enforce SEMANTIC CATEGORIES per ENTITY ROLE
     (industry-agnostic), not named fields like 'subtotal'/'currency_code'.
     The agent serves 100+ industries; baking retail vocabulary into the
     prompt is itself a defect (it biases telco/healthcare/oil&gas runs)."""
@@ -416,7 +416,7 @@ class TestPromptsAreIndustryAgnostic:
     # introduced — the test scans ONLY between these markers.
     _M5_HEADER = "FUNDAMENTAL ATTRIBUTE CATEGORIES BY ENTITY ROLE"
     _M5_END = "PRE-SUBMISSION CHECKLIST"
-    _M3M4_HEADER = "TEMPORAL PRECEDENCE (v0.8.5 M3-FIX"
+    _M3M4_HEADER = "TEMPORAL PRECEDENCE (M3-FIX"
     _M3M4_END = "Return JSON"
     _M1_HEADER = "The FK column name MUST EQUAL the target table"
     _M1_END = "Each source product should gain at most"

@@ -1,4 +1,4 @@
-"""v0.9.7 BEHAVIORAL tests for the greedy bundle of fixes.
+"""BEHAVIORAL tests for the greedy bundle of fixes.
 
 Each fix has a [FIRED] sentinel that this test file grep-verifies, plus
 positive/negative behavioral simulations per CLAUDE.md §8.3 (no tautologies).
@@ -217,7 +217,7 @@ class TestUpdateBusinessContextBroaden:
 
 
 class TestMetricViewJoinsRedesign:
-    """v0.9.7 metric view redesign: multi-table JOINs in metric views."""
+    """metric view redesign: multi-table JOINs in metric views."""
 
     def test_render_alias_present(self, agent_src):
         """The renderer FIRED alias is the primary signal that the join code is wired."""
@@ -315,7 +315,7 @@ class TestMetricViewJoinsRedesign:
 
 
 class TestKpiFirstRedesign:
-    """v0.9.7 batch 4: full top-N KPI-first metric view redesign.
+    """batch 4: full top-N KPI-first metric view redesign.
 
     The user explicitly requested: "the LLM should say what are the top
     100 metrics of an Airline (for example), and then it try to satisfy

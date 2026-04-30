@@ -44,22 +44,22 @@ def _agent_src() -> str:
 # NEW-3 — IMMUTABLE-VIOLATION early-exit
 # =============================================================================
 
-def test_v065_new3_alias_present():
+def test_new3_alias_present():
     src = _agent_src()
     assert "alias=immutable-early-exit" in src, "immutable-early-exit sentinel missing"
 
 
-def test_v065_new3_fired_marker_present():
+def test_new3_fired_marker_present():
     src = _agent_src()
     assert "[IMMUTABLE-EARLY-EXIT FIRED]" in src, "FIRED log marker missing"
 
 
-def test_v065_new3_consecutive_counter_initialized():
+def test_new3_consecutive_counter_initialized():
     src = _agent_src()
     assert "_consec_immutable_failures = 0" in src, "consecutive-failure counter not initialized"
 
 
-def test_v065_new3_immut_patterns_match_validator_block():
+def test_new3_immut_patterns_match_validator_block():
     """The patterns used to detect IMMUTABLE failures must match the validator's
     error-emission language so we don't mis-classify."""
     src = _agent_src()
@@ -75,13 +75,13 @@ def test_v065_new3_immut_patterns_match_validator_block():
         assert needle in src, f"missing pattern in _IMMUT_PATTERNS: {needle}"
 
 
-def test_v065_new3_short_circuits_on_2nd_consec():
+def test_new3_short_circuits_on_2nd_consec():
     """Verify the threshold is >= 2 (not >= 3); 3 would still emit Max retries exhausted."""
     src = _agent_src()
     assert "_consec_immutable_failures >= 2 and attempt < max_attempts - 1" in src
 
 
-def test_v065_new3_strengthens_feedback_with_protected_lists():
+def test_new3_strengthens_feedback_with_protected_lists():
     """The retry feedback on IMMUTABLE failure must echo BOTH protected_domains_list
     AND protected_products_list so the LLM cannot miss it on the next attempt."""
     src = _agent_src()
@@ -91,7 +91,7 @@ def test_v065_new3_strengthens_feedback_with_protected_lists():
     assert "current_vars.get('protected_products_list', '')" in src
 
 
-def test_v065_new3_returns_failure_not_soft_accept():
+def test_new3_returns_failure_not_soft_accept():
     """Early-exit must `return False` so downstream defense-in-depth treats it as
     failure (architect's iteration is skipped, model unchanged) — NEVER soft-accept."""
     src = _agent_src()
@@ -109,17 +109,17 @@ def test_v065_new3_returns_failure_not_soft_accept():
 # NEW-4 — LLM JSON-decode recoverable demotion
 # =============================================================================
 
-def test_v065_new4_alias_present():
+def test_new4_alias_present():
     src = _agent_src()
     assert "alias=llm-json-recoverable" in src
 
 
-def test_v065_new4_fired_marker_present():
+def test_new4_fired_marker_present():
     src = _agent_src()
     assert "[LLM-JSON-RECOVERABLE FIRED]" in src
 
 
-def test_v065_new4_demotes_to_info_only_on_recoverable_class():
+def test_new4_demotes_to_info_only_on_recoverable_class():
     """The demotion must check the error class — only JSON-decode errors get INFO,
     everything else still WARNING."""
     src = _agent_src()
@@ -133,7 +133,7 @@ def test_v065_new4_demotes_to_info_only_on_recoverable_class():
            'AI Query{_label} failed (Step:' in window
 
 
-def test_v065_new4_only_when_retry_will_happen():
+def test_new4_only_when_retry_will_happen():
     """The demotion is gated by `if retry_attempt < max_retries - 1` — final-retry
     failures still escalate to ERROR."""
     src = _agent_src()
@@ -145,7 +145,7 @@ def test_v065_new4_only_when_retry_will_happen():
     assert "retry_attempt < max_retries - 1" in pre
 
 
-def test_v065_new4_pattern_set_covers_audit_observation():
+def test_new4_pattern_set_covers_audit_observation():
     """The audit observed 'Unterminated string' — make sure our pattern list
     includes it (case-insensitive)."""
     src = _agent_src()
@@ -158,17 +158,17 @@ def test_v065_new4_pattern_set_covers_audit_observation():
 # NEW-5 — Stem-based cross-domain duplicate autofix
 # =============================================================================
 
-def test_v065_new5_alias_present():
+def test_new5_alias_present():
     src = _agent_src()
     assert "alias=ssot-stem-autofix" in src
 
 
-def test_v065_new5_fired_marker_present():
+def test_new5_fired_marker_present():
     src = _agent_src()
     assert "[P0.74-COLLISION-STEM FIRED]" in src
 
 
-def test_v065_new5_uses_strip_domain_prefix():
+def test_new5_uses_strip_domain_prefix():
     """Pass 3 must use the SAME stem stripper as the static-analysis SSOT check
     (~line 69640) to be aligned. If they diverge, the autofix won't catch what
     the SA emits."""
@@ -182,7 +182,7 @@ def test_v065_new5_uses_strip_domain_prefix():
     )
 
 
-def test_v065_new5_excludes_generic_stems():
+def test_new5_excludes_generic_stems():
     """The autofix exclusion list must include the SAME generic stems the SA
     excludes (payment, order, status, type, code, rate, fee, charge, ...).
     Otherwise the autofix would aggressively rename legitimate cross-domain
@@ -193,7 +193,7 @@ def test_v065_new5_excludes_generic_stems():
         assert stem in src, f"generic-stem exclusion missing: {stem}"
 
 
-def test_v065_new5_min_stem_length_4():
+def test_new5_min_stem_length_4():
     """Stems shorter than 4 chars are too generic — don't autofix; matches the
     SA's `len(_cd_stem) < 4` filter."""
     src = _agent_src()
@@ -203,7 +203,7 @@ def test_v065_new5_min_stem_length_4():
     assert "len(_stem_l) < 4" in pre, "stem-length filter must match SA semantics"
 
 
-def test_v065_new5_keeps_first_domain_owner():
+def test_new5_keeps_first_domain_owner():
     """The pick-an-owner rule must keep the first (sorted) domain unchanged and
     rename the rest — predictable, deterministic, industry-agnostic."""
     src = _agent_src()
@@ -213,7 +213,7 @@ def test_v065_new5_keeps_first_domain_owner():
     assert "_kept_dom = sorted(_by_dom.keys())[0]" in pre
 
 
-def test_v065_new5_propagates_attribute_and_fk_updates():
+def test_new5_propagates_attribute_and_fk_updates():
     """After Pass 3 mutates products, the rename_map MUST flow into attribute.product
     and foreign_key_to rewriting (existing block at end of fn). Verify the new
     pass appends to the SAME rename_map."""
@@ -230,25 +230,25 @@ def test_v065_new5_propagates_attribute_and_fk_updates():
 # Cross-fix invariants
 # =============================================================================
 
-def test_v065_no_regression_from_v064_aliases():
-    """v0.6.5 builds on v0.6.4. Every v0.6.4 alias must still be present."""
+def test_no_regression_from_v064_aliases():
+    """builds on v0.6.4. Every v0.6.4 alias must still be present."""
     src = _agent_src()
-    assert "v0.6.4 B1 alias=perf-cap-16" in src
-    assert "v0.6.4 B8 alias=perf-llm-throttle-16" in src
+    assert "alias=perf-cap-16" in src
+    assert "alias=perf-llm-throttle-16" in src
 
 
-def test_v065_readme_version_bumped():
+def test_readme_version_bumped():
     """readme.md current version must be v0.6.5."""
     with open("/Users/amr.ali/Documents/projects/vibe-modelling-agent/readme.md") as f:
         readme = f.read()
     assert "v0.6.5" in readme, "readme not bumped to v0.6.5"
 
 
-def test_v065_readme_history_entry_present():
+def test_readme_history_entry_present():
     """readme.md must list the v0.6.5 history row."""
     with open("/Users/amr.ali/Documents/projects/vibe-modelling-agent/readme.md") as f:
         readme = f.read()
-    assert re.search(r"v0\.6\.5", readme), "v0.6.5 history row missing"
+    assert re.search(r"v0\.6\.5", readme), "history row missing"
     assert "immutable-early-exit" in readme or "IMMUTABLE-EARLY-EXIT" in readme
     assert "llm-json-recoverable" in readme or "LLM-JSON-RECOVERABLE" in readme
     assert "ssot-stem-autofix" in readme or "P0.74-COLLISION-STEM" in readme

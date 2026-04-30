@@ -79,7 +79,7 @@ class TestF6PromptBraceEscape:
         helpers.smoke_render_all_prompts(helpers.PROMPT_TEMPLATES)
 
     def test_brace_escape_alias_present(self, agent_src):
-        assert "v0.8.2 P6" in agent_src
+        assert "P6" in agent_src
         assert "prompt-brace-escape" in agent_src
 
 
@@ -98,7 +98,6 @@ class TestF5JobTagsSkipDeleted:
         )
         assert m, "Could not locate update_job_tags"
         body = m.group(0)
-        assert "v0.8.2 P5" in body, "Fix sentinel `v0.8.2 P5` must appear in update_job_tags"
         assert "jobtags-skip-deleted-job" in body
         # Must check existence before update -- presence of the early-return path
         assert "_job_exists" in body or "JobNotFoundException" in body or "does not exist" in body.lower(), (
@@ -127,7 +126,6 @@ class TestF2DomainNameMismatchCritical:
         )
 
     def test_p2_alias_present(self, agent_src):
-        assert "v0.8.2 P2" in agent_src
         assert "domain-name-mismatch-critical" in agent_src
 
 
@@ -148,7 +146,7 @@ class TestF1ScratchPathTempfile:
         assert "_resolve_business_scratch_path" in agent_src, (
             "The DRY helper _resolve_business_scratch_path must exist"
         )
-        assert "v0.8.2 P1" in agent_src
+        assert "P1" in agent_src
         assert "scratch-path-tempfile" in agent_src
 
     def test_helper_uses_tempfile(self, agent_src):
@@ -198,7 +196,7 @@ class TestF1ScratchPathTempfile:
 
 class TestF3DecimalCoercion:
     def test_p3_alias_present(self, agent_src):
-        assert "v0.8.2 P3" in agent_src
+        assert "P3" in agent_src
         assert "decimal-to-float-coercion" in agent_src
 
     def test_helper_exists(self, agent_src):
@@ -250,7 +248,7 @@ class TestF3DecimalCoercion:
 
 class TestF8ManagedLocationAccessibility:
     def test_p8_alias_present(self, agent_src):
-        assert "v0.8.2 P8" in agent_src
+        assert "P8" in agent_src
         assert "managed-location-accessibility-check" in agent_src
 
     def test_validate_storage_accessible_helper_exists(self, agent_src):
@@ -335,7 +333,6 @@ class TestF8ManagedLocationAccessibility:
 
 class TestF7JobLaunchGateBlocksOnChild:
     def test_p7_alias_present(self, agent_src):
-        assert "v0.8.2 P7" in agent_src
         assert "job-launch-gate-blocks-on-child" in agent_src
 
     def test_wait_for_run_terminal_helper_exists(self, agent_src):
@@ -378,7 +375,7 @@ class TestF7JobLaunchGateBlocksOnChild:
 
 class TestF4ShrinkForbidsSiloed:
     def test_p4_alias_present(self, agent_src):
-        assert "v0.8.2 P4" in agent_src
+        assert "P4" in agent_src
         assert "shrink-forbids-siloed" in agent_src
 
     def test_shrink_prompt_mentions_no_siloed(self, agent_src):
@@ -456,7 +453,7 @@ class TestF4ShrinkForbidsSiloed:
 
 class TestF10MetricViewInstallCountValidation:
     def test_p10_alias_present(self, agent_src):
-        assert "v0.8.2 P10" in agent_src
+        assert "P10" in agent_src
         assert "mv-install-count-validation" in agent_src
 
     def test_count_audit_helper_exists(self, agent_src):

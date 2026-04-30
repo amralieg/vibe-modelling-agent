@@ -97,14 +97,14 @@ def _extract_function_source(full_src, func_name):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_v073_helpers_block_present():
+def test_helpers_block_present():
     src = _agent_source()
     assert "[vibe-audit-helpers-block FIRED alias=vibe-audit-helpers-block]" in src, (
-        "v0.7.3 vibe-audit helpers block sentinel must be present in the agent notebook"
+        "vibe-audit helpers block sentinel must be present in the agent notebook"
     )
 
 
-def test_v073_actionable_categories_extended():
+def test_actionable_categories_extended():
     src = _agent_source()
     assert "[vibe-audit-actionable-extend FIRED alias=vibe-audit-actionable-extend]" in src
     for cat in [
@@ -118,25 +118,25 @@ def test_v073_actionable_categories_extended():
         assert cat in src, f"_ACTIONABLE_CATEGORIES must contain {cat}"
 
 
-def test_v073_audit_stage_function_defined():
+def test_audit_stage_function_defined():
     src = _agent_source()
     assert "[vibe-audit-stage-fn-defined FIRED alias=vibe-audit-stage-fn-defined]" in src
     assert "def step_generate_vibe_audit_report(widgets_values):" in src
 
 
-def test_v073_audit_stage_called_in_track1():
+def test_audit_stage_called_in_track1():
     src = _agent_source()
     assert "[vibe-audit-stage-call FIRED alias=vibe-audit-stage-call]" in src
     assert "step_generate_vibe_audit_report(widgets_values)" in src
 
 
-def test_v073_sa_extension_called_in_capture_invariants():
+def test_sa_extension_called_in_capture_invariants():
     src = _agent_source()
     assert "[vibe-audit-sa-extend-call FIRED alias=vibe-audit-sa-extend-call]" in src
     assert "_extend_sa_with_vibe_compliance(" in src
 
 
-def test_v073_release_notes_md_format():
+def test_release_notes_md_format():
     src = _agent_source()
     assert "[release-notes-md-format FIRED alias=release-notes-md-format]" in src
     # Must use .md path
@@ -147,26 +147,26 @@ def test_v073_release_notes_md_format():
     )
 
 
-def test_v073_release_notes_appends_audit_md():
+def test_release_notes_appends_audit_md():
     src = _agent_source()
     # Must read the stashed audit + parity markdown
     assert "_vibe_audit_report_md" in src
     assert "_install_parity_audit_md" in src
 
 
-def test_v073_install_parity_audit_stage_defined():
+def test_install_parity_audit_stage_defined():
     src = _agent_source()
     assert "[install-parity-audit-stage FIRED alias=install-parity-audit-stage]" in src
     assert "def step_install_parity_audit(widgets_values):" in src
 
 
-def test_v073_install_parity_audit_called_in_deploy():
+def test_install_parity_audit_called_in_deploy():
     src = _agent_source()
     assert "[install-parity-audit-call FIRED alias=install-parity-audit-call]" in src
     assert "step_install_parity_audit(widgets_values)" in src
 
 
-def test_v073_progress_table_uses_canonical_lifecycle():
+def test_progress_table_uses_canonical_lifecycle():
     """Stage emit_step calls must use 'stage_started' → 'stage_succeeded' lifecycle
     (and 'stage_warning' on failure), per VibeWriter._VALID_STATUSES."""
     src = _agent_source()
@@ -219,7 +219,7 @@ def _load_helper_namespace():
     return ns
 
 
-def test_v073_extract_ddl_blocks_generic():
+def test_extract_ddl_blocks_generic():
     """DDL extraction must be industry-agnostic — works for retail, healthcare, finance."""
     ns = _load_helper_namespace()
     extract = ns["_vibe_audit_extract_ddl_blocks"]
@@ -259,7 +259,7 @@ def test_v073_extract_ddl_blocks_generic():
     assert extract(None) == []
 
 
-def test_v073_extract_hard_counts_detects_exactly_and_hard_qualifier():
+def test_extract_hard_counts_detects_exactly_and_hard_qualifier():
     ns = _load_helper_namespace()
     extract = ns["_vibe_audit_extract_hard_counts"]
     # EXACTLY THREE (HARD) — generic any noun
@@ -279,7 +279,7 @@ def test_v073_extract_hard_counts_detects_exactly_and_hard_qualifier():
     assert extract("just some free text without counts") == {}
 
 
-def test_v073_extract_canonical_keys_handles_multiple_phrasings():
+def test_extract_canonical_keys_handles_multiple_phrasings():
     ns = _load_helper_namespace()
     extract = ns["_vibe_audit_extract_canonical_keys"]
     # Multiple phrasing patterns
@@ -296,7 +296,7 @@ def test_v073_extract_canonical_keys_handles_multiple_phrasings():
     assert extract("") == []
 
 
-def test_v073_extract_subdomain_hints_widget_first():
+def test_extract_subdomain_hints_widget_first():
     """business_domains widget OUTRANKS vibe text per CLAUDE.md §3b."""
     ns = _load_helper_namespace()
     extract = ns["_vibe_audit_extract_subdomain_hints"]
@@ -309,7 +309,7 @@ def test_v073_extract_subdomain_hints_widget_first():
     assert "product" in idents
 
 
-def test_v073_walk_model_counts_correct():
+def test_walk_model_counts_correct():
     ns = _load_helper_namespace()
     walk = ns["_vibe_audit_walk_model"]
     domains = [{"domain": "customer"}, {"domain": "order"}]
@@ -332,7 +332,7 @@ def test_v073_walk_model_counts_correct():
     assert "customer.person" in walked["fk_targets_set"]
 
 
-def test_v073_extend_sa_emits_hard_count_violation_when_exceeded():
+def test_extend_sa_emits_hard_count_violation_when_exceeded():
     """When user vibe says 'EXACTLY THREE metric views (HARD)' and model has 5 → must emit."""
     ns = _load_helper_namespace()
     extend = ns["_extend_sa_with_vibe_compliance"]
@@ -354,7 +354,7 @@ def test_v073_extend_sa_emits_hard_count_violation_when_exceeded():
     assert found["details"]["actual"] == 5
 
 
-def test_v073_extend_sa_emits_canonical_key_drift_when_missing():
+def test_extend_sa_emits_canonical_key_drift_when_missing():
     ns = _load_helper_namespace()
     extend = ns["_extend_sa_with_vibe_compliance"]
 
@@ -381,7 +381,7 @@ def test_v073_extend_sa_emits_canonical_key_drift_when_missing():
     assert "position_id" not in drift_keys  # this one IS used as PK
 
 
-def test_v073_extend_sa_skip_when_no_vibe_text():
+def test_extend_sa_skip_when_no_vibe_text():
     """If no vibe and no business_domains widget → skip cleanly (no issues added)."""
     ns = _load_helper_namespace()
     extend = ns["_extend_sa_with_vibe_compliance"]
@@ -398,7 +398,7 @@ def test_v073_extend_sa_skip_when_no_vibe_text():
     assert len(vibe_cats) == 0
 
 
-def test_v073_render_audit_report_includes_required_sections():
+def test_render_audit_report_includes_required_sections():
     """The rendered Markdown report must contain all canonical sections."""
     ns = _load_helper_namespace()
     render = ns["_render_vibe_audit_report_md"]
@@ -449,7 +449,7 @@ def test_v073_render_audit_report_includes_required_sections():
     assert "Customer" in md  # subdomain hint label
 
 
-def test_v073_score_vreq_weighting():
+def test_score_vreq_weighting():
     """Score must deduct: error=-25, warning=-10, info=-3 per finding, capped at 0."""
     ns = _load_helper_namespace()
     score = ns["_vibe_audit_score_vreq"]
@@ -462,7 +462,7 @@ def test_v073_score_vreq_weighting():
     assert score("x", {"error": 10, "warning": 10, "info": 10}, 30) == 0
 
 
-def test_v073_extract_glossary_table_pipe_format():
+def test_extract_glossary_table_pipe_format():
     """Pipe-table glossary parsing — works for any business glossary header style."""
     ns = _load_helper_namespace()
     extract = ns["_vibe_audit_extract_glossary_table"]
@@ -487,7 +487,7 @@ def test_v073_extract_glossary_table_pipe_format():
     assert "identifier" in cust_def.lower()
 
 
-def test_v073_full_pipeline_smoke():
+def test_full_pipeline_smoke():
     """End-to-end: extract → extend SA → render report — generic vibe."""
     ns = _load_helper_namespace()
     extract_ddl = ns["_vibe_audit_extract_ddl_blocks"]

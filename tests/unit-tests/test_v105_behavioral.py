@@ -1,4 +1,4 @@
-"""v1.0.5 BEHAVIORAL tests — eliminate the two v1.0.4 soft findings.
+"""BEHAVIORAL tests — eliminate the two v1.0.4 soft findings.
 
 Fixes covered:
   E. fk-validator-skip-external-refs
@@ -49,16 +49,16 @@ class TestFKValidatorSkipExternalRefs:
         assert "alias=fk-validator-skip-external-refs" in agent_src
 
     def test_helper_function_present(self, agent_src):
-        assert "_v105_is_external_ref" in agent_src
+        assert "_is_external_ref" in agent_src
 
     def test_external_prefix_excluded(self, agent_src):
-        idx = agent_src.find("_v105_is_external_ref")
+        idx = agent_src.find("_is_external_ref")
         assert idx != -1
         window = agent_src[idx:idx + 800]
         assert "startswith('external_')" in window
 
     def test_natural_key_suffixes_excluded(self, agent_src):
-        idx = agent_src.find("_v105_is_external_ref")
+        idx = agent_src.find("_is_external_ref")
         window = agent_src[idx:idx + 800]
         for suffix in ("_code", "_ref", "_handle", "_key", "_uuid", "_slug"):
             assert f"'{suffix}'" in window, f"suffix {suffix} must be in exclusion list"
@@ -67,10 +67,10 @@ class TestFKValidatorSkipExternalRefs:
         idx = agent_src.find("potential_fk_attrs = [a.get('attribute') for a in sp_attrs")
         assert idx != -1
         window = agent_src[idx:idx + 1000]
-        assert "_v105_is_external_ref" in window
+        assert "_is_external_ref" in window
 
     def test_external_ref_logic_positive_negative(self):
-        def _v105_is_external_ref(attr_name):
+        def _is_external_ref(attr_name):
             _n = (attr_name or '').lower()
             if _n.startswith('external_'):
                 return True
@@ -78,19 +78,19 @@ class TestFKValidatorSkipExternalRefs:
                 if _n.endswith(_suffix):
                     return True
             return False
-        assert _v105_is_external_ref("external_segment_id") is True
-        assert _v105_is_external_ref("customer_code") is True
-        assert _v105_is_external_ref("partner_ref") is True
-        assert _v105_is_external_ref("region_handle") is True
-        assert _v105_is_external_ref("natural_key") is True
-        assert _v105_is_external_ref("system_uuid") is True
-        assert _v105_is_external_ref("url_slug") is True
-        assert _v105_is_external_ref("account_id") is False
-        assert _v105_is_external_ref("customer_id") is False
-        assert _v105_is_external_ref("order_id") is False
-        assert _v105_is_external_ref("shipment_id") is False
-        assert _v105_is_external_ref("") is False
-        assert _v105_is_external_ref(None) is False
+        assert _is_external_ref("external_segment_id") is True
+        assert _is_external_ref("customer_code") is True
+        assert _is_external_ref("partner_ref") is True
+        assert _is_external_ref("region_handle") is True
+        assert _is_external_ref("natural_key") is True
+        assert _is_external_ref("system_uuid") is True
+        assert _is_external_ref("url_slug") is True
+        assert _is_external_ref("account_id") is False
+        assert _is_external_ref("customer_id") is False
+        assert _is_external_ref("order_id") is False
+        assert _is_external_ref("shipment_id") is False
+        assert _is_external_ref("") is False
+        assert _is_external_ref(None) is False
 
 
 class TestBidirectionalPointerAutoResolve:
@@ -101,10 +101,10 @@ class TestBidirectionalPointerAutoResolve:
         assert "alias=bidirectional-pointer-auto-resolve" in agent_src
 
     def test_helper_function_present(self, agent_src):
-        assert "_v105_is_pointer_attr" in agent_src
+        assert "_is_pointer_attr" in agent_src
 
     def test_pointer_prefixes_present(self, agent_src):
-        idx = agent_src.find("_v105_is_pointer_attr")
+        idx = agent_src.find("_is_pointer_attr")
         assert idx != -1
         window = agent_src[idx:idx + 800]
         for prefix in ("default_", "primary_", "current_", "latest_", "last_", "preferred_", "main_"):
@@ -126,7 +126,7 @@ class TestBidirectionalPointerAutoResolve:
         assert idx != -1
         window = agent_src[idx:idx + 3500]
         assert "_pa['foreign_key_to'] = ''" in window, "must strip FK on pointer side"
-        assert "bidirectional_links = _v105_keep_links" in window, "must replace list so cycle detector does not see pair"
+        assert "bidirectional_links = _keep_links" in window, "must replace list so cycle detector does not see pair"
 
     def test_log_level_is_info_for_auto_resolved(self, agent_src):
         idx = agent_src.find("bidirectional-pointer-auto-resolve FIRED")
@@ -135,37 +135,37 @@ class TestBidirectionalPointerAutoResolve:
         assert "logger.info" in window_before, "auto-resolve FIRED line must be INFO, not WARNING"
 
     def test_pointer_logic_positive_negative(self):
-        def _v105_is_pointer_attr(attr_name):
+        def _is_pointer_attr(attr_name):
             _n = (attr_name or '').lower()
             for _prefix in ('default_', 'primary_', 'current_', 'latest_', 'last_', 'preferred_', 'main_'):
                 if _n.startswith(_prefix):
                     return True
             return False
-        assert _v105_is_pointer_attr("default_shipping_address_id") is True
-        assert _v105_is_pointer_attr("primary_account_id") is True
-        assert _v105_is_pointer_attr("current_session_id") is True
-        assert _v105_is_pointer_attr("latest_order_id") is True
-        assert _v105_is_pointer_attr("last_login_id") is True
-        assert _v105_is_pointer_attr("preferred_address_id") is True
-        assert _v105_is_pointer_attr("main_contact_id") is True
-        assert _v105_is_pointer_attr("account_id") is False
-        assert _v105_is_pointer_attr("customer_id") is False
-        assert _v105_is_pointer_attr("address_id") is False
-        assert _v105_is_pointer_attr("") is False
-        assert _v105_is_pointer_attr(None) is False
+        assert _is_pointer_attr("default_shipping_address_id") is True
+        assert _is_pointer_attr("primary_account_id") is True
+        assert _is_pointer_attr("current_session_id") is True
+        assert _is_pointer_attr("latest_order_id") is True
+        assert _is_pointer_attr("last_login_id") is True
+        assert _is_pointer_attr("preferred_address_id") is True
+        assert _is_pointer_attr("main_contact_id") is True
+        assert _is_pointer_attr("account_id") is False
+        assert _is_pointer_attr("customer_id") is False
+        assert _is_pointer_attr("address_id") is False
+        assert _is_pointer_attr("") is False
+        assert _is_pointer_attr(None) is False
 
 
 class TestV104RegressionUnchanged:
     """Regression: v1.0.4 fixes remain intact in v1.0.5."""
 
-    def test_v104_aliases_intact(self, agent_src):
+    def test_aliases_intact(self, agent_src):
         for alias in (
             "mv-filter-strip-comments",
             "mv-column-prevalidate-drop",
         ):
-            assert alias in agent_src, f"v1.0.4 alias {alias!r} must not regress"
+            assert alias in agent_src, f"alias {alias!r} must not regress"
 
-    def test_v104_prompt_joins_disabled_still_present(self, agent_src):
+    def test_prompt_joins_disabled_still_present(self, agent_src):
         assert "SINGLE-TABLE METRIC VIEWS ONLY" in agent_src
         assert "SINGLE-TABLE KPIs ONLY" in agent_src
         assert "JOINS ARE DISABLED" in agent_src
@@ -174,12 +174,12 @@ class TestV104RegressionUnchanged:
 class TestV103RegressionUnchanged:
     """Regression: v1.0.3 fixes remain intact in v1.0.5."""
 
-    def test_v103_aliases_intact(self, agent_src):
+    def test_aliases_intact(self, agent_src):
         for alias in (
             "fidelity-count-soft-pass-strategy-agnostic",
             "mv-cross-table-measure-drop",
         ):
-            assert alias in agent_src, f"v1.0.3 alias {alias!r} must not regress"
+            assert alias in agent_src, f"alias {alias!r} must not regress"
 
     def test_earlier_aliases_intact(self, agent_src):
         for alias in (

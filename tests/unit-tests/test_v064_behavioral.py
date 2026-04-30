@@ -31,18 +31,18 @@ def _agent_src() -> str:
 # B1 — _compute_max_concurrent_batches_for_32gb cap 8 -> 16
 # =============================================================================
 
-def test_v064_b1_alias_present():
+def test_b1_alias_present():
     src = _agent_src()
-    assert "v0.6.4 B1 alias=perf-cap-16" in src, "perf-cap-16 sentinel missing"
+    assert "alias=perf-cap-16" in src, "perf-cap-16 sentinel missing"
 
 
-def test_v064_b1_cap_lifted_to_16():
+def test_b1_cap_lifted_to_16():
     src = _agent_src()
     assert "min(raw, 16)" in src, "B1 cap should be min(raw, 16)"
     assert "return min(raw, 8)" not in src, "old min(raw, 8) cap must be gone"
 
 
-def test_v064_b1_raw_upper_bound_lifted():
+def test_b1_raw_upper_bound_lifted():
     src = _agent_src()
     assert re.search(r"raw\s*=\s*24\s+if\s+n_attributes\s*<\s*100_?000", src), \
         "raw upper bound should be 24 for n_attributes < 100k"
@@ -52,12 +52,12 @@ def test_v064_b1_raw_upper_bound_lifted():
 # B8 — LLM throttle ceilings 10 -> 16
 # =============================================================================
 
-def test_v064_b8_alias_present():
+def test_b8_alias_present():
     src = _agent_src()
-    assert "v0.6.4 B8 alias=perf-llm-throttle-16" in src, "perf-llm-throttle-16 sentinel missing"
+    assert "alias=perf-llm-throttle-16" in src, "perf-llm-throttle-16 sentinel missing"
 
 
-def test_v064_b8_min10_replaced_with_min16():
+def test_b8_min10_replaced_with_min16():
     src = _agent_src()
     assert src.count("min(10, max_batches)") == 0, \
         "old min(10, max_batches) LLM throttle must be gone"
@@ -65,7 +65,7 @@ def test_v064_b8_min10_replaced_with_min16():
         "new min(16, max_batches) LLM throttle must be present at least once"
 
 
-def test_v064_b8_orchestrator_init_throttle_lifted():
+def test_b8_orchestrator_init_throttle_lifted():
     src = _agent_src()
     pattern = re.compile(
         r'MAX_CONCURRENT_LLM_CALLS["\']?\s*,\s*min\(\s*16\s*,\s*self\.system_config\.get\(\s*["\']MAX_CONCURRENT_BATCHES'
@@ -78,25 +78,25 @@ def test_v064_b8_orchestrator_init_throttle_lifted():
 # B3 — MV15 sequential loop -> parallel
 # =============================================================================
 
-def test_v064_b3_alias_present():
+def test_b3_alias_present():
     src = _agent_src()
-    assert "v0.6.4 B3 alias=perf-mv15-parallel" in src, "perf-mv15-parallel sentinel missing"
+    assert "alias=perf-mv15-parallel" in src, "perf-mv15-parallel sentinel missing"
 
 
-def test_v064_b3_helper_function_extracted():
+def test_b3_helper_function_extracted():
     src = _agent_src()
     assert "_process_one_mv15_batch" in src, \
         "B3 should extract per-batch logic into _process_one_mv15_batch helper"
 
 
-def test_v064_b3_count_lock_guards_counters():
+def test_b3_count_lock_guards_counters():
     src = _agent_src()
     assert "_mv15_count_lock" in src, "MV15 aggregate-counter lock must exist"
     assert re.search(r"_mv15_count_lock\s*=\s*threading\.Lock\(", src), \
         "_mv15_count_lock must be a threading.Lock instance"
 
 
-def test_v064_b3_uses_parallel_runner():
+def test_b3_uses_parallel_runner():
     """Helper must be invoked via the project's parallel runner (or a guarded thread pool)."""
     src = _agent_src()
     idx = src.find("def _process_one_mv15_batch")
@@ -109,7 +109,7 @@ def test_v064_b3_uses_parallel_runner():
     ), "MV15 batches must be dispatched via a parallel pool, not a sequential for-loop"
 
 
-def test_v064_b3_no_continue_inside_helper():
+def test_b3_no_continue_inside_helper():
     """`continue` is invalid inside a function body; helper must use return None."""
     src = _agent_src()
     idx = src.find("def _process_one_mv15_batch")
@@ -134,15 +134,15 @@ def _readme_src() -> str:
     return open(README).read()
 
 
-def test_v064_readme_current_version_bumped():
-    """v0.6.4 must be reachable from the readme — either as Current version OR as a
+def test_readme_current_version_bumped():
+    """must be reachable from the readme — either as Current version OR as a
     history-table entry. Once a later version bumps the Current pointer, the v0.6.4
     history row is the surviving evidence that v0.6.4 shipped."""
     rd = _readme_src()
     assert "**v0.6.4**" in rd, "readme must reference v0.6.4 (current or history row)"
 
 
-def test_v064_readme_history_entry_present():
+def test_readme_history_entry_present():
     rd = _readme_src()
     assert "**v0.6.4**" in rd, "readme version history must include v0.6.4 row"
     assert "perf-cap-16" in rd
@@ -150,7 +150,7 @@ def test_v064_readme_history_entry_present():
     assert "perf-mv15-parallel" in rd
 
 
-def test_v064_readme_b2_b7_explicitly_excluded():
+def test_readme_b2_b7_explicitly_excluded():
     """Per user directive, B2 and B7 are NOT shipped; the readme must document this."""
     rd = _readme_src()
     assert "NOT applied" in rd or "not applied" in rd or "kept sequential" in rd, \

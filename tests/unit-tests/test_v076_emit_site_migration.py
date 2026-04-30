@@ -12,10 +12,10 @@ queues, which meant:
 
 v0.7.6 adds the following ADDITIVE migration (no behaviour change to existing
 queue consumers):
-  1. _v076_emit_finding helper — thin adapter; no-op if dispatcher is None
-  2. _v076_protected_targets_from_widgets — builds the canonical user-protected
+  1. _emit_finding helper — thin adapter; no-op if dispatcher is None
+  2. _protected_targets_from_widgets — builds the canonical user-protected
      target set (business_domains + must_have_data_products) for dispatcher
-  3. _v076_safe_executor — minimal LOCAL-only executor that handles
+  3. _local_action_executor — minimal LOCAL-only executor that handles
      alter_description (product/attribute), add_tag (attribute), update_regex
      (attribute). All FK-rewire and norm-redo actions return False -> defer.
   4. Domain architect (_apply_single_domain_review_to_model + parent
@@ -29,17 +29,17 @@ queue consumers):
      a FindingShape to a next_vibes_generation-stage dispatcher (no executor;
      observability-only since priorities feed the next iteration's vibe).
 
-Pre-existing v0.7.2 sentinel `v0.7.2 SHRINK-NEW-SILO-ALL-ORPHANS` is also
-patched into the empty-plan branch so test_v072_fix3_handles_degenerate_empty_plan
+Pre-existing v0.7.2 sentinel `SHRINK-NEW-SILO-ALL-ORPHANS` is also
+patched into the empty-plan branch so test_fix3_handles_degenerate_empty_plan
 no longer reports a long-standing pre-existing fail.
 
 Aliases under test:
-  - v076-emit-finding-helper
-  - v076-protected-targets
-  - v076-safe-executor
-  - v076-architect-dispatcher
-  - v076-audit-dispatcher
-  - v076-next-vibes-dispatcher
+  - emit-finding-helper
+  - protected-targets
+  - safe-executor
+  - architect-dispatcher
+  - audit-dispatcher
+  - next-vibes-dispatcher
   - shrink-orphan-drop-emptied (re-asserted with v0.7.2 SHRINK-NEW-SILO-ALL-ORPHANS sentinel)
   - agent-version-global   (re-asserted at 0.7.6)
   - agent-version-mirror   (re-asserted at 0.7.6)
@@ -76,7 +76,7 @@ def _agent_cell_3_text():
     raise AssertionError("agent notebook must contain a code cell defining FindingDispatcher")
 
 
-def _exec_v076_namespace():
+def _exec_namespace():
     """Re-exec the slice of cell 3 that defines ACTION_COST_* / MasterActionRegistry /
     classify_action_cost / FindingDispatcher / v076 helpers in a clean namespace.
     Slice ends at _cascade_domain_rename so we don't pull in the entire cell.
@@ -115,19 +115,19 @@ def _exec_v076_namespace():
 # ── Section 1: __AGENT_VERSION__ pin ─────────────────────────────────────────
 
 
-def test_v076_agent_version_is_076():
+def test_agent_version_is_076():
     src = _agent_text()
-    assert '__AGENT_VERSION__ = "0.7.6"' in src, (
-        "v0.7.6 must stamp __AGENT_VERSION__ = '0.7.6' (CLAUDE.md §3a-bis)"
+    assert '__AGENT_VERSION__ = "0.7.7"' in src, (
+        "must stamp __AGENT_VERSION__ = '0.7.7' (CLAUDE.md §3a-bis)"
     )
 
 
-def test_v076_agent_version_first_non_comment_line():
+def test_agent_version_first_non_comment_line():
     nb = json.loads(AGENT_NB.read_text())
     first_code_cell = next(c for c in nb["cells"] if c.get("cell_type") == "code")
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
-    assert '__AGENT_VERSION__ = "0.7.6"' in code_lines[0], (
+    assert '__AGENT_VERSION__ = "0.7.7"' in code_lines[0], (
         "First non-comment line must be __AGENT_VERSION__ = \"0.7.6\""
     )
 
@@ -135,15 +135,15 @@ def test_v076_agent_version_first_non_comment_line():
 # ── Section 2: helper functions exist + correct behaviour ────────────────────
 
 
-def test_v076_helpers_defined_in_cell_3():
+def test_helpers_defined_in_cell_3():
     src = _agent_cell_3_text()
-    for fn in ("_v076_emit_finding", "_v076_protected_targets_from_widgets", "_v076_safe_executor"):
-        assert f"def {fn}(" in src, f"v0.7.6 helper {fn} must be defined in Cell 3"
+    for fn in ("_emit_finding", "_protected_targets_from_widgets", "_local_action_executor"):
+        assert f"def {fn}(" in src, f"helper {fn} must be defined in Cell 3"
 
 
-def test_v076_emit_finding_no_op_on_none_dispatcher():
-    ns = _exec_v076_namespace()
-    out = ns["_v076_emit_finding"](
+def test_emit_finding_no_op_on_none_dispatcher():
+    ns = _exec_namespace()
+    out = ns["_emit_finding"](
         None,
         stage="domain_architect_review",
         category="test",
@@ -155,20 +155,20 @@ def test_v076_emit_finding_no_op_on_none_dispatcher():
         action_scope="product",
         args={},
     )
-    assert out is None, "v0.7.6 _v076_emit_finding must be a no-op when dispatcher is None"
+    assert out is None, "_emit_finding must be a no-op when dispatcher is None"
 
 
-def test_v076_emit_finding_submits_canonical_finding():
-    ns = _exec_v076_namespace()
+def test_emit_finding_submits_canonical_finding():
+    ns = _exec_namespace()
     logger = ns["_MockLogger"]()
     disp = ns["FindingDispatcher"](
         stage_name="domain_architect_review",
         model_state={"domains": []},
         logger=logger,
-        executor=ns["_v076_safe_executor"],
+        executor=ns["_local_action_executor"],
         protected_targets=set(),
     )
-    out = ns["_v076_emit_finding"](
+    out = ns["_emit_finding"](
         disp,
         stage="domain_architect_review",
         category="domain_architect_rename",
@@ -189,41 +189,41 @@ def test_v076_emit_finding_submits_canonical_finding():
     assert len(disp.pending) == 1
 
 
-def test_v076_protected_targets_reads_business_domains_widget():
-    ns = _exec_v076_namespace()
+def test_protected_targets_reads_business_domains_widget():
+    ns = _exec_namespace()
     widgets = {"business_domains": "customer, order, product"}
-    targets = ns["_v076_protected_targets_from_widgets"](widgets, None)
+    targets = ns["_protected_targets_from_widgets"](widgets, None)
     assert targets == {"customer", "order", "product"}
 
 
-def test_v076_protected_targets_reads_must_have_products_widget():
-    ns = _exec_v076_namespace()
+def test_protected_targets_reads_must_have_products_widget():
+    ns = _exec_namespace()
     widgets = {"must_have_data_products": "invoice; ledger"}
-    targets = ns["_v076_protected_targets_from_widgets"](widgets, None)
+    targets = ns["_protected_targets_from_widgets"](widgets, None)
     assert targets == {"invoice", "ledger"}
 
 
-def test_v076_protected_targets_falls_back_to_config_business_config():
-    ns = _exec_v076_namespace()
+def test_protected_targets_falls_back_to_config_business_config():
+    ns = _exec_namespace()
     config = {"PROMPT_VARIABLES": {"business_config": {"business_domains": "alpha,beta"}}}
-    targets = ns["_v076_protected_targets_from_widgets"]({}, config)
+    targets = ns["_protected_targets_from_widgets"]({}, config)
     assert targets == {"alpha", "beta"}
 
 
-def test_v076_protected_targets_handles_list_input():
-    ns = _exec_v076_namespace()
+def test_protected_targets_handles_list_input():
+    ns = _exec_namespace()
     widgets = {"business_domains": ["customer", "order"], "must_have_data_products": ["invoice"]}
-    targets = ns["_v076_protected_targets_from_widgets"](widgets, None)
+    targets = ns["_protected_targets_from_widgets"](widgets, None)
     assert targets == {"customer", "order", "invoice"}
 
 
-def test_v076_protected_targets_empty_when_no_input():
-    ns = _exec_v076_namespace()
-    targets = ns["_v076_protected_targets_from_widgets"]({}, {})
+def test_protected_targets_empty_when_no_input():
+    ns = _exec_namespace()
+    targets = ns["_protected_targets_from_widgets"]({}, {})
     assert targets == set()
 
 
-# ── Section 3: _v076_safe_executor unit tests (LOCAL-only subset) ────────────
+# ── Section 3: _local_action_executor unit tests (LOCAL-only subset) ────────────
 
 
 def _model_state_with_one_attr():
@@ -246,8 +246,8 @@ def _model_state_with_one_attr():
     }
 
 
-def test_v076_safe_executor_alter_description_product():
-    ns = _exec_v076_namespace()
+def test_local_action_executor_alter_description_product():
+    ns = _exec_namespace()
     state = _model_state_with_one_attr()
     finding = ns["make_finding"](
         stage="vibe_audit",
@@ -261,13 +261,13 @@ def test_v076_safe_executor_alter_description_product():
         args={"domain": "customer", "product": "account", "description": "new prose"},
         provenance=ns["PROVENANCE_USER_VIBE"],
     )
-    ok = ns["_v076_safe_executor"](finding, state, ns["_MockLogger"]())
+    ok = ns["_local_action_executor"](finding, state, ns["_MockLogger"]())
     assert ok is True
     assert state["domains"][0]["products"][0]["description"] == "new prose"
 
 
-def test_v076_safe_executor_add_tag_attribute_idempotent():
-    ns = _exec_v076_namespace()
+def test_local_action_executor_add_tag_attribute_idempotent():
+    ns = _exec_namespace()
     state = _model_state_with_one_attr()
     finding = ns["make_finding"](
         stage="vibe_audit",
@@ -281,8 +281,8 @@ def test_v076_safe_executor_add_tag_attribute_idempotent():
         args={"domain": "customer", "product": "account", "attribute": "email", "tag": "sensitive"},
         provenance=ns["PROVENANCE_USER_VIBE"],
     )
-    ok1 = ns["_v076_safe_executor"](finding, state, ns["_MockLogger"]())
-    ok2 = ns["_v076_safe_executor"](finding, state, ns["_MockLogger"]())
+    ok1 = ns["_local_action_executor"](finding, state, ns["_MockLogger"]())
+    ok2 = ns["_local_action_executor"](finding, state, ns["_MockLogger"]())
     assert ok1 is True and ok2 is True
     tags = state["domains"][0]["products"][0]["attributes"][0]["tags"]
     assert "sensitive" in tags
@@ -290,8 +290,8 @@ def test_v076_safe_executor_add_tag_attribute_idempotent():
     assert tags.count("sensitive") == 1, "add_tag must be idempotent"
 
 
-def test_v076_safe_executor_update_regex_attribute():
-    ns = _exec_v076_namespace()
+def test_local_action_executor_update_regex_attribute():
+    ns = _exec_namespace()
     state = _model_state_with_one_attr()
     finding = ns["make_finding"](
         stage="vibe_audit",
@@ -305,13 +305,13 @@ def test_v076_safe_executor_update_regex_attribute():
         args={"domain": "customer", "product": "account", "attribute": "email", "regex": "^[a-z]+$"},
         provenance=ns["PROVENANCE_USER_VIBE"],
     )
-    ok = ns["_v076_safe_executor"](finding, state, ns["_MockLogger"]())
+    ok = ns["_local_action_executor"](finding, state, ns["_MockLogger"]())
     assert ok is True
     assert state["domains"][0]["products"][0]["attributes"][0]["value_regex"] == "^[a-z]+$"
 
 
-def test_v076_safe_executor_returns_false_for_unsafe_action():
-    ns = _exec_v076_namespace()
+def test_local_action_executor_returns_false_for_unsafe_action():
+    ns = _exec_namespace()
     state = _model_state_with_one_attr()
     finding = ns["make_finding"](
         stage="vibe_audit",
@@ -325,12 +325,12 @@ def test_v076_safe_executor_returns_false_for_unsafe_action():
         args={"domain": "customer", "product": "account", "new_name": "client"},
         provenance=ns["PROVENANCE_USER_VIBE"],
     )
-    ok = ns["_v076_safe_executor"](finding, state, ns["_MockLogger"]())
+    ok = ns["_local_action_executor"](finding, state, ns["_MockLogger"]())
     assert ok is False, "rename product (FK_REWIRE cost) MUST be deferred by safe executor"
 
 
-def test_v076_safe_executor_returns_false_when_target_missing():
-    ns = _exec_v076_namespace()
+def test_local_action_executor_returns_false_when_target_missing():
+    ns = _exec_namespace()
     state = _model_state_with_one_attr()
     finding = ns["make_finding"](
         stage="vibe_audit",
@@ -344,54 +344,54 @@ def test_v076_safe_executor_returns_false_when_target_missing():
         args={"domain": "nonexistent", "product": "fake", "description": "x"},
         provenance=ns["PROVENANCE_USER_VIBE"],
     )
-    ok = ns["_v076_safe_executor"](finding, state, ns["_MockLogger"]())
+    ok = ns["_local_action_executor"](finding, state, ns["_MockLogger"]())
     assert ok is False
 
 
 # ── Section 4: domain architect emit-site migration ──────────────────────────
 
 
-def test_v076_apply_single_domain_review_accepts_dispatcher_arg():
+def test_apply_single_domain_review_accepts_dispatcher_arg():
     src = _agent_text()
     sig_pat = re.compile(
         r"def _apply_single_domain_review_to_model\([^)]*_finding_dispatcher=None",
         re.MULTILINE | re.DOTALL,
     )
     assert sig_pat.search(src), (
-        "v0.7.6: _apply_single_domain_review_to_model MUST accept _finding_dispatcher=None "
+        "_apply_single_domain_review_to_model MUST accept _finding_dispatcher=None "
         "(default None preserves existing call sites)"
     )
 
 
-def test_v076_architect_dispatcher_constructed_in_step():
+def test_architect_dispatcher_constructed_in_step():
     src = _agent_text()
-    assert "v076-architect-dispatcher FIRED" in src, (
-        "v0.7.6: step_domain_architect_review MUST emit [v076-architect-dispatcher FIRED] "
+    assert "architect-dispatcher FIRED" in src, (
+        "step_domain_architect_review MUST emit [architect-dispatcher FIRED] "
         "when constructing the per-stage FindingDispatcher"
     )
     assert "stage_name='domain_architect_review'" in src, (
         "Architect dispatcher MUST use stage_name='domain_architect_review'"
     )
-    assert "executor=_v076_safe_executor," in src, (
-        "Architect dispatcher MUST register _v076_safe_executor"
+    assert "executor=_local_action_executor," in src, (
+        "Architect dispatcher MUST register _local_action_executor"
     )
 
 
-def test_v076_architect_dispatcher_passes_protected_targets():
+def test_architect_dispatcher_passes_protected_targets():
     src = _agent_text()
-    assert "_v076_protected_targets_from_widgets(widgets_values, config)" in src, (
-        "v0.7.6: architect dispatcher MUST derive protected_targets from §3b/§3c widgets"
+    assert "_protected_targets_from_widgets(widgets_values, config)" in src, (
+        "architect dispatcher MUST derive protected_targets from §3b/§3c widgets"
     )
 
 
-def test_v076_architect_dispatcher_calls_process_batch():
+def test_architect_dispatcher_calls_process_batch():
     src = _agent_text()
-    assert "v076-architect-dispatcher SUMMARY" in src, (
-        "v0.7.6: architect dispatcher MUST call process_batch() and emit SUMMARY log"
+    assert "architect-dispatcher SUMMARY" in src, (
+        "architect dispatcher MUST call process_batch() and emit SUMMARY log"
     )
 
 
-def test_v076_all_9_architect_emit_sites_migrated():
+def test_all_9_architect_emit_sites_migrated():
     src = _agent_text()
     expected_categories = [
         "domain_architect_rename",
@@ -404,44 +404,44 @@ def test_v076_all_9_architect_emit_sites_migrated():
     for cat in expected_categories:
         assert (
             f"category='{cat}'" in src
-        ), f"v0.7.6: architect emit site for category={cat} MUST submit a FindingShape via _v076_emit_finding"
+        ), f"architect emit site for category={cat} MUST submit a FindingShape via _emit_finding"
     assert "category=f'domain_architect_self_review_priority:" in src, (
-        "v0.7.6: architect self-review priority emit site MUST submit FindingShape"
+        "architect self-review priority emit site MUST submit FindingShape"
     )
     assert "category=f'domain_architect_gate:" in src, (
-        "v0.7.6: architect gate-failure emit sites MUST submit FindingShape"
+        "architect gate-failure emit sites MUST submit FindingShape"
     )
 
 
 # ── Section 5: VIBE_AUDIT remediate migration ────────────────────────────────
 
 
-def test_v076_audit_dispatcher_constructed_in_remediate():
+def test_audit_dispatcheratcher_constructed_in_remediate():
     src = _agent_text()
-    assert "v076-audit-dispatcher FIRED" in src, (
-        "v0.7.6: VibeOrchestrator.remediate MUST emit [v076-audit-dispatcher FIRED] "
+    assert "audit-dispatcher FIRED" in src, (
+        "VibeOrchestrator.remediate MUST emit [audit-dispatcher FIRED] "
         "when constructing the vibe_audit-stage dispatcher"
     )
     assert "stage_name='vibe_audit'" in src, (
         "Audit dispatcher MUST use stage_name='vibe_audit'"
     )
-    assert "v076-audit-dispatcher SUMMARY" in src, (
-        "v0.7.6: audit dispatcher MUST call process_batch() and emit SUMMARY log"
+    assert "audit-dispatcher SUMMARY" in src, (
+        "audit dispatcher MUST call process_batch() and emit SUMMARY log"
     )
 
 
-def test_v076_audit_emit_uses_user_vibe_provenance():
+def test_audit_emit_uses_user_vibe_provenance():
     src = _agent_text()
     assert "provenance=PROVENANCE_USER_VIBE" in src, (
-        "v0.7.6: VIBE_AUDIT remediate MUST submit findings with PROVENANCE_USER_VIBE "
+        "VIBE_AUDIT remediate MUST submit findings with PROVENANCE_USER_VIBE "
         "(audit is enforcing user-vibe requirements per §3c)"
     )
 
 
-def test_v076_audit_emit_resolves_action_type_scope_from_master_registry():
+def test_audit_emit_resolves_action_type_scope_from_master_registry():
     src = _agent_text()
-    assert "(_v076_at, _v076_sc) in MASTER_ACTION_REGISTRY" in src, (
-        "v0.7.6: audit emit MUST gate on MASTER_ACTION_REGISTRY membership "
+    assert "(_at, _sc) in MASTER_ACTION_REGISTRY" in src, (
+        "audit emit MUST gate on MASTER_ACTION_REGISTRY membership "
         "to avoid submitting findings with unknown action_type+scope tuples"
     )
 
@@ -449,38 +449,38 @@ def test_v076_audit_emit_resolves_action_type_scope_from_master_registry():
 # ── Section 6: VIBE_CREATE_NEXT priority parser migration ────────────────────
 
 
-def test_v076_next_vibes_dispatcher_constructed():
+def test_next_vibes_dispatcher_constructed():
     src = _agent_text()
-    assert "v076-next-vibes-dispatcher FIRED" in src, (
-        "v0.7.6: step_generate_next_vibes MUST emit [v076-next-vibes-dispatcher FIRED]"
+    assert "next-vibes-dispatcher FIRED" in src, (
+        "step_generate_next_vibes MUST emit [next-vibes-dispatcher FIRED]"
     )
     assert "stage_name='next_vibes_generation'" in src, (
         "Next-vibes dispatcher MUST use stage_name='next_vibes_generation'"
     )
 
 
-def test_v076_next_vibes_priority_parser_present():
+def test_next_vibes_priority_parser_present():
     src = _agent_text()
-    assert "_v076_priority_re" in src, (
-        "v0.7.6: next-vibes consumer MUST parse PRIORITY blocks via _v076_priority_re"
+    assert "_priority_re" in src, (
+        "next-vibes consumer MUST parse PRIORITY blocks via _priority_re"
     )
 
 
-def test_v076_next_vibes_executor_is_none_observability_only():
+def test_next_vibes_executor_is_none_observability_only():
     src = _agent_text()
     pat = re.compile(
         r"stage_name='next_vibes_generation',[\s\S]{0,800}?executor=None",
     )
     assert pat.search(src), (
-        "v0.7.6: next-vibes dispatcher MUST register executor=None (observability-only "
+        "next-vibes dispatcher MUST register executor=None (observability-only "
         "since priorities feed the next iteration's vibe, not direct mutation)"
     )
 
 
-def test_v076_next_vibes_emits_qa_provenance():
+def test_next_vibes_emits_qa_provenance():
     src = _agent_text()
     assert "provenance=PROVENANCE_QA" in src, (
-        "v0.7.6: next-vibes priorities MUST be submitted with PROVENANCE_QA "
+        "next-vibes priorities MUST be submitted with PROVENANCE_QA "
         "(LLM-generated quality recommendations)"
     )
 
@@ -488,38 +488,38 @@ def test_v076_next_vibes_emits_qa_provenance():
 # ── Section 7: pre-existing v0.7.2 sentinel patched ──────────────────────────
 
 
-def test_v076_v072_shrink_orphan_drop_emptied_sentinel_present():
+def test_shrink_orphan_drop_emptied_sentinel_present():
     src = _agent_text()
-    assert "v0.7.2 SHRINK-NEW-SILO-ALL-ORPHANS" in src, (
-        "v0.7.6 patches the long-pending v0.7.2 fix3 sentinel into the empty-plan branch "
-        "(test_v072_fix3_handles_degenerate_empty_plan)"
+    assert "SHRINK-NEW-SILO-ALL-ORPHANS" in src, (
+        "patches the long-pending v0.7.2 fix3 sentinel into the empty-plan branch "
+        "(test_fix3_handles_degenerate_empty_plan)"
     )
     assert "shrink-orphan-drop-emptied" in src, (
-        "v0.7.6 must preserve the alias=shrink-orphan-drop-emptied for grep audit"
+        "alias=shrink-orphan-drop-emptied for grep audit"
     )
 
 
 # ── Section 8: industry-agnostic + serverless-compat invariants ──────────────
 
 
-def test_v076_helpers_industry_agnostic():
-    """v0.7.6 helpers MUST NOT name any specific industry/customer (CLAUDE.md §8.5)."""
+def test_helpers_industry_agnostic():
+    """helpers MUST NOT name any specific industry/customer (CLAUDE.md §8.5)."""
     src = _agent_cell_3_text()
     forbidden = ["airline", "emirates", "telco", "banking", "ecommerce", "healthcare", "retail", "manufacturing"]
     for word in forbidden:
-        v076_block_start = src.find("def _v076_emit_finding")
+        v076_block_start = src.find("def _emit_finding")
         v076_block_end = src.find("def _cascade_domain_rename")
         assert v076_block_start > 0 and v076_block_end > v076_block_start
         block = src[v076_block_start:v076_block_end].lower()
         assert word not in block, (
-            f"v0.7.6 helper block leaks industry term '{word}' (industry-agnostic invariant)"
+            f"helper block leaks industry term '{word}' (industry-agnostic invariant)"
         )
 
 
-def test_v076_helpers_serverless_compatible():
-    """v0.7.6 helpers MUST NOT use cache/persist/uncache/sparkcontext (CLAUDE.md §2)."""
+def test_helpers_serverless_compatible():
+    """helpers MUST NOT use cache/persist/uncache/sparkcontext (CLAUDE.md §2)."""
     src = _agent_cell_3_text()
-    v076_block_start = src.find("def _v076_emit_finding")
+    v076_block_start = src.find("def _emit_finding")
     v076_block_end = src.find("def _cascade_domain_rename")
     assert v076_block_start > 0 and v076_block_end > v076_block_start
     block = src[v076_block_start:v076_block_end]
@@ -533,20 +533,20 @@ def test_v076_helpers_serverless_compatible():
 # ── Section 9: end-to-end dispatcher integration via mock ────────────────────
 
 
-def test_v076_dispatcher_protects_user_targets_from_architect():
+def test_architect_dispatcheratcher_protects_user_targets_from_architect():
     """Integration: an architect finding (PROVENANCE_ARCHITECT) targeting a user-protected
     domain MUST be DEFERRED by the dispatcher with reason starting protected_by_user_vibe."""
-    ns = _exec_v076_namespace()
+    ns = _exec_namespace()
     logger = ns["_MockLogger"]()
     state = {"domains": [{"domain": "customer", "products": []}]}
     disp = ns["FindingDispatcher"](
         stage_name="domain_architect_review",
         model_state=state,
         logger=logger,
-        executor=ns["_v076_safe_executor"],
+        executor=ns["_local_action_executor"],
         protected_targets={"customer"},
     )
-    ns["_v076_emit_finding"](
+    ns["_emit_finding"](
         disp,
         stage="domain_architect_review",
         category="domain_architect_remove",
@@ -567,21 +567,21 @@ def test_v076_dispatcher_protects_user_targets_from_architect():
     assert disp.deferred[0]["_dispatch_reason"].startswith("protected_by_user_vibe")
 
 
-def test_v076_dispatcher_lets_user_vibe_audit_through_protected():
+def test_architect_dispatcheratcher_lets_user_vibe_audit_through_protected():
     """Integration: a user-vibe finding (PROVENANCE_USER_VIBE) IS allowed to touch a user-protected
     target — that's the whole point of §3c (user vibes are supreme authority).
     Test specifically isolates provenance gating from cost gating by using a LOCAL action."""
-    ns = _exec_v076_namespace()
+    ns = _exec_namespace()
     logger = ns["_MockLogger"]()
     state = _model_state_with_one_attr()
     disp = ns["FindingDispatcher"](
         stage_name="vibe_audit",
         model_state=state,
         logger=logger,
-        executor=ns["_v076_safe_executor"],
+        executor=ns["_local_action_executor"],
         protected_targets={"customer"},
     )
-    ns["_v076_emit_finding"](
+    ns["_emit_finding"](
         disp,
         stage="vibe_audit",
         category="vibe_audit_remediation:test",

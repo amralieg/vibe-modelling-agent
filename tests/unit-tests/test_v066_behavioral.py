@@ -49,26 +49,26 @@ def _agent_src() -> str:
 # NEW-7 — collision-naming-canonical
 # =============================================================================
 
-def test_v066_new7_alias_present():
+def test_new7_alias_present():
     src = _agent_src()
     assert "collision-naming-canonical" in src, (
         "collision-naming-canonical sentinel missing"
     )
 
 
-def test_v066_new7_fired_marker_present():
+def test_new7_fired_marker_present():
     src = _agent_src()
     assert "[collision-naming-canonical FIRED]" in src, (
         "[collision-naming-canonical FIRED] runtime log marker missing"
     )
 
 
-def test_v066_new7_helper_defined():
+def test_new7_helper_defined():
     src = _agent_src()
     assert "def _canonicalise_p074(" in src, "_canonicalise_p074 helper missing"
 
 
-def test_v066_new7_calls_apply_convention():
+def test_new7_calls_apply_convention():
     src = _agent_src()
     # The canonicalise helper must call apply_convention with the configured
     # naming convention.
@@ -79,7 +79,7 @@ def test_v066_new7_calls_apply_convention():
     ), "_canonicalise_p074 does not call apply_convention"
 
 
-def test_v066_new7_reads_naming_convention_from_config():
+def test_new7_reads_naming_convention_from_config():
     src = _agent_src()
     assert "data_asset_naming_convention" in src, (
         "data_asset_naming_convention not read from config"
@@ -87,7 +87,7 @@ def test_v066_new7_reads_naming_convention_from_config():
     assert "_naming_convention_p074" in src, "_naming_convention_p074 sentinel missing"
 
 
-def test_v066_new7_validate_collisions_takes_config():
+def test_new7_validate_collisions_takes_config():
     src = _agent_src()
     # The function signature must accept config.
     assert re.search(
@@ -96,7 +96,7 @@ def test_v066_new7_validate_collisions_takes_config():
     ), "_validate_product_name_collisions does not accept config"
 
 
-def test_v066_new7_call_sites_pass_config():
+def test_new7_call_sites_pass_config():
     src = _agent_src()
     # Both production call sites must pass config=config so the
     # canonicalisation respects the model's naming convention.
@@ -131,7 +131,7 @@ def test_v066_new7_call_sites_pass_config():
     )
 
 
-def test_v066_new7_canonicalise_applied_in_pass1():
+def test_new7_canonicalise_applied_in_pass1():
     src = _agent_src()
     # Find Pass 1: domain-name collision rename. After computing new_name via
     # _p074_qualified_rename it must be canonicalised.
@@ -140,7 +140,7 @@ def test_v066_new7_canonicalise_applied_in_pass1():
     )
 
 
-def test_v066_new7_canonicalise_applied_to_collision_suffix():
+def test_new7_canonicalise_applied_to_collision_suffix():
     src = _agent_src()
     # When a sibling name collides we suffix N. The suffix variant must also
     # canonicalise so we don't introduce 'CustomerAccount2' style names.
@@ -154,31 +154,31 @@ def test_v066_new7_canonicalise_applied_to_collision_suffix():
 # NEW-8 — fmfl-canonical-target
 # =============================================================================
 
-def test_v066_new8_alias_present():
+def test_new8_alias_present():
     src = _agent_src()
     assert "alias=fmfl-canonical-target" in src, (
         "fmfl-canonical-target sentinel missing"
     )
 
 
-def test_v066_new8_canonical_entities_set_built():
+def test_new8_canonical_entities_set_built():
     src = _agent_src()
     assert "_fmfl_canonical_entities" in src, (
         "_fmfl_canonical_entities set not built in _validate_fmfl"
     )
 
 
-def test_v066_new8_normalise_target_helper():
+def test_new8_normalise_target_helper():
     src = _agent_src()
     assert "def _fmfl_normalise_target(" in src, "_fmfl_normalise_target missing"
 
 
-def test_v066_new8_suggest_canonical_helper():
+def test_new8_suggest_canonical_helper():
     src = _agent_src()
     assert "def _fmfl_suggest_canonical(" in src, "_fmfl_suggest_canonical missing"
 
 
-def test_v066_new8_link_target_validation_present():
+def test_new8_link_target_validation_present():
     src = _agent_src()
     # Validator must reject LINK targets that don't exist in canonical entities.
     assert re.search(
@@ -187,7 +187,7 @@ def test_v066_new8_link_target_validation_present():
     ), "LINK target canonical-existence check missing"
 
 
-def test_v066_new8_suggestion_string_in_error_message():
+def test_new8_suggestion_string_in_error_message():
     src = _agent_src()
     # The error message must include 'did you mean'-style suggestions to guide
     # the LLM's retry without F2 Max-retries silent-accept.
@@ -196,7 +196,7 @@ def test_v066_new8_suggestion_string_in_error_message():
     )
 
 
-def test_v066_new8_stem_score_logic_industry_agnostic():
+def test_new8_stem_score_logic_industry_agnostic():
     src = _agent_src()
     # The stem suggestion must use generic prefix/suffix/contains scoring,
     # not any hardcoded business strings.
@@ -206,7 +206,7 @@ def test_v066_new8_stem_score_logic_industry_agnostic():
     )
 
 
-def test_v066_new8_handles_no_match_gracefully():
+def test_new8_handles_no_match_gracefully():
     src = _agent_src()
     # v0.6.8 NEW-13 evolved this behavior: when stem suggestions are empty, the
     # validator no longer just rejects with a "change your decision" message —
@@ -230,28 +230,28 @@ def test_v066_new8_handles_no_match_gracefully():
 # NEW-10 — surgical-mv-preserve
 # =============================================================================
 
-def test_v066_new10_alias_present():
+def test_new10_alias_present():
     src = _agent_src()
     assert "alias=surgical-mv-preserve" in src, (
         "surgical-mv-preserve sentinel missing"
     )
 
 
-def test_v066_new10_fired_marker_present():
+def test_new10_fired_marker_present():
     src = _agent_src()
     assert "[surgical-mv-preserve FIRED]" in src, (
         "surgical-mv-preserve FIRED runtime marker missing"
     )
 
 
-def test_v066_new10_helper_defined():
+def test_new10_helper_defined():
     src = _agent_src()
     assert "def _preserve_baseline_metric_views_for_surgical(" in src, (
         "Helper function missing"
     )
 
 
-def test_v066_new10_called_in_surgical_else_branch():
+def test_new10_called_in_surgical_else_branch():
     src = _agent_src()
     # The surgical fast path 'else' branch must call the preserve helper.
     assert "_preserve_baseline_metric_views_for_surgical(widgets_values, config, logger)" in src, (
@@ -259,7 +259,7 @@ def test_v066_new10_called_in_surgical_else_branch():
     )
 
 
-def test_v066_new10_reads_baseline_model_json():
+def test_new10_reads_baseline_model_json():
     src = _agent_src()
     # Helper must construct prev_volume from base_version_for_review.
     assert "base_version_for_review" in src
@@ -268,7 +268,7 @@ def test_v066_new10_reads_baseline_model_json():
     )
 
 
-def test_v066_new10_drops_mv_with_renamed_owner():
+def test_new10_drops_mv_with_renamed_owner():
     src = _agent_src()
     # If owner_product (domain, product) no longer exists, drop the MV.
     assert "owner {_od}.{_op} no longer exists" in src, (
@@ -276,7 +276,7 @@ def test_v066_new10_drops_mv_with_renamed_owner():
     )
 
 
-def test_v066_new10_drops_mv_with_renamed_referenced_product():
+def test_new10_drops_mv_with_renamed_referenced_product():
     src = _agent_src()
     # If embedded SQL references a missing product, drop the MV.
     assert "references missing product" in src, (
@@ -284,7 +284,7 @@ def test_v066_new10_drops_mv_with_renamed_referenced_product():
     )
 
 
-def test_v066_new10_seeds_both_records_and_statements():
+def test_new10_seeds_both_records_and_statements():
     src = _agent_src()
     # Both _metric_view_records (used by writeback) and metric_view_statements
     # (used by step_apply_metric_views) must be seeded — otherwise model.json
@@ -293,7 +293,7 @@ def test_v066_new10_seeds_both_records_and_statements():
     assert 'widgets_values["metric_view_statements"] = _stmts' in src
 
 
-def test_v066_new10_skips_for_new_base_model():
+def test_new10_skips_for_new_base_model():
     src = _agent_src()
     # Helper must early-return for 'new base model' op (no baseline to preserve).
     assert 'if operation == "new base model"' in src
@@ -305,7 +305,7 @@ def test_v066_new10_skips_for_new_base_model():
     )
 
 
-def test_v066_new10_only_in_else_branch():
+def test_new10_only_in_else_branch():
     src = _agent_src()
     # The call must be inside an else branch of the `if not _surgical_fast_path:`
     # check, so it does NOT fire for full-path runs.
@@ -319,7 +319,7 @@ def test_v066_new10_only_in_else_branch():
     )
 
 
-def test_v066_new10_industry_agnostic():
+def test_new10_industry_agnostic():
     src = _agent_src()
     helper_idx = src.find("def _preserve_baseline_metric_views_for_surgical(")
     helper_body = src[helper_idx : helper_idx + 6000]
@@ -335,17 +335,17 @@ def test_v066_new10_industry_agnostic():
 # Cross-cutting: readme + version
 # =============================================================================
 
-def test_v066_readme_current_version_bumped():
+def test_readme_current_version_bumped():
     with open("/Users/amr.ali/Documents/projects/vibe-modelling-agent/readme.md") as f:
         rd = f.read()
-    assert "**v0.6.6**" in rd, "v0.6.6 not in readme (either as Current or in history)"
+    assert "**v0.6.6**" in rd, "not in readme (either as Current or in history)"
 
 
 # =============================================================================
 # v0.6.x aliases preserved (no regression)
 # =============================================================================
 
-def test_v066_no_regression_v064_aliases_present():
+def test_no_regression_v064_aliases_present():
     src = _agent_src()
     # B1 perf cap, B3 MV15 parallel, B8 LLM throttle (actual alias name)
     for alias in [
@@ -353,18 +353,18 @@ def test_v066_no_regression_v064_aliases_present():
         "perf-mv15-parallel",
         "perf-llm-throttle-16",
     ]:
-        assert alias in src, f"v0.6.4 perf alias {alias} dropped — regression"
+        assert alias in src, f"perf alias {alias} dropped — regression"
 
 
-def test_v066_no_regression_v065_aliases_present():
+def test_no_regression_v065_aliases_present():
     src = _agent_src()
     for alias in [
         "immutable-early-exit",
         "ssot-stem-autofix",
     ]:
-        assert alias in src, f"v0.6.5 alias {alias} dropped — regression"
+        assert alias in src, f"alias {alias} dropped — regression"
 
 
-def test_v066_no_regression_v063_alias_present():
+def test_no_regression_v063_alias_present():
     src = _agent_src()
-    assert "det-priority-parse" in src, "v0.6.3 deterministic priority parser dropped"
+    assert "det-priority-parse" in src, "deterministic priority parser dropped"

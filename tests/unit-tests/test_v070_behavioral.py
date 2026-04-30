@@ -65,7 +65,7 @@ def _agent_text_for_grep():
     return _agent_text()
 
 
-def test_v070_constant_bumped_to_expected():
+def test_constant_bumped_to_expected():
     txt = _agent_text()
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', txt)
     assert m is not None, "__AGENT_VERSION__ constant not found"
@@ -74,7 +74,7 @@ def test_v070_constant_bumped_to_expected():
     )
 
 
-def test_v070_constant_first_line_of_cell1_unchanged():
+def test_constant_first_line_of_cell1_unchanged():
     src = _first_code_cell_source()
     code_lines = [
         ln for ln in src.splitlines()
@@ -85,7 +85,7 @@ def test_v070_constant_first_line_of_cell1_unchanged():
     )
 
 
-def test_v070_constant_single_digit_semver():
+def test_constant_single_digit_semver():
     assert re.fullmatch(r"\d\.\d\.\d", EXPECTED_VERSION), (
         f"EXPECTED_VERSION '{EXPECTED_VERSION}' violates §3a single-digit semver"
     )
@@ -96,14 +96,14 @@ def test_v070_constant_single_digit_semver():
 # ============================================================================
 
 
-def test_v070_fix1_alias_present():
+def test_fix1_alias_present():
     txt = _agent_text_for_grep()
     assert "vov-metrics-teardown" in txt, (
         "vov-metrics-teardown alias not found in agent — Fix 1 sentinel missing"
     )
 
 
-def test_v070_fix1_metrics_removed_from_protected_set():
+def test_fix1_metrics_removed_from_protected_set():
     """The new _VOV_PROTECTED_SCHEMAS must NOT include `_metrics`."""
     txt = _agent_text_for_grep()
     m = re.search(
@@ -120,7 +120,7 @@ def test_v070_fix1_metrics_removed_from_protected_set():
     )
 
 
-def test_v070_fix1_logger_emits_metrics_drop_count():
+def test_fix1_logger_emits_metrics_drop_count():
     """The new logger.info must report _metrics= and domain= drop counts."""
     txt = _agent_text_for_grep()
     assert re.search(r"vov-metrics-teardown FIRED.*_metrics=", txt), (
@@ -152,14 +152,14 @@ def _extract_sanitize_metric_measure_expr_source():
     return txt, needed
 
 
-def test_v070_fix2_alias_present():
+def test_fix2_alias_present():
     txt = _agent_text_for_grep()
     assert "mv-measure-agg-wrap" in txt, (
         "mv-measure-agg-wrap alias not found in agent — Fix 2 sentinel missing"
     )
 
 
-def test_v070_fix2_zero_aggregate_branch_present():
+def test_fix2_zero_aggregate_branch_present():
     """The sanitizer must contain the zero-aggregate detection branch."""
     txt = _agent_text_for_grep()
     assert re.search(
@@ -251,7 +251,7 @@ def _load_sanitizer_namespace():
     return ns
 
 
-def test_v070_fix2_sanitizer_wraps_bare_column():
+def test_fix2_sanitizer_wraps_bare_column():
     """End-to-end: feed a bare column name into the sanitizer; expect SUM-wrap."""
     ns = _load_sanitizer_namespace()
     sanitize = ns["_sanitize_metric_measure_expr"]
@@ -265,7 +265,7 @@ def test_v070_fix2_sanitizer_wraps_bare_column():
     )
 
 
-def test_v070_fix2_preserves_existing_aggregates():
+def test_fix2_preserves_existing_aggregates():
     """Sanitizer must NOT double-wrap expressions that already have an aggregate."""
     ns = _load_sanitizer_namespace()
     sanitize = ns["_sanitize_metric_measure_expr"]
@@ -275,7 +275,7 @@ def test_v070_fix2_preserves_existing_aggregates():
     assert out2.strip() == "COUNT(1)", f"COUNT(1) must pass through unchanged; got: {out2!r}"
 
 
-def test_v070_fix2_string_literal_falls_back_to_count1():
+def test_fix2_string_literal_falls_back_to_count1():
     """Sanitizer must NOT wrap an expr containing string literals in SUM-CAST.
     Such expressions can't be safely cast to DOUBLE and must fall back to COUNT(1)."""
     ns = _load_sanitizer_namespace()
@@ -291,14 +291,14 @@ def test_v070_fix2_string_literal_falls_back_to_count1():
 # ============================================================================
 
 
-def test_v070_fix3_alias_present():
+def test_fix3_alias_present():
     txt = _agent_text_for_grep()
     assert "step-boundary-flush" in txt, (
         "step-boundary-flush alias not found in agent — Fix 3 sentinel missing"
     )
 
 
-def test_v070_fix3_helper_defined_and_called_in_both_log_steps():
+def test_fix3_helper_defined_and_called_in_both_log_steps():
     txt = _agent_text_for_grep()
     assert "_step_boundary_force_flush" in txt, (
         "_step_boundary_force_flush helper not defined"
@@ -316,7 +316,7 @@ def test_v070_fix3_helper_defined_and_called_in_both_log_steps():
     ), "_log_step_end must invoke _step_boundary_force_flush('end', ...)"
 
 
-def test_v070_fix3_helper_writes_step_boundary_sentinel_with_fsync():
+def test_fix3_helper_writes_step_boundary_sentinel_with_fsync():
     txt = _agent_text_for_grep()
     # The helper must write a [STEP-BOUNDARY] line and call fsync for durability.
     assert "[STEP-BOUNDARY] kind=" in txt, (
@@ -327,7 +327,7 @@ def test_v070_fix3_helper_writes_step_boundary_sentinel_with_fsync():
     )
 
 
-def test_v070_fix3_helper_flushes_logger_handlers():
+def test_fix3_helper_flushes_logger_handlers():
     txt = _agent_text_for_grep()
     # Loop over getattr(logger, 'handlers', []) and call _h.flush()
     assert re.search(
@@ -341,7 +341,7 @@ def test_v070_fix3_helper_flushes_logger_handlers():
 # ============================================================================
 
 
-def test_v070_readme_lists_v070():
+def test_readme_lists_v070():
     txt = README.read_text()
     assert "v0.7.0" in txt, "readme.md must contain a v0.7.0 entry"
     assert re.search(r"Current version[^\n]*v0\.7\.0", txt), (
@@ -349,7 +349,7 @@ def test_v070_readme_lists_v070():
     )
 
 
-def test_v070_readme_mentions_three_fixes():
+def test_readme_mentions_three_fixes():
     txt = README.read_text()
     for needle in ("vov-metrics-teardown", "mv-measure-agg-wrap", "step-boundary-flush"):
         assert needle in txt, f"readme.md must mention alias '{needle}' for v0.7.0 traceability"

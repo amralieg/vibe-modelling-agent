@@ -1,4 +1,4 @@
-"""v0.8.9 fix bundle tests.
+"""fix bundle tests.
 
 Verifies each fix has a deployable sentinel that audits can grep:
 

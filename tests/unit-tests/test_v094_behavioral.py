@@ -1,4 +1,4 @@
-"""v0.9.4 BEHAVIORAL tests — actually invoke the patched functions with
+"""BEHAVIORAL tests — actually invoke the patched functions with
 mocked args and assert real behavior. Replaces the static-grep-only
 sentinel tests of v0.8.9-v0.9.2.
 
@@ -66,7 +66,7 @@ def test_is_system_identifier_column_handles_list_sor(monkeypatch):
 
 
 def test_is_system_identifier_column_pii_debias_no_emirates_id(monkeypatch):
-    """v0.9.4 PII-DEBIAS — emirates_id/civil_id/eid_number should NOT be in
+    """PII-DEBIAS — emirates_id/civil_id/eid_number should NOT be in
     the system-identifier whitelist (it's a PII column, not a system ID).
     This test ensures we didn't accidentally add them somewhere else
     while removing them.
@@ -94,7 +94,7 @@ def test_is_system_identifier_column_recognizes_system_id_suffixes():
 
 
 def test_wrap_schema_with_honesty_preserves_strict_true():
-    """v0.9.0 R7-STRICT-PRESERVE — when base schema declares strict=True,
+    """R7-STRICT-PRESERVE — when base schema declares strict=True,
     the wrapper MUST keep strict=True (was forcing strict=False prior to fix)."""
     import agent_helpers as ah
 
@@ -109,7 +109,7 @@ def test_wrap_schema_with_honesty_preserves_strict_true():
     }
     wrapped = ah.wrap_schema_with_honesty(base)
     assert wrapped.get("strict") is True, (
-        "v0.9.0 R7-STRICT-PRESERVE: outer strict must remain True"
+        "R7-STRICT-PRESERVE: outer strict must remain True"
     )
     assert wrapped["schema"].get("strict", True) is True, (
         "schema-level strict must not be downgraded"

@@ -53,7 +53,7 @@ def helpers():
 
 class TestR1VibeVersionMustAdvance:
     def test_q1_alias_present(self, agent_src):
-        assert "v0.8.3 Q1" in agent_src
+        assert "Q1" in agent_src
         assert "vibe-version-must-advance" in agent_src
 
     def test_helper_exists(self, agent_src):
@@ -122,7 +122,7 @@ class TestR1VibeVersionMustAdvance:
 
     def test_helper_callsite_at_metric_views_writeback(self, agent_src):
         assert "step_apply_metric_views.model_json_writeback" in agent_src, (
-            "v0.8.4: 4th callsite at step_apply_metric_views must use the "
+            "4th callsite at step_apply_metric_views must use the "
             "'model_json_writeback' callsite name so log signals identify it uniquely."
         )
 
@@ -181,7 +181,7 @@ class TestR1VibeVersionMustAdvance:
 
 class TestF2RegImmutableViolationCritical:
     def test_q2_alias_present(self, agent_src):
-        assert "v0.8.3 Q2" in agent_src
+        assert "Q2" in agent_src
         assert "immutable-violation-critical" in agent_src
 
     def test_immutable_patterns_in_critical_list(self, agent_src):
@@ -250,7 +250,7 @@ class TestF2RegImmutableViolationCritical:
 
 class TestR3LogNoTruncateOnSuccess:
     def test_q3_alias_present(self, agent_src):
-        assert "v0.8.3 Q3" in agent_src
+        assert "Q3" in agent_src
         assert "log-no-truncate-on-success" in agent_src
 
     def test_safe_volume_flush_helper_exists(self, agent_src):
@@ -368,7 +368,7 @@ class TestR3LogNoTruncateOnSuccess:
 
 class TestR6MetricViewBareViaDescribe:
     def test_q6_alias_present(self, agent_src):
-        assert "v0.8.3 Q6" in agent_src
+        assert "Q6" in agent_src
         assert "metric-view-bare-via-describe" in agent_src
 
     def test_describe_rewrite_helper_exists(self, agent_src):
@@ -440,7 +440,7 @@ class TestR6MetricViewBareViaDescribe:
 
 class TestR7ModelParamsSubdomainRequired:
     def test_q7_alias_present(self, agent_src):
-        assert "v0.8.3 Q7" in agent_src
+        assert "Q7" in agent_src
         assert "model-params-subdomain-required" in agent_src
 
     def test_required_keys_include_subdomain(self, agent_src):
@@ -520,7 +520,7 @@ class TestR7ModelParamsSubdomainRequired:
 
 class TestR8CycleBreakerDeterministicPass2:
     def test_q8_alias_present(self, agent_src):
-        assert "v0.8.3 Q8" in agent_src
+        assert "Q8" in agent_src
         assert "cycle-breaker-deterministic-pass2" in agent_src
 
     def test_pass2_uses_heuristic_breaker(self, agent_src):
@@ -534,7 +534,7 @@ class TestR8CycleBreakerDeterministicPass2:
         )
         assert m, "Could not locate step_finalize_model_before_physical_schema"
         body = m.group(0)
-        assert "v0.8.3 Q8" in body, "Pass-2 sentinel must live inside the finalize step"
+        assert "Q8" in body, "Pass-2 sentinel must live inside the finalize step"
         assert "_break_cycles_heuristic_internal" in body, (
             "Pass-2 must fall back to the deterministic heuristic breaker"
         )

@@ -1,4 +1,4 @@
-"""v0.9.8 BEHAVIORAL tests for the airlines_mvm_v1 audit fixes.
+"""BEHAVIORAL tests for the airlines_mvm_v1 audit fixes.
 
 Each test exercises real input -> output behavior (positive AND negative cases per CLAUDE.md
 section 8.3 anti-tautology). Many tests parse the notebook source via AST/regex so they do
@@ -262,7 +262,7 @@ class TestNotebookIntegrity:
                 errors.append((i, e.msg, e.lineno))
         assert not errors, f"Syntax errors in cells: {errors}"
 
-    def test_all_v098_aliases_grep_at_least_once(self, agent_src):
+    def test_all_aliases_grep_at_least_once(self, agent_src):
        for alias, min_hits in [
                ("mv-valid-columns-merge-joins", 2),
                ("mv-attrs-by-key-stash", 2),
@@ -326,14 +326,14 @@ class TestV100MetricViewYamlNoTypeField:
         body = agent_src[idx_fn:idx_fn + 30000]
         offending = "type: {_vj['type']}"
         assert offending not in body, (
-            "v1.0.0 regression: metric-view YAML still emits `type:` field — "
+            "regression: metric-view YAML still emits `type:` field — "
             "Databricks metric-view spec rejects this and the install fails."
         )
 
     def test_alias_self_reports_at_runtime(self, agent_src):
         """`mv-yaml-no-type-field` must self-report `[FIRED]` on every join emission."""
         assert "[mv-yaml-no-type-field FIRED]" in agent_src, (
-            "v1.0.0 alias not present — no runtime evidence of fix execution."
+            "alias not present — no runtime evidence of fix execution."
         )
 
 
@@ -346,14 +346,14 @@ class TestV101MetricViewJoinsDisabled:
         with `if False and ...` so no joins YAML block is emitted."""
         idx = agent_src.find("if False and isinstance(_mv_joins_raw, list)")
         assert idx > 0, (
-            "v1.0.1 regression: the join-emission gate was not flipped to `if False and ...`. "
+            "regression: the join-emission gate was not flipped to `if False and ...`. "
             "MV joins will continue to emit and fail at column-resolution time."
         )
 
     def test_alias_present_and_self_reports(self, agent_src):
-        """v1.0.1 alias must appear ≥2 times: once in comment, once in runtime self-report."""
+        """alias must appear ≥2 times: once in comment, once in runtime self-report."""
         assert agent_src.count("mv-joins-disabled-pending-syntax-fix") >= 2, (
-            "v1.0.1 alias missing — no audit trail."
+            "alias missing — no audit trail."
         )
         assert "[mv-joins-disabled-pending-syntax-fix FIRED]" in agent_src
 
@@ -361,5 +361,5 @@ class TestV101MetricViewJoinsDisabled:
         """The runtime marker must log when LLM proposed joins that we suppressed —
         provides the auditor with `suppressed_joins=N` evidence per MV."""
         assert "suppressed_joins=" in agent_src, (
-            "v1.0.1 runtime marker missing the suppressed_joins=N count."
+            "runtime marker missing the suppressed_joins=N count."
         )

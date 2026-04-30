@@ -1,4 +1,4 @@
-"""v1.0.4 BEHAVIORAL tests for the v1.0.3 tiny ECM+MVM audit fixes.
+"""BEHAVIORAL tests for the v1.0.3 tiny ECM+MVM audit fixes.
 
 Fixes covered:
   A. mv-filter-strip-comments                (MV-FILTER-FALSE-POSITIVE-PHANTOM)
@@ -111,7 +111,7 @@ class TestMVPromptJoinsDisabled:
             "JOIN kind:",
         ]
         for phrase in forbidden_guidance:
-            assert phrase not in agent_src, f"v1.0.4 prompt should not instruct joins via: {phrase!r}"
+            assert phrase not in agent_src, f"prompt should not instruct joins via: {phrase!r}"
 
     def test_explicit_disabled_rule_present(self, agent_src):
         assert "JOINS ARE DISABLED" in agent_src
@@ -180,21 +180,21 @@ class TestMVColumnPrevalidateDrop:
 class TestV103RegressionUnchanged:
     """Regression: v1.0.3 fixes remain intact in v1.0.4."""
 
-    def test_v103_fidelity_alias_still_present(self, agent_src):
+    def test_fidelity_alias_still_present(self, agent_src):
         assert "[fidelity-count-soft-pass-strategy-agnostic FIRED]" in agent_src
 
-    def test_v103_measure_drop_alias_still_present(self, agent_src):
+    def test_measure_drop_alias_still_present(self, agent_src):
         assert "[mv-cross-table-measure-drop FIRED]" in agent_src
 
-    def test_v102_aliases_intact(self, agent_src):
+    def test_aliases_intact(self, agent_src):
         for alias in (
             "fidelity-count-soft-pass-deterministic",
             "mv-source-product-prefix-rewrite",
             "prefix-strip-reserved-word-guard",
         ):
-            assert alias in agent_src, f"v1.0.2 alias {alias!r} must not regress"
+            assert alias in agent_src, f"alias {alias!r} must not regress"
 
-    def test_v095_alias_intact(self, agent_src):
+    def test_alias_intact(self, agent_src):
         assert "mv-spec-whitelist-tables" in agent_src
 
 

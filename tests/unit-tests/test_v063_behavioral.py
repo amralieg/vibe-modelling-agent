@@ -33,14 +33,14 @@ def _agent_src() -> str:
 # NEW-1 — det-priority-parse / fallback / augment
 # =============================================================================
 
-def test_v063_new1_aliases_present():
+def test_new1_aliases_present():
     src = _agent_src()
     assert "[det-priority-parse FIRED]" in src, "det-priority-parse self-report missing"
     assert "[det-priority-fallback FIRED]" in src, "det-priority-fallback self-report missing"
     assert "[det-priority-augment FIRED]" in src, "det-priority-augment self-report missing"
 
 
-def test_v063_new1_pattern_constant_defined():
+def test_new1_pattern_constant_defined():
     src = _agent_src()
     assert "_PRIORITY_DIRECTIVE_PATTERN" in src
     # Must be a re.compile with DOTALL + IGNORECASE for multi-line bodies
@@ -51,7 +51,7 @@ def test_v063_new1_pattern_constant_defined():
     assert "re.DOTALL" in body
 
 
-def test_v063_new1_converter_emits_handler_recognised_actions():
+def test_new1_converter_emits_handler_recognised_actions():
     """The parser must emit action types the action loop already handles."""
     src = _agent_src()
     # Find the converter
@@ -70,7 +70,7 @@ def test_v063_new1_converter_emits_handler_recognised_actions():
     assert "'action': 'add_tag', 'scope': 'attribute'" in converter
 
 
-def test_v063_new1_create_attribute_emits_json_target_state():
+def test_new1_create_attribute_emits_json_target_state():
     """create_attribute handler at ~line 50354 calls json.loads(target_state)."""
     src = _agent_src()
     idx = src.find("def _convert_priority_to_action")
@@ -80,7 +80,7 @@ def test_v063_new1_create_attribute_emits_json_target_state():
     assert "'foreign_key_to': fk_to" in converter or "foreign_key_to" in converter
 
 
-def test_v063_new1_fallback_replaces_empty_master_actions():
+def test_new1_fallback_replaces_empty_master_actions():
     src = _agent_src()
     # Use rfind to skip the comment-block occurrence and land on the actual log line
     idx = src.rfind("[det-priority-fallback FIRED]")
@@ -89,7 +89,7 @@ def test_v063_new1_fallback_replaces_empty_master_actions():
     assert "actions = _det_actions" in window
 
 
-def test_v063_new1_augment_appends_missing_master_priorities():
+def test_new1_augment_appends_missing_master_priorities():
     src = _agent_src()
     idx = src.find("[det-priority-augment FIRED]")
     assert idx > 0
@@ -100,7 +100,7 @@ def test_v063_new1_augment_appends_missing_master_priorities():
     assert "list(_master_actions) + _missing_det" in window
 
 
-def test_v063_new1_parser_skips_non_priority_text():
+def test_new1_parser_skips_non_priority_text():
     """Pure regex check: parser should not match non-PRIORITY paragraphs."""
     src = _agent_src()
     idx = src.find("_PRIORITY_DIRECTIVE_PATTERN")
@@ -109,7 +109,7 @@ def test_v063_new1_parser_skips_non_priority_text():
     assert "(?=\\n\\*\\*PRIORITY|\\nOther|\\nDeterministic score:|\\Z)" in pattern_block
 
 
-def test_v063_new1_real_next_vibes_full_coverage():
+def test_new1_real_next_vibes_full_coverage():
     """Live-fire test against a captured next_vibes.txt (95 priorities, telecom v0.6.2 v1).
 
     Re-implements the parser locally (must stay in sync with the notebook) and
@@ -146,7 +146,7 @@ Deterministic score: 83
     assert seen_types == {"rename_product", "rename_attribute", "connect_table", "remove_fk", "add_tag", "move_product"}
 
 
-def test_v063_new1_call_site_in_step_interpret_model_instructions():
+def test_new1_call_site_in_step_interpret_model_instructions():
     """The deterministic parser must be wired into step_interpret_model_instructions."""
     src = _agent_src()
     # Must call _parse_priority_directives at least once in the orchestrator step
@@ -157,12 +157,12 @@ def test_v063_new1_call_site_in_step_interpret_model_instructions():
 # NEW-2 — remove-fk-handler
 # =============================================================================
 
-def test_v063_new2_alias_present():
+def test_new2_alias_present():
     src = _agent_src()
     assert "[remove-fk-handler FIRED]" in src
 
 
-def test_v063_new2_handler_clears_foreign_key_to():
+def test_new2_handler_clears_foreign_key_to():
     src = _agent_src()
     idx = src.find("[remove-fk-handler FIRED]")
     assert idx > 0
@@ -173,7 +173,7 @@ def test_v063_new2_handler_clears_foreign_key_to():
     assert 'foreign_key' in window
 
 
-def test_v063_new2_handler_in_apply_mutation_command():
+def test_new2_handler_in_apply_mutation_command():
     src = _agent_src()
     # remove_fk path must be inside apply_mutation_command (so it runs BEFORE the elif chain)
     idx_func = src.find("def apply_mutation_command")
@@ -186,7 +186,7 @@ def test_v063_new2_handler_in_apply_mutation_command():
     assert idx_handler - idx_func < 1000, "remove_fk handler must be near the top of apply_mutation_command"
 
 
-def test_v063_new2_handler_emits_mutation_applied_event():
+def test_new2_handler_emits_mutation_applied_event():
     src = _agent_src()
     # Use rfind to land on the actual log line (not the comment-block sentinel)
     idx = src.rfind("[remove-fk-handler FIRED]")

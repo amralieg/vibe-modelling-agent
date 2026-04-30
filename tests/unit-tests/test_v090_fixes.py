@@ -1,4 +1,4 @@
-"""v0.9.0 hotfix bundle tests.
+"""hotfix bundle tests.
 
 After v0.8.9 was deployed, the live tester surfaced four MORE root causes
 that v0.8.9 had not fully closed:

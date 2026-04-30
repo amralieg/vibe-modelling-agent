@@ -1,4 +1,4 @@
-"""v0.9.1 hotfix bundle test.
+"""hotfix bundle test.
 
 The v0.8.9 tester run 401706974398159 TERMINATED in INTERNAL_ERROR/FAILED
 because tiny_mvm_shrink hit a deterministic ValueError on BOTH retry
@@ -53,14 +53,14 @@ class TestShrinkInputSiloPassThrough:
         snippet = agent_src[idx:idx + 12000]
         assert "if _new_silos:" in snippet
         assert "shrink-orphan-drop FIRED" in snippet, (
-            "v0.7.4: new-silos branch must auto-drop orphans (alias=shrink-orphan-drop) "
+            "new-silos branch must auto-drop orphans (alias=shrink-orphan-drop) "
             "instead of raising"
         )
         assert (
             "shrink-fk-densest-fallback" in snippet
             or "shrink-cascade-iterate" in snippet
         ), (
-            "v0.7.4 R2-1/R2-2: when auto-drop empties or cascades, recovery must engage "
+            "R2-1/R2-2: when auto-drop empties or cascades, recovery must engage "
             "(no raise on recoverable shrink failures)"
         )
 

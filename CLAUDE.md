@@ -689,15 +689,21 @@ databricks workspace import "$WS/vibe_runner_v<NN>" --file runner/vibe_runner.ip
 ```
 NEVER deploy to canon path `agent/dbx_vibe_modelling_agent`. NEVER skip the version suffix. Each version archive has a unique workspace `object_id` so the executor cache cannot serve a stale version.
 
-**Step 6 — Verify versioned archive content.**
+**Step 6 — Verify versioned archive content (single canary).**
+
+Per v0.7.7 directive ("the code has nothing to do with the version EXCEPT `__AGENT_VERSION__`"), the deploy verification mechanism is a SINGLE canary grep on `__AGENT_VERSION__`. Per-fix aliases are NO LONGER required for deploy verification — they were a layered remedy for the era when version pollution leaked into identifiers; with the §3a-bis canary contract enforced by `tests/unit-tests/test_v077_no_version_pollution.py`, the constant is the supreme source of truth for "which version is deployed".
+
 ```bash
 databricks workspace export "$WS/dbx_vibe_modelling_agent_v<NN>" --format JUPYTER --profile <profile> --file /tmp/v<NN>_check.ipynb
-for marker in <list-of-aliases>; do
-  count=$(grep -c "$marker" /tmp/v<NN>_check.ipynb)
-  echo "  $marker: $count"
-done
+EXPECTED="<NN_with_dots>"   # e.g. 0.7.7
+hits=$(grep -cE "__AGENT_VERSION__\s*=\s*\"$EXPECTED\"" /tmp/v<NN>_check.ipynb)
+echo "  __AGENT_VERSION__ canary hits for $EXPECTED: $hits"
+[ "$hits" -ge 1 ] || { echo "STOP — canary missing, re-deploy"; exit 1; }
 ```
-Every alias from this version's commit MUST appear ≥1 in the deployed archive. If any is 0 — STOP and re-deploy.
+
+If the canary count is 0 — STOP and re-deploy. Workspace import has brief eventual-consistency; retry after 10s.
+
+**Optional supplementary check** — if the change introduces a NEW semantic helper (e.g. `_local_action_executor`, `_emit_finding`, `MasterActionRegistry`, `FindingShape`, `FindingDispatcher`), grep for that helper's name as a behavioural sentinel. NOT version-tagged — semantic-tagged. Example for v0.7.5 unification work: `grep -c "MasterActionRegistry" /tmp/v75_check.ipynb` should be ≥1.
 
 **Step 7 — Patch the JOB definition to point at the versioned agent.**
 ```bash

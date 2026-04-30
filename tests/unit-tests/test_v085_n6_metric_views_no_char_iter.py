@@ -11,7 +11,7 @@ JSON-string blob (~40K chars) instead of a list. Each char fell into
 the str-branch, failed JSON repair, and emitted a warning. Result:
 40K identical "Skipping unparseable" warnings in 1 second = 5.5MB log.
 
-Live evidence: tiny_v84_gcp/ecm_v2 error.log on 2026-04-24 13:08:44.
+Live evidence: tiny_gcp/ecm_v2 error.log on 2026-04-24 13:08:44.
 
 Fix:
 1. UPSTREAM type-guard at top of function: parse string-blob once,
@@ -62,7 +62,7 @@ def helpers():
 
 class TestN6Sentinels:
     def test_n6_alias_present(self, agent_src):
-        assert "v0.8.5 N6-FIX" in agent_src, "v0.8.5 N6-FIX alias missing"
+        assert "N6-FIX" in agent_src, "N6-FIX alias missing"
         assert "metric-views-no-char-iter" in agent_src, \
             "alias=metric-views-no-char-iter sentinel missing"
 

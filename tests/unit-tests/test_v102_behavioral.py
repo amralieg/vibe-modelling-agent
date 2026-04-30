@@ -1,4 +1,4 @@
-"""v1.0.2 BEHAVIORAL tests for the v1.0.1 tiny ECM audit fixes.
+"""BEHAVIORAL tests for the v1.0.1 tiny ECM audit fixes.
 
 Each test exercises real input -> output behavior (positive AND negative cases per
 CLAUDE.md section 8.3 anti-tautology).

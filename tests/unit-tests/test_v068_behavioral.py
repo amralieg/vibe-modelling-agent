@@ -38,17 +38,17 @@ def _agent_text():
 # ---------------------------------------------------------------------------
 # NEW-13: fmfl auto-coerce KEEP_AS_IS when no stem candidates
 # ---------------------------------------------------------------------------
-def test_v068_new13_alias_present():
+def test_new13_alias_present():
     txt = _agent_text()
-    assert "fmfl-auto-coerce-keep" in txt, "v0.6.8 NEW-13 alias 'fmfl-auto-coerce-keep' missing"
+    assert "fmfl-auto-coerce-keep" in txt, "NEW-13 alias 'fmfl-auto-coerce-keep' missing"
 
 
-def test_v068_new13_fired_marker_present():
+def test_new13_fired_marker_present():
     txt = _agent_text()
     assert "[fmfl-auto-coerce-keep FIRED]" in txt, "[fmfl-auto-coerce-keep FIRED] marker missing"
 
 
-def test_v068_new13_keep_as_is_branch():
+def test_new13_keep_as_is_branch():
     """If _suggestions is empty, dec must be coerced to KEEP_AS_IS."""
     txt = _agent_text()
     assert "if not _suggestions:" in txt, "auto-coerce branch missing"
@@ -59,7 +59,7 @@ def test_v068_new13_keep_as_is_branch():
     assert "dec['target_table'] = None" in window, "dec target_table clear missing"
 
 
-def test_v068_new13_continues_skipping_error_append():
+def test_new13_continues_skipping_error_append():
     """Auto-coerce branch must use `continue` so the error.append() does NOT fire."""
     txt = _agent_text()
     idx = txt.find("[fmfl-auto-coerce-keep FIRED]")
@@ -68,14 +68,14 @@ def test_v068_new13_continues_skipping_error_append():
     assert "continue" in window, "auto-coerce branch must `continue` to skip error.append()"
 
 
-def test_v068_new13_reasoning_audit_trail():
+def test_new13_reasoning_audit_trail():
     """The auto-coerced decision must carry an [AUTO-COERCED:] reasoning trail."""
     txt = _agent_text()
     assert "[AUTO-COERCED: LINK target" in txt, "audit trail in dec.reasoning missing"
     assert "alias=fmfl-auto-coerce-keep" in txt
 
 
-def test_v068_new13_only_fires_on_empty_suggestions():
+def test_new13_only_fires_on_empty_suggestions():
     """Make sure the branch hierarchy is: if not _suggestions: <coerce> else: <error>."""
     txt = _agent_text()
     # The error.append("LINK target ... is NOT a canonical product") must remain
@@ -84,27 +84,27 @@ def test_v068_new13_only_fires_on_empty_suggestions():
     assert "Closest canonical candidates by stem: [{_sugg_str}]" in txt
 
 
-def test_v068_new13_preserves_existing_fmfl_canonical_target_alias():
-    """v0.6.6 NEW-8 alias must remain — auto-coerce is a complement, not a replacement."""
+def test_new13_preserves_existing_fmfl_canonical_target_alias():
+    """NEW-8 alias must remain — auto-coerce is a complement, not a replacement."""
     txt = _agent_text()
-    assert "fmfl-canonical-target" in txt, "v0.6.6 NEW-8 alias must remain"
+    assert "fmfl-canonical-target" in txt, "NEW-8 alias must remain"
     assert "alias=fmfl-canonical-target" in txt
 
 
 # ---------------------------------------------------------------------------
 # NEW-12: log append on retry
 # ---------------------------------------------------------------------------
-def test_v068_new12_alias_present():
+def test_new12_alias_present():
     txt = _agent_text()
-    assert "log-append-on-retry" in txt, "v0.6.8 NEW-12 alias 'log-append-on-retry' missing"
+    assert "log-append-on-retry" in txt, "NEW-12 alias 'log-append-on-retry' missing"
 
 
-def test_v068_new12_fired_marker_present():
+def test_new12_fired_marker_present():
     txt = _agent_text()
     assert "[log-append-on-retry FIRED]" in txt, "[log-append-on-retry FIRED] marker missing"
 
 
-def test_v068_new12_mode_decision_uses_databricks_env():
+def test_new12_mode_decision_uses_databricks_env():
     """The handler open mode must be 'a' under DATABRICKS_RUN_ID, else 'w'."""
     txt = _agent_text()
     # Pattern: _log_open_mode = 'a' if os.environ.get('DATABRICKS_RUN_ID') else 'w'
@@ -113,14 +113,14 @@ def test_v068_new12_mode_decision_uses_databricks_env():
     assert pat.search(txt), "_log_open_mode decision logic missing or malformed"
 
 
-def test_v068_new12_handlers_use_open_mode_variable():
+def test_new12_handlers_use_open_mode_variable():
     """fh_info and fh_error must be constructed with mode=_log_open_mode."""
     txt = _agent_text()
     assert 'ImmediateFlushFileHandler(config["LOCAL_INFO_LOG_PATH"], mode=_log_open_mode)' in txt
     assert 'ImmediateFlushFileHandler(config["LOCAL_ERROR_LOG_PATH"], mode=_log_open_mode)' in txt
 
 
-def test_v068_new12_no_stale_mode_w_handlers_remain():
+def test_new12_no_stale_mode_w_handlers_remain():
     """The pre-fix mode='w' literal in the business logger setup must be gone."""
     txt = _agent_text()
     # Find the lines around LOCAL_INFO_LOG_PATH and verify NO mode='w' literal remains there.
@@ -133,30 +133,30 @@ def test_v068_new12_no_stale_mode_w_handlers_remain():
 # ---------------------------------------------------------------------------
 # NEW-14: perf-cap-16 / perf-llm-throttle-16 FIRED markers at runtime
 # ---------------------------------------------------------------------------
-def test_v068_new14_perf_cap_16_fired_emitted():
+def test_new14_perf_cap_16_fired_emitted():
     txt = _agent_text()
     assert "[perf-cap-16 FIRED]" in txt, "[perf-cap-16 FIRED] marker missing at runtime callsite"
 
 
-def test_v068_new14_perf_cap_16_alias_emit():
+def test_new14_perf_cap_16_alias_emit():
     txt = _agent_text()
-    assert "perf-cap-16-emit" in txt, "v0.6.8 NEW-14 alias 'perf-cap-16-emit' missing"
+    assert "perf-cap-16-emit" in txt, "NEW-14 alias 'perf-cap-16-emit' missing"
 
 
-def test_v068_new14_perf_llm_throttle_16_fired_emitted():
+def test_new14_perf_llm_throttle_16_fired_emitted():
     txt = _agent_text()
     assert "[perf-llm-throttle-16 FIRED]" in txt, (
         "[perf-llm-throttle-16 FIRED] marker missing at AIAgent init callsite"
     )
 
 
-def test_v068_new14_perf_mv15_parallel_remains():
-    """v0.6.4 B3 [perf-mv15-parallel FIRED] must continue to emit (regression check)."""
+def test_new14_perf_mv15_parallel_remains():
+    """B3 [perf-mv15-parallel FIRED] must continue to emit (regression check)."""
     txt = _agent_text()
     assert "[perf-mv15-parallel FIRED]" in txt
 
 
-def test_v068_new14_perf_cap_16_idempotent():
+def test_new14_perf_cap_16_idempotent():
     """The perf-cap-16 emission must use _fired_once flag to avoid log spam (it's
     called many times during a run). Test verifies the once-only sentinel."""
     txt = _agent_text()
@@ -166,7 +166,7 @@ def test_v068_new14_perf_cap_16_idempotent():
 # ---------------------------------------------------------------------------
 # Standalone integration tests for fmfl auto-coerce semantics
 # ---------------------------------------------------------------------------
-def test_v068_auto_coerce_simulated_no_match_no_error():
+def test_auto_coerce_simulated_no_match_no_error():
     """Simulate the validator's auto-coerce: given an empty suggestion list, the
     decision must mutate to KEEP_AS_IS and the validator should NOT add an error."""
     # Reproduce the validator logic locally to guarantee semantics.
@@ -217,7 +217,7 @@ def test_v068_auto_coerce_simulated_no_match_no_error():
     assert errors == [], "errors must be empty so validator returns success and breaks retry loop"
 
 
-def test_v068_auto_coerce_does_not_fire_when_suggestions_exist():
+def test_auto_coerce_does_not_fire_when_suggestions_exist():
     """When stem-match candidates exist, the validator must STILL append an error
     (so the LLM can pick the correct canonical target on retry)."""
     canonical = {"customer.user_account", "billing.invoice"}
@@ -262,7 +262,7 @@ def test_v068_auto_coerce_does_not_fire_when_suggestions_exist():
     assert "customer.user_account" in sugg
 
 
-def test_v068_auto_coerce_idempotent_on_already_keep_as_is():
+def test_auto_coerce_idempotent_on_already_keep_as_is():
     """If validator runs twice (e.g. retry path) on a previously coerced decision,
     it must be a no-op (decision stays KEEP_AS_IS, no errors, no side effects)."""
     canonical = {"customer.account"}
@@ -282,12 +282,12 @@ def test_v068_auto_coerce_idempotent_on_already_keep_as_is():
 # ---------------------------------------------------------------------------
 # Regression: readme + version bump + previous aliases
 # ---------------------------------------------------------------------------
-def test_v068_readme_version_bumped():
+def test_readme_version_bumped():
     txt = README.read_text()
     assert "v0.6.8" in txt, "readme.md missing v0.6.8 entry"
 
 
-def test_v068_preserves_v0_6_x_aliases():
+def test_preserves_v0_6_x_aliases():
     """All v0.6.x aliases must remain — defense in depth."""
     txt = _agent_text()
     expected = [
@@ -310,7 +310,7 @@ def test_v068_preserves_v0_6_x_aliases():
     assert not missing, f"Missing aliases: {missing}"
 
 
-def test_v068_industry_agnostic():
+def test_industry_agnostic():
     """No customer-specific industry name in the v0.6.8 fix snippets."""
     txt = _agent_text()
     forbidden = ["telecom", "airline", "airlines", "emirates", "etihad", "qatar", "delta_air"]

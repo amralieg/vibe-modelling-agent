@@ -64,7 +64,7 @@ def _load_cell_source(path: Path, cell_idx: int) -> str:
     return "".join(cell.get("source", []))
 
 
-def _exec_v075_namespace():
+def _exec_namespace():
     """Build a namespace exposing MASTER_ACTION_REGISTRY + ACTION_COST_* +
     classify_action_cost + render_master_action_catalog + make_finding +
     validate_finding + STAGE_SAFE_COST_CLASSES + FindingDispatcher by exec-ing
@@ -85,7 +85,7 @@ def _exec_v075_namespace():
 # =====================================================================
 
 def test_master_action_registry_is_defined():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     assert "MASTER_ACTION_REGISTRY" in ns
     reg = ns["MASTER_ACTION_REGISTRY"]
     assert isinstance(reg, dict)
@@ -96,7 +96,7 @@ def test_master_action_registry_is_defined():
 
 
 def test_master_action_registry_keys_are_action_scope_tuples():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     reg = ns["MASTER_ACTION_REGISTRY"]
     for k in reg.keys():
         assert isinstance(k, tuple) and len(k) == 2, (
@@ -108,7 +108,7 @@ def test_master_action_registry_keys_are_action_scope_tuples():
 
 
 def test_master_action_registry_each_entry_has_cost_default_and_description():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     reg = ns["MASTER_ACTION_REGISTRY"]
     valid_costs = {
         ns["ACTION_COST_LOCAL"], ns["ACTION_COST_FK_REWIRE"],
@@ -128,7 +128,7 @@ def test_master_action_registry_each_entry_has_cost_default_and_description():
 def test_master_action_registry_covers_critical_actions():
     """The actions that the v0.7.4 dispatcher consumes + the actions that the
     LLM most commonly proposes MUST all exist in the registry."""
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     reg = ns["MASTER_ACTION_REGISTRY"]
     must_have = [
         ("rename", "attribute"), ("rename", "product"), ("rename", "domain"),
@@ -160,7 +160,7 @@ def test_master_action_registry_covers_critical_actions():
 # =====================================================================
 
 def test_classify_unknown_action_returns_full_regen():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     cost = ns["classify_action_cost"]({}, "totally_made_up_action", "scope_foo", {})
     assert cost == ns["ACTION_COST_FULL_REGEN"], (
         "Unknown actions must default to FULL_REGEN (safest defer)"
@@ -168,7 +168,7 @@ def test_classify_unknown_action_returns_full_regen():
 
 
 def test_classify_rename_attribute_non_key_is_local():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     model = {
         "domains": [{
             "name": "customer",
@@ -190,7 +190,7 @@ def test_classify_rename_attribute_non_key_is_local():
 
 
 def test_classify_rename_attribute_pk_is_fk_rewire():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     model = {
         "domains": [{
             "name": "customer",
@@ -211,7 +211,7 @@ def test_classify_rename_attribute_pk_is_fk_rewire():
 
 
 def test_classify_rename_attribute_fk_target_is_fk_rewire():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     model = {
         "domains": [{
             "name": "customer",
@@ -233,7 +233,7 @@ def test_classify_rename_attribute_fk_target_is_fk_rewire():
 
 
 def test_classify_drop_attribute_non_key_is_local():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     model = {
         "domains": [{
             "name": "customer",
@@ -247,46 +247,46 @@ def test_classify_drop_attribute_non_key_is_local():
 
 
 def test_classify_drop_product_is_fk_rewire():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     cost = ns["classify_action_cost"]({}, "drop", "product", {})
     assert cost == ns["ACTION_COST_FK_REWIRE"]
 
 
 def test_classify_drop_domain_is_norm_redo():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     cost = ns["classify_action_cost"]({}, "drop", "domain", {})
     assert cost == ns["ACTION_COST_NORM_REDO"]
 
 
 def test_classify_split_product_is_norm_redo():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     cost = ns["classify_action_cost"]({}, "split", "product", {})
     assert cost == ns["ACTION_COST_NORM_REDO"]
 
 
 def test_classify_enlarge_model_falls_back_full_regen():
     """enlarge_model isn't explicitly in the registry but must default safe."""
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     cost = ns["classify_action_cost"]({}, "enlarge_model", "model", {})
     # Either explicit FULL_REGEN entry OR default fallback
     assert cost in (ns["ACTION_COST_NORM_REDO"], ns["ACTION_COST_FULL_REGEN"])
 
 
 def test_classify_add_tag_attribute_is_local():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     cost = ns["classify_action_cost"]({}, "add_tag", "attribute", {})
     assert cost == ns["ACTION_COST_LOCAL"]
 
 
 def test_classify_alter_description_is_local_for_all_scopes():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     for scope in ("attribute", "product", "domain"):
         cost = ns["classify_action_cost"]({}, "alter_description", scope, {})
         assert cost == ns["ACTION_COST_LOCAL"], f"alter_description on {scope} should be LOCAL"
 
 
 def test_classify_modify_attribute_with_fk_change_is_fk_rewire():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     cost = ns["classify_action_cost"]({}, "modify", "attribute", {
         "foreign_key_to": "other.product.id"
     })
@@ -294,7 +294,7 @@ def test_classify_modify_attribute_with_fk_change_is_fk_rewire():
 
 
 def test_classify_modify_attribute_with_pk_change_is_fk_rewire():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     cost = ns["classify_action_cost"]({}, "modify", "attribute", {
         "primary_key": True
     })
@@ -306,7 +306,7 @@ def test_classify_modify_attribute_with_pk_change_is_fk_rewire():
 # =====================================================================
 
 def test_render_master_action_catalog_returns_non_empty_markdown():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     md = ns["render_master_action_catalog"]()
     assert isinstance(md, str)
     assert len(md) > 500
@@ -316,7 +316,7 @@ def test_render_master_action_catalog_returns_non_empty_markdown():
 
 
 def test_render_master_action_catalog_includes_cost_classes():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     md = ns["render_master_action_catalog"]()
     assert "LOCAL" in md
     assert "REQUIRES_FK_REWIRE" in md
@@ -325,7 +325,7 @@ def test_render_master_action_catalog_includes_cost_classes():
 
 
 def test_render_master_action_catalog_supports_scope_filter():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     md_attr = ns["render_master_action_catalog"](scope_filter={"attribute"})
     md_full = ns["render_master_action_catalog"]()
     assert len(md_attr) < len(md_full), (
@@ -337,7 +337,7 @@ def test_render_master_action_catalog_supports_scope_filter():
 
 
 def test_render_master_action_catalog_industry_agnostic():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     md = ns["render_master_action_catalog"]()
     forbidden = [
         "airline", "airlines", "emirates", "telecom", "banking",
@@ -355,7 +355,7 @@ def test_render_master_action_catalog_industry_agnostic():
 # =====================================================================
 
 def test_make_finding_returns_canonical_dict():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     f = ns["make_finding"](
         stage="static_analysis_post_attribute_gen",
         category="missing_attribute_description",
@@ -382,7 +382,7 @@ def test_make_finding_returns_canonical_dict():
 
 
 def test_make_finding_handles_string_scope_targets():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     f = ns["make_finding"](
         stage="x", category="y", severity=ns["SEVERITY_SHOULD_FIX"], scope="attribute",
         scope_targets="single.target.string",  # string, not list
@@ -392,7 +392,7 @@ def test_make_finding_handles_string_scope_targets():
 
 
 def test_validate_finding_accepts_canonical():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     f = ns["make_finding"](
         stage="x", category="y", severity=ns["SEVERITY_SHOULD_FIX"], scope="attribute",
         scope_targets=["a.b.c"], summary="s",
@@ -404,7 +404,7 @@ def test_validate_finding_accepts_canonical():
 
 
 def test_validate_finding_rejects_unknown_action():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     f = ns["make_finding"](
         stage="x", category="y", severity=ns["SEVERITY_SHOULD_FIX"], scope="attribute",
         scope_targets=["a.b.c"], summary="s",
@@ -417,14 +417,14 @@ def test_validate_finding_rejects_unknown_action():
 
 
 def test_validate_finding_rejects_missing_required_keys():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     ok, err = ns["validate_finding"]({"stage": "x"})
     assert not ok
     assert "missing required key" in err
 
 
 def test_validate_finding_rejects_non_dict():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     ok, err = ns["validate_finding"]("not a dict")
     assert not ok
 
@@ -434,7 +434,7 @@ def test_validate_finding_rejects_non_dict():
 # =====================================================================
 
 def test_stage_safe_cost_classes_defines_all_4_review_stages():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     safes = ns["STAGE_SAFE_COST_CLASSES"]
     for stage in (
         "static_analysis_post_attribute_gen", "architect_review",
@@ -445,7 +445,7 @@ def test_stage_safe_cost_classes_defines_all_4_review_stages():
 
 
 def test_static_analysis_stage_only_allows_local():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     safes = ns["STAGE_SAFE_COST_CLASSES"]
     sa_safes = safes["static_analysis_post_attribute_gen"]
     assert sa_safes == {ns["ACTION_COST_LOCAL"]}, (
@@ -455,7 +455,7 @@ def test_static_analysis_stage_only_allows_local():
 
 
 def test_quality_gate_allows_local_and_fk_rewire():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     safes = ns["STAGE_SAFE_COST_CLASSES"]
     qg_safes = safes["quality_gate"]
     assert ns["ACTION_COST_LOCAL"] in qg_safes
@@ -463,7 +463,7 @@ def test_quality_gate_allows_local_and_fk_rewire():
 
 
 def test_architect_review_only_allows_local():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     safes = ns["STAGE_SAFE_COST_CLASSES"]
     ar_safes = safes["architect_review"]
     assert ar_safes == {ns["ACTION_COST_LOCAL"]}, (
@@ -472,7 +472,7 @@ def test_architect_review_only_allows_local():
 
 
 def test_next_vibes_only_allows_local():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     safes = ns["STAGE_SAFE_COST_CLASSES"]
     nv_safes = safes["next_vibes_generation"]
     assert nv_safes == {ns["ACTION_COST_LOCAL"]}, (
@@ -497,7 +497,7 @@ class _FakeLogger:
 
 
 def test_dispatcher_applies_lhf_via_executor():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     log = _FakeLogger()
     applied_calls = []
     def executor(finding, model, lg):
@@ -522,7 +522,7 @@ def test_dispatcher_applies_lhf_via_executor():
 
 
 def test_dispatcher_defers_high_cost_action():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     log = _FakeLogger()
     def executor(finding, model, lg):
         return True
@@ -544,7 +544,7 @@ def test_dispatcher_defers_high_cost_action():
 
 
 def test_dispatcher_marks_invalid_findings():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     log = _FakeLogger()
     disp = ns["FindingDispatcher"](
         stage_name="next_vibes_generation",
@@ -566,7 +566,7 @@ def test_dispatcher_marks_invalid_findings():
 def test_dispatcher_detects_conflicts():
     """Two findings on the same scope_target with DIFFERENT proposed actions
     (e.g. drop vs rename) must both defer (conflict)."""
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     log = _FakeLogger()
     disp = ns["FindingDispatcher"](
         stage_name="next_vibes_generation",
@@ -592,7 +592,7 @@ def test_dispatcher_detects_conflicts():
 
 
 def test_dispatcher_handles_executor_exception():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     log = _FakeLogger()
     def boom(f, m, lg):
         raise ValueError("simulated executor failure")
@@ -614,7 +614,7 @@ def test_dispatcher_handles_executor_exception():
 
 
 def test_dispatcher_no_executor_defers_everything():
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     log = _FakeLogger()
     disp = ns["FindingDispatcher"](
         stage_name="next_vibes_generation",
@@ -734,33 +734,33 @@ def test_vibe_audit_full_audit_passes_master_action_catalog_in_format():
 # 8. v0.7.4 retirement shim
 # =====================================================================
 
-def test_v074_sa_action_vocab_now_derives_from_master():
+def test_sa_action_vocab_now_derives_from_master():
     src = _load_nb_source(AGENT_NB)
-    assert "_V074_SA_ACTION_VOCAB = _v075_build_v074_vocab_compat()" in src, (
-        "v0.7.4 _V074_SA_ACTION_VOCAB must now be derived from MASTER_ACTION_REGISTRY"
+    assert "_V074_SA_ACTION_VOCAB = _build_action_vocab_compat()" in src, (
+        "_V074_SA_ACTION_VOCAB must now be derived from MASTER_ACTION_REGISTRY"
     )
-    assert "def _v075_build_v074_vocab_compat" in src
+    assert "def _build_action_vocab_compat" in src
     assert "V075_RETIRE_V074_VOCAB FIRED" in src
 
 
-def test_v074_render_action_vocab_block_is_thin_shim():
+def test_render_action_vocab_block_is_thin_shim():
     src = _load_nb_source(AGENT_NB)
     # find the function body
-    pos = src.find("def _v074_render_action_vocab_block():")
+    pos = src.find("def _render_action_vocab_block():")
     assert pos > 0
     body_end = src.find("\ndef ", pos + 1)
     body = src[pos:body_end if body_end > 0 else pos + 2000]
     assert "return render_master_action_catalog()" in body, (
-        "_v074_render_action_vocab_block must now delegate to canonical render"
+        "_render_action_vocab_block must now delegate to canonical render"
     )
 
 
-def test_v074_action_vocab_dict_no_longer_hardcoded():
+def test_action_vocab_dict_no_longer_hardcoded():
     """The hardcoded dict literal _V074_SA_ACTION_VOCAB = { ... } must be GONE.
     It's now derived. Detect by checking the IMMEDIATE next char after the
     assignment isn't '{' (a literal dict)."""
     src = _load_nb_source(AGENT_NB)
-    occurrences = re.findall(r"_V074_SA_ACTION_VOCAB\s*=\s*(\{|_v075_build_v074_vocab_compat\(\))", src)
+    occurrences = re.findall(r"_V074_SA_ACTION_VOCAB\s*=\s*(\{|_build_action_vocab_compat\(\))", src)
     # Must have exactly one assignment, and it must be the shim call
     assignments_to_dict_literal = [o for o in occurrences if o == "{"]
     assert not assignments_to_dict_literal, (
@@ -819,7 +819,7 @@ def test_sa_dispatcher_returns_deferred_high_cost_field():
 # 10. Industry-agnostic guarantees (CLAUDE.md §8.5)
 # =====================================================================
 
-def test_v075_module_no_industry_strings():
+def test_module_no_industry_strings():
     src = _load_cell_source(AGENT_NB, 3)
     start = src.find("ACTION_COST_LOCAL = 'LOCAL'")
     end = src.find("def _cascade_domain_rename(")
@@ -831,11 +831,11 @@ def test_v075_module_no_industry_strings():
     ]
     for word in forbidden:
         assert word not in block, (
-            f"v0.7.5 MasterActionRegistry/dispatcher block leaks industry term '{word}'"
+            f"MasterActionRegistry/dispatcher block leaks industry term '{word}'"
         )
 
 
-def test_v075_no_persist_or_cache_or_sparkcontext():
+def test_no_persist_or_cache_or_sparkcontext():
     src = _load_cell_source(AGENT_NB, 3)
     start = src.find("ACTION_COST_LOCAL = 'LOCAL'")
     end = src.find("def _cascade_domain_rename(")
@@ -854,12 +854,12 @@ def test_v075_no_persist_or_cache_or_sparkcontext():
 # 11. Version pin (single-digit semver per CLAUDE.md §3a)
 # =====================================================================
 
-def test_v075_agent_version_constant():
+def test_agent_version_constant():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "0.7.6"' in src
+    assert '__AGENT_VERSION__ = "0.7.7"' in src
 
 
-def test_v075_semver_single_digit_segments():
+def test_semver_single_digit_segments():
     src = _load_nb_source(AGENT_NB)
     m = re.search(r'__AGENT_VERSION__\s*=\s*"(\d+)\.(\d+)\.(\d+)"', src)
     assert m
@@ -873,7 +873,7 @@ def test_v075_semver_single_digit_segments():
 # 10. v0.7.5 Risk-1 PATCH — scope-filtered catalog per prompt
 # =====================================================================
 
-def test_v075_risk1_per_prompt_scope_filter_registry_exists():
+def test_risk1_per_prompt_scope_filter_registry_exists():
     src = _load_nb_source(AGENT_NB)
     assert "_PROMPT_ACTION_CATALOG_SCOPE_FILTER" in src, (
         "Risk-1 patch: per-prompt scope filter registry must exist so architects "
@@ -883,7 +883,7 @@ def test_v075_risk1_per_prompt_scope_filter_registry_exists():
     assert '"DOMAIN_ARCHITECT_REVIEW_PROMPT"' in src
 
 
-def test_v075_risk1_resolve_master_action_catalog_for_prompt_exists():
+def test_risk1_resolve_master_action_catalog_for_prompt_exists():
     src = _load_nb_source(AGENT_NB)
     assert "def _resolve_master_action_catalog_for_prompt(" in src, (
         "Risk-1 patch: per-prompt resolver function must exist"
@@ -891,8 +891,8 @@ def test_v075_risk1_resolve_master_action_catalog_for_prompt_exists():
     assert "master-catalog-scope-filtered FIRED" in src
 
 
-def test_v075_risk1_render_master_action_catalog_supports_scope_filter():
-    ns = _exec_v075_namespace()
+def test_risk1_render_master_action_catalog_supports_scope_filter():
+    ns = _exec_namespace()
     full = ns["render_master_action_catalog"]()
     strategic_only = ns["render_master_action_catalog"](scope_filter={'domain', 'product', 'model'})
     assert len(strategic_only) < len(full), (
@@ -913,15 +913,15 @@ def test_v075_risk1_render_master_action_catalog_supports_scope_filter():
 # 11. v0.7.5 Risk-2 PATCH — severity axis orthogonal to cost
 # =====================================================================
 
-def test_v075_risk2_severity_constants_defined():
-    ns = _exec_v075_namespace()
+def test_risk2_severity_constants_defined():
+    ns = _exec_namespace()
     assert ns["SEVERITY_MUST_FIX"] == "MUST_FIX"
     assert ns["SEVERITY_SHOULD_FIX"] == "SHOULD_FIX"
     assert ns["SEVERITY_NICE_TO_HAVE"] == "NICE_TO_HAVE"
 
 
-def test_v075_risk2_validate_finding_rejects_invalid_severity():
-    ns = _exec_v075_namespace()
+def test_risk2_validate_finding_rejects_invalid_severity():
+    ns = _exec_namespace()
     f = ns["make_finding"](
         stage="x", category="y", severity="not_a_real_severity",
         scope="attribute", scope_targets=["a.b.c"], summary="s",
@@ -932,10 +932,10 @@ def test_v075_risk2_validate_finding_rejects_invalid_severity():
     assert "severity" in err.lower()
 
 
-def test_v075_risk2_dispatcher_applies_must_fix_before_nice_to_have():
+def test_risk2_dispatcher_applies_must_fix_before_nice_to_have():
     """Severity-aware ordering: MUST_FIX runs before NICE_TO_HAVE within the
     same cost class. Verifies the dispatcher honours severity for apply order."""
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     log = _FakeLogger()
     apply_log = []
     def executor(f, m, lg):
@@ -968,8 +968,8 @@ def test_v075_risk2_dispatcher_applies_must_fix_before_nice_to_have():
 # 12. v0.7.5 Risk-3 PATCH — provenance gating (\u00a73b/\u00a73c authority)
 # =====================================================================
 
-def test_v075_risk3_provenance_constants_defined():
-    ns = _exec_v075_namespace()
+def test_risk3_provenance_constants_defined():
+    ns = _exec_namespace()
     assert ns["PROVENANCE_USER_VIBE"] == "user_vibe"
     assert ns["PROVENANCE_ARCHITECT"] == "architect"
     assert ns["PROVENANCE_SA"] == "sa"
@@ -977,8 +977,8 @@ def test_v075_risk3_provenance_constants_defined():
     assert ns["PROVENANCE_AUTOFIX"] == "autofix"
 
 
-def test_v075_risk3_validate_finding_rejects_invalid_provenance():
-    ns = _exec_v075_namespace()
+def test_risk3_validate_finding_rejects_invalid_provenance():
+    ns = _exec_namespace()
     f = {
         "stage": "x", "category": "y",
         "severity": ns["SEVERITY_SHOULD_FIX"],
@@ -991,9 +991,9 @@ def test_v075_risk3_validate_finding_rejects_invalid_provenance():
     assert "provenance" in err.lower()
 
 
-def test_v075_risk3_dispatcher_protects_user_specified_targets():
+def test_risk3_dispatcher_protects_user_specified_targets():
     """Non-user_vibe finding touching a protected target must HARD-DEFER (\u00a73b/\u00a73c)."""
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     log = _FakeLogger()
     apply_log = []
     def executor(f, m, lg):
@@ -1021,13 +1021,13 @@ def test_v075_risk3_dispatcher_protects_user_specified_targets():
     assert len(apply_log) == 0
 
 
-def test_v075_risk3_dispatcher_lets_user_vibe_pass_through():
+def test_risk3_dispatcher_lets_user_vibe_pass_through():
     """User_vibe provenance is exempt from the PROTECTED-TARGET check (\u00a73c top of pyramid).
 
     Cost gating still applies orthogonally (a user-asked FK_REWIRE may still defer
     when only LOCAL is safe in the current stage). This test isolates the
     provenance gate by using a LOCAL action on a protected target."""
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     log = _FakeLogger()
     apply_log = []
     def executor(f, m, lg):
@@ -1079,10 +1079,10 @@ def test_v075_risk3_dispatcher_lets_user_vibe_pass_through():
     assert result2["protected_violations"] >= 1
 
 
-def test_v075_risk3_dotted_target_first_segment_is_protected():
+def test_risk3_dotted_target_first_segment_is_protected():
     """If protected_targets contains 'domain_name', a finding targeting
     'domain_name.product.attr' must also be rejected (first-segment match)."""
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     log = _FakeLogger()
     disp = ns["FindingDispatcher"](
         stage_name="next_vibes_generation",
@@ -1111,7 +1111,7 @@ def test_v075_risk3_dotted_target_first_segment_is_protected():
 # 13. v0.7.5 Risk-4 PATCH — recipe-based SA category map
 # =====================================================================
 
-def test_v075_risk4_sa_category_map_values_are_lists():
+def test_risk4_sa_category_map_values_are_lists():
     src = _load_nb_source(AGENT_NB)
     pos = src.find("_V075_SA_CATEGORY_TO_ACTION = {")
     assert pos >= 0
@@ -1124,7 +1124,7 @@ def test_v075_risk4_sa_category_map_values_are_lists():
     )
 
 
-def test_v075_risk4_denormalized_natural_key_has_multi_step_recipe():
+def test_risk4_denormalized_natural_key_has_multi_step_recipe():
     src = _load_nb_source(AGENT_NB)
     # Search inside the _V075_SA_CATEGORY_TO_ACTION block specifically (not the
     # v0.7.4 callback registry, which still contains the same key).
@@ -1144,12 +1144,12 @@ def test_v075_risk4_denormalized_natural_key_has_multi_step_recipe():
     )
 
 
-def test_v075_risk4_classify_recipe_cost_helper_exists():
-    ns = _exec_v075_namespace()
-    assert "_v075_classify_recipe_cost" in ns, (
-        "Risk-4 patch: _v075_classify_recipe_cost helper must exist"
+def test_risk4_classify_recipe_cost_helper_exists():
+    ns = _exec_namespace()
+    assert "_classify_recipe_cost" in ns, (
+        "Risk-4 patch: _classify_recipe_cost helper must exist"
     )
-    helper = ns["_v075_classify_recipe_cost"]
+    helper = ns["_classify_recipe_cost"]
     # All-LOCAL recipe
     cost = helper({}, [("add_tag", "attribute"), ("alter_description", "attribute")], {})
     assert cost == ns["ACTION_COST_LOCAL"], (
@@ -1157,10 +1157,10 @@ def test_v075_risk4_classify_recipe_cost_helper_exists():
     )
 
 
-def test_v075_risk4_recipe_cost_inherits_worst_case():
+def test_risk4_recipe_cost_inherits_worst_case():
     """Multi-step recipe MUST inherit its highest-cost step (most conservative)."""
-    ns = _exec_v075_namespace()
-    helper = ns["_v075_classify_recipe_cost"]
+    ns = _exec_namespace()
+    helper = ns["_classify_recipe_cost"]
     # 1 LOCAL + 1 default-FK_REWIRE => overall FK_REWIRE
     cost = helper({}, [
         ("add_tag", "attribute"),
@@ -1175,10 +1175,10 @@ def test_v075_risk4_recipe_cost_inherits_worst_case():
 # 14. v0.7.5 Risk-5 PATCH — combinatorial cost classifier
 # =====================================================================
 
-def test_v075_risk5_product_drop_with_inbound_cross_fk_is_fk_rewire():
+def test_risk5_product_drop_with_inbound_cross_fk_is_fk_rewire():
     """Dropping a product that has FKs pointing INTO it from other domains
     must be FK_REWIRE, not LOCAL — leaves dangling refs otherwise."""
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     model = {
         "domains": [
             {
@@ -1217,9 +1217,9 @@ def test_v075_risk5_product_drop_with_inbound_cross_fk_is_fk_rewire():
     )
 
 
-def test_v075_risk5_product_drop_no_inbound_cross_fk_uses_default():
+def test_risk5_product_drop_no_inbound_cross_fk_uses_default():
     """Dropping a product with NO inbound cross-FK uses the registry default."""
-    ns = _exec_v075_namespace()
+    ns = _exec_namespace()
     model = {
         "domains": [
             {"domain": "orders", "products": [
@@ -1236,8 +1236,8 @@ def test_v075_risk5_product_drop_no_inbound_cross_fk_uses_default():
     )
 
 
-def test_v075_risk5_domain_drop_with_inbound_cross_fk_is_norm_redo():
-    ns = _exec_v075_namespace()
+def test_risk5_domain_drop_with_inbound_cross_fk_is_norm_redo():
+    ns = _exec_namespace()
     model = {
         "domains": [
             {"domain": "ref", "products": [
@@ -1261,7 +1261,7 @@ def test_v075_risk5_domain_drop_with_inbound_cross_fk_is_norm_redo():
     )
 
 
-def test_v075_risk5_helpers_are_industry_agnostic():
+def test_risk5_helpers_are_industry_agnostic():
     """The cross-FK detection helpers must use no business-specific names."""
     src = _load_nb_source(AGENT_NB)
     pos = src.find("def _product_has_inbound_cross_fk(")
@@ -1280,8 +1280,8 @@ def test_v075_risk5_helpers_are_industry_agnostic():
 # 15. v0.7.5 Risk-6 PATCH — dispatcher reports protected_violations
 # =====================================================================
 
-def test_v075_risk6_process_batch_returns_protected_violations_count():
-    ns = _exec_v075_namespace()
+def test_risk6_process_batch_returns_protected_violations_count():
+    ns = _exec_namespace()
     log = _FakeLogger()
     disp = ns["FindingDispatcher"](
         stage_name="next_vibes_generation",

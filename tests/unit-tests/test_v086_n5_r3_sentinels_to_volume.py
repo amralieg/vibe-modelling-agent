@@ -1,4 +1,4 @@
-"""v0.8.6 N5-FIX — R3 sentinels MUST also reach the volume log file, not
+"""N5-FIX — R3 sentinels MUST also reach the volume log file, not
 only the driver console (sys.stderr).
 
 Pre-existing v0.8.4 R3 fix (log-no-truncate-on-success) added three
@@ -49,7 +49,7 @@ class TestN5R3SentinelsReachVolumeInfoLog:
     def test_three_n5_callsites_present(self, agent_src):
         # Each of the three sentinel sites (SHRUNK warning, SAFE-FLUSH,
         # FINAL-FLUSH) must have a paired N5-FIX local-file append block.
-        n5_blocks = re.findall(r"v0\.8\.6 N5-FIX", agent_src)
+        n5_blocks = re.findall(r"\bN5-FIX\b", agent_src)
         assert len(n5_blocks) >= 3, (
             f"Expected ≥3 N5-FIX call sites (shrunk warning, safe-flush, "
             f"final-flush); found {len(n5_blocks)}."

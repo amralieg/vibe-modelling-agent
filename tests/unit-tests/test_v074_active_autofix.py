@@ -67,28 +67,28 @@ def _load_cell_source(path: Path, cell_idx: int) -> str:
 # §3a-bis — version invariants
 # ════════════════════════════════════════════════════════════════════════════
 
-def test_v074_agent_version_is_074():
+def test_agent_version_is_074():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "0.7.6"' in src, (
-        "v0.7.6 must stamp __AGENT_VERSION__ = '0.7.6' (CLAUDE.md §3a-bis); "
-        "v0.7.6 closes the v0.7.5 deferred emit-site migrations (architect/audit/next_vibes)."
+    assert '__AGENT_VERSION__ = "0.7.7"' in src, (
+        "must stamp __AGENT_VERSION__ = '0.7.7' (CLAUDE.md §3a-bis); "
+        "closes the v0.7.5 deferred emit-site migrations (architect/audit/next_vibes)."
     )
 
 
-def test_v074_agent_version_is_first_non_comment_line_of_first_code_cell():
+def test_agent_version_is_first_non_comment_line_of_first_code_cell():
     nb = json.loads(AGENT_NB.read_text())
     first_code_cell = next((c for c in nb["cells"] if c.get("cell_type") == "code"), None)
     assert first_code_cell is not None
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
     assert code_lines, "First code cell must contain at least one code line"
-    assert '__AGENT_VERSION__ = "0.7.6"' in code_lines[0], (
+    assert '__AGENT_VERSION__ = "0.7.7"' in code_lines[0], (
         "First non-comment code line of first code cell must declare "
         "__AGENT_VERSION__ = \"0.7.6\" (CLAUDE.md §3a-bis)"
     )
 
 
-def test_v074_semver_is_single_digit_segments():
+def test_semver_is_single_digit_segments():
     src = _load_nb_source(AGENT_NB)
     m = re.search(r'__AGENT_VERSION__\s*=\s*"(\d+)\.(\d+)\.(\d+)"', src)
     assert m, "Could not find __AGENT_VERSION__ tuple"
@@ -103,17 +103,17 @@ def test_v074_semver_is_single_digit_segments():
 # RC-4..RC-11: Active SA-autofix dispatcher
 # ════════════════════════════════════════════════════════════════════════════
 
-def test_v074_dispatcher_function_exists():
+def test_dispatcher_function_exists():
     src = _load_nb_source(AGENT_NB)
     assert "def step_static_analysis_autofix(" in src, (
-        "v0.7.4 dispatcher step_static_analysis_autofix MUST be defined"
+        "dispatcher step_static_analysis_autofix MUST be defined"
     )
     assert "alias=step-sa-active-autofix" in src, (
         "Dispatcher MUST emit [step-sa-active-autofix FIRED] sentinel"
     )
 
 
-def test_v074_autofix_registry_covers_10_categories():
+def test_autofix_registry_covers_10_categories():
     src = _load_nb_source(AGENT_NB)
     expected_categories = [
         "banned_boilerplate_in_output",
@@ -133,24 +133,24 @@ def test_v074_autofix_registry_covers_10_categories():
         )
 
 
-def test_v074_autofix_functions_all_defined():
+def test_autofix_functions_all_defined():
     src = _load_nb_source(AGENT_NB)
     expected_fns = [
-        "_v074_strip_banned_boilerplate",
-        "_v074_strip_redundant_value_regex",
-        "_v074_add_pii_tags",
-        "_v074_strip_redundant_product_prefix",
-        "_v074_drop_denormalized_natural_keys",
-        "_v074_rename_self_fk_on_pk",
-        "_v074_fill_missing_descriptions",
-        "_v074_fill_missing_pks",
-        "_v074_merge_cross_domain_duplicate_subset",
+        "_strip_banned_boilerplate",
+        "_strip_redundant_value_regex",
+        "_add_pii_tags",
+        "_strip_redundant_product_prefix",
+        "_drop_denormalized_natural_keys",
+        "_rename_self_fk_on_pk",
+        "_fill_missing_descriptions",
+        "_fill_missing_pks",
+        "_merge_cross_domain_duplicate_subset",
     ]
     for fn in expected_fns:
         assert f"def {fn}(" in src, f"Autofix function {fn} MUST be defined"
 
 
-def test_v074_each_autofix_emits_sentinel_log_line():
+def test_each_autofix_emits_sentinel_log_line():
     src = _load_nb_source(AGENT_NB)
     expected_sentinels = [
         "sa-autofix-banned_boilerplate_in_output FIRED",
@@ -167,28 +167,28 @@ def test_v074_each_autofix_emits_sentinel_log_line():
         assert s in src, f"Sentinel '{s}' MUST be emitted on successful autofix"
 
 
-def test_v074_dispatcher_has_summary_sentinel():
+def test_dispatcher_has_summary_sentinel():
     src = _load_nb_source(AGENT_NB)
     assert "sa-active-autofix-summary FIRED" in src, (
         "Dispatcher MUST emit summary sentinel with per-category counts"
     )
 
 
-def test_v074_dispatcher_wired_into_step_generate_next_vibes():
+def test_dispatcher_wired_into_step_generate_next_vibes():
     src = _load_nb_source(AGENT_NB)
     assert "step-sa-active-autofix-call FIRED" in src, (
         "Dispatcher MUST be called from step_generate_next_vibes "
         "(after run_metamodel_static_analysis)"
     )
     # Specifically: dispatcher call must come AFTER the SA call
-    sa_pos = src.find("analysis = run_metamodel_static_analysis(domains_data, products_data, attributes_data, config, logger)\n        # v0.7.4 [step-sa-active-autofix-call FIRED")
+    sa_pos = src.find("analysis = run_metamodel_static_analysis(domains_data, products_data, attributes_data, config, logger)\n        # [step-sa-active-autofix-call FIRED")
     assert sa_pos >= 0, (
         "Dispatcher must be wired DIRECTLY after the SA call inside "
         "step_generate_next_vibes else issues won't reflect post-fix state"
     )
 
 
-def test_v074_dispatcher_wired_into_model_checkup():
+def test_dispatcher_wired_into_model_checkup():
     src = _load_nb_source(AGENT_NB)
     assert "model-checkup-sa-autofix-call FIRED" in src, (
         "Dispatcher MUST be called from the model_checkup action handler "
@@ -196,28 +196,28 @@ def test_v074_dispatcher_wired_into_model_checkup():
     )
 
 
-def test_v074_dispatcher_re_runs_sa_after_autofix():
+def test_dispatcher_re_runs_sa_after_autofix():
     src = _load_nb_source(AGENT_NB)
     # Both call sites must re-run SA when autofix applied something
     assert "Re-running static analysis after active autofix" in src
-    assert "Re-running static analysis after v0.7.4 active autofix" in src
+    assert "Re-running static analysis after active autofix" in src
 
 
-def test_v074_autofixers_are_industry_agnostic():
+def test_autofixers_are_industry_agnostic():
     """CLAUDE.md §8.5 — no hardcoded customer/business names in autofixer CODE.
     Comments may reference the AUDIT that motivated the fix (airline VOV) but
     the CODE itself MUST contain no industry-specific entity names. Strip
     comments before checking. v0.7.5: dispatcher block start marker preserved
     (the dispatcher itself is the same v0.7.4 functions, now cost-class-gated)."""
     src = _load_nb_source(AGENT_NB)
-    start_marker = "# v0.7.4 [step-sa-active-autofix FIRED alias=step-sa-active-autofix]"
+    start_marker = "# [step-sa-active-autofix FIRED alias=step-sa-active-autofix]"
     # v0.7.5 retired the explicit END marker when wrapping the dispatcher; we
     # bound the search by the next major section banner to extract the same
     # dispatcher block.
     s = src.find(start_marker)
     if s < 0:
         s = src.find("step-sa-active-autofix FIRED")
-    e = src.find("# v0.7.5 [V075_RETIRE_V074_VOCAB", s if s >= 0 else 0)
+    e = src.find("# [V075_RETIRE_V074_VOCAB", s if s >= 0 else 0)
     if e < 0:
         e = s + 80000  # generous bound
     assert s >= 0 and e > s, (
@@ -265,7 +265,7 @@ def test_v074_autofixers_are_industry_agnostic():
 # RC-1 + RC-3: FMFL stem auto-apply BEFORE final-sanitize coercion
 # ════════════════════════════════════════════════════════════════════════════
 
-def test_v074_fmfl_auto_apply_top1_sentinel_present():
+def test_fmfl_auto_apply_top1_sentinel_present():
     src = _load_nb_source(AGENT_NB)
     assert "fmfl-auto-apply-top1 FIRED" in src, (
         "RC-1+RC-3 fix: fmfl-auto-apply-top1 sentinel MUST be emitted when "
@@ -276,7 +276,7 @@ def test_v074_fmfl_auto_apply_top1_sentinel_present():
     )
 
 
-def test_v074_fmfl_auto_apply_runs_before_final_sanitize():
+def test_fmfl_auto_apply_runs_before_final_sanitize():
     """The auto-apply pass MUST run BEFORE fmfl-final-sanitize coercion so
     candidates with stem matches get healed instead of dropped to KEEP_AS_IS."""
     src = _load_nb_source(AGENT_NB)
@@ -289,16 +289,16 @@ def test_v074_fmfl_auto_apply_runs_before_final_sanitize():
     )
 
 
-def test_v074_fmfl_auto_apply_uses_existing_helpers_not_new_ones():
+def test_fmfl_auto_apply_uses_existing_helpers_not_new_ones():
     """CLAUDE.md §3d (search-first/reuse-first/DRY): the auto-apply must call
     the EXISTING _fmfl_suggest_canonical helper, not a duplicate."""
     src = _load_nb_source(AGENT_NB)
-    auto_apply_block_start = src.find("# v0.7.4 [fmfl-auto-apply-top1 FIRED")
+    auto_apply_block_start = src.find("# [fmfl-auto-apply-top1 FIRED")
     auto_apply_block_end = src.find("_final_sanitize_count = 0", auto_apply_block_start)
     assert auto_apply_block_start >= 0 and auto_apply_block_end > auto_apply_block_start
     block = src[auto_apply_block_start:auto_apply_block_end]
     assert "_fmfl_suggest_canonical(" in block, (
-        "v0.7.4 fmfl-auto-apply-top1 MUST reuse existing _fmfl_suggest_canonical "
+        "fmfl-auto-apply-top1 MUST reuse existing _fmfl_suggest_canonical "
         "helper (DRY per CLAUDE.md §3d)"
     )
 
@@ -307,7 +307,7 @@ def test_v074_fmfl_auto_apply_uses_existing_helpers_not_new_ones():
 # RC-2: Fidelity gate HALT
 # ════════════════════════════════════════════════════════════════════════════
 
-def test_v074_fidelity_gate_halt_sentinel_present():
+def test_fidelity_gate_halt_sentinel_present():
     src = _load_nb_source(AGENT_NB)
     assert "fidelity-gate-halt FIRED" in src, (
         "RC-2 fix: fidelity-gate-halt sentinel MUST be emitted when user-provided "
@@ -315,7 +315,7 @@ def test_v074_fidelity_gate_halt_sentinel_present():
     )
 
 
-def test_v074_fidelity_gate_raises_runtimeerror():
+def test_fidelity_gate_raises_runtimeerror():
     src = _load_nb_source(AGENT_NB)
     halt_pos = src.find("fidelity-gate-halt FIRED")
     assert halt_pos >= 0
@@ -326,12 +326,12 @@ def test_v074_fidelity_gate_raises_runtimeerror():
         "RC-2: fidelity-gate-halt MUST raise RuntimeError to halt the pipeline "
         "instead of just logging WARNING"
     )
-    assert "v0.7.4 fidelity-gate HALT" in block, (
-        "RuntimeError message MUST include 'v0.7.4 fidelity-gate HALT' for grep-ability"
+    assert "fidelity-gate HALT" in block, (
+        "RuntimeError message MUST include 'fidelity-gate HALT' for grep-ability"
     )
 
 
-def test_v074_fidelity_gate_halt_has_escape_hatch():
+def test_fidelity_gate_halt_has_escape_hatch():
     src = _load_nb_source(AGENT_NB)
     assert "vibe_fidelity_gate_halt_disabled" in src, (
         "RC-2 fix MUST provide vibe_fidelity_gate_halt_disabled escape hatch "
@@ -339,7 +339,7 @@ def test_v074_fidelity_gate_halt_has_escape_hatch():
     )
 
 
-def test_v074_fidelity_gate_halt_only_when_user_contract():
+def test_fidelity_gate_halt_only_when_user_contract():
     """The HALT must only fire when a USER-PROVIDED VibeContract is in effect.
     If no contract or auto-derived, the existing 'informational only' branch
     must continue to run unchanged."""
@@ -354,9 +354,9 @@ def test_v074_fidelity_gate_halt_only_when_user_contract():
 # Action vocabulary in next_vibes prompt
 # ════════════════════════════════════════════════════════════════════════════
 
-def test_v074_action_vocab_renderer_defined():
+def test_action_vocab_renderer_defined():
     src = _load_nb_source(AGENT_NB)
-    assert "def _v074_render_action_vocab_block(" in src, (
+    assert "def _render_action_vocab_block(" in src, (
         "Action-vocabulary renderer MUST be defined"
     )
     assert "_V074_SA_ACTION_VOCAB" in src, (
@@ -364,26 +364,26 @@ def test_v074_action_vocab_renderer_defined():
     )
 
 
-def test_v074_action_vocab_covers_all_six_scopes():
-    """v0.7.5 retired _V074_SA_ACTION_VOCAB as a duplicate of MASTER_ACTION_REGISTRY.
+def test_action_vocab_covers_all_six_scopes():
+    """retired _V074_SA_ACTION_VOCAB as a duplicate of MASTER_ACTION_REGISTRY.
     The shim must still expose all six scopes for backward compatibility, but the
     underlying source of truth is now MasterActionRegistry."""
     src = _load_nb_source(AGENT_NB)
     expected_scopes = ["'attribute'", "'product'", "'domain'", "'link'", "'tag'", "'model'"]
-    assert "MASTER_ACTION_REGISTRY = {" in src, "v0.7.5 MASTER_ACTION_REGISTRY MUST be defined"
+    assert "MASTER_ACTION_REGISTRY = {" in src, "MASTER_ACTION_REGISTRY MUST be defined"
     reg_pos = src.find("MASTER_ACTION_REGISTRY = {")
     block = src[reg_pos:reg_pos + 25000]
     for scope in expected_scopes:
         assert f", {scope}):" in block, f"MASTER_ACTION_REGISTRY MUST cover scope {scope}"
-    assert "def _v075_build_v074_vocab_compat" in src, (
-        "v0.7.5 backward-compat shim _v075_build_v074_vocab_compat MUST be defined"
+    assert "def _build_action_vocab_compat" in src, (
+        "backward-compat shim _build_action_vocab_compat MUST be defined"
     )
-    assert "_V074_SA_ACTION_VOCAB = _v075_build_v074_vocab_compat()" in src, (
+    assert "_V074_SA_ACTION_VOCAB = _build_action_vocab_compat()" in src, (
         "_V074_SA_ACTION_VOCAB MUST be derived from MASTER_ACTION_REGISTRY (shim only)"
     )
 
 
-def test_v074_action_vocab_includes_critical_actions():
+def test_action_vocab_includes_critical_actions():
     """CLAUDE.md §3d/§5 — MASTER_ACTION_REGISTRY (which now backs the vocab) MUST
     include the actions that the dispatcher consumes and the actions that the LLM
     most commonly proposes."""
@@ -404,30 +404,30 @@ def test_v074_action_vocab_includes_critical_actions():
         )
 
 
-def test_v074_action_vocab_block_injected_into_prompt_template():
-    """v0.7.5 renamed the placeholder to {master_action_catalog} (the canonical
+def test_action_vocab_block_injected_into_prompt_template():
+    """renamed the placeholder to {master_action_catalog} (the canonical
     source of truth) — the old name {action_vocabulary_block} is retired."""
     src = _load_nb_source(AGENT_NB)
     assert "{master_action_catalog}" in src, (
-        "v0.7.5: VIBE_CREATE_NEXT_PROMPT MUST contain {master_action_catalog} placeholder"
+        "VIBE_CREATE_NEXT_PROMPT MUST contain {master_action_catalog} placeholder"
     )
 
 
-def test_v074_action_vocab_block_passed_in_format_call():
-    """v0.7.5 .format() call uses the canonical render_master_action_catalog()."""
+def test_action_vocab_block_passed_in_format_call():
+    """.format() call uses the canonical render_master_action_catalog()."""
     src = _load_nb_source(AGENT_NB)
     assert "master_action_catalog=_master_action_catalog" in src, (
-        "v0.7.5: step_generate_next_vibes .format() MUST pass master_action_catalog "
+        "step_generate_next_vibes .format() MUST pass master_action_catalog "
         "rendered from MASTER_ACTION_REGISTRY (single source of truth)"
     )
 
 
-def test_v074_action_vocab_prompt_inject_sentinel_present():
-    """v0.7.5 sentinel is master-action-catalog-prompt-inject (renamed from
+def test_action_vocab_prompt_inject_sentinel_present():
+    """sentinel is master-action-catalog-prompt-inject (renamed from
     V074_SA_ACTION_VOCAB-prompt-inject when the duplicate vocab was retired)."""
     src = _load_nb_source(AGENT_NB)
     assert "master-action-catalog-prompt-inject FIRED" in src, (
-        "v0.7.5: master-action-catalog-prompt-inject sentinel MUST be present "
+        "master-action-catalog-prompt-inject sentinel MUST be present "
         "(needed for grep-based deploy verification per CLAUDE.md §10.7 step 6)"
     )
 
@@ -452,7 +452,7 @@ def _extract_function_source(nb_path: Path, fn_name: str) -> str:
     return m.group(0)
 
 
-def _exec_v074_autofixers_in_isolation():
+def _exec_autofixers_in_isolation():
     """Build a minimal namespace that exposes the v0.7.4 autofixers + the
     helpers they depend on (re, get_pk_suffix, build_pk_name_from_config,
     PII_FALSE_POSITIVE_RE, classify_pii_subtype). Lets each test exec the
@@ -488,15 +488,15 @@ def _exec_v074_autofixers_in_isolation():
     ns["_V074_NATURAL_KEY_SUFFIXES"] = ("_code", "_number", "_no", "_key")
     # Exec each autofixer's source into the namespace
     for fn in (
-        "_v074_strip_banned_boilerplate",
-        "_v074_strip_redundant_value_regex",
-        "_v074_add_pii_tags",
-        "_v074_strip_redundant_product_prefix",
-        "_v074_drop_denormalized_natural_keys",
-        "_v074_rename_self_fk_on_pk",
-        "_v074_fill_missing_descriptions",
-        "_v074_fill_missing_pks",
-        "_v074_merge_cross_domain_duplicate_subset",
+        "_strip_banned_boilerplate",
+        "_strip_redundant_value_regex",
+        "_add_pii_tags",
+        "_strip_redundant_product_prefix",
+        "_drop_denormalized_natural_keys",
+        "_rename_self_fk_on_pk",
+        "_fill_missing_descriptions",
+        "_fill_missing_pks",
+        "_merge_cross_domain_duplicate_subset",
     ):
         exec(_extract_function_source(AGENT_NB, fn), ns)
     return ns
@@ -516,28 +516,28 @@ class _NoopLogger:
         pass
 
 
-def test_v074_exec_strip_banned_boilerplate_actually_strips():
-    ns = _exec_v074_autofixers_in_isolation()
+def test_exec_strip_banned_boilerplate_actually_strips():
+    ns = _exec_autofixers_in_isolation()
     attrs = [
         {"attribute": "x", "description": "A Fortune 500 multinational metric"},
         {"attribute": "y", "description": "A clean attribute"},
     ]
-    n = ns["_v074_strip_banned_boilerplate"]([], [], attrs, {}, {}, _NoopLogger())
+    n = ns["_strip_banned_boilerplate"]([], [], attrs, {}, {}, _NoopLogger())
     assert n == 1, "Should have stripped 1 attr"
     assert "fortune" not in attrs[0]["description"].lower()
     assert "multinational" not in attrs[0]["description"].lower()
     assert attrs[1]["description"] == "A clean attribute"
 
 
-def test_v074_exec_strip_redundant_value_regex_on_typed():
-    ns = _exec_v074_autofixers_in_isolation()
+def test_exec_strip_redundant_value_regex_on_typed():
+    ns = _exec_autofixers_in_isolation()
     attrs = [
         {"attribute": "amount", "type": "DECIMAL(18,2)", "value_regex": r"^\d+\.\d{2}$"},
         {"attribute": "name", "type": "STRING", "value_regex": r"^[A-Z]+$"},  # keep
         {"attribute": "ts", "type": "TIMESTAMP", "value_regex": r"\d{4}-\d{2}-\d{2}"},
         {"attribute": "flag", "type": "BOOLEAN", "value_regex": r"true|false"},
     ]
-    n = ns["_v074_strip_redundant_value_regex"]([], [], attrs, {}, {}, _NoopLogger())
+    n = ns["_strip_redundant_value_regex"]([], [], attrs, {}, {}, _NoopLogger())
     assert n == 3, f"Should strip 3 typed columns, got {n}"
     assert attrs[0]["value_regex"] == ""
     assert attrs[1]["value_regex"] == r"^[A-Z]+$"  # STRING — keep
@@ -545,8 +545,8 @@ def test_v074_exec_strip_redundant_value_regex_on_typed():
     assert attrs[3]["value_regex"] == ""
 
 
-def test_v074_exec_add_pii_tags_industry_agnostic():
-    ns = _exec_v074_autofixers_in_isolation()
+def test_exec_add_pii_tags_industry_agnostic():
+    ns = _exec_autofixers_in_isolation()
     attrs = [
         {"attribute": "customer_email", "tags": ""},
         {"attribute": "phone_number", "tags": "contact"},
@@ -555,7 +555,7 @@ def test_v074_exec_add_pii_tags_industry_agnostic():
         {"attribute": "patient_address", "tags": ""},  # works for healthcare too
         {"attribute": "claim_id", "tags": ""},  # not a PII pattern — skip
     ]
-    n = ns["_v074_add_pii_tags"]([], [], attrs, {}, {}, _NoopLogger())
+    n = ns["_add_pii_tags"]([], [], attrs, {}, {}, _NoopLogger())
     assert n == 3, f"Should tag 3 PII attrs, got {n}"
     assert "pii_personal" in attrs[0]["tags"]
     assert "pii_personal" in attrs[1]["tags"]
@@ -565,15 +565,15 @@ def test_v074_exec_add_pii_tags_industry_agnostic():
     assert "pii_personal" not in attrs[5]["tags"]
 
 
-def test_v074_exec_strip_redundant_product_prefix():
-    ns = _exec_v074_autofixers_in_isolation()
+def test_exec_strip_redundant_product_prefix():
+    ns = _exec_autofixers_in_isolation()
     attrs = [
         {"domain": "d", "product": "customer", "attribute": "customer_email", "tags": ""},
         {"domain": "d", "product": "customer", "attribute": "customer_id", "tags": "primary_key"},  # PK — skip
         {"domain": "d", "product": "order", "attribute": "order_status", "tags": ""},
         {"domain": "d", "product": "order", "attribute": "shipping_address", "tags": ""},  # no prefix — skip
     ]
-    n = ns["_v074_strip_redundant_product_prefix"]([], [], attrs, {}, {}, _NoopLogger())
+    n = ns["_strip_redundant_product_prefix"]([], [], attrs, {}, {}, _NoopLogger())
     assert n == 2, f"Should rename 2 attrs, got {n}"
     assert attrs[0]["attribute"] == "email"
     assert attrs[1]["attribute"] == "customer_id"  # unchanged
@@ -581,8 +581,8 @@ def test_v074_exec_strip_redundant_product_prefix():
     assert attrs[3]["attribute"] == "shipping_address"  # unchanged
 
 
-def test_v074_exec_drop_denormalized_natural_keys():
-    ns = _exec_v074_autofixers_in_isolation()
+def test_exec_drop_denormalized_natural_keys():
+    ns = _exec_autofixers_in_isolation()
     attrs = [
         {"domain": "d", "product": "order", "attribute": "customer_id", "foreign_key_to": "d.customer.customer_id"},
         {"domain": "d", "product": "order", "attribute": "customer_code", "foreign_key_to": ""},  # DROP
@@ -590,7 +590,7 @@ def test_v074_exec_drop_denormalized_natural_keys():
         {"domain": "d", "product": "shipment", "attribute": "carrier_id", "foreign_key_to": "d.carrier.carrier_id"},
         {"domain": "d", "product": "shipment", "attribute": "carrier_number", "foreign_key_to": ""},  # DROP
     ]
-    n = ns["_v074_drop_denormalized_natural_keys"]([], [], attrs, {}, {}, _NoopLogger())
+    n = ns["_drop_denormalized_natural_keys"]([], [], attrs, {}, {}, _NoopLogger())
     assert n == 2, f"Should drop 2 natural keys, got {n}"
     surviving = [a["attribute"] for a in attrs]
     assert "customer_code" not in surviving
@@ -599,8 +599,8 @@ def test_v074_exec_drop_denormalized_natural_keys():
     assert "carrier_id" in surviving
 
 
-def test_v074_exec_rename_self_fk_on_pk():
-    ns = _exec_v074_autofixers_in_isolation()
+def test_exec_rename_self_fk_on_pk():
+    ns = _exec_autofixers_in_isolation()
     products = [
         {"domain": "cargo", "product": "awb", "primary_key": "awb_id"},
         {"domain": "cargo", "product": "shipment", "primary_key": "shipment_id"},
@@ -612,21 +612,21 @@ def test_v074_exec_rename_self_fk_on_pk():
         # Also: shipment.shipment_id is the PK (skip)
         {"domain": "cargo", "product": "shipment", "attribute": "shipment_id", "tags": "primary_key", "foreign_key_to": ""},
     ]
-    n = ns["_v074_rename_self_fk_on_pk"](
+    n = ns["_rename_self_fk_on_pk"](
         [], products, attrs, {}, {}, _NoopLogger()
     )
     assert n == 1, f"Should rename 1 self-FK collision, got {n}"
     assert attrs[0]["attribute"] == "parent_awb_id"
 
 
-def test_v074_exec_fill_missing_descriptions_industry_agnostic():
-    ns = _exec_v074_autofixers_in_isolation()
+def test_exec_fill_missing_descriptions_industry_agnostic():
+    ns = _exec_autofixers_in_isolation()
     attrs = [
         {"domain": "sales", "product": "order", "attribute": "order_status", "description": ""},
         {"domain": "sales", "product": "order", "attribute": "amount", "description": "ok desc longer than 10 chars"},
         {"domain": "hr", "product": "employee", "attribute": "hire_date", "description": "x"},
     ]
-    n = ns["_v074_fill_missing_descriptions"]([], [], attrs, {}, {}, _NoopLogger())
+    n = ns["_fill_missing_descriptions"]([], [], attrs, {}, {}, _NoopLogger())
     assert n == 2, f"Should fill 2 short descriptions, got {n}"
     assert "order status" in attrs[0]["description"]
     assert "order" in attrs[0]["description"]
@@ -635,8 +635,8 @@ def test_v074_exec_fill_missing_descriptions_industry_agnostic():
     assert "employee" in attrs[2]["description"]
 
 
-def test_v074_exec_fill_missing_pks_from_naming_pattern():
-    ns = _exec_v074_autofixers_in_isolation()
+def test_exec_fill_missing_pks_from_naming_pattern():
+    ns = _exec_autofixers_in_isolation()
     products = [
         {"domain": "d", "product": "customer", "primary_key": ""},
         {"domain": "d", "product": "order", "primary_key": "order_id"},  # already has PK — skip
@@ -646,15 +646,15 @@ def test_v074_exec_fill_missing_pks_from_naming_pattern():
         {"domain": "d", "product": "customer", "attribute": "name", "tags": ""},
         {"domain": "d", "product": "order", "attribute": "order_id", "tags": "primary_key", "is_primary_key": True},
     ]
-    n = ns["_v074_fill_missing_pks"]([], products, attrs, {}, {}, _NoopLogger())
+    n = ns["_fill_missing_pks"]([], products, attrs, {}, {}, _NoopLogger())
     assert n == 1, f"Should tag 1 missing PK, got {n}"
     assert "primary_key" in attrs[0]["tags"]
     assert attrs[0].get("is_primary_key") is True
     assert products[0]["primary_key"] == "customer_id"
 
 
-def test_v074_exec_subset_merge_cross_domain_duplicate_safe_only():
-    ns = _exec_v074_autofixers_in_isolation()
+def test_exec_subset_merge_cross_domain_duplicate_safe_only():
+    ns = _exec_autofixers_in_isolation()
     products = [
         {"domain": "crm", "product": "customer", "primary_key": "customer_id"},
         {"domain": "support", "product": "customer", "primary_key": "customer_id"},  # subset of crm.customer
@@ -677,7 +677,7 @@ def test_v074_exec_subset_merge_cross_domain_duplicate_safe_only():
         {"domain": "crm", "product": "order", "attribute": "customer_id", "foreign_key_to": "crm.customer.customer_id"},  # FK to CRM, NOT support
     ]
     before = len(products)
-    n = ns["_v074_merge_cross_domain_duplicate_subset"]([], products, attrs, {}, {}, _NoopLogger())
+    n = ns["_merge_cross_domain_duplicate_subset"]([], products, attrs, {}, {}, _NoopLogger())
     assert n == 1, f"Should subset-merge 1 cross-domain duplicate, got {n}"
     assert len(products) == before - 1
     surviving_keys = {(p["domain"], p["product"]) for p in products}
@@ -687,10 +687,10 @@ def test_v074_exec_subset_merge_cross_domain_duplicate_safe_only():
     )
 
 
-def test_v074_subset_merge_REJECTS_when_smaller_has_unique_attrs():
+def test_subset_merge_REJECTS_when_smaller_has_unique_attrs():
     """Safety: if the 'subset' actually has unique attrs the larger lacks, it's
     NOT a subset and must NOT be merged. Defers to next_vibes for LLM."""
-    ns = _exec_v074_autofixers_in_isolation()
+    ns = _exec_autofixers_in_isolation()
     products = [
         {"domain": "crm", "product": "customer"},
         {"domain": "support", "product": "customer"},
@@ -701,15 +701,15 @@ def test_v074_subset_merge_REJECTS_when_smaller_has_unique_attrs():
         {"domain": "support", "product": "customer", "attribute": "customer_id"},
         {"domain": "support", "product": "customer", "attribute": "support_tier"},  # UNIQUE — must not merge
     ]
-    n = ns["_v074_merge_cross_domain_duplicate_subset"]([], products, attrs, {}, {}, _NoopLogger())
+    n = ns["_merge_cross_domain_duplicate_subset"]([], products, attrs, {}, {}, _NoopLogger())
     assert n == 0, "Must NOT merge when smaller has unique attrs (safety property)"
     assert len(products) == 2
 
 
-def test_v074_subset_merge_REJECTS_when_smaller_has_incoming_fks():
+def test_subset_merge_REJECTS_when_smaller_has_incoming_fks():
     """Safety: if other products FK to the would-be-dropped product, dropping
     would orphan those FKs. Must defer to next_vibes."""
-    ns = _exec_v074_autofixers_in_isolation()
+    ns = _exec_autofixers_in_isolation()
     products = [
         {"domain": "crm", "product": "customer"},
         {"domain": "support", "product": "customer"},
@@ -725,7 +725,7 @@ def test_v074_subset_merge_REJECTS_when_smaller_has_incoming_fks():
         # FK from support.ticket → support.customer — would-be-orphaned
         {"domain": "support", "product": "ticket", "attribute": "customer_id", "foreign_key_to": "support.customer.customer_id"},
     ]
-    n = ns["_v074_merge_cross_domain_duplicate_subset"]([], products, attrs, {}, {}, _NoopLogger())
+    n = ns["_merge_cross_domain_duplicate_subset"]([], products, attrs, {}, {}, _NoopLogger())
     assert n == 0, "Must NOT merge when subset has incoming FKs (safety property)"
 
 
@@ -733,7 +733,7 @@ def test_v074_subset_merge_REJECTS_when_smaller_has_incoming_fks():
 # Static-analysis remediation_actions coverage (audit confirmed all 65 covered)
 # ════════════════════════════════════════════════════════════════════════════
 
-def test_v074_all_sa_categories_have_remediation_actions():
+def test_all_sa_categories_have_remediation_actions():
     src = _load_nb_source(AGENT_NB)
     pat = re.compile(r'issues\.append\(\s*\{', re.MULTILINE)
     seen = {}
@@ -762,7 +762,7 @@ def test_v074_all_sa_categories_have_remediation_actions():
 # Cross-cutting v0.7.4 invariants
 # ════════════════════════════════════════════════════════════════════════════
 
-def test_v074_dispatcher_dependencies_available_in_namespace():
+def test_dispatcher_dependencies_available_in_namespace():
     """The dispatcher uses re, get_pk_suffix, build_pk_name_from_config,
     PII_FALSE_POSITIVE_RE, classify_pii_subtype. Each MUST exist in the agent
     notebook (defined earlier than cell 21)."""
@@ -774,10 +774,10 @@ def test_v074_dispatcher_dependencies_available_in_namespace():
         "def classify_pii_subtype(",
     ]
     for d in deps:
-        assert d in src, f"v0.7.4 dispatcher dependency missing: {d}"
+        assert d in src, f"dispatcher dependency missing: {d}"
 
 
-def test_v074_no_persist_or_cache_or_sparkcontext():
+def test_no_persist_or_cache_or_sparkcontext():
     """CLAUDE.md §2: serverless-compatible — no .cache/.persist/sparkContext
     in dispatcher CODE (comments are allowed to mention them as 'we don't use
     these'). v0.7.5: dispatcher start marker preserved; END marker retired when
@@ -786,11 +786,11 @@ def test_v074_no_persist_or_cache_or_sparkcontext():
     nb = json.loads(AGENT_NB.read_text())
     cells = nb["cells"]
     src = "".join(cells[21].get("source", []))
-    start_marker = "# v0.7.4 [step-sa-active-autofix FIRED alias=step-sa-active-autofix]"
+    start_marker = "# [step-sa-active-autofix FIRED alias=step-sa-active-autofix]"
     s = src.find(start_marker)
     if s < 0:
         s = src.find("step-sa-active-autofix FIRED")
-    e = src.find("# v0.7.5 [V075_RETIRE_V074_VOCAB", s if s >= 0 else 0)
+    e = src.find("# [V075_RETIRE_V074_VOCAB", s if s >= 0 else 0)
     if e < 0:
         e = s + 80000
     assert s >= 0 and e > s

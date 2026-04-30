@@ -1,4 +1,4 @@
-"""v0.9.6 BEHAVIORAL tests for naming-reserved-word-guard.
+"""BEHAVIORAL tests for naming-reserved-word-guard.
 
 Root cause fixed: line 4523-4528 of agent notebook applied
 strip_product_prefix() without checking _SQL_RESERVED_OR_AMBIGUOUS_NAMES,
@@ -152,7 +152,7 @@ class TestNamingReservedWordGuard:
             "owner is not reserved in our ambiguous set — rename SHOULD proceed"
         )
 
-    def test_guard_blocks_observed_v95_renames(self, agent_src):
+    def test_guard_blocks_observed_renames(self, agent_src):
         """The 6 specific desyncs from airline run 368656354285786:
         - safety.audit.audit_type → type
         - safety.audit.audit_category → category
@@ -168,7 +168,7 @@ class TestNamingReservedWordGuard:
         # Each observed failure column must be in the reserved set
         for failure_col in ('type', 'category', 'status'):
             assert f"'{failure_col}'" in window, (
-                f"v0.9.5 desync column '{failure_col}' must be in v0.9.6 reserved set"
+                f"desync column '{failure_col}' must be in v0.9.6 reserved set"
             )
 
     def test_continue_branch_in_guard(self, agent_src):

@@ -1,4 +1,4 @@
-"""v1.0.3 BEHAVIORAL tests for the v1.0.2 tiny ECM+MVM audit fixes.
+"""BEHAVIORAL tests for the v1.0.2 tiny ECM+MVM audit fixes.
 
 Fixes covered:
   1. fidelity-count-soft-pass-strategy-agnostic  (FIDELITY-STRATEGY-AGNOSTIC)
@@ -53,18 +53,18 @@ class TestFidelityCountSoftPassStrategyAgnostic:
         # Take a window of ~3000 chars starting at the function def
         window = agent_src[idx: idx + 3000]
 
-        regex_pos = window.find("_v103_count_shape_re")
+        regex_pos = window.find("_count_shape_re")
         fired_pos = window.find("fidelity-count-soft-pass-strategy-agnostic")
         dispatch_pos = window.find('req.verification_strategy == "deterministic"')
 
-        assert regex_pos != -1, "v1.0.3 regex var not found in _verify_requirement"
-        assert fired_pos != -1, "v1.0.3 FIRED marker not found in _verify_requirement"
+        assert regex_pos != -1, "regex var not found in _verify_requirement"
+        assert fired_pos != -1, "FIRED marker not found in _verify_requirement"
         assert dispatch_pos != -1, "strategy dispatch not found in _verify_requirement"
         assert regex_pos < dispatch_pos, (
-            "v1.0.3 regex must be defined BEFORE strategy dispatch"
+            "regex must be defined BEFORE strategy dispatch"
         )
         assert fired_pos < dispatch_pos, (
-            "v1.0.3 FIRED marker must appear BEFORE strategy dispatch"
+            "FIRED marker must appear BEFORE strategy dispatch"
         )
 
     def test_regex_pattern_matches_tiny_vibes(self):
@@ -129,13 +129,13 @@ class TestMVCrossTableMeasureDrop:
         # Scope to the v1.0.3 measure-drop ColCheck marker (unique to the measure site).
         marker = "[mv-cross-table-measure-drop FIRED] Dropping measure"
         idx = agent_src.find(marker)
-        assert idx != -1, "v1.0.3 measure-drop marker missing at ColCheck site"
+        assert idx != -1, "measure-drop marker missing at ColCheck site"
         window = agent_src[idx: idx + 400]
         assert 'meas_expr = "COUNT(1)"' not in window, (
-            "v1.0.3 should have removed COUNT(1) substitution at measure ColCheck site"
+            "should have removed COUNT(1) substitution at measure ColCheck site"
         )
         assert "continue" in window, (
-            "v1.0.3 fix expected `continue` to replace COUNT(1) substitution at measure site"
+            "fix expected `continue` to replace COUNT(1) substitution at measure site"
         )
 
     def test_typecheck_site_also_drops(self, agent_src):
@@ -144,7 +144,7 @@ class TestMVCrossTableMeasureDrop:
         # There are TWO measure-drop markers (ColCheck + TypeCheck). Find the SECOND.
         first = agent_src.find(marker)
         second = agent_src.find(marker, first + 1)
-        assert second != -1, "v1.0.3 TypeCheck measure-drop marker missing"
+        assert second != -1, "TypeCheck measure-drop marker missing"
         window = agent_src[second: second + 400]
         assert 'meas_expr = "COUNT(1)"' not in window
         assert "continue" in window
@@ -167,16 +167,16 @@ class TestMVCrossTableMeasureDrop:
 class TestV103DoesNotBreakV102:
     """Regression: v1.0.3 must not break v1.0.2 behaviors."""
 
-    def test_v102_deterministic_alias_still_present(self, agent_src):
+    def test_deterministic_alias_still_present(self, agent_src):
         # The v1.0.2 deterministic-branch soft-pass is still there (redundant
         # safety net, but harmless — any count-shape req now promoted TWICE
         # on the deterministic path, the first return wins in v1.0.3).
         assert "[fidelity-count-soft-pass-deterministic FIRED]" in agent_src
 
-    def test_v102_source_product_prefix_rewrite_still_present(self, agent_src):
+    def test_source_product_prefix_rewrite_still_present(self, agent_src):
         assert "[mv-source-product-prefix-rewrite FIRED]" in agent_src
         assert "_strip_source_product_prefix_in_expr" in agent_src
 
-    def test_v102_reserved_word_guard_still_present(self, agent_src):
+    def test_reserved_word_guard_still_present(self, agent_src):
         assert "[prefix-strip-reserved-word-guard FIRED]" in agent_src
         assert "_V102_PREFIX_STRIP_RESERVED" in agent_src

@@ -47,9 +47,9 @@ def _first_code_cell_source():
     raise AssertionError("No non-empty code cell found in agent notebook")
 
 
-def test_v069_constant_value_matches_expected():
+def test_constant_value_matches_expected():
     """The v0.6.9 contract: a single-digit-semver __AGENT_VERSION__ constant
-    must exist. The exact value naturally bumps each release (v0.6.9 was the
+    must exist. The exact value naturally bumps each release (was the
     introducing version; v0.7.0 onward keep the contract). Any conformant
     single-digit semver passes; pinning to a specific value would force this
     test to break on every release bump, which is not the intent."""
@@ -64,7 +64,7 @@ def test_v069_constant_value_matches_expected():
     )
 
 
-def test_v069_constant_is_first_code_line_in_cell1():
+def test_constant_is_first_code_line_in_cell1():
     src = _first_code_cell_source()
     lines = [ln for ln in src.splitlines() if ln.strip()]
     code_lines = [ln for ln in lines if not ln.lstrip().startswith("#")]
@@ -75,7 +75,7 @@ def test_v069_constant_is_first_code_line_in_cell1():
     )
 
 
-def test_v069_constant_is_single_digit_semver():
+def test_constant_is_single_digit_semver():
     txt = _agent_text()
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', txt)
     assert m and re.fullmatch(r"\d\.\d\.\d", m.group(1)), (
@@ -83,24 +83,24 @@ def test_v069_constant_is_single_digit_semver():
     )
 
 
-def test_v069_alias_global_present():
+def test_alias_global_present():
     txt = _agent_text()
     assert "agent-version-global" in txt, "alias 'agent-version-global' missing"
 
 
-def test_v069_alias_mirror_present():
+def test_alias_mirror_present():
     txt = _agent_text()
     assert "agent-version-mirror" in txt, "alias 'agent-version-mirror' missing"
 
 
-def test_v069_fired_marker_present():
+def test_fired_marker_present():
     txt = _agent_text()
     assert "[agent-version-mirror FIRED]" in txt, (
         "[agent-version-mirror FIRED] log marker missing"
     )
 
 
-def test_v069_model_json_root_has_agent_version_first_key():
+def test_model_json_root_has_agent_version_first_key():
     txt = _agent_text()
     pat = re.compile(
         r'model_json_root\s*=\s*\{\s*"agent_version"\s*:\s*__AGENT_VERSION__\s*,\s*'
@@ -113,7 +113,7 @@ def test_v069_model_json_root_has_agent_version_first_key():
     )
 
 
-def test_v069_metric_view_writeback_refreshes_agent_version():
+def test_metric_view_writeback_refreshes_agent_version():
     txt = _agent_text()
     assert (
         '"agent_version" in _mj_root' in txt
@@ -122,7 +122,7 @@ def test_v069_metric_view_writeback_refreshes_agent_version():
     ), "metric-view writeback path must refresh/prepend agent_version"
 
 
-def test_v069_install_metric_cleanup_refreshes_agent_version():
+def test_install_metric_cleanup_refreshes_agent_version():
     txt = _agent_text()
     assert (
         '"agent_version" in _parsed_root' in txt
@@ -131,7 +131,7 @@ def test_v069_install_metric_cleanup_refreshes_agent_version():
     ), "install metric-view cleanup writeback must refresh/prepend agent_version"
 
 
-def test_v069_install_location_writeback_refreshes_agent_version():
+def test_install_location_writeback_refreshes_agent_version():
     txt = _agent_text()
     assert (
         '"agent_version" in _updated_root' in txt
@@ -140,7 +140,7 @@ def test_v069_install_location_writeback_refreshes_agent_version():
     ), "install location writeback must refresh/prepend agent_version"
 
 
-def test_v069_no_two_digit_semver_in_constant():
+def test_no_two_digit_semver_in_constant():
     txt = _agent_text()
     bad = re.search(r'__AGENT_VERSION__\s*=\s*"\d+\.\d{2,}', txt)
     assert bad is None, (
@@ -152,7 +152,7 @@ def test_v069_no_two_digit_semver_in_constant():
     )
 
 
-def test_v069_readme_current_version_matches():
+def test_readme_current_version_matches():
     """The readme 'Current version' line must reference the same version as
     the agent's __AGENT_VERSION__ constant (whatever the current value is).
     The introducing version was v0.6.9; subsequent releases bump both in
@@ -168,7 +168,7 @@ def test_v069_readme_current_version_matches():
     )
 
 
-def test_v069_readme_history_row_present():
+def test_readme_history_row_present():
     """The readme version-history table must have a row for the introducing
     version (v0.6.9) AND for the current version. The introducing-version
     row preserves the historical record; the current-version row proves the
@@ -187,7 +187,7 @@ def test_v069_readme_history_row_present():
     )
 
 
-def test_v069_claude_md_documents_rule():
+def test_claude_md_documents_rule():
     text = CLAUDE_MD.read_text(encoding="utf-8")
     assert "## 3a-bis. Global `__AGENT_VERSION__` constant" in text, (
         "CLAUDE.md must document §3a-bis __AGENT_VERSION__ rule"
@@ -197,7 +197,7 @@ def test_v069_claude_md_documents_rule():
     )
 
 
-def test_v069_simulated_model_json_serializes_agent_version_first():
+def test_simulated_model_json_serializes_agent_version_first():
     """Simulate the model_json_root assembly and confirm json.dump preserves
     insertion order with agent_version first."""
     cur = _current_agent_version()
@@ -224,7 +224,7 @@ def _current_agent_version():
     return m.group(1)
 
 
-def test_v069_simulated_rewrite_path_refreshes_stale_agent_version():
+def test_simulated_rewrite_path_refreshes_stale_agent_version():
     """Simulate the rewrite-path logic that an older model.json gets re-stamped."""
     cur = _current_agent_version()
     stale = {
@@ -241,7 +241,7 @@ def test_v069_simulated_rewrite_path_refreshes_stale_agent_version():
     assert keys[0] == "agent_version"
 
 
-def test_v069_simulated_rewrite_path_prepends_when_missing():
+def test_simulated_rewrite_path_prepends_when_missing():
     cur = _current_agent_version()
     legacy = {"model_requirements": {}, "model": {}}
     if "agent_version" in legacy:
@@ -252,7 +252,7 @@ def test_v069_simulated_rewrite_path_prepends_when_missing():
     assert legacy["agent_version"] == cur
 
 
-def test_v069_prior_aliases_preserved():
+def test_prior_aliases_preserved():
     """Regression — every v0.6.x alias from prior fixes must still be present."""
     txt = _agent_text()
     prior_aliases = [

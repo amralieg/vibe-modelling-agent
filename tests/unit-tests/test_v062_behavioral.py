@@ -28,13 +28,13 @@ def _agent_src() -> str:
 # REG-1 — vov-auto-next-vibes
 # =============================================================================
 
-def test_v062_reg1_alias_present():
+def test_reg1_alias_present():
     src = _agent_src()
     assert "[vov-auto-next-vibes FIRED]" in src
     assert "[vov-auto-next-vibes SKIP]" in src
 
 
-def test_v062_reg1_only_fires_for_vov_operation():
+def test_reg1_only_fires_for_vov_operation():
     """Auto-load ONLY fires when operation == 'vibe modeling of version'."""
     src = _agent_src()
     idx = src.find("[vov-auto-next-vibes FIRED]")
@@ -43,7 +43,7 @@ def test_v062_reg1_only_fires_for_vov_operation():
     assert 'operation == "vibe modeling of version"' in window
 
 
-def test_v062_reg1_only_fires_when_user_vibes_empty():
+def test_reg1_only_fires_when_user_vibes_empty():
     """The auto-load MUST respect §3c: explicit user model_vibes always win."""
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
@@ -51,7 +51,7 @@ def test_v062_reg1_only_fires_when_user_vibes_empty():
     assert 'not widgets_values.get("vibe_modelling_instructions", "").strip()' in window
 
 
-def test_v062_reg1_uses_base_version_path():
+def test_reg1_uses_base_version_path():
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
     window = src[max(0, idx - 2000):idx + 4000]
@@ -60,7 +60,7 @@ def test_v062_reg1_uses_base_version_path():
     assert 'next_vibes.txt' in window
 
 
-def test_v062_reg1_path_uses_model_scope_and_sanitized_business():
+def test_reg1_path_uses_model_scope_and_sanitized_business():
     """Path is {root_loc}/business/{sanitized_name}/{model_scope}_v{base}/vibes/next_vibes.txt"""
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
@@ -69,7 +69,7 @@ def test_v062_reg1_path_uses_model_scope_and_sanitized_business():
     assert 'f"{model_scope}_v{_base_ver_auto}"' in window
 
 
-def test_v062_reg1_has_dbutils_fs_head_fallback():
+def test_reg1_has_dbutils_fs_head_fallback():
     """If POSIX open fails, fall back to dbutils.fs.head with 1MB cap."""
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
@@ -78,14 +78,14 @@ def test_v062_reg1_has_dbutils_fs_head_fallback():
     assert "1024 * 1024" in window
 
 
-def test_v062_reg1_assigns_to_widget_vibes_key():
+def test_reg1_assigns_to_widget_vibes_key():
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
     window = src[max(0, idx - 2000):idx + 4000]
     assert 'widgets_values["vibe_modelling_instructions"] = _auto_vibes_content' in window
 
 
-def test_v062_reg1_records_source_version_marker():
+def test_reg1_records_source_version_marker():
     """Auditor needs to verify the auto-load fired — record which version it came from."""
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
@@ -97,12 +97,12 @@ def test_v062_reg1_records_source_version_marker():
 # REG-2 — rename-product-convention-enforce
 # =============================================================================
 
-def test_v062_reg2_alias_present():
+def test_reg2_alias_present():
     src = _agent_src()
     assert "[rename-product-convention-enforce FIRED]" in src
 
 
-def test_v062_reg2_calls_apply_convention_on_product():
+def test_reg2_calls_apply_convention_on_product():
     src = _agent_src()
     idx = src.find("[rename-product-convention-enforce FIRED]")
     assert idx > 0
@@ -110,7 +110,7 @@ def test_v062_reg2_calls_apply_convention_on_product():
     assert "apply_convention(new_product, _rename_convention, dedup=False)" in window
 
 
-def test_v062_reg2_convention_pulled_from_config():
+def test_reg2_convention_pulled_from_config():
     src = _agent_src()
     idx = src.find("[rename-product-convention-enforce FIRED]")
     window = src[max(0, idx - 2000):idx + 4000]
@@ -119,7 +119,7 @@ def test_v062_reg2_convention_pulled_from_config():
     assert '"snake_case"' in window
 
 
-def test_v062_reg2_also_normalises_domain_when_cross_domain_rename():
+def test_reg2_also_normalises_domain_when_cross_domain_rename():
     """If target_state is 'new_domain.new_product', new_domain must also be normalised."""
     src = _agent_src()
     idx = src.find("[rename-product-convention-enforce FIRED]")
@@ -127,7 +127,7 @@ def test_v062_reg2_also_normalises_domain_when_cross_domain_rename():
     assert "apply_convention(new_domain, _rename_convention, dedup=False)" in window
 
 
-def test_v062_reg2_apply_convention_snake_case_pascal_input():
+def test_reg2_apply_convention_snake_case_pascal_input():
     """Direct unit test of the canonical conversion used in REG-2.
 
     Replicates apply_convention's core logic for snake_case target on a
@@ -154,12 +154,12 @@ def test_v062_reg2_apply_convention_snake_case_pascal_input():
 # REG-4 — self-ref-banned-prefix-autorename
 # =============================================================================
 
-def test_v062_reg4_alias_present():
+def test_reg4_alias_present():
     src = _agent_src()
     assert "[self-ref-banned-prefix-autorename FIRED]" in src
 
 
-def test_v062_reg4_attempts_rename_before_clearing():
+def test_reg4_attempts_rename_before_clearing():
     """The new branch must try to rename to parent_<pk> before falling through to clear."""
     src = _agent_src()
     idx = src.find("[self-ref-banned-prefix-autorename FIRED]")
@@ -169,7 +169,7 @@ def test_v062_reg4_attempts_rename_before_clearing():
     assert "_autoren" in window
 
 
-def test_v062_reg4_collision_check_before_rename():
+def test_reg4_collision_check_before_rename():
     """Rename must not clobber an existing attribute on the same product."""
     src = _agent_src()
     idx = src.find("[self-ref-banned-prefix-autorename FIRED]")
@@ -178,7 +178,7 @@ def test_v062_reg4_collision_check_before_rename():
     assert "if _cand_new not in _existing_attrs_on_prod" in window
 
 
-def test_v062_reg4_handles_exact_pk_equality_case():
+def test_reg4_handles_exact_pk_equality_case():
     """attr_name == pk (e.g., attr 'fallout_id' on table fallout with FK to itself)."""
     src = _agent_src()
     idx = src.find("[self-ref-banned-prefix-autorename FIRED]")
@@ -186,7 +186,7 @@ def test_v062_reg4_handles_exact_pk_equality_case():
     assert "_a_low == _p_low" in window
 
 
-def test_v062_reg4_handles_banned_prefix_case():
+def test_reg4_handles_banned_prefix_case():
     """attr_name like 'related_fallout_id' with PK 'fallout_id'."""
     src = _agent_src()
     idx = src.find("[self-ref-banned-prefix-autorename FIRED]")
@@ -195,7 +195,7 @@ def test_v062_reg4_handles_banned_prefix_case():
     assert "_a_low.endswith(_p_low)" in window
 
 
-def test_v062_reg4_preserves_fk_when_renaming():
+def test_reg4_preserves_fk_when_renaming():
     """When renaming, the FK target must be fixed to point at the correct PK."""
     src = _agent_src()
     idx = src.find("[self-ref-banned-prefix-autorename FIRED]")
@@ -203,7 +203,7 @@ def test_v062_reg4_preserves_fk_when_renaming():
     assert "attr['foreign_key_to'] = f\"{td}.{tp}.{_own_pk}\"" in window
 
 
-def test_v062_reg4_fallback_clear_still_exists():
+def test_reg4_fallback_clear_still_exists():
     """If rename fails (collision), fall through to old clear-FK behaviour."""
     src = _agent_src()
     idx = src.find("[self-ref-banned-prefix-autorename FIRED]")
@@ -216,7 +216,7 @@ def test_v062_reg4_fallback_clear_still_exists():
 # Integration: ensure all three v0.6.2 aliases co-exist and notebook parses
 # =============================================================================
 
-def test_v062_all_three_aliases_present_in_notebook():
+def test_all_three_aliases_present_in_notebook():
     src = _agent_src()
     for alias in (
         "[vov-auto-next-vibes FIRED]",
@@ -226,7 +226,7 @@ def test_v062_all_three_aliases_present_in_notebook():
         assert alias in src, f"missing {alias} — v0.6.2 fix not deployed"
 
 
-def test_v062_notebook_cells_all_parse():
+def test_notebook_cells_all_parse():
     """No syntax errors introduced by the three patches."""
     nb = json.load(open(NB))
     for i, c in enumerate(nb["cells"]):
@@ -236,11 +236,11 @@ def test_v062_notebook_cells_all_parse():
         ast.parse(src)  # raises if any syntax error
 
 
-def test_v062_version_marker_v062_in_notebook_and_readme():
-    src = _agent_src()
-    assert "v0.6.2" in src
+def test_version_marker_v062_in_notebook_and_readme():
+    """v0.7.7 contract: code identifiers and comments must NOT carry version
+    references (only `__AGENT_VERSION__` does). Version history is preserved
+    in readme.md as documentation, but agent code is timeless."""
     readme = open("/Users/amr.ali/Documents/projects/vibe-modelling-agent/readme.md").read()
-    # v0.6.2 must remain in the version-history table even after later releases
     assert "**v0.6.2**" in readme
 
 
@@ -250,7 +250,7 @@ def test_v062_version_marker_v062_in_notebook_and_readme():
 # Not a pipeline fix, but a testing helper: confirms how PKs are actually
 # represented in model.json so future audit scripts don't miss them.
 
-def test_v062_pk_invariant_helper():
+def test_pk_invariant_helper():
     """Helper: verify the set of fields/patterns used to identify a PK in model.json."""
     # From the notebook's enforce_configured_pk_consistency + make_attribute_dict,
     # a PK attribute may be identified by ANY of these in model.json:

@@ -1,4 +1,4 @@
-"""v0.9.2 TESTER-USE-LATEST-ARCHIVE test.
+"""TESTER-USE-LATEST-ARCHIVE test.
 
 The vibe_tester notebook now auto-discovers the latest
 `dbx_vibe_modelling_agent_v*` archive in the tester's parent directory

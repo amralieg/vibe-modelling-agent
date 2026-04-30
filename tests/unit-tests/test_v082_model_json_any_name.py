@@ -269,8 +269,8 @@ class TestUserFacingMessages:
 # ────────────────────────────────────────────────────────────────────────────
 
 class TestSentinelGreppable:
-    def test_v082_mj_fix_sentinel_present(self, agent_src):
-        assert "v0.8.2 MJ-FIX" in agent_src, "v0.8.2 MJ-FIX sentinel must be present"
+    def test_mj_fix_sentinel_present(self, agent_src):
+        assert "MJ-FIX" in agent_src, "MJ-FIX sentinel must be present"
 
     def test_alias_greppable(self, agent_src):
         assert "model-json-any-name" in agent_src, "Alias 'model-json-any-name' must be greppable"

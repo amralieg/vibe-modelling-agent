@@ -80,7 +80,7 @@ def _first_code_cell_source():
     raise AssertionError("No non-empty code cell found in agent notebook")
 
 
-def test_v071_constant_bumped_to_expected():
+def test_constant_bumped_to_expected():
     txt = _agent_text()
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', txt)
     assert m is not None, "__AGENT_VERSION__ constant not found"
@@ -89,7 +89,7 @@ def test_v071_constant_bumped_to_expected():
     )
 
 
-def test_v071_constant_first_line_of_cell1():
+def test_constant_first_line_of_cell1():
     src = _first_code_cell_source()
     code_lines = [
         ln for ln in src.splitlines()
@@ -100,7 +100,7 @@ def test_v071_constant_first_line_of_cell1():
     )
 
 
-def test_v071_single_digit_semver():
+def test_single_digit_semver():
     assert re.fullmatch(r"\d\.\d\.\d", EXPECTED_VERSION), (
         f"EXPECTED_VERSION '{EXPECTED_VERSION}' violates CLAUDE.md §3a single-digit semver"
     )
@@ -111,7 +111,7 @@ def test_v071_single_digit_semver():
 # ============================================================================
 
 
-def test_v071_fix1_alias_present():
+def test_fix1_alias_present():
     txt = _agent_text()
     assert "shrink-llm-malformed FIRED" in txt, (
         "Expected at least one [shrink-llm-malformed FIRED] log marker"
@@ -121,7 +121,7 @@ def test_v071_fix1_alias_present():
     )
 
 
-def test_v071_fix1_handles_string_in_domains_to_remove():
+def test_fix1_handles_string_in_domains_to_remove():
     txt = _agent_text()
     assert "domains_to_remove item not a dict" in txt, (
         "domains_to_remove items must be guarded against non-dict (root cause of "
@@ -129,7 +129,7 @@ def test_v071_fix1_handles_string_in_domains_to_remove():
     )
 
 
-def test_v071_fix1_handles_string_in_tables_to_keep():
+def test_fix1_handles_string_in_tables_to_keep():
     txt = _agent_text()
     assert "tables_to_keep item not a {{domain,product}} dict" in txt, (
         "tables_to_keep items must be guarded against non-dict shape "
@@ -137,21 +137,21 @@ def test_v071_fix1_handles_string_in_tables_to_keep():
     )
 
 
-def test_v071_fix1_handles_string_in_tables_to_relocate():
+def test_fix1_handles_string_in_tables_to_relocate():
     txt = _agent_text()
     assert "tables_to_relocate item not a dict" in txt, (
         "tables_to_relocate items must be guarded against non-dict shape"
     )
 
 
-def test_v071_fix1_summary_emitted():
+def test_fix1_summary_emitted():
     txt = _agent_text()
     assert "shrink-llm-malformed-summary FIRED" in txt, (
         "Expected a summary marker after shrink LLM response parsing"
     )
 
 
-def test_v071_fix1_no_unguarded_dict_get_on_removed_domain():
+def test_fix1_no_unguarded_dict_get_on_removed_domain():
     """Behavioural: the `removed_domain.get(\"tables_to_relocate\")` call MUST
     be preceded by an `isinstance(removed_domain, dict)` guard within ~6 lines."""
     txt = _agent_text()
@@ -173,7 +173,7 @@ def test_v071_fix1_no_unguarded_dict_get_on_removed_domain():
 # ============================================================================
 
 
-def test_v071_fix2_alias_present():
+def test_fix2_alias_present():
     txt = _agent_text()
     assert "shrink-phantom-drop FIRED" in txt, (
         "Expected [shrink-phantom-drop FIRED] log marker"
@@ -183,12 +183,12 @@ def test_v071_fix2_alias_present():
     )
 
 
-def test_v071_fix2_phantom_filter_runs_before_silo_validator():
+def test_fix2_phantom_filter_runs_before_silo_validator():
     """The phantom filter MUST run BEFORE the silo validator block; otherwise
     the silo validator would still wrongly fail on phantom product names."""
     txt = _agent_text()
     phantom_pos = txt.find("shrink-phantom-drop FIRED")
-    silo_pos = txt.find("v0.9.1 SHRINK-NEW-SILO")
+    silo_pos = txt.find("SHRINK-NEW-SILO")
     assert phantom_pos > 0 and silo_pos > 0, "Both markers must be present"
     assert phantom_pos < silo_pos, (
         "Phantom-drop must occur BEFORE the SHRINK-NEW-SILO validator raises; "
@@ -198,7 +198,7 @@ def test_v071_fix2_phantom_filter_runs_before_silo_validator():
     )
 
 
-def test_v071_fix2_filter_uses_source_product_names():
+def test_fix2_filter_uses_source_product_names():
     txt = _agent_text()
     assert "_source_product_names_set" in txt, (
         "Phantom filter must compare against source product names (not just (domain,product) tuples) "
@@ -206,7 +206,7 @@ def test_v071_fix2_filter_uses_source_product_names():
     )
 
 
-def test_v071_fix2_relocations_filtered_too():
+def test_fix2_relocations_filtered_too():
     """Phantom drop must also filter `domain_relocations` so downstream FK
     rewrite logic does not see phantom mappings."""
     txt = _agent_text()
@@ -222,7 +222,7 @@ def test_v071_fix2_relocations_filtered_too():
 # ============================================================================
 
 
-def test_v071_fix3_alias_present():
+def test_fix3_alias_present():
     txt = _agent_text()
     assert "fmfl-final-sanitize FIRED" in txt, (
         "Expected [fmfl-final-sanitize FIRED] log marker"
@@ -232,14 +232,14 @@ def test_v071_fix3_alias_present():
     )
 
 
-def test_v071_fix3_summary_emitted():
+def test_fix3_summary_emitted():
     txt = _agent_text()
     assert "fmfl-final-sanitize-summary FIRED" in txt, (
         "Expected summary marker after FMFL post-process sanitisation"
     )
 
 
-def test_v071_fix3_runs_inside_fmfl_postprocessor():
+def test_fix3_runs_inside_fmfl_postprocessor():
     """The final sanitise must be inside `_fmfl_postprocessor`, after the
     person/role corrections, BEFORE the actual_counts recomputation."""
     txt = _agent_text()
@@ -253,7 +253,7 @@ def test_v071_fix3_runs_inside_fmfl_postprocessor():
     )
 
 
-def test_v071_fix3_coerces_link_to_keep_as_is():
+def test_fix3_coerces_link_to_keep_as_is():
     """The sanitiser must change decision -> KEEP_AS_IS, null target_table,
     and prepend an AUTO-COERCED-FINAL marker to reasoning."""
     txt = _agent_text()
@@ -266,7 +266,7 @@ def test_v071_fix3_coerces_link_to_keep_as_is():
     assert 'dec["target_table"] = None' in window, "Sanitiser must null the target_table"
 
 
-def test_v071_fix3_uses_canonical_entities_set():
+def test_fix3_uses_canonical_entities_set():
     """The sanitiser must check against `_fmfl_canonical_entities` (the same
     set used by the validator), not invent a new check."""
     txt = _agent_text()
@@ -285,7 +285,7 @@ def test_v071_fix3_uses_canonical_entities_set():
 # ============================================================================
 
 
-def test_v071_no_tautology_shrink_llm_malformed():
+def test_no_tautology_shrink_llm_malformed():
     """Per CLAUDE.md §8.3, the malformed guard MUST have a hard skip path,
     not just log + continue with broken data."""
     txt = _agent_text()
@@ -298,7 +298,7 @@ def test_v071_no_tautology_shrink_llm_malformed():
     )
 
 
-def test_v071_no_tautology_phantom_drop_filters_set():
+def test_no_tautology_phantom_drop_filters_set():
     txt = _agent_text()
     pos = txt.find("[shrink-phantom-drop FIRED]")
     assert pos > 0
@@ -309,7 +309,7 @@ def test_v071_no_tautology_phantom_drop_filters_set():
     )
 
 
-def test_v071_no_tautology_fmfl_actually_changes_decision():
+def test_no_tautology_fmfl_actually_changes_decision():
     txt = _agent_text()
     pos = txt.find("[fmfl-final-sanitize FIRED]")
     assert pos > 0
