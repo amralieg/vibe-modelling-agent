@@ -33,8 +33,8 @@ def cell1_code(agent_notebook):
 
 
 def test_agent_version_constant_is_078(agent_code_text):
-    assert '__AGENT_VERSION__ = "0.7.8"' in agent_code_text, (
-        '__AGENT_VERSION__ must be exactly "0.7.8" per CLAUDE.md §3a-bis '
+    assert '__AGENT_VERSION__ = "0.7.9"' in agent_code_text, (
+        '__AGENT_VERSION__ must be exactly "0.7.9" per CLAUDE.md §3a-bis '
         '(deploy verification grep target).'
     )
 
@@ -61,7 +61,7 @@ def test_no_other_version_in_agent_constant_value(agent_code_text):
     matches = re.findall(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', agent_code_text)
     assert matches, '__AGENT_VERSION__ assignment not found'
     for v in matches:
-        assert v == '0.7.8', f'all __AGENT_VERSION__ assignments must equal "0.7.8"; found {v!r}'
+        assert v == '0.7.9', f'all __AGENT_VERSION__ assignments must equal "0.7.9"; found {v!r}'
 
 
 def test_audit_all_filter_is_strategy_agnostic(agent_code_text):
@@ -72,7 +72,7 @@ def test_audit_all_filter_is_strategy_agnostic(agent_code_text):
     )
     assert not bad_pattern.search(src), (
         'audit_all MUST NOT filter on r.verification_strategy == "llm_verify". '
-        'Per v0.7.8 root-cause fix (alias=llm-audit-residual), the LLM safety-net '
+        'Per v0.7.9 root-cause fix (alias=llm-audit-residual), the LLM safety-net '
         'must consider EVERY unfulfilled requirement regardless of parser-assigned '
         'verification_strategy. The bug this fixes: deterministic-strategy reqs '
         'that the limited deterministic verifier could not match got stuck at '
@@ -93,7 +93,7 @@ def test_audit_all_uses_strategy_agnostic_filter(agent_code_text):
 
 def test_llm_audit_residual_alias_present(agent_code_text):
     assert '[llm-audit-residual FIRED]' in agent_code_text, (
-        'v0.7.8 alias=llm-audit-residual must appear at least once in audit_all '
+        'v0.7.9 alias=llm-audit-residual must appear at least once in audit_all '
         'as a [FIRED] log line so deploy-verification grep can confirm this fix '
         'is active in the live run logs.'
     )
@@ -120,7 +120,7 @@ def test_audit_all_still_calls_vibe_audit_prompt(agent_code_text):
     assert len(in_audit_all) == 2, 'audit_all method body could not be isolated'
     body = in_audit_all[1].split('def ', 1)[0]
     assert 'PROMPT_TEMPLATES["VIBE_AUDIT_PROMPT"]' in body, (
-        'audit_all must still build the VIBE_AUDIT_PROMPT after the v0.7.8 filter widen — '
+        'audit_all must still build the VIBE_AUDIT_PROMPT after the v0.7.9 filter widen — '
         'broadening the input set was the only intended behaviour change.'
     )
     assert 'self.ai_agent._call_ai_query' in body, (
@@ -150,7 +150,7 @@ def test_no_new_regex_on_vibe_text_added(agent_code_text):
     body = new_audit_block[1].split('def ', 1)[0]
     risky = re.findall(r're\.compile\(|re\.search\(|re\.match\(|re\.findall\(', body)
     assert len(risky) == 0, (
-        'v0.7.8 must NOT introduce regex calls inside audit_all — '
+        'v0.7.9 must NOT introduce regex calls inside audit_all — '
         'per CLAUDE.md §3d the LLM is the authoritative interpreter of vibe text. '
         f'Found regex calls: {risky}'
     )
@@ -159,7 +159,7 @@ def test_no_new_regex_on_vibe_text_added(agent_code_text):
 def test_validate_method_still_calls_audit_all(agent_code_text):
     src = agent_code_text
     assert 'self.audit_all(domains, products, attributes)' in src, (
-        'validate() must still call self.audit_all(...) at the end. The v0.7.8 fix '
+        'validate() must still call self.audit_all(...) at the end. The v0.7.9 fix '
         'broadens the FILTER inside audit_all — the call site is unchanged. '
         'If this assertion fails, the wiring has been broken.'
     )
@@ -173,13 +173,13 @@ def test_score_uses_real_fulfilled_count_not_regex_shortcut(agent_code_text):
     assert 'len(self.manifest.fulfilled_requirements)' in score_body, (
         'score() must compute fulfilled count from manifest.fulfilled_requirements '
         '— the LLM audit updates these via mark_fulfilled, so removing this would '
-        'silently disconnect the v0.7.8 fix from the scorecard.'
+        'silently disconnect the v0.7.9 fix from the scorecard.'
     )
 
 
 def test_v078_marker_in_agent_version_description(cell1_code):
-    assert 'v0.7.8' in cell1_code and 'audit_all' in cell1_code, (
-        '__AGENT_VERSION__ comment must mention v0.7.8 + audit_all so '
+    assert 'v0.7.9' in cell1_code and 'audit_all' in cell1_code, (
+        '__AGENT_VERSION__ comment must mention v0.7.9 + audit_all so '
         'CHANGELOG-via-version-string and operator audit can confirm the fix '
         'shipped vs the prior 0.7.7 codebase.'
     )

@@ -32,7 +32,7 @@ def _load_nb_source(path: Path) -> str:
 
 def test_agent_version_is_074_release():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "0.7.8"' in src, (
+    assert '__AGENT_VERSION__ = "0.7.9"' in src, (
         "emit-site migration release must stamp __AGENT_VERSION__ = '0.7.7' "
         "(supersedes v0.7.5 MasterActionRegistry foundation; closes the deferred architect/audit/next_vibes emit-site migrations)"
     )
@@ -45,7 +45,7 @@ def test_agent_version_is_first_non_comment_line_of_first_code_cell():
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
     assert code_lines, "First code cell must contain at least one code line"
-    assert '__AGENT_VERSION__ = "0.7.8"' in code_lines[0], (
+    assert '__AGENT_VERSION__ = "0.7.9"' in code_lines[0], (
         "First non-comment code line of first code cell must declare __AGENT_VERSION__ = \"0.7.6\" (CLAUDE.md §3a-bis)"
     )
 
@@ -295,7 +295,7 @@ def test_runner_failure_manifest_only_writes_when_not_all_ok():
 
 def test_readme_current_version_matches():
     rd = (REPO_ROOT / "readme.md").read_text()
-    assert "Current version: **v0.7.8**" in rd, (
+    assert "Current version: **v0.7.9**" in rd, (
         "readme `Current version:` line must match __AGENT_VERSION__ (CLAUDE.md \u00a73a-bis)"
     )
 
