@@ -1,0 +1,46 @@
+{
+  "widget_values": {
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
+    "catalog_prefix": "",
+    "catalog_suffix": "",
+    "generate_samples": "0",
+    "naming_convention": "snake_case",
+    "primary_key_suffix": "_id",
+    "schema_prefix": "",
+    "schema_suffix": "",
+    "tag_prefix": "dbx_",
+    "tag_suffix": "",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No",
+    "global_collection_volume": "/Volumes/_root/default/root_vol"
+  },
+  "businesses": [
+    {
+      "name": "Healthcare",
+      "description": "Healthcare is a vast industry operating hospitals, clinics, outpatient facilities, and integrated care systems, delivering patient care, medical research, diagnostics, and health education across diverse populations and regions.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Pharmaceuticals",
+      "description": "Pharmaceuticals is a research-intensive industry focused on discovering, developing, and manufacturing medicines, vaccines, and consumer health products to treat and prevent diseases across therapeutic areas including oncology, immunology, and rare diseases.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Genomics Biotech",
+      "description": "Genomics and Biotechnology is a rapidly evolving industry developing sequencing, array-based, and gene-editing solutions for genetic analysis, enabling advances in precision medicine, drug development, agricultural genomics, and diagnostics.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Clinical Trials",
+      "description": "Clinical Trials is a specialized industry that designs, manages, and monitors clinical research studies for pharmaceutical and biotech sponsors, providing data analytics, regulatory expertise, and patient recruitment to accelerate drug development.",
+      "model_vibes": ""
+    }
+  ]
+}

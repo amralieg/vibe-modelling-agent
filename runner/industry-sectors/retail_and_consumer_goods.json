@@ -1,0 +1,61 @@
+{
+  "widget_values": {
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
+    "catalog_prefix": "",
+    "catalog_suffix": "",
+    "generate_samples": "0",
+    "naming_convention": "snake_case",
+    "primary_key_suffix": "_id",
+    "schema_prefix": "",
+    "schema_suffix": "",
+    "tag_prefix": "dbx_",
+    "tag_suffix": "",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No",
+    "global_collection_volume": "/Volumes/_root/default/root_vol"
+  },
+  "businesses": [
+    {
+      "name": "Retail",
+      "description": "Retail is a massive consumer-facing industry operating hypermarkets, department stores, discount outlets, and e-commerce platforms, offering groceries, apparel, electronics, and household goods at competitive prices to diverse demographics.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Grocery",
+      "description": "Grocery is a large-scale retail industry operating supermarkets, pharmacies, and fuel centers, offering fresh produce, private-label brands, and omnichannel shopping experiences with delivery and pickup services.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Ecommerce",
+      "description": "E-Commerce is a rapidly growing digital industry operating online marketplaces, fulfillment networks, and technology platforms that connect millions of buyers and sellers with fast delivery, personalized recommendations, and seamless transactions.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Consumer Goods",
+      "description": "Consumer Goods is a broad manufacturing industry producing and marketing household, health, hygiene, and personal care products distributed through retail stores, e-commerce platforms, and wholesale channels worldwide.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Apparel Fashion",
+      "description": "Apparel and Fashion is a creative and commercial industry designing, manufacturing, and marketing athletic, lifestyle, and luxury clothing, footwear, and accessories through retail stores, e-commerce, and wholesale partnerships.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Food Beverage",
+      "description": "Food and Beverage is a global consumer industry manufacturing, marketing, and distributing a diverse portfolio of snacks, beverages, dairy products, and packaged foods through retail, foodservice, and direct-to-consumer channels.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Restaurants",
+      "description": "Restaurants is a global foodservice industry operating quick-service, casual, and fine-dining establishments through franchise and company-owned models, serving millions of customers daily with a focus on speed, quality, and value.",
+      "model_vibes": ""
+    }
+  ]
+}

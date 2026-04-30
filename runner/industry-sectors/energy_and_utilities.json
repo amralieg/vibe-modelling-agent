@@ -1,0 +1,46 @@
+{
+  "widget_values": {
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
+    "catalog_prefix": "",
+    "catalog_suffix": "",
+    "generate_samples": "0",
+    "naming_convention": "snake_case",
+    "primary_key_suffix": "_id",
+    "schema_prefix": "",
+    "schema_suffix": "",
+    "tag_prefix": "dbx_",
+    "tag_suffix": "",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No",
+    "global_collection_volume": "/Volumes/_root/default/root_vol"
+  },
+  "businesses": [
+    {
+      "name": "Oil Gas",
+      "description": "Oil and Gas is a multinational industry engaged in the exploration, production, refining, and marketing of petroleum and natural gas products, along with petrochemical manufacturing operations that fuel the global economy.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Energy Utilities",
+      "description": "Energy and Utilities is a critical infrastructure industry generating, transmitting, and distributing electric power from renewable and conventional sources to residential, commercial, and industrial customers worldwide.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Mining",
+      "description": "Mining is a resource extraction industry engaged in the exploration, mining, and processing of minerals including iron ore, copper, coal, lithium, and nickel, supplying raw materials to the steel, energy, and manufacturing sectors.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Water Utilities",
+      "description": "Water and Wastewater is an essential utilities industry providing water treatment, purification, distribution, and recycling services to municipalities and industrial clients, ensuring clean water access and environmental compliance.",
+      "model_vibes": ""
+    }
+  ]
+}

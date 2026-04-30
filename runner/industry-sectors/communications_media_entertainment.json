@@ -1,0 +1,51 @@
+{
+  "widget_values": {
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
+    "catalog_prefix": "",
+    "catalog_suffix": "",
+    "generate_samples": "0",
+    "naming_convention": "snake_case",
+    "primary_key_suffix": "_id",
+    "schema_prefix": "",
+    "schema_suffix": "",
+    "tag_prefix": "dbx_",
+    "tag_suffix": "",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No",
+    "global_collection_volume": "/Volumes/_root/default/root_vol"
+  },
+  "businesses": [
+    {
+      "name": "Telecommunication",
+      "description": "Telecommunications is a global industry providing wireless services, broadband, fiber internet, and digital entertainment to billions of consumer and business customers through extensive network infrastructure.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Media Broadcasting",
+      "description": "Media and Broadcasting is a global content and distribution industry encompassing film studios, television networks, streaming platforms, music labels, news organizations, and digital publishers that produce, license, and deliver entertainment and information to audiences through linear, on-demand, and social channels.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Sports Entertainment",
+      "description": "Sports and Entertainment is a live experience industry operating professional leagues, broadcasting networks, athlete management, venue operations, concerts, and fan engagement platforms across global markets.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Gaming",
+      "description": "Gaming and Interactive Entertainment is a digital media industry developing and publishing video games, operating online gaming platforms, esports leagues, and providing game engine technology for console, PC, and mobile platforms.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Advertising",
+      "description": "Advertising and Marketing is a dynamic industry delivering creative campaigns, media planning and buying, public relations, data-driven analytics, and brand strategy to help organizations reach and engage their target audiences.",
+      "model_vibes": ""
+    }
+  ]
+}
