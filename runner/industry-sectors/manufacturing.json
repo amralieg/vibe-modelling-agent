@@ -1,0 +1,51 @@
+{
+  "widget_values": {
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
+    "catalog_prefix": "",
+    "catalog_suffix": "",
+    "generate_samples": "0",
+    "naming_convention": "snake_case",
+    "primary_key_suffix": "_id",
+    "schema_prefix": "",
+    "schema_suffix": "",
+    "tag_prefix": "dbx_",
+    "tag_suffix": "",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No",
+    "global_collection_volume": "/Volumes/_root/default/root_vol"
+  },
+  "businesses": [
+    {
+      "name": "Manufacturing",
+      "description": "Industrial Manufacturing encompasses the design, production, and delivery of automation systems, electrification solutions, and smart infrastructure components for factories, buildings, transportation, and urban environments.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Chemical Mfg",
+      "description": "Chemical Manufacturing is a foundational industry producing a wide range of chemicals, plastics, performance materials, and agricultural solutions used across automotive, construction, electronics, and consumer goods sectors.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Semiconductors",
+      "description": "Semiconductor is a high-technology industry that designs and fabricates advanced integrated circuits, processors, and chips powering computing, mobile, automotive, AI, and IoT applications across the digital economy.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Automotive",
+      "description": "Automotive is a major manufacturing industry producing cars, trucks, SUVs, and commercial vehicles along with hybrid and electric powertrains, connected mobility services, and autonomous driving technologies.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Construction",
+      "description": "Construction is a global engineering and building industry delivering large-scale infrastructure, energy, and commercial projects including highways, airports, bridges, power plants, and residential developments.",
+      "model_vibes": ""
+    }
+  ]
+}

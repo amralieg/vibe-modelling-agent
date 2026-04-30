@@ -1,0 +1,31 @@
+{
+  "widget_values": {
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
+    "catalog_prefix": "",
+    "catalog_suffix": "",
+    "generate_samples": "0",
+    "naming_convention": "snake_case",
+    "primary_key_suffix": "_id",
+    "schema_prefix": "",
+    "schema_suffix": "",
+    "tag_prefix": "dbx_",
+    "tag_suffix": "",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No",
+    "global_collection_volume": "/Volumes/_root/default/root_vol"
+  },
+  "businesses": [
+    {
+      "name": "Agriculture",
+      "description": "Agriculture is a global industry encompassing crop cultivation, animal husbandry, and food production, providing essential supply chain solutions from farm to table for food manufacturers and consumers worldwide.",
+      "model_vibes": ""
+    }
+  ]
+}

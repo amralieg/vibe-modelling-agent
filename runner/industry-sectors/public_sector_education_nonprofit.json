@@ -1,0 +1,46 @@
+{
+  "widget_values": {
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
+    "catalog_prefix": "",
+    "catalog_suffix": "",
+    "generate_samples": "0",
+    "naming_convention": "snake_case",
+    "primary_key_suffix": "_id",
+    "schema_prefix": "",
+    "schema_suffix": "",
+    "tag_prefix": "dbx_",
+    "tag_suffix": "",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No",
+    "global_collection_volume": "/Volumes/_root/default/root_vol"
+  },
+  "businesses": [
+    {
+      "name": "Education",
+      "description": "Education is a foundational industry spanning universities, colleges, and research institutions that deliver undergraduate, graduate, and professional programs across the arts, sciences, engineering, and business disciplines.",
+      "model_vibes": ""
+    },
+    {
+      "name": "NGO",
+      "description": "Nonprofit Organizations are mission-driven entities providing humanitarian aid, disaster relief, health services, education, and community development programs to vulnerable and underserved populations worldwide.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Legal",
+      "description": "Legal is a professional services industry providing advisory and representation services across corporate transactions, dispute resolution, intellectual property, employment law, and regulatory compliance for organizations and governments.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Waste Management",
+      "description": "Waste Management is an environmental services industry providing residential and commercial waste collection, recycling, landfill operations, hazardous waste handling, and sustainable waste-to-energy solutions.",
+      "model_vibes": ""
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "widget_values": {
+    "business_domains": "",
+    "org_divisions": "Operations, Business and Corporate",
+    "cataloging_style": "One Catalog",
+    "catalog_prefix": "",
+    "catalog_suffix": "",
+    "generate_samples": "0",
+    "naming_convention": "snake_case",
+    "primary_key_suffix": "_id",
+    "schema_prefix": "",
+    "schema_suffix": "",
+    "tag_prefix": "dbx_",
+    "tag_suffix": "",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "housekeeping_columns": "No",
+    "history_tracking_columns": "No",
+    "global_collection_volume": "/Volumes/_root/default/root_vol"
+  },
+  "businesses": [
+    {
+      "name": "Real Estate",
+      "description": "Real Estate is a capital-intensive industry encompassing commercial and residential property sales, leasing, valuations, property management, development, and investment advisory services for owners, investors, and tenants.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Staffing HR",
+      "description": "Staffing and Human Resources is a workforce solutions industry providing temporary and permanent talent placement, recruitment process outsourcing, workforce management, and HR consulting services across all industries and skill levels.",
+      "model_vibes": ""
+    }
+  ]
+}
