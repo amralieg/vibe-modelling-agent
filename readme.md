@@ -83,9 +83,9 @@ The name **"Vibe"** reflects the core workflow:
 
 Each iteration produces a new version. The agent carries forward your context so nothing is lost between runs. You are never locked into a static template — the model evolves with your business.
 
-Current version: **v0.7.1** — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v08x) below.
+Current version: **v0.7.5** (dev branch — pre-release) — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v08x) below.
 
-> **Note on numbering:** the dev branch tracked four internal iterations labelled `v0.7.1`, `v0.7.2`, `v0.7.3`, `v0.7.4` between the `v0.7.0` and `v0.7.1` release tags. The `v0.7.1` release tag on `main` consolidates all of those iterations into a single public release, so `__AGENT_VERSION__ = "0.7.1"` is stamped into every model.json produced from this point forward. The earlier per-iteration version-history rows below are kept verbatim as the engineering trace.
+> **Note on numbering:** the dev branch tracked four internal iterations labelled `v0.7.1`, `v0.7.2`, `v0.7.3`, `v0.7.4` between the `v0.7.0` and `v0.7.1` release tags. The `v0.7.1` release tag on `main` consolidates all of those iterations into a single public release. `v0.7.5` is the next dev iteration on top of `v0.7.4`, introducing the **MasterActionRegistry + FindingDispatcher** unification foundation (one canonical action vocabulary of 149 actions, injected into all four review prompts: `MODEL_ARCHITECT_REVIEW_PROMPT`, `DOMAIN_ARCHITECT_REVIEW_PROMPT`, `VIBE_AUDIT_PROMPT`, `VIBE_CREATE_NEXT_PROMPT`; per-context cost classification with severity + provenance gating; cost-gated low-hanging-fruit auto-apply at static-analysis stage). Architect / QA / next_vibes emit-site shape migration is deliberately deferred to `v0.7.6` to keep the v0.7.5 commit reviewable + reversible.
 
 ---
 

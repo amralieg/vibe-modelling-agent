@@ -69,8 +69,9 @@ def _load_cell_source(path: Path, cell_idx: int) -> str:
 
 def test_v074_agent_version_is_074():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "0.7.4"' in src, (
-        "v0.7.4 must stamp __AGENT_VERSION__ = '0.7.4' (CLAUDE.md §3a-bis)"
+    assert '__AGENT_VERSION__ = "0.7.5"' in src, (
+        "v0.7.5 must stamp __AGENT_VERSION__ = '0.7.5' (CLAUDE.md §3a-bis); "
+        "the original v0.7.4 active-autofix dispatcher is preserved + extended in v0.7.5."
     )
 
 
@@ -81,9 +82,9 @@ def test_v074_agent_version_is_first_non_comment_line_of_first_code_cell():
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
     assert code_lines, "First code cell must contain at least one code line"
-    assert '__AGENT_VERSION__ = "0.7.4"' in code_lines[0], (
+    assert '__AGENT_VERSION__ = "0.7.5"' in code_lines[0], (
         "First non-comment code line of first code cell must declare "
-        "__AGENT_VERSION__ = \"0.7.4\" (CLAUDE.md §3a-bis)"
+        "__AGENT_VERSION__ = \"0.7.5\" (CLAUDE.md §3a-bis)"
     )
 
 
@@ -206,12 +207,19 @@ def test_v074_autofixers_are_industry_agnostic():
     """CLAUDE.md §8.5 — no hardcoded customer/business names in autofixer CODE.
     Comments may reference the AUDIT that motivated the fix (airline VOV) but
     the CODE itself MUST contain no industry-specific entity names. Strip
-    comments before checking."""
+    comments before checking. v0.7.5: dispatcher block start marker preserved
+    (the dispatcher itself is the same v0.7.4 functions, now cost-class-gated)."""
     src = _load_nb_source(AGENT_NB)
     start_marker = "# v0.7.4 [step-sa-active-autofix FIRED alias=step-sa-active-autofix]"
-    end_marker = "# END v0.7.4 SA-active-autofix dispatcher"
+    # v0.7.5 retired the explicit END marker when wrapping the dispatcher; we
+    # bound the search by the next major section banner to extract the same
+    # dispatcher block.
     s = src.find(start_marker)
-    e = src.find(end_marker, s if s >= 0 else 0)
+    if s < 0:
+        s = src.find("step-sa-active-autofix FIRED")
+    e = src.find("# v0.7.5 [V075_RETIRE_V074_VOCAB", s if s >= 0 else 0)
+    if e < 0:
+        e = s + 80000  # generous bound
     assert s >= 0 and e > s, (
         "Could not locate v0.7.4 dispatcher block boundaries — markers missing"
     )
@@ -357,25 +365,31 @@ def test_v074_action_vocab_renderer_defined():
 
 
 def test_v074_action_vocab_covers_all_six_scopes():
+    """v0.7.5 retired _V074_SA_ACTION_VOCAB as a duplicate of MASTER_ACTION_REGISTRY.
+    The shim must still expose all six scopes for backward compatibility, but the
+    underlying source of truth is now MasterActionRegistry."""
     src = _load_nb_source(AGENT_NB)
-    # The renderer iterates these scopes — each must be present
     expected_scopes = ["'attribute'", "'product'", "'domain'", "'link'", "'tag'", "'model'"]
-    # Find the registry block
-    reg_pos = src.find("_V074_SA_ACTION_VOCAB = {")
-    assert reg_pos >= 0
-    block = src[reg_pos:reg_pos + 6000]
+    assert "MASTER_ACTION_REGISTRY = {" in src, "v0.7.5 MASTER_ACTION_REGISTRY MUST be defined"
+    reg_pos = src.find("MASTER_ACTION_REGISTRY = {")
+    block = src[reg_pos:reg_pos + 25000]
     for scope in expected_scopes:
-        assert f"{scope}: [" in block, f"Action vocab MUST cover scope {scope}"
+        assert f", {scope}):" in block, f"MASTER_ACTION_REGISTRY MUST cover scope {scope}"
+    assert "def _v075_build_v074_vocab_compat" in src, (
+        "v0.7.5 backward-compat shim _v075_build_v074_vocab_compat MUST be defined"
+    )
+    assert "_V074_SA_ACTION_VOCAB = _v075_build_v074_vocab_compat()" in src, (
+        "_V074_SA_ACTION_VOCAB MUST be derived from MASTER_ACTION_REGISTRY (shim only)"
+    )
 
 
 def test_v074_action_vocab_includes_critical_actions():
-    """CLAUDE.md §3d/§5 — vocab MUST include the actions that v0.7.4 dispatcher
-    consumes and the actions that the LLM most commonly proposes."""
+    """CLAUDE.md §3d/§5 — MASTER_ACTION_REGISTRY (which now backs the vocab) MUST
+    include the actions that the dispatcher consumes and the actions that the LLM
+    most commonly proposes."""
     src = _load_nb_source(AGENT_NB)
-    reg_pos = src.find("_V074_SA_ACTION_VOCAB = {")
-    end_pos = src.find("}", reg_pos)
-    # Need to find the full block — it has nested {} so just take a generous slice
-    block = src[reg_pos:reg_pos + 6000]
+    reg_pos = src.find("MASTER_ACTION_REGISTRY = {")
+    block = src[reg_pos:reg_pos + 25000]
     must_have_actions = [
         "rename", "modify", "drop", "create", "merge", "split",
         "add_tag", "remove_tag", "create_link", "drop_link", "redirect_fk",
@@ -385,31 +399,35 @@ def test_v074_action_vocab_includes_critical_actions():
         "set_primary_key", "change_type",
     ]
     for act in must_have_actions:
-        assert f"'{act}'" in block, (
-            f"Action vocab MUST include '{act}' so LLM can propose it"
+        assert f"('{act}'," in block, (
+            f"MASTER_ACTION_REGISTRY MUST include action '{act}' so LLM can propose it"
         )
 
 
 def test_v074_action_vocab_block_injected_into_prompt_template():
+    """v0.7.5 renamed the placeholder to {master_action_catalog} (the canonical
+    source of truth) — the old name {action_vocabulary_block} is retired."""
     src = _load_nb_source(AGENT_NB)
-    # The placeholder MUST exist in the template
-    assert "{action_vocabulary_block}" in src, (
-        "VIBE_CREATE_NEXT_PROMPT MUST contain {action_vocabulary_block} placeholder"
+    assert "{master_action_catalog}" in src, (
+        "v0.7.5: VIBE_CREATE_NEXT_PROMPT MUST contain {master_action_catalog} placeholder"
     )
 
 
 def test_v074_action_vocab_block_passed_in_format_call():
+    """v0.7.5 .format() call uses the canonical render_master_action_catalog()."""
     src = _load_nb_source(AGENT_NB)
-    # The .format() call must pass action_vocabulary_block
-    assert "action_vocabulary_block=_v074_action_vocab_block" in src, (
-        "step_generate_next_vibes .format() call MUST pass action_vocabulary_block"
+    assert "master_action_catalog=_master_action_catalog" in src, (
+        "v0.7.5: step_generate_next_vibes .format() MUST pass master_action_catalog "
+        "rendered from MASTER_ACTION_REGISTRY (single source of truth)"
     )
 
 
 def test_v074_action_vocab_prompt_inject_sentinel_present():
+    """v0.7.5 sentinel is master-action-catalog-prompt-inject (renamed from
+    V074_SA_ACTION_VOCAB-prompt-inject when the duplicate vocab was retired)."""
     src = _load_nb_source(AGENT_NB)
-    assert "V074_SA_ACTION_VOCAB-prompt-inject FIRED" in src, (
-        "Sentinel for action-vocab prompt injection MUST be present "
+    assert "master-action-catalog-prompt-inject FIRED" in src, (
+        "v0.7.5: master-action-catalog-prompt-inject sentinel MUST be present "
         "(needed for grep-based deploy verification per CLAUDE.md §10.7 step 6)"
     )
 
@@ -762,14 +780,19 @@ def test_v074_dispatcher_dependencies_available_in_namespace():
 def test_v074_no_persist_or_cache_or_sparkcontext():
     """CLAUDE.md §2: serverless-compatible — no .cache/.persist/sparkContext
     in dispatcher CODE (comments are allowed to mention them as 'we don't use
-    these')."""
+    these'). v0.7.5: dispatcher start marker preserved; END marker retired when
+    dispatcher merged with v0.7.5 cost-class gating + V075_RETIRE_V074_VOCAB
+    follow-on block — bound the scan by the next major-section banner."""
     nb = json.loads(AGENT_NB.read_text())
     cells = nb["cells"]
     src = "".join(cells[21].get("source", []))
     start_marker = "# v0.7.4 [step-sa-active-autofix FIRED alias=step-sa-active-autofix]"
-    end_marker = "# END v0.7.4 SA-active-autofix dispatcher"
     s = src.find(start_marker)
-    e = src.find(end_marker, s)
+    if s < 0:
+        s = src.find("step-sa-active-autofix FIRED")
+    e = src.find("# v0.7.5 [V075_RETIRE_V074_VOCAB", s if s >= 0 else 0)
+    if e < 0:
+        e = s + 80000
     assert s >= 0 and e > s
     block = src[s:e]
     # Strip pure-comment lines so we only check executable code

@@ -32,8 +32,9 @@ def _load_nb_source(path: Path) -> str:
 
 def test_v074_agent_version_is_074_release():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "0.7.4"' in src, (
-        "v0.7.4 active-SA-autofix-dispatcher release must stamp __AGENT_VERSION__ = '0.7.4'"
+    assert '__AGENT_VERSION__ = "0.7.5"' in src, (
+        "v0.7.5 MasterActionRegistry release must stamp __AGENT_VERSION__ = '0.7.5' "
+        "(supersedes v0.7.4 active-SA-autofix-dispatcher; that dispatcher is preserved + cost-class-gated in v0.7.5)"
     )
 
 
@@ -44,8 +45,8 @@ def test_v074_agent_version_is_first_non_comment_line_of_first_code_cell():
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
     assert code_lines, "First code cell must contain at least one code line"
-    assert '__AGENT_VERSION__ = "0.7.4"' in code_lines[0], (
-        "First non-comment code line of first code cell must declare __AGENT_VERSION__ = \"0.7.4\" (CLAUDE.md §3a-bis)"
+    assert '__AGENT_VERSION__ = "0.7.5"' in code_lines[0], (
+        "First non-comment code line of first code cell must declare __AGENT_VERSION__ = \"0.7.5\" (CLAUDE.md §3a-bis)"
     )
 
 
@@ -294,8 +295,8 @@ def test_v074_runner_failure_manifest_only_writes_when_not_all_ok():
 
 def test_v074_readme_current_version_matches():
     rd = (REPO_ROOT / "readme.md").read_text()
-    assert "Current version: **v0.7.1**" in rd, (
-        "readme `Current version:` line must match __AGENT_VERSION__ (CLAUDE.md \u00a73a-bis); v0.7.1 release tag consolidates dev iterations"
+    assert "Current version: **v0.7.5**" in rd, (
+        "readme `Current version:` line must match __AGENT_VERSION__ (CLAUDE.md \u00a73a-bis); v0.7.5 dev iteration adds MasterActionRegistry + FindingDispatcher unification on top of v0.7.4"
     )
 
 
