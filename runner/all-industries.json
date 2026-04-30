@@ -37,8 +37,18 @@
       "model_vibes": ""
     },
     {
+      "name": "Healthcare",
+      "description": "Healthcare is a vast industry operating hospitals, clinics, outpatient facilities, and integrated care systems, delivering patient care, medical research, diagnostics, and health education across diverse populations and regions.",
+      "model_vibes": ""
+    },
+    {
       "name": "Telecommunication",
       "description": "Telecommunications is a global industry providing wireless services, broadband, fiber internet, and digital entertainment to billions of consumer and business customers through extensive network infrastructure.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Energy Utilities",
+      "description": "Energy and Utilities is a critical infrastructure industry generating, transmitting, and distributing electric power from renewable and conventional sources to residential, commercial, and industrial customers worldwide.",
       "model_vibes": ""
     },
     {
@@ -47,18 +57,18 @@
       "model_vibes": ""
     },
     {
-      "name": "Healthcare",
-      "description": "Healthcare is a vast industry operating hospitals, clinics, outpatient facilities, and integrated care systems, delivering patient care, medical research, diagnostics, and health education across diverse populations and regions.",
-      "model_vibes": ""
-    },
-    {
-      "name": "Pharmaceuticals",
-      "description": "Pharmaceuticals is a research-intensive industry focused on discovering, developing, and manufacturing medicines, vaccines, and consumer health products to treat and prevent diseases across therapeutic areas including oncology, immunology, and rare diseases.",
+      "name": "Transport Shipping",
+      "description": "Transport and Shipping is a global logistics industry providing express delivery, freight forwarding, supply chain management, and e-commerce fulfillment services that connect businesses and consumers across continents.",
       "model_vibes": ""
     },
     {
       "name": "Genomics Biotech",
       "description": "Genomics and Biotechnology is a rapidly evolving industry developing sequencing, array-based, and gene-editing solutions for genetic analysis, enabling advances in precision medicine, drug development, agricultural genomics, and diagnostics.",
+      "model_vibes": ""
+    },
+    {
+      "name": "Pharmaceuticals",
+      "description": "Pharmaceuticals is a research-intensive industry focused on discovering, developing, and manufacturing medicines, vaccines, and consumer health products to treat and prevent diseases across therapeutic areas including oncology, immunology, and rare diseases.",
       "model_vibes": ""
     },
     {
@@ -82,11 +92,6 @@
       "model_vibes": ""
     },
     {
-      "name": "Energy Utilities",
-      "description": "Energy and Utilities is a critical infrastructure industry generating, transmitting, and distributing electric power from renewable and conventional sources to residential, commercial, and industrial customers worldwide.",
-      "model_vibes": ""
-    },
-    {
       "name": "Chemical Mfg",
       "description": "Chemical Manufacturing is a foundational industry producing a wide range of chemicals, plastics, performance materials, and agricultural solutions used across automotive, construction, electronics, and consumer goods sectors.",
       "model_vibes": ""
@@ -94,11 +99,6 @@
     {
       "name": "Semiconductors",
       "description": "Semiconductor is a high-technology industry that designs and fabricates advanced integrated circuits, processors, and chips powering computing, mobile, automotive, AI, and IoT applications across the digital economy.",
-      "model_vibes": ""
-    },
-    {
-      "name": "Transport Shipping",
-      "description": "Transport and Shipping is a global logistics industry providing express delivery, freight forwarding, supply chain management, and e-commerce fulfillment services that connect businesses and consumers across continents.",
       "model_vibes": ""
     },
     {
