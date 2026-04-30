@@ -172,6 +172,26 @@ def test_orchestrator_pulse_interval_is_10_minutes():
     assert "PULSE_INTERVAL_S = 600" in src, "pulse cadence must be 10 minutes (per user directive 2026-04-30)"
 
 
+def test_orchestrator_uploads_create_parent_dir():
+    src = ORCHESTRATOR.read_text()
+    upload_fn = src.split("def upload_sector_to_volume", 1)[1].split("\ndef ", 1)[0]
+    assert '"fs", "mkdir"' in upload_fn, (
+        "upload_sector_to_volume must mkdir the volume subdir before cp "
+        "(databricks fs cp does NOT auto-create parents — caught in 2026-04-30 hot run)"
+    )
+    assert "RESOURCE_ALREADY_EXISTS" in upload_fn or "already exists" in upload_fn.lower(), (
+        "mkdir must tolerate already-exists so reruns don't crash"
+    )
+
+
+def test_orchestrator_preflight_creates_sectors_subdir():
+    src = ORCHESTRATOR.read_text()
+    preflight_fn = src.split("def preflight", 1)[1].split("\ndef ", 1)[0]
+    assert "_sectors" in preflight_fn and '"fs", "mkdir"' in preflight_fn, (
+        "preflight must mkdir the _sectors subdir up-front so the first sector upload doesn't fail"
+    )
+
+
 def test_orchestrator_supports_kill_switch():
     src = ORCHESTRATOR.read_text()
     assert 'KILL_FILE_NAME = "_kill.json"' in src
