@@ -281,6 +281,62 @@ class TestV080Fix3MVColumnLLMRepair(unittest.TestCase):
                       "Error-path alias missing for exception forensics")
 
 
+class TestV080Fix4MVJoinsReenabled(unittest.TestCase):
+    """Issue 4 fix (v0.8.0 amendment): re-enable MV cross-table joins.
+
+    Pre-fix: joins disabled by `if False and ...` due to runtime alias-resolution bug
+    (`i.order_id` -> `did you mean ord.order_id?`). Caused 12 cross-table measures
+    to be dropped at MV-gen time in ncdot run 158267072339186 across 3 user-named MVs.
+
+    Per CLAUDE.md \u00a71a NO VERSIONING ROADMAP: this fix ships in v0.8.0, not v0.8.1.
+    """
+
+    def test_joins_gate_unconditional(self):
+        """The `if False and isinstance(_mv_joins_raw, ...)` gate must be removed."""
+        nb = _load_notebook_text()
+        self.assertNotIn("if False and isinstance(_mv_joins_raw", nb,
+                         "joins gate must be unconditional (False removed)")
+        self.assertIn("if isinstance(_mv_joins_raw, list) and _mv_joins_raw:", nb,
+                      "unconditional joins gate not found")
+
+    def test_mv_joins_reenabled_alias_present(self):
+        nb = _load_notebook_text()
+        self.assertIn("mv-joins-reenabled", nb, "mv-joins-reenabled alias missing")
+
+    def test_alias_normalize_uses_table_name(self):
+        """Join `name:` MUST be the joined table name (not LLM short alias)."""
+        nb = _load_notebook_text()
+        self.assertIn("mv-joins-alias-normalize", nb, "mv-joins-alias-normalize alias missing")
+        # The normalization logic: _normalized_alias = (_t_table or _j_alias).strip()
+        self.assertIn("_normalized_alias = (_t_table or _j_alias).strip()", nb,
+                      "Normalization logic missing — must prefer table name over LLM alias")
+
+    def test_on_clause_alias_rewrite(self):
+        """Join ON clause must rewrite `<llm_alias>.col` -> `<table_name>.col`."""
+        nb = _load_notebook_text()
+        # The rewrite regex must be present
+        self.assertIn("rewrote join alias", nb, "ON-clause alias-rewrite log line missing")
+
+    def test_measure_dim_filter_alias_rewrite(self):
+        """Measure/dimension/filter exprs must also have aliases rewritten BEFORE ColCheck."""
+        nb = _load_notebook_text()
+        self.assertIn("mv-joins-expr-alias-rewrite", nb,
+                      "mv-joins-expr-alias-rewrite alias missing")
+        # Must walk measures + dimensions (JSON-escaped form)
+        self.assertIn('_coll_name in (\\"measures\\", \\"dimensions\\")', nb,
+                      "Expression rewrite must walk measures + dimensions collections")
+        # Must also handle filter expr
+        self.assertIn('mv.get(\\"filter\\")', nb,
+                      "Expression rewrite must handle filter expression")
+
+    def test_llm_alias_preserved_in_valid_joins_dict(self):
+        """The dict in _valid_joins must store BOTH normalized alias AND llm_alias."""
+        nb = _load_notebook_text()
+        # JSON-escaped form: "llm_alias" appears as \"llm_alias\"
+        self.assertIn('\\"llm_alias\\": _j_alias', nb,
+                      "_valid_joins entry must preserve LLM-original alias for downstream rewrite")
+
+
 class TestV080NoVersioningRoadmap(unittest.TestCase):
     """Per CLAUDE.md \u00a71a: every audit-surfaced issue MUST be fixed in the same version."""
 
@@ -298,13 +354,16 @@ class TestV080NoVersioningRoadmap(unittest.TestCase):
             self.assertNotIn(forbidden, cell1_src,
                              f"\u00a71a violation: version comment defers to future version: {forbidden!r}")
 
-    def test_all_three_audit_fix_aliases_present(self):
-        """All 3 audit issues from v0.7.9 NCDOT MVM run MUST have aliases in v0.8.0."""
+    def test_all_audit_fix_aliases_present(self):
+        """All audit issues from v0.7.9 NCDOT + v0.8.0 first-run MUST have aliases in v0.8.0."""
         nb = _load_notebook_text()
         for alias in [
-            "user-vibe-tag-applier",   # Issue 1
-            "mv-product-dedup-guard",  # Issue 2
-            "mv-column-llm-repair",    # Issue 3
+            "user-vibe-tag-applier",          # Issue 1 (v0.7.9 audit)
+            "mv-product-dedup-guard",         # Issue 2 (v0.7.9 audit)
+            "mv-column-llm-repair",           # Issue 3 (v0.7.9 audit)
+            "mv-joins-reenabled",             # Issue 4 (v0.8.0 first-run audit @ run 158267072339186)
+            "mv-joins-alias-normalize",       # Issue 4 supporting fix
+            "mv-joins-expr-alias-rewrite",    # Issue 4 supporting fix
         ]:
             self.assertIn(alias, nb,
                           f"\u00a71a violation: audit-issue alias missing: {alias!r}")
