@@ -337,6 +337,46 @@ class TestV080Fix4MVJoinsReenabled(unittest.TestCase):
                       "_valid_joins entry must preserve LLM-original alias for downstream rewrite")
 
 
+class TestV080Fix4PromptJoinsEnabled(unittest.TestCase):
+    """Issue 4 amendment-2: prompts must INSTRUCT the LLM to use joins, not forbid them.
+
+    Discovered from AI logs of run 665620745043660 where the LLM honestly reported
+    "joins array is correctly empty per the SINGLE-TABLE HARD RULE" \u2014 the prompt
+    forbade joins, so the renderer-side fix had nothing to render.
+    """
+
+    def test_no_joins_disabled_prompt_remains(self):
+        """The 'JOINS ARE DISABLED' / mv-prompt-joins-disabled directives must be REMOVED."""
+        nb = _load_notebook_text()
+        self.assertNotIn("JOINS ARE DISABLED", nb,
+                         "'JOINS ARE DISABLED' must be removed from all prompts")
+        self.assertNotIn("mv-prompt-joins-disabled", nb,
+                         "'mv-prompt-joins-disabled' alias must be replaced by mv-prompt-joins-enabled")
+
+    def test_joins_enabled_prompt_present_twice(self):
+        """Both DOMAIN_METRICS_PROMPT and KPI_FIRST_GLOBAL_PROMPT must declare joins enabled."""
+        nb = _load_notebook_text()
+        # Each prompt header line contains 'mv-prompt-joins-enabled' twice (header + alias=)
+        self.assertGreaterEqual(nb.count("mv-prompt-joins-enabled"), 2,
+                                "mv-prompt-joins-enabled alias must appear in both prompts")
+        self.assertEqual(nb.count("JOINS ARE ENABLED"), 2,
+                         "'JOINS ARE ENABLED' must appear in both prompts")
+
+    def test_prompt_describes_alias_normalization(self):
+        """Prompts must explain the alias-normalization behaviour."""
+        nb = _load_notebook_text()
+        self.assertIn("mv-joins-alias-normalize", nb,
+                      "Prompt must reference mv-joins-alias-normalize so LLM emits compatible aliases")
+
+    def test_prompt_describes_repair_path(self):
+        """Prompts must reference the install-time repair fallback."""
+        nb = _load_notebook_text()
+        # mv-column-llm-repair must be referenced in the new prompt block
+        # (it's already referenced in code; check the prompt mentions it)
+        self.assertGreaterEqual(nb.count("mv-column-llm-repair"), 5,
+                                "mv-column-llm-repair must be referenced in code AND prompts")
+
+
 class TestV080NoVersioningRoadmap(unittest.TestCase):
     """Per CLAUDE.md \u00a71a: every audit-surfaced issue MUST be fixed in the same version."""
 
