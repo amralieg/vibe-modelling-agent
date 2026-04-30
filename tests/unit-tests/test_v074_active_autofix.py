@@ -69,9 +69,9 @@ def _load_cell_source(path: Path, cell_idx: int) -> str:
 
 def test_v074_agent_version_is_074():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "0.7.5"' in src, (
-        "v0.7.5 must stamp __AGENT_VERSION__ = '0.7.5' (CLAUDE.md §3a-bis); "
-        "the original v0.7.4 active-autofix dispatcher is preserved + extended in v0.7.5."
+    assert '__AGENT_VERSION__ = "0.7.6"' in src, (
+        "v0.7.6 must stamp __AGENT_VERSION__ = '0.7.6' (CLAUDE.md §3a-bis); "
+        "v0.7.6 closes the v0.7.5 deferred emit-site migrations (architect/audit/next_vibes)."
     )
 
 
@@ -82,9 +82,9 @@ def test_v074_agent_version_is_first_non_comment_line_of_first_code_cell():
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
     assert code_lines, "First code cell must contain at least one code line"
-    assert '__AGENT_VERSION__ = "0.7.5"' in code_lines[0], (
+    assert '__AGENT_VERSION__ = "0.7.6"' in code_lines[0], (
         "First non-comment code line of first code cell must declare "
-        "__AGENT_VERSION__ = \"0.7.5\" (CLAUDE.md §3a-bis)"
+        "__AGENT_VERSION__ = \"0.7.6\" (CLAUDE.md §3a-bis)"
     )
 
 

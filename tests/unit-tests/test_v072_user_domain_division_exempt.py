@@ -86,7 +86,7 @@ def test_t1_version_is_074():
     src = _read_all_source()
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', src)
     assert m is not None, "__AGENT_VERSION__ not found"
-    assert m.group(1) == "0.7.5", f"Expected 0.7.5, got {m.group(1)}"
+    assert m.group(1) == "0.7.6", f"Expected 0.7.6, got {m.group(1)}"
 
 
 def test_t2_sentinels_present():
