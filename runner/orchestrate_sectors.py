@@ -162,7 +162,7 @@ def submit_sector_run(profile, job_id, business_context_path):
     }
     payload_path = f"/tmp/orch_run_now_{int(time.time())}.json"
     Path(payload_path).write_text(json.dumps(payload))
-    res = db_json(["jobs", "run-now", "--json", f"@{payload_path}"], profile)
+    res = db_json(["jobs", "run-now", "--no-wait", "--json", f"@{payload_path}"], profile)
     return res["run_id"]
 
 
