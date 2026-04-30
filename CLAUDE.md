@@ -32,6 +32,37 @@ Short, emoji-filled, or pure-feature-list changelogs are NOT acceptable for tag-
 
 AFTER FINISHING YOUR JOB, FIND EVERY SINGLE REGRESSION ERROR AND RACTIFY THE ROOT CAUSE BEFORE YOU DELIVER, AND THEN SHOW ME REGRESSION RESPORT WITH HOW CRITICAL THE ISSUE IS.
 
+## 1a. NO VERSIONING ROADMAP — FIX EVERYTHING IN THE CURRENT VERSION (HARD RULE — NON-NEGOTIABLE)
+
+Added 2026-04-30 after a session where Issue 3 (vacancy_rate metric view dropped due to UNRESOLVED_COLUMN) was deferred to a future "v0.8.1" while v0.8.0 was deployed with only 2 of 3 known issues fixed. The user reaction: **"FIX EVERY THING IN THE CURRENT VERSION TO BE DEPLOYED, NO VERSIONING ROADMAP."**
+
+**RULE:** When an audit, log review, or test surfaces N issues, ALL N issues MUST be fixed in the SAME version that ships next. NEVER defer an issue to a later version with rationale like:
+- "existing prevalidator catches it without halt"
+- "user can iterate via next_vibes V → V+1"
+- "low priority, deferred to v<NEXT>"
+- "smaller scope, do first; <other> deferred"
+
+Every one of those rationales is forbidden. The current-version commit/deploy MUST address every known root cause in the audit at hand. There is no roadmap. There is no "next version will fix X." There is only THIS version, and it MUST be complete.
+
+**Enforcement:**
+- Before bumping the version constant or pushing the commit, list EVERY issue surfaced by the latest audit/log review.
+- For each issue, the commit MUST contain a root-cause fix (per §3) with sentinel `[<alias> FIRED]` log line, behavioural unit test, and call site.
+- Defer-to-future is a §8.4 dead-code-framed-as-fix violation and a §8.7 "shipped" violation.
+- The commit message MUST list ALL N issues, NOT a subset. Listing "Issue 3 deferred" is a §1a violation regardless of justification.
+- The deployed-archive grep verification (§10.7 Step 6) MUST find aliases for ALL N fixes before any run is submitted.
+
+**Single permitted exception:**
+- If an issue's root cause sits in a system the agent does not own (Databricks platform bug, third-party library, etc.) AND a workaround in the agent would be a §8.3 tautology or worse, surface this explicitly with: (a) link/evidence proving the issue is upstream, (b) the workaround chosen for THIS version, (c) the upstream tracker. Even then, the workaround ships in the current version — not deferred.
+
+**Why this rule exists:**
+- Defer-to-future creates roadmap debt that never gets paid down. Every "v0.8.1" never happens because the next session focuses on the next user request.
+- Partial fixes inflate honesty scores: "2 of 3 issues fixed" is REPORTED as "v0.8.0 ships 2 fixes" but EXPERIENCED by the user as "still broken on issue 3."
+- The user pays for compute for every run; partial fixes guarantee the next run will surface the same Issue 3 again, wasting cycles.
+
+Violations seen in this session (must never happen again):
+- v0.8.0 commit listed Issue 3 as "DEFERRED to v0.8.1" while shipping the deploy → user explicitly rejected.
+- The cancelled todo `v710_iss3` ("DEFER ISSUE 3 to v0.8.1") was a §1a violation the moment it was created.
+
 ## 2. Databricks Serverless compatibility (hard constraint)
 
 ALL THE CODE YOU GENERATE MUST ALWAYS WORKS WITH DATABRIKC SERVERLESS ENVIRONMENT, No Cache, persist, uncache, sparkcontext etc.

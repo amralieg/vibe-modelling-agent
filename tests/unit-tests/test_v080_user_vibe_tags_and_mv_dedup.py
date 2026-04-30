@@ -212,6 +212,104 @@ class TestV080Fix1UserVibeTagApplier(unittest.TestCase):
                           f"_has_tag missing format-check: {fmt_check}")
 
 
+class TestV080Fix3MVColumnLLMRepair(unittest.TestCase):
+    """Issue 3 fix: LLM-based MV column repair before drop.
+
+    Per CLAUDE.md \u00a71a NO VERSIONING ROADMAP: every audit issue MUST be fixed
+    in the SAME version that ships next. Issue 3 (vacancy_rate dropped due to
+    UNRESOLVED_COLUMN) MUST be fixed in v0.8.0 alongside Fix 1 + Fix 2.
+    """
+
+    def test_alias_present_in_notebook(self):
+        nb = _load_notebook_text()
+        self.assertIn("mv-column-llm-repair", nb,
+                      "Issue 3 fix alias missing — mv-column-llm-repair must be present")
+
+    def test_fired_marker_for_repair_success(self):
+        nb = _load_notebook_text()
+        self.assertIn("[mv-column-llm-repair FIRED]", nb,
+                      "FIRED log marker missing — must self-report when repair succeeds")
+
+    def test_repair_runs_before_drop(self):
+        """Repair must be ATTEMPTED before falling through to the drop bucket."""
+        src = _extract_function_source("step_apply_metric_views")
+        repair_idx = src.find("[mv-column-llm-repair FIRED]")
+        drop_idx = src.find("_dropped2.append(_stmt)\n                        _drop_reasons2.append((_vname, f\"physical table")
+        # Drop is in the FALLTHROUGH branch (`if _repaired_stmt is not None: ... else: ...`)
+        # So repair invocation comes textually BEFORE the fallthrough drop branch
+        self.assertGreater(repair_idx, 0, "repair FIRED log not found in step_apply_metric_views")
+        self.assertGreater(drop_idx, 0, "fallthrough drop branch not found in step_apply_metric_views")
+        self.assertLess(repair_idx, drop_idx,
+                        "Repair must be attempted BEFORE drop fallthrough")
+
+    def test_repair_uses_llm_not_regex(self):
+        """Per CLAUDE.md \u00a73c: USE LLM ALL THE WAY for semantic decisions on user vibe artefacts."""
+        src = _extract_function_source("step_apply_metric_views")
+        # Locate the repair block specifically
+        repair_block_start = src.find("_repaired_stmt = None")
+        self.assertGreater(repair_block_start, 0, "repair block not found")
+        repair_block = src[repair_block_start:repair_block_start + 5000]
+        self.assertIn("_call_ai_query", repair_block,
+                      "Repair must use LLM via _call_ai_query")
+        self.assertIn("USER-KING AUTHORITY", repair_block,
+                      "Per \u00a73c every prompt must declare user-king authority")
+        self.assertIn("AVAILABLE_COLUMNS", repair_block,
+                      "Repair prompt must constrain to available physical columns")
+
+    def test_repair_revalidates_candidate_before_keeping(self):
+        """LLM may hallucinate; repair must revalidate the candidate against _src_cols."""
+        src = _extract_function_source("step_apply_metric_views")
+        # The candidate revalidation reuses _src_cols / _mvcp_token_re / _mvcp_SQL_KW
+        repair_block_start = src.find("_repaired_stmt = None")
+        repair_block = src[repair_block_start:repair_block_start + 5000]
+        self.assertIn("_cand_bad", repair_block,
+                      "Candidate must be revalidated for residual bad columns")
+        self.assertIn("if not _cand_bad:", repair_block,
+                      "Repair must only KEEP candidate when 0 residual bad columns")
+
+    def test_repair_falls_through_to_drop_on_failure(self):
+        """If repair fails OR LLM unavailable, MV must be dropped (preserves prior behaviour)."""
+        src = _extract_function_source("step_apply_metric_views")
+        # The fallthrough path: when _repaired_stmt is None, we hit _dropped2.append + _drop_reasons2.append
+        self.assertIn("if _repaired_stmt is not None:", src,
+                      "Fallthrough conditional missing")
+        self.assertIn("_dropped2.append(_stmt)", src,
+                      "Fallthrough must still drop on repair failure")
+        self.assertIn("mv-column-llm-repair-failed", src,
+                      "Failed-repair alias missing for log forensics")
+        self.assertIn("mv-column-llm-repair-error", src,
+                      "Error-path alias missing for exception forensics")
+
+
+class TestV080NoVersioningRoadmap(unittest.TestCase):
+    """Per CLAUDE.md \u00a71a: every audit-surfaced issue MUST be fixed in the same version."""
+
+    def test_no_defer_to_future_version_in_version_comment(self):
+        """Version comment must NOT contain 'deferred to v0.X.Y' rationale."""
+        nb_json = _load_notebook_json()
+        cell1_src = "".join(nb_json["cells"][1].get("source", []))
+        # Forbidden phrases
+        for forbidden in [
+            "deferred to v0.8.1",
+            "deferred to v0.8.2",
+            "deferred to next version",
+            "DEFER ISSUE",
+        ]:
+            self.assertNotIn(forbidden, cell1_src,
+                             f"\u00a71a violation: version comment defers to future version: {forbidden!r}")
+
+    def test_all_three_audit_fix_aliases_present(self):
+        """All 3 audit issues from v0.7.9 NCDOT MVM run MUST have aliases in v0.8.0."""
+        nb = _load_notebook_text()
+        for alias in [
+            "user-vibe-tag-applier",   # Issue 1
+            "mv-product-dedup-guard",  # Issue 2
+            "mv-column-llm-repair",    # Issue 3
+        ]:
+            self.assertIn(alias, nb,
+                          f"\u00a71a violation: audit-issue alias missing: {alias!r}")
+
+
 class TestV080PriorVersionAliasesPreserved(unittest.TestCase):
     """Ensure prior-version aliases (positive signals) are still present in v0.8.0."""
 
