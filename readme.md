@@ -83,7 +83,7 @@ The name **"Vibe"** reflects the core workflow:
 
 Each iteration produces a new version. The agent carries forward your context so nothing is lost between runs. You are never locked into a static template — the model evolves with your business.
 
-Current version: **v0.7.7** (dev branch — pre-release) — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v08x) below.
+Current version: **v0.7.8** (dev branch — pre-release) — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v08x) below.
 
 > **Note on numbering:** the dev branch tracked four internal iterations labelled `v0.7.1`, `v0.7.2`, `v0.7.3`, `v0.7.4` between the `v0.7.0` and `v0.7.1` release tags. The `v0.7.1` release tag on `main` consolidates all of those iterations into a single public release. `v0.7.5` introduced the **MasterActionRegistry + FindingDispatcher** unification foundation (one canonical action vocabulary of 149 actions, per-context cost classification with severity + provenance gating, cost-gated low-hanging-fruit auto-apply at static-analysis stage). `v0.7.6` closes the deferred emit-site migrations — the **Domain Architect (Step 3.6)**, **VIBE_AUDIT remediate()** (Phase 6), and **VIBE_CREATE_NEXT priorities** (post-LLM parse) now ALSO submit `FindingShape` dicts to a stage-scoped `FindingDispatcher` with §3b/§3c-derived `protected_targets`. A minimal **`_v076_safe_executor`** applies LOCAL-cost actions (`alter_description` on product/attribute, `add_tag` on attribute, `update_regex` on attribute); higher-cost actions are deferred with an explicit `_dispatch_decision`. Pre-existing `v0.7.2 SHRINK-NEW-SILO-ALL-ORPHANS` sentinel is patched into the empty-plan branch so the long-standing test pin is honest.
 

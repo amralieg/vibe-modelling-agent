@@ -856,7 +856,7 @@ def test_no_persist_or_cache_or_sparkcontext():
 
 def test_agent_version_constant():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "0.7.7"' in src
+    assert '__AGENT_VERSION__ = "0.7.8"' in src
 
 
 def test_semver_single_digit_segments():
