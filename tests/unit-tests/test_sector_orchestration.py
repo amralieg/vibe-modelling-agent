@@ -202,6 +202,28 @@ def test_orchestrator_submit_uses_no_wait():
     )
 
 
+def test_orchestrator_preflight_kills_orphan_child_runs():
+    src = ORCHESTRATOR.read_text()
+    preflight_fn = src.split("def preflight", 1)[1].split("\ndef ", 1)[0]
+    assert "ORPHAN-DETECTED" in preflight_fn, (
+        "preflight MUST detect orphan dbx_vibe_*_pipeline_* child runs left over from "
+        "cancelled prior orchestrator attempts — they occupy max_concurrent_runs=1 slots "
+        "and block our new child runs from starting (caught 2026-04-30 in launch)"
+    )
+    assert "dbx_vibe_" in preflight_fn and "_pipeline_" in preflight_fn, (
+        "orphan detector MUST match the runner's child-job naming pattern"
+    )
+    assert '"jobs", "cancel-run"' in preflight_fn, (
+        "preflight MUST actually cancel detected orphans, not just warn"
+    )
+    assert "creator_user_name" in preflight_fn or "creator ==" in preflight_fn, (
+        "orphan detector MUST scope to current-user-owned runs (per §12 ownership rule)"
+    )
+    assert "CATALOG-DROP RULE" in preflight_fn or "§12" in preflight_fn, (
+        "orphan cancellation MUST log §12 authorisation rationale"
+    )
+
+
 def test_orchestrator_supports_kill_switch():
     src = ORCHESTRATOR.read_text()
     assert 'KILL_FILE_NAME = "_kill.json"' in src
