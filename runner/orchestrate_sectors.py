@@ -400,13 +400,61 @@ def preflight(profile, runner_path, global_volume, pulse_file):
             return False
 
     try:
+        me_info = db_json(["current-user", "me"], profile)
+        me = me_info.get("userName", "")
         active = db_json(["jobs", "list-runs", "--active-only", "--limit", "25"], profile)
         runs = active if isinstance(active, list) else active.get("runs", [])
-        if runs:
-            log_pulse(f"  [preflight] WARN: {len(runs)} active runs already on workspace", pulse_file)
-            for r in runs[:5]:
-                log_pulse(f"    active run_id={r.get('run_id')} job_id={r.get('job_id')}", pulse_file)
-        else:
+        orphans = []
+        non_orphan_active = []
+        for r in runs:
+            run_name = r.get("run_name", "") or ""
+            creator = r.get("creator_user_name", "") or ""
+            is_ours_pattern = (
+                run_name.startswith("dbx_vibe_")
+                and "_pipeline_" in run_name
+                and creator == me
+            )
+            if is_ours_pattern:
+                orphans.append(r)
+            else:
+                non_orphan_active.append(r)
+        if orphans:
+            log_pulse(
+                f"  [preflight ORPHAN-DETECTED §12 §11.1.3] {len(orphans)} orphan child run(s) match "
+                f"dbx_vibe_*_pipeline_* owned by {me} — cancelling to free child-job concurrency slots",
+                pulse_file,
+            )
+            for r in orphans:
+                rid = r.get("run_id")
+                rn = r.get("run_name", "?")
+                jid = r.get("job_id")
+                try:
+                    db(["jobs", "cancel-run", str(rid)], profile, timeout=60)
+                    log_pulse(
+                        f"    [preflight ORPHAN-CANCELLED] run_id={rid} job_id={jid} name={rn}",
+                        pulse_file,
+                    )
+                except Exception as ce:
+                    log_pulse(
+                        f"    [preflight ORPHAN-CANCEL-FAILED] run_id={rid}: {str(ce)[:200]}",
+                        pulse_file,
+                    )
+            log_pulse(
+                f"  [CATALOG-DROP RULE §12] orphan-run cancellations are destructive of stale agent state; "
+                f"authorised because run_name matches dbx_vibe_*_pipeline_* AND creator={me}.",
+                pulse_file,
+            )
+        if non_orphan_active:
+            log_pulse(
+                f"  [preflight] WARN: {len(non_orphan_active)} non-orphan active run(s) on workspace (left untouched)",
+                pulse_file,
+            )
+            for r in non_orphan_active[:5]:
+                log_pulse(
+                    f"    active run_id={r.get('run_id')} job_id={r.get('job_id')} name={r.get('run_name','?')} creator={r.get('creator_user_name','?')}",
+                    pulse_file,
+                )
+        if not orphans and not non_orphan_active:
             log_pulse(f"  [preflight FIRED] no active runs on workspace", pulse_file)
     except Exception as e:
         log_pulse(f"  [preflight] WARN active-runs probe failed: {str(e)[:200]}", pulse_file)
