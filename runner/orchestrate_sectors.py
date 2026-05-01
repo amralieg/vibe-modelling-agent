@@ -20,7 +20,7 @@ DEFAULT_JOB_NAME = "dbx_vibe_modelling_sector_runner_v71"
 KILL_FILE_NAME = "_kill.json"
 PULSE_INTERVAL_S = 600
 POLL_INTERVAL_S = 120
-SECTOR_TIMEOUT_S = 6 * 3600
+SECTOR_TIMEOUT_S = 14 * 3600
 SUBMIT_RETRY_COUNT = 2
 SUBMIT_RETRY_DELAY_S = 60
 
@@ -106,6 +106,7 @@ def find_or_create_job(profile, runner_path, job_name, pulse_file):
             return j["job_id"]
     spec = {
         "name": job_name,
+        "timeout_seconds": SECTOR_TIMEOUT_S,
         "tasks": [
             {
                 "task_key": "sector_runner",
