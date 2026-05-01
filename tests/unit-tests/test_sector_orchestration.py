@@ -172,6 +172,31 @@ def test_orchestrator_pulse_interval_is_10_minutes():
     assert "PULSE_INTERVAL_S = 600" in src, "pulse cadence must be 10 minutes (per user directive 2026-04-30)"
 
 
+def test_orchestrator_sector_timeout_is_14h():
+    src = ORCHESTRATOR.read_text()
+    assert "SECTOR_TIMEOUT_S = 14 * 3600" in src, (
+        "SECTOR_TIMEOUT_S MUST be 14 * 3600 (50400s, 14 hours) per user directive 2026-05-01. "
+        "Original 6h cap killed Agriculture run at 99% completion (post-finalize normalization) "
+        "wasting all 14160 attrs / 357 products / clean DAG. User stated tier-1 takes ~10h "
+        "so 14h gives 4h safety margin."
+    )
+
+
+def test_orchestrator_job_spec_has_both_task_and_job_level_timeout():
+    src = ORCHESTRATOR.read_text()
+    create_fn = src.split("def find_or_create_job", 1)[1].split("\ndef ", 1)[0]
+    assert '"timeout_seconds": SECTOR_TIMEOUT_S' in create_fn, (
+        "find_or_create_job spec MUST set timeout_seconds: SECTOR_TIMEOUT_S "
+        "(per user directive 2026-05-01: 'make the timeout 14hr for all tasks and jobs')"
+    )
+    timeout_lines = [l for l in create_fn.splitlines() if '"timeout_seconds": SECTOR_TIMEOUT_S' in l]
+    assert len(timeout_lines) >= 2, (
+        f"job spec MUST set timeout_seconds at BOTH job-level (top-level settings) AND "
+        f"task-level (inside tasks[]). Found {len(timeout_lines)} occurrence(s); need >= 2. "
+        "Without job-level timeout, the per-task 14h still risks Databricks-side default job timeout."
+    )
+
+
 def test_orchestrator_uploads_create_parent_dir():
     src = ORCHESTRATOR.read_text()
     upload_fn = src.split("def upload_sector_to_volume", 1)[1].split("\ndef ", 1)[0]
