@@ -228,24 +228,33 @@ def test_orchestrator_submit_uses_no_wait():
 
 
 def test_orchestrator_preflight_kills_orphan_child_runs():
+    """Behavioural contract for orphan detection (logic now lives in helper).
+
+    Hoisted out of preflight() into kill_orphan_pipeline_runs() so it can ALSO
+    be called inside the retry loop (root-cause fix for 2026-05-02 16:46 UTC
+    duplicate Staffing HR run incident — see test_process_sector_kills_orphans*).
+    """
     src = ORCHESTRATOR.read_text()
-    preflight_fn = src.split("def preflight", 1)[1].split("\ndef ", 1)[0]
-    assert "ORPHAN-DETECTED" in preflight_fn, (
-        "preflight MUST detect orphan dbx_vibe_*_pipeline_* child runs left over from "
-        "cancelled prior orchestrator attempts — they occupy max_concurrent_runs=1 slots "
-        "and block our new child runs from starting (caught 2026-04-30 in launch)"
+    helper_body = src.split("def kill_orphan_pipeline_runs(", 1)[1].split("\ndef ", 1)[0]
+    assert "ORPHAN-DETECTED" in helper_body, (
+        "helper MUST detect orphan dbx_vibe_*_pipeline_* child runs"
     )
-    assert "dbx_vibe_" in preflight_fn and "_pipeline_" in preflight_fn, (
+    assert "dbx_vibe_" in helper_body and "_pipeline_" in helper_body, (
         "orphan detector MUST match the runner's child-job naming pattern"
     )
-    assert '"jobs", "cancel-run"' in preflight_fn, (
-        "preflight MUST actually cancel detected orphans, not just warn"
+    assert '"jobs", "cancel-run"' in helper_body, (
+        "helper MUST actually cancel detected orphans, not just warn"
     )
-    assert "creator_user_name" in preflight_fn or "creator ==" in preflight_fn, (
+    assert "creator_user_name" in helper_body or "creator ==" in helper_body, (
         "orphan detector MUST scope to current-user-owned runs (per §12 ownership rule)"
     )
-    assert "CATALOG-DROP RULE" in preflight_fn or "§12" in preflight_fn, (
+    assert "CATALOG-DROP RULE" in helper_body or "§12" in helper_body, (
         "orphan cancellation MUST log §12 authorisation rationale"
+    )
+
+    preflight_fn = src.split("def preflight(", 1)[1].split("\ndef ", 1)[0]
+    assert "kill_orphan_pipeline_runs(" in preflight_fn, (
+        "preflight() MUST delegate to the shared helper (DRY)"
     )
 
 
@@ -368,6 +377,69 @@ def test_agent_version_constant_unchanged_at_071():
     assert matches[0] in ("0.7.1", "0.8.1"), (
         f"agent __AGENT_VERSION__ unexpected value: {matches[0]} "
         "(should be 0.7.1 for v0.7.1 deploy, or 0.8.1 if dev iteration)"
+    )
+
+
+def test_orchestrator_exposes_kill_orphan_pipeline_runs_helper():
+    """The orphan-kill logic must be hoisted out of preflight() into a reusable helper.
+
+    Bug observed 2026-05-02 16:46 UTC: when a sector parent timed out, its child
+    'dbx_vibe_*_pipeline_*' run kept executing on its own job. The orchestrator's
+    retry path then submitted a NEW child run, which queued behind the orphan
+    (job concurrency=1). User saw two runs of the same model — exactly what
+    'NO 2 RUNS FOR ANY MODEL' forbids.
+    """
+    src = ORCHESTRATOR.read_text()
+    assert "def kill_orphan_pipeline_runs(" in src, (
+        "orphan-kill must be a standalone helper, not buried in preflight()"
+    )
+    assert "alias_tag" in src.split("def kill_orphan_pipeline_runs(", 1)[1].split("\ndef ", 1)[0], (
+        "helper must accept alias_tag so log lines distinguish 'preflight' vs 'retry' invocations"
+    )
+
+
+def test_preflight_invokes_kill_orphan_helper():
+    src = ORCHESTRATOR.read_text()
+    preflight_body = src.split("def preflight(", 1)[1].split("\ndef ", 1)[0]
+    assert "kill_orphan_pipeline_runs(" in preflight_body, (
+        "preflight() MUST delegate orphan-kill to the shared helper (DRY)"
+    )
+
+
+def test_process_sector_kills_orphans_before_each_retry_submission():
+    """ROOT-CAUSE FIX for 2026-05-02 16:46 UTC duplicate-run incident.
+
+    The retry loop inside process_sector MUST call kill_orphan_pipeline_runs
+    BEFORE every submit_sector_run, so that any child run left behind by a
+    timed-out previous parent is cancelled FIRST. Otherwise the new submission
+    queues behind the orphan (Databricks job concurrency=1).
+
+    The §10.6 'no two runs of the same model' invariant depends on this.
+    """
+    src = ORCHESTRATOR.read_text()
+    process_sector_body = src.split("def process_sector(", 1)[1].split("\ndef ", 1)[0]
+    retry_section = process_sector_body.split("retrying {len(failed)} failed industries", 1)
+    assert len(retry_section) == 2, "process_sector must contain the retry loop guarded by 'retrying ... failed industries'"
+    after_retry_log = retry_section[1]
+    submit_idx = after_retry_log.find("submit_sector_run(")
+    kill_idx = after_retry_log.find("kill_orphan_pipeline_runs(")
+    assert kill_idx >= 0, "process_sector retry path MUST call kill_orphan_pipeline_runs before submission"
+    assert submit_idx >= 0, "process_sector retry path MUST call submit_sector_run after the kill"
+    assert kill_idx < submit_idx, (
+        "kill_orphan_pipeline_runs MUST run BEFORE submit_sector_run inside the retry loop "
+        "(otherwise the new submission queues behind the orphan and produces duplicate runs)"
+    )
+
+
+def test_kill_orphan_helper_uses_section12_ownership_filter():
+    """§12 catalog/job ownership rule — never touch other users' runs."""
+    src = ORCHESTRATOR.read_text()
+    helper_body = src.split("def kill_orphan_pipeline_runs(", 1)[1].split("\ndef ", 1)[0]
+    assert "creator == me" in helper_body, (
+        "helper MUST filter by creator == authenticated user (§12 ownership rule)"
+    )
+    assert "dbx_vibe_" in helper_body and "_pipeline_" in helper_body, (
+        "helper MUST filter by run_name pattern dbx_vibe_*_pipeline_* (do not cancel non-pipeline runs)"
     )
 
 

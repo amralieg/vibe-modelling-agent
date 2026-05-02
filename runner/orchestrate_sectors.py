@@ -333,6 +333,7 @@ def process_sector(profile, job_id, sector_label, sector_local_path, global_volu
     if failed:
         log_pulse(f"  [{sector_label}] retrying {len(failed)} failed industries one-by-one", pulse_file)
         for ind in failed:
+            kill_orphan_pipeline_runs(profile, pulse_file, alias_tag=f"retry[{sanitize_name(ind)}]")
             single_payload = build_single_industry_payload(sector_payload, ind)
             single_local = f"/tmp/orch_retry_{sanitize_name(ind)}_{int(time.time())}.json"
             Path(single_local).write_text(json.dumps(single_payload, indent=2))
@@ -409,6 +410,93 @@ def process_sector(profile, job_id, sector_label, sector_local_path, global_volu
     log_pulse(f"=== SECTOR END:   {sector_label} ===", pulse_file)
 
 
+def kill_orphan_pipeline_runs(profile, pulse_file, alias_tag="preflight"):
+    """
+    Cancel any active dbx_vibe_*_pipeline_* runs owned by the current user.
+
+    Called at TWO points (root-cause fix for the orphan-survives-parent-timeout
+    bug observed 2026-05-02 on the Staffing HR retry):
+
+      1. Orchestrator preflight (alias_tag='preflight') — at process startup,
+         before any sector is submitted.
+
+      2. Retry submission inside process_sector (alias_tag='retry') — BEFORE
+         submitting a fresh per-industry retry, so any child run that the
+         previous (timed-out) parent sector left behind is killed FIRST.
+         Without this, the new retry submission queues behind the orphan
+         (job concurrency=1), producing two runs of the same model — exactly
+         the duplication reported on 2026-05-02 16:46 UTC.
+
+    §12 ownership rule: only cancels runs whose creator matches the
+    authenticated user AND whose run_name matches the dbx_vibe_*_pipeline_*
+    convention — never touches other users' runs or non-pipeline runs.
+    Returns {"orphans_cancelled": N, "non_orphans_seen": M}.
+    """
+    summary = {"orphans_cancelled": 0, "non_orphans_seen": 0}
+    try:
+        me_info = db_json(["current-user", "me"], profile)
+        me = me_info.get("userName", "")
+        active = db_json(["jobs", "list-runs", "--active-only", "--limit", "25"], profile)
+        runs = active if isinstance(active, list) else active.get("runs", [])
+        orphans = []
+        non_orphan_active = []
+        for r in runs:
+            run_name = r.get("run_name", "") or ""
+            creator = r.get("creator_user_name", "") or ""
+            is_ours_pattern = (
+                run_name.startswith("dbx_vibe_")
+                and "_pipeline_" in run_name
+                and creator == me
+            )
+            if is_ours_pattern:
+                orphans.append(r)
+            else:
+                non_orphan_active.append(r)
+        if orphans:
+            log_pulse(
+                f"  [{alias_tag} ORPHAN-DETECTED §12 §11.1.3] {len(orphans)} orphan child run(s) match "
+                f"dbx_vibe_*_pipeline_* owned by {me} — cancelling to free child-job concurrency slots",
+                pulse_file,
+            )
+            for r in orphans:
+                rid = r.get("run_id")
+                rn = r.get("run_name", "?")
+                jid = r.get("job_id")
+                try:
+                    db(["jobs", "cancel-run", str(rid)], profile, timeout=60)
+                    log_pulse(
+                        f"    [{alias_tag} ORPHAN-CANCELLED] run_id={rid} job_id={jid} name={rn}",
+                        pulse_file,
+                    )
+                    summary["orphans_cancelled"] += 1
+                except Exception as ce:
+                    log_pulse(
+                        f"    [{alias_tag} ORPHAN-CANCEL-FAILED] run_id={rid}: {str(ce)[:200]}",
+                        pulse_file,
+                    )
+            log_pulse(
+                f"  [CATALOG-DROP RULE §12] orphan-run cancellations are destructive of stale agent state; "
+                f"authorised because run_name matches dbx_vibe_*_pipeline_* AND creator={me}.",
+                pulse_file,
+            )
+        if non_orphan_active:
+            summary["non_orphans_seen"] = len(non_orphan_active)
+            log_pulse(
+                f"  [{alias_tag}] WARN: {len(non_orphan_active)} non-orphan active run(s) on workspace (left untouched)",
+                pulse_file,
+            )
+            for r in non_orphan_active[:5]:
+                log_pulse(
+                    f"    active run_id={r.get('run_id')} job_id={r.get('job_id')} name={r.get('run_name','?')} creator={r.get('creator_user_name','?')}",
+                    pulse_file,
+                )
+        if not orphans and not non_orphan_active:
+            log_pulse(f"  [{alias_tag} FIRED] no active runs on workspace", pulse_file)
+    except Exception as e:
+        log_pulse(f"  [{alias_tag}] WARN active-runs probe failed: {str(e)[:200]}", pulse_file)
+    return summary
+
+
 def preflight(profile, runner_path, global_volume, pulse_file):
     log_pulse(f"=== PRE-FLIGHT (profile={profile}) ===", pulse_file)
 
@@ -440,65 +528,7 @@ def preflight(profile, runner_path, global_volume, pulse_file):
             log_pulse(f"  [preflight] FAILED: cannot create sectors upload subdir {sectors_subdir}: {str(e)[:200]}", pulse_file)
             return False
 
-    try:
-        me_info = db_json(["current-user", "me"], profile)
-        me = me_info.get("userName", "")
-        active = db_json(["jobs", "list-runs", "--active-only", "--limit", "25"], profile)
-        runs = active if isinstance(active, list) else active.get("runs", [])
-        orphans = []
-        non_orphan_active = []
-        for r in runs:
-            run_name = r.get("run_name", "") or ""
-            creator = r.get("creator_user_name", "") or ""
-            is_ours_pattern = (
-                run_name.startswith("dbx_vibe_")
-                and "_pipeline_" in run_name
-                and creator == me
-            )
-            if is_ours_pattern:
-                orphans.append(r)
-            else:
-                non_orphan_active.append(r)
-        if orphans:
-            log_pulse(
-                f"  [preflight ORPHAN-DETECTED §12 §11.1.3] {len(orphans)} orphan child run(s) match "
-                f"dbx_vibe_*_pipeline_* owned by {me} — cancelling to free child-job concurrency slots",
-                pulse_file,
-            )
-            for r in orphans:
-                rid = r.get("run_id")
-                rn = r.get("run_name", "?")
-                jid = r.get("job_id")
-                try:
-                    db(["jobs", "cancel-run", str(rid)], profile, timeout=60)
-                    log_pulse(
-                        f"    [preflight ORPHAN-CANCELLED] run_id={rid} job_id={jid} name={rn}",
-                        pulse_file,
-                    )
-                except Exception as ce:
-                    log_pulse(
-                        f"    [preflight ORPHAN-CANCEL-FAILED] run_id={rid}: {str(ce)[:200]}",
-                        pulse_file,
-                    )
-            log_pulse(
-                f"  [CATALOG-DROP RULE §12] orphan-run cancellations are destructive of stale agent state; "
-                f"authorised because run_name matches dbx_vibe_*_pipeline_* AND creator={me}.",
-                pulse_file,
-            )
-        if non_orphan_active:
-            log_pulse(
-                f"  [preflight] WARN: {len(non_orphan_active)} non-orphan active run(s) on workspace (left untouched)",
-                pulse_file,
-            )
-            for r in non_orphan_active[:5]:
-                log_pulse(
-                    f"    active run_id={r.get('run_id')} job_id={r.get('job_id')} name={r.get('run_name','?')} creator={r.get('creator_user_name','?')}",
-                    pulse_file,
-                )
-        if not orphans and not non_orphan_active:
-            log_pulse(f"  [preflight FIRED] no active runs on workspace", pulse_file)
-    except Exception as e:
-        log_pulse(f"  [preflight] WARN active-runs probe failed: {str(e)[:200]}", pulse_file)
+    kill_orphan_pipeline_runs(profile, pulse_file, alias_tag="preflight")
 
     return True
 
