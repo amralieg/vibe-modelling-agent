@@ -16,6 +16,7 @@ sector loop is never blocked by a repo-sync error.
 
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -28,6 +29,142 @@ DEFAULT_REPO_BRANCH = "main"
 GIT_OP_TIMEOUT_S = 600
 EXPORT_TIMEOUT_S = 600
 WS_LIST_TIMEOUT_S = 60
+
+
+_TABLE_SEP_RE = re.compile(r"^\|[\s\-:|]+\|\s*$")
+_ANCHOR_RE = re.compile(r'^\s*<a\s+id="(domain-[^"]+)"></a>\s*$')
+_COMPARISON_HEADING = "## Domain & Product Comparison"
+
+
+def normalize_domain_product_comparison(md_text: str) -> str:
+    """
+    Repair the 'Domain & Product Comparison' section in industry-root readme.md.
+
+    Bug (agent v0.7.1): the agent appends '\\n<a id=\"domain-X\"></a>\\n' between
+    the markdown table header+separator and the first data row, which inserts a
+    blank line that breaks the table — every data row then renders as paragraph
+    text with literal '|' characters.
+
+    Fix: rewrite the section as one mini-table per domain, with the anchor and
+    an H3 heading BEFORE each table. The first 'Domain' column is dropped
+    because each table now lives under its own '### domain' heading.
+
+    Idempotent: returns the input unchanged if the section is already in the
+    fixed shape (no broken anchor-in-table pattern found).
+    """
+    if _COMPARISON_HEADING not in md_text:
+        return md_text
+
+    lines = md_text.split("\n")
+
+    section_start = None
+    for i, line in enumerate(lines):
+        if line.strip() == _COMPARISON_HEADING:
+            section_start = i
+            break
+    if section_start is None:
+        return md_text
+
+    section_end = len(lines)
+    for i in range(section_start + 1, len(lines)):
+        if lines[i].startswith("## "):
+            section_end = i
+            break
+
+    section = lines[section_start:section_end]
+
+    sep_idx = None
+    for i, line in enumerate(section):
+        if _TABLE_SEP_RE.match(line):
+            sep_idx = i
+            break
+    if sep_idx is None:
+        return md_text
+
+    has_anchor_after_sep = False
+    j = sep_idx + 1
+    while j < len(section):
+        s = section[j].strip()
+        if s == "":
+            j += 1
+            continue
+        if _ANCHOR_RE.match(section[j]):
+            has_anchor_after_sep = True
+        break
+
+    if not has_anchor_after_sep:
+        return md_text
+
+    blocks: List[tuple] = []
+    current_anchor: Optional[str] = None
+    current_rows: List[str] = []
+    for i in range(sep_idx + 1, len(section)):
+        line = section[i]
+        m = _ANCHOR_RE.match(line)
+        if m:
+            if current_anchor is not None:
+                blocks.append((current_anchor, current_rows))
+            current_anchor = m.group(1)
+            current_rows = []
+            continue
+        if line.lstrip().startswith("|") and not _TABLE_SEP_RE.match(line):
+            current_rows.append(line)
+    if current_anchor is not None:
+        blocks.append((current_anchor, current_rows))
+
+    if not blocks:
+        return md_text
+
+    new_section: List[str] = [_COMPARISON_HEADING, ""]
+    for anchor_id, rows in blocks:
+        domain_label = anchor_id[len("domain-"):].replace("-", " ")
+        new_section.append(f'<a id="{anchor_id}"></a>')
+        new_section.append(f"### {domain_label}")
+        new_section.append("")
+        new_section.append("| Subdomain | Product | ECM | MVM | Notes |")
+        new_section.append("|---|---|:---:|:---:|---|")
+        for row in rows:
+            cells = [c.strip() for c in row.split("|")]
+            if len(cells) < 7:
+                continue
+            subdomain = cells[2]
+            product = cells[3]
+            ecm = cells[4]
+            mvm = cells[5]
+            notes = cells[6]
+            new_section.append(f"| {subdomain} | {product} | {ecm} | {mvm} | {notes} |")
+        new_section.append("")
+
+    new_lines = lines[:section_start] + new_section + lines[section_end:]
+    return "\n".join(new_lines)
+
+
+def normalize_industry_readmes(industry_dir: str, log: Optional[Callable[[str], None]] = None) -> Dict[str, object]:
+    """
+    Apply readme normalizations to <industry_dir>/readme.md (and recursively safe
+    on any other readme that exposes the same broken pattern).
+    Returns {"normalized": [paths]}.
+    """
+    if log is None:
+        log = print
+    normalized: List[str] = []
+    for root, _dirs, files in os.walk(industry_dir):
+        for fn in files:
+            if fn.lower() != "readme.md":
+                continue
+            path = os.path.join(root, fn)
+            try:
+                original = open(path, encoding="utf-8", errors="ignore").read()
+            except Exception as e:
+                log(f"  [readme-normalizer] could not read {path}: {str(e)[:200]}")
+                continue
+            fixed = normalize_domain_product_comparison(original)
+            if fixed != original:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(fixed)
+                normalized.append(path)
+                log(f"  [readme-normalizer FIRED] rewrote {path} (Domain & Product Comparison section)")
+    return {"normalized": normalized}
 
 
 def _run(cmd: List[str], timeout: int = GIT_OP_TIMEOUT_S, cwd: Optional[str] = None) -> subprocess.CompletedProcess:
@@ -195,6 +332,10 @@ def sync_completed_industries(
         if not ok:
             result["failed"].append(ind)
             continue
+        try:
+            normalize_industry_readmes(local, log)
+        except Exception as _norm_err:
+            log(f"  [readme-normalizer] threw on {ind}: {str(_norm_err)[:200]}")
         ok = _commit_and_push(repo_path, ind, branch, log)
         if ok:
             result["synced"].append(ind)
