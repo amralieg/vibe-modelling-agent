@@ -262,6 +262,101 @@ def test_orchestrator_supports_one_retry_on_failure():
     assert "build_single_industry_payload" in src
 
 
+def test_sync_to_repo_module_exists():
+    p = REPO / "runner" / "sync_to_repo.py"
+    assert p.exists(), "runner/sync_to_repo.py must exist (post-sector repo-push hook)"
+
+
+def test_sync_to_repo_exposes_public_api():
+    src = (REPO / "runner" / "sync_to_repo.py").read_text()
+    assert "def sync_completed_industries(" in src, (
+        "sync_to_repo must expose sync_completed_industries(...) for the orchestrator hook"
+    )
+    assert "DEFAULT_REPO_PATH" in src and "vibe-business-data-models" in src, (
+        "sync_to_repo must hard-default to amralieg/vibe-business-data-models repo path"
+    )
+    assert "DEFAULT_WORKSPACE_ROOT" in src and "vibe_runner_models" in src, (
+        "sync_to_repo must default to /Users/<user>/vibe_runner_models workspace folder "
+        "(matches what the runner notebook writes per industry)"
+    )
+
+
+def test_sync_to_repo_uses_workspace_export_dir():
+    src = (REPO / "runner" / "sync_to_repo.py").read_text()
+    assert '"workspace", "export-dir"' in src, (
+        "sync_to_repo MUST use 'databricks workspace export-dir' to mirror the entire "
+        "industry tree (readme.md + ecm_v1/* + mvm_v1/*) into the local repo"
+    )
+
+
+def test_sync_to_repo_skips_already_present_industries():
+    src = (REPO / "runner" / "sync_to_repo.py").read_text()
+    assert "skipped_existing" in src, (
+        "sync hook MUST skip industries already present in the local repo to keep the "
+        "operation idempotent across orchestrator restarts (multiple sectors completing across runs)"
+    )
+    assert "os.path.isdir(local)" in src or "os.path.isdir(\n        local" in src or "isdir(local)" in src, (
+        "sync hook must check os.path.isdir on the local industry folder before re-exporting"
+    )
+
+
+def test_sync_to_repo_commit_message_includes_counts():
+    src = (REPO / "runner" / "sync_to_repo.py").read_text()
+    assert "_extract_counts(" in src, (
+        "commit message must include D/P/A/MV counts so the audit log shows scope at a glance"
+    )
+    assert "Co-authored-by: Isaac" in src, (
+        "every auto-pushed commit must credit Isaac per repo convention"
+    )
+
+
+def test_sync_to_repo_pushes_to_origin_main():
+    src = (REPO / "runner" / "sync_to_repo.py").read_text()
+    assert '"git", "-C", repo_path, "push", "origin", branch' in src, (
+        "sync hook MUST push to origin/<branch> after each industry commit so the repo "
+        "is updated within ~1 min of each industry completing"
+    )
+
+
+def test_sync_to_repo_never_raises_for_orchestrator():
+    src = (REPO / "runner" / "sync_to_repo.py").read_text()
+    assert "result = {\"synced\": [], \"skipped_existing\": [], \"failed\": [], \"error\": None}" in src, (
+        "sync_completed_industries MUST return a structured result dict on every path "
+        "(success, partial failure, total failure) so the orchestrator can log without raising"
+    )
+    fn_body = src.split("def sync_completed_industries(", 1)[1]
+    assert "return result" in fn_body, "sync_completed_industries must end by returning the result dict"
+
+
+def test_orchestrator_calls_sync_to_repo_after_sector():
+    src = ORCHESTRATOR.read_text()
+    proc_fn = src.split("def process_sector(", 1)[1].split("\ndef ", 1)[0]
+    assert "sync_to_repo" in proc_fn, (
+        "process_sector MUST import the sync_to_repo module after a sector terminates so "
+        "completed industries are pushed to vibe-business-data-models within seconds"
+    )
+    assert "sync_completed_industries(" in proc_fn, (
+        "process_sector MUST call sync_completed_industries(...) post-sector"
+    )
+    assert "industry_allowlist=green_industries" in proc_fn, (
+        "the sync call MUST pass the just-completed green industries as an allowlist so "
+        "we don't accidentally re-export industries from other sessions"
+    )
+    assert "[repo-sync FIRED]" in proc_fn, (
+        "post-sector pulse MUST log a [repo-sync FIRED] sentinel for §10.7 grep verification"
+    )
+
+
+def test_orchestrator_repo_sync_failure_is_non_fatal():
+    src = ORCHESTRATOR.read_text()
+    proc_fn = src.split("def process_sector(", 1)[1].split("\ndef ", 1)[0]
+    sync_block = proc_fn.split("[repo-sync FIRED]", 1)[1] if "[repo-sync FIRED]" in proc_fn else ""
+    assert "try:" in sync_block and "except Exception" in sync_block, (
+        "the orchestrator's sync call MUST be wrapped in try/except so a git/network/auth "
+        "error in the hook never blocks the next sector"
+    )
+
+
 def test_agent_version_constant_unchanged_at_071():
     nb = json.loads(open(REPO / "agent" / "dbx_vibe_modelling_agent.ipynb").read())
     cell0_src = "".join(nb["cells"][0].get("source", [])) if nb["cells"][0].get("cell_type") == "code" else ""

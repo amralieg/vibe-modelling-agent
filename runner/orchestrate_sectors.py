@@ -366,6 +366,46 @@ def process_sector(profile, job_id, sector_label, sector_local_path, global_volu
         ),
     }
     save_state(state, state_file)
+
+    try:
+        from runner import sync_to_repo as _str_mod
+    except Exception:
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import sync_to_repo as _str_mod
+        except Exception as _imp_err:
+            _str_mod = None
+            log_pulse(f"  [{sector_label}] [repo-sync-import] skipped — could not import sync_to_repo: {str(_imp_err)[:200]}", pulse_file)
+    if _str_mod is not None:
+        green_industries = [
+            ind for ind in industries
+            if state.get("industries", {}).get(ind, {}).get("status", "").startswith("green")
+        ]
+        if green_industries:
+            log_pulse(f"  [{sector_label}] [repo-sync FIRED] syncing {len(green_industries)} green industries to vibe-business-data-models", pulse_file)
+            try:
+                sync_result = _str_mod.sync_completed_industries(
+                    profile=profile,
+                    industry_allowlist=green_industries,
+                    log=lambda m: log_pulse(m, pulse_file),
+                )
+                state.setdefault("repo_sync", {})[sector_label] = {
+                    "ts": now_utc(),
+                    "synced": sync_result.get("synced", []),
+                    "skipped_existing": sync_result.get("skipped_existing", []),
+                    "failed": sync_result.get("failed", []),
+                    "error": sync_result.get("error"),
+                }
+                save_state(state, state_file)
+                log_pulse(
+                    f"  [{sector_label}] [repo-sync RESULT] synced={len(sync_result.get('synced', []))} "
+                    f"skipped={len(sync_result.get('skipped_existing', []))} "
+                    f"failed={len(sync_result.get('failed', []))}",
+                    pulse_file,
+                )
+            except Exception as _sync_err:
+                log_pulse(f"  [{sector_label}] [repo-sync] threw: {str(_sync_err)[:300]}", pulse_file)
+
     log_pulse(f"=== SECTOR END:   {sector_label} ===", pulse_file)
 
 
