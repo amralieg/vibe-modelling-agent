@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -94,6 +95,40 @@ def save_state(state, state_file):
     tmp = state_file + ".tmp"
     Path(tmp).write_text(json.dumps(state, indent=2, default=str))
     os.replace(tmp, state_file)
+
+
+def _runner_notebook_sha(profile, runner_path, timeout=60):
+    try:
+        p = subprocess.run(
+            ["databricks", "workspace", "export", runner_path, "--format", "JUPYTER", "--profile", profile],
+            capture_output=True, text=True, timeout=timeout,
+        )
+        if p.returncode != 0 or not p.stdout:
+            return None
+        return hashlib.sha256(p.stdout.encode("utf-8")).hexdigest()
+    except Exception:
+        return None
+
+
+def assert_runner_fresh(profile, runner_path, startup_sha, pulse_file, sector_label):
+    if not startup_sha:
+        return True
+    current_sha = _runner_notebook_sha(profile, runner_path)
+    if not current_sha:
+        log_pulse(
+            f"  [stale-runner-check] WARN could not fetch current SHA for {runner_path}; skipping freshness gate",
+            pulse_file,
+        )
+        return True
+    if current_sha != startup_sha:
+        log_pulse(
+            f"  [stale-runner-detected FIRED §11.6] runner notebook changed mid-orchestrator: "
+            f"startup_sha={startup_sha[:12]} current_sha={current_sha[:12]} "
+            f"path={runner_path} — refusing to submit {sector_label} so a fresh orchestrator launch picks up the new code",
+            pulse_file,
+        )
+        return False
+    return True
 
 
 def find_or_create_job(profile, runner_path, job_name, pulse_file):
@@ -576,6 +611,19 @@ def main():
     state["job_id"] = job_id
     save_state(state, args.state_file)
 
+    startup_runner_sha = _runner_notebook_sha(args.profile, args.runner_path)
+    if startup_runner_sha:
+        log_pulse(
+            f"[orchestrator FIRED §11.6] captured startup runner SHA-256 = {startup_runner_sha[:12]}... "
+            f"for stale-import safety gate (path={args.runner_path}) alias=stale-runner-startup-sha",
+            args.pulse_file,
+        )
+    else:
+        log_pulse(
+            f"[orchestrator] WARN could not capture startup runner SHA — stale-import safety gate disabled",
+            args.pulse_file,
+        )
+
     log_pulse(f"[orchestrator FIRED] starting 10-sector loop "
               f"profile={args.profile} job_id={job_id} runner={args.runner_path} "
               f"global_volume={args.global_volume}", args.pulse_file)
@@ -587,6 +635,9 @@ def main():
                       f"{args.global_volume}/{KILL_FILE_NAME} — exiting cleanly before {sector_label}",
                       args.pulse_file)
             return
+        if not assert_runner_fresh(args.profile, args.runner_path, startup_runner_sha, args.pulse_file, sector_label):
+            save_state(state, args.state_file)
+            sys.exit(4)
         try:
             process_sector(
                 args.profile, job_id, sector_label, str(spath),

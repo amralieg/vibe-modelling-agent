@@ -366,6 +366,76 @@ def test_orchestrator_repo_sync_failure_is_non_fatal():
     )
 
 
+def test_orchestrator_has_runner_notebook_sha_helper():
+    src = ORCHESTRATOR.read_text()
+    assert "def _runner_notebook_sha(" in src, (
+        "orchestrator MUST expose _runner_notebook_sha(profile, runner_path) helper that "
+        "exports the deployed runner notebook and returns SHA-256 — needed for §11.6 stale-import gate"
+    )
+    assert "hashlib.sha256" in src, (
+        "_runner_notebook_sha must hash with SHA-256 (collision-resistant; sufficient for change detection)"
+    )
+    assert '"workspace", "export"' in src, (
+        "the helper MUST call 'databricks workspace export' to obtain the live deployed notebook bytes"
+    )
+
+
+def test_orchestrator_runner_sha_helper_returns_none_on_failure():
+    src = ORCHESTRATOR.read_text()
+    fn_body = src.split("def _runner_notebook_sha(", 1)[1].split("\ndef ", 1)[0]
+    assert "return None" in fn_body, (
+        "_runner_notebook_sha MUST return None on subprocess failure / timeout / non-zero exit "
+        "so the orchestrator's safety gate degrades gracefully without ever raising"
+    )
+    assert "except Exception" in fn_body, (
+        "_runner_notebook_sha MUST swallow all exceptions and return None — this is a safety "
+        "check, not a critical-path operation; raising would block legitimate sector submissions"
+    )
+
+
+def test_orchestrator_has_assert_runner_fresh_gate():
+    src = ORCHESTRATOR.read_text()
+    assert "def assert_runner_fresh(" in src, (
+        "orchestrator MUST expose assert_runner_fresh(...) — the §11.6 stale-import gate "
+        "called before each sector submission"
+    )
+    fn_body = src.split("def assert_runner_fresh(", 1)[1].split("\ndef ", 1)[0]
+    assert "stale-runner-detected FIRED" in fn_body, (
+        "stale-runner gate MUST emit the [stale-runner-detected FIRED] sentinel for §10.7 "
+        "deployed-archive grep verification (this is the alias the auditor will search for)"
+    )
+    assert "startup_sha" in fn_body and "current_sha" in fn_body, (
+        "the gate MUST log BOTH the startup SHA and the current SHA so the user can see "
+        "what changed and when"
+    )
+
+
+def test_orchestrator_main_captures_startup_runner_sha():
+    src = ORCHESTRATOR.read_text()
+    main_body = src.split("def main():", 1)[1]
+    assert "startup_runner_sha = _runner_notebook_sha(" in main_body, (
+        "main() MUST capture the startup runner SHA AFTER find_or_create_job (when the runner_path "
+        "is finalized) and BEFORE the sector loop — this snapshot is the §11.6 baseline"
+    )
+    assert "stale-runner-startup-sha" in main_body, (
+        "main() MUST log the startup-sha alias for grep-verification of the §11.6 deploy"
+    )
+
+
+def test_orchestrator_sector_loop_calls_assert_runner_fresh():
+    src = ORCHESTRATOR.read_text()
+    main_body = src.split("def main():", 1)[1]
+    loop_body = main_body.split("for spath in sector_paths:", 1)[1]
+    assert "assert_runner_fresh(" in loop_body, (
+        "the per-sector loop MUST call assert_runner_fresh(...) BEFORE process_sector(...) "
+        "so a mid-loop runner re-deploy aborts the orchestrator instead of submitting a stale-DAG sector"
+    )
+    assert "sys.exit(4)" in loop_body, (
+        "on stale-runner detection the orchestrator MUST exit with code 4 (distinct from "
+        "preflight=3 / sectors-missing=2 / generic=1) so a wrapper / cron can re-launch"
+    )
+
+
 def test_agent_version_constant_unchanged_at_071():
     nb = json.loads(open(REPO / "agent" / "dbx_vibe_modelling_agent.ipynb").read())
     cell0_src = "".join(nb["cells"][0].get("source", [])) if nb["cells"][0].get("cell_type") == "code" else ""
