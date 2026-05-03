@@ -468,6 +468,135 @@ def test_orchestrator_exposes_kill_orphan_pipeline_runs_helper():
     )
 
 
+def test_orchestrator_has_resolve_sector_filter_helper():
+    """v0.7.1 (alias=sectors-filter) — the orchestrator MUST expose
+    _resolve_sector_filter(sectors_arg, default_sector_paths) so the Option B
+    multi-cloud launcher can pass GCP its half of sectors and Azure the other half.
+    Sentinel grep + signature contract.
+    """
+    src = ORCHESTRATOR.read_text()
+    assert "def _resolve_sector_filter(" in src, (
+        "orchestrator MUST expose _resolve_sector_filter(...) — required for Option B "
+        "multi-cloud parallelisation (split SECTOR_FILES_ORDER across emirates-gcp + fe-vm-feip)"
+    )
+    fn_body = src.split("def _resolve_sector_filter(", 1)[1].split("\ndef ", 1)[0]
+    assert "alias=sectors-filter" in fn_body, (
+        "_resolve_sector_filter MUST carry the sectors-filter alias in its docstring "
+        "so §10.7 deployed-archive grep can verify the v0.7.1 fix is live"
+    )
+    assert "raise ValueError" in fn_body, (
+        "_resolve_sector_filter MUST raise ValueError on unknown sector — fail loudly so "
+        "a typo'd launcher arg never silently drops sectors from the run"
+    )
+    assert "specified more than once" in fn_body, (
+        "_resolve_sector_filter MUST reject duplicates — submitting the same sector twice "
+        "would create two parallel pipelines per industry, violating §10.6 'no two runs' rule"
+    )
+
+
+def test_orchestrator_supports_sectors_cli_arg():
+    """The --sectors CLI arg must appear in --help and be plumbed into _resolve_sector_filter."""
+    import subprocess
+    p = subprocess.run(
+        ["python3", str(ORCHESTRATOR), "--help"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert p.returncode == 0, f"orchestrator --help failed: {p.stderr[:500]}"
+    assert "--sectors" in p.stdout, "--sectors CLI arg missing from orchestrator --help"
+    src = ORCHESTRATOR.read_text()
+    main_body = src.split("def main():", 1)[1]
+    assert 'parser.add_argument(\n        "--sectors"' in main_body or 'parser.add_argument("--sectors"' in main_body, (
+        "main() MUST register the --sectors CLI arg via parser.add_argument"
+    )
+    assert "_resolve_sector_filter(args.sectors, sector_paths)" in main_body, (
+        "main() MUST call _resolve_sector_filter(args.sectors, sector_paths) AFTER "
+        "building the default sector_paths list and BEFORE the sector loop"
+    )
+
+
+def test_orchestrator_logs_sectors_filter_fired_alias():
+    """The [sectors-filter FIRED] sentinel must be logged when --sectors is set, and the
+    [sectors-filter] no-op log when it isn't — both for §10.7 deployed-archive grep verification.
+    """
+    src = ORCHESTRATOR.read_text()
+    main_body = src.split("def main():", 1)[1]
+    assert "[sectors-filter FIRED]" in main_body, (
+        "main() MUST log [sectors-filter FIRED] when --sectors is non-empty so the auditor "
+        "can grep the deployed orchestrator to confirm the filter is wired into the live binary"
+    )
+    assert "alias=sectors-filter-default" in main_body, (
+        "main() MUST log alias=sectors-filter-default when --sectors is omitted so the no-filter "
+        "path also leaves an audit trail"
+    )
+
+
+def test_resolve_sector_filter_round_trip_with_real_sectors():
+    """End-to-end: import the helper, call it with realistic GCP + Azure splits, verify
+    the right Path objects come back in the right order. Catches accidental refactor-breakage.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("orchestrate_sectors", ORCHESTRATOR)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    defaults = [Path(f"/fake/dir/{n}") for n in mod.SECTOR_FILES_ORDER]
+
+    gcp_half = mod._resolve_sector_filter(
+        "financial_services,healthcare_and_life_sciences,travel_transport_logistics,retail_and_consumer_goods",
+        defaults,
+    )
+    assert [p.stem for p in gcp_half] == [
+        "financial_services",
+        "healthcare_and_life_sciences",
+        "travel_transport_logistics",
+        "retail_and_consumer_goods",
+    ]
+
+    azure_half = mod._resolve_sector_filter(
+        "energy_and_utilities,public_sector_education_nonprofit,communications_media_entertainment,manufacturing",
+        defaults,
+    )
+    assert [p.stem for p in azure_half] == [
+        "energy_and_utilities",
+        "public_sector_education_nonprofit",
+        "communications_media_entertainment",
+        "manufacturing",
+    ]
+
+    covered = {p.stem for p in gcp_half} | {p.stem for p in azure_half}
+    expected_post_done = {p.stem for p in defaults} - {"agriculture", "real_estate_and_professional_services"}
+    assert covered == expected_post_done, (
+        f"GCP+Azure split must cover every sector NOT already done by the active GCP run "
+        f"(agriculture + real_estate already in vibe-business-data-models). "
+        f"Missing: {expected_post_done - covered}, extra: {covered - expected_post_done}"
+    )
+
+    none_arg = mod._resolve_sector_filter(None, defaults)
+    assert len(none_arg) == 10
+    empty_arg = mod._resolve_sector_filter("", defaults)
+    assert len(empty_arg) == 10
+    whitespace_arg = mod._resolve_sector_filter("   ", defaults)
+    assert len(whitespace_arg) == 10
+
+
+def test_resolve_sector_filter_rejects_unknown_and_duplicate():
+    """Defensive contract: typo'd sector name MUST fail the orchestrator at startup
+    so the user catches it before launching a run that silently skips sectors.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("orchestrate_sectors", ORCHESTRATOR)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    defaults = [Path(f"/fake/dir/{n}") for n in mod.SECTOR_FILES_ORDER]
+
+    with pytest.raises(ValueError, match="unknown sector"):
+        mod._resolve_sector_filter("healthcare_and_life_sciences,not_a_real_sector", defaults)
+
+    with pytest.raises(ValueError, match="more than once"):
+        mod._resolve_sector_filter("manufacturing,manufacturing", defaults)
+
+
 def test_preflight_invokes_kill_orphan_helper():
     src = ORCHESTRATOR.read_text()
     preflight_body = src.split("def preflight(", 1)[1].split("\ndef ", 1)[0]

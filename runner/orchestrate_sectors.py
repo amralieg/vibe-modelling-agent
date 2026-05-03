@@ -39,6 +39,54 @@ SECTOR_FILES_ORDER = [
 ]
 
 
+def _resolve_sector_filter(sectors_arg, default_sector_paths):
+    """v0.7.1 (alias=sectors-filter) — Filter and reorder sector_paths from a
+    comma-separated CLI arg.
+
+    Inputs:
+      sectors_arg: e.g. "healthcare_and_life_sciences,travel_transport_logistics"
+                   or "healthcare_and_life_sciences.json,travel.json"
+                   None / "" / whitespace -> return default_sector_paths unchanged.
+      default_sector_paths: list[pathlib.Path] in canonical SECTOR_FILES_ORDER order.
+
+    Returns: list[pathlib.Path] in the order the user specified.
+
+    Raises ValueError if any requested sector stem/filename is not present in the
+    default list — fail loudly rather than silently dropping a misspelled sector.
+
+    This is what enables Option B multi-cloud parallelisation: the GCP launcher
+    passes its half via --sectors, the Azure launcher passes its half, neither
+    cloud sees the other's catalogs.
+    """
+    if not sectors_arg or not str(sectors_arg).strip():
+        return list(default_sector_paths)
+    by_stem = {p.stem: p for p in default_sector_paths}
+    by_name = {p.name: p for p in default_sector_paths}
+    requested = [s.strip() for s in str(sectors_arg).split(",") if s.strip()]
+    if not requested:
+        return list(default_sector_paths)
+    out = []
+    seen = set()
+    for r in requested:
+        if r in by_stem:
+            p = by_stem[r]
+        elif r in by_name:
+            p = by_name[r]
+        elif r.endswith(".json") and r in by_name:
+            p = by_name[r]
+        else:
+            raise ValueError(
+                f"--sectors: unknown sector '{r}'. "
+                f"Valid stems: {sorted(by_stem.keys())}. "
+                f"Valid filenames: {sorted(by_name.keys())}."
+            )
+        if p.stem in seen:
+            raise ValueError(f"--sectors: sector '{r}' specified more than once")
+        seen.add(p.stem)
+        out.append(p)
+    return out
+
+
 def now_utc():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -578,6 +626,15 @@ def main():
     parser.add_argument("--pulse-file", default=DEFAULT_PULSE_FILE)
     parser.add_argument("--state-file", default=DEFAULT_STATE_FILE)
     parser.add_argument("--sectors-dir", default=str(Path(__file__).resolve().parent / "industry-sectors"))
+    parser.add_argument(
+        "--sectors",
+        default=None,
+        help="Comma-separated subset of sector stems or filenames to run, in the "
+             "order specified. Example: --sectors "
+             "healthcare_and_life_sciences,travel_transport_logistics,retail_and_consumer_goods. "
+             "When omitted, all 10 sectors run in canonical SECTOR_FILES_ORDER. Used by the "
+             "Option B multi-cloud launcher to split sectors across emirates-gcp and fe-vm-feip.",
+    )
     parser.add_argument("--dry-preflight", action="store_true",
                         help="Run pre-flight checks only and exit without submitting any sector.")
     args = parser.parse_args()
@@ -594,6 +651,12 @@ def main():
             print(f"FATAL: sector file missing: {p}", file=sys.stderr)
             sys.exit(2)
         sector_paths.append(p)
+
+    try:
+        sector_paths = _resolve_sector_filter(args.sectors, sector_paths)
+    except ValueError as e:
+        print(f"FATAL: {e}", file=sys.stderr)
+        sys.exit(2)
 
     sector_upload_dir = f"{args.global_volume}/{args.sector_upload_subdir}"
     state = load_state(args.state_file)
@@ -624,7 +687,23 @@ def main():
             args.pulse_file,
         )
 
-    log_pulse(f"[orchestrator FIRED] starting 10-sector loop "
+    if args.sectors:
+        log_pulse(
+            f"[sectors-filter FIRED] alias=sectors-filter user-specified subset of "
+            f"{len(sector_paths)}/{len(SECTOR_FILES_ORDER)} sectors will run in this order: "
+            f"{[p.stem for p in sector_paths]} (raw arg={args.sectors!r}) — "
+            f"this is Option B multi-cloud parallelisation; the OTHER cloud must run the "
+            f"complement to cover all 10 sectors.",
+            args.pulse_file,
+        )
+    else:
+        log_pulse(
+            f"[sectors-filter] no --sectors specified — running ALL "
+            f"{len(SECTOR_FILES_ORDER)} sectors in canonical order alias=sectors-filter-default",
+            args.pulse_file,
+        )
+
+    log_pulse(f"[orchestrator FIRED] starting {len(sector_paths)}-sector loop "
               f"profile={args.profile} job_id={job_id} runner={args.runner_path} "
               f"global_volume={args.global_volume}", args.pulse_file)
 
