@@ -317,8 +317,24 @@ def sync_completed_industries(
 
     industries = _list_workspace_industries(workspace_root, profile, log)
     if industry_allowlist:
-        allow = set(industry_allowlist)
-        industries = [i for i in industries if i in allow]
+        # v0.7.2 (alias=sync-allowlist-snake-case) — orchestrator passes display
+        # names like "Health Insurance" / "Payments Fintech" into industry_allowlist
+        # (these are the names from state.json["industries"] which preserves
+        # widget capitalization), but workspace folder names are sanitized
+        # snake_case ("health_insurance", "payments_fintech"). Pre-fix the set
+        # intersection was empty for every orchestrator-fired sync — silent
+        # zero-push on every sector END despite multiple GREEN industries
+        # being ready in the workspace. Normalize BOTH sides to snake_case
+        # before intersecting so the orchestrator's allowlist actually matches.
+        def _to_snake(n):
+            import re as _re
+            s = str(n).lower()
+            s = _re.sub(r"[^a-z0-9_]+", "_", s)
+            s = _re.sub(r"_+", "_", s).strip("_")
+            return s
+        allow = {_to_snake(i) for i in industry_allowlist}
+        industries = [i for i in industries if _to_snake(i) in allow]
+        log(f"  [sync-allowlist-snake-case FIRED] allowlist normalized to {sorted(allow)} — matched {len(industries)} workspace dirs")
     if not industries:
         log(f"  [repo-sync] no industries found under {workspace_root}")
         return result
