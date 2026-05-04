@@ -48,6 +48,10 @@ QUALITY_GATE_MIN_PRODUCTS = 5
 QUALITY_GATE_MIN_ATTRIBUTES = 50
 QUALITY_GATE_MIN_DOMAINS = 3
 QUALITY_GATE_PROBE_DEPTH = 5
+GLOBAL_VOLUME = "/Volumes/_root/default/root_vol"
+QUALITY_GATE_MIN_FILES_COPIED = 30
+QUALITY_GATE_MIN_FILES_ECM = 20
+QUALITY_GATE_MIN_FILES_MVM = 15
 JOB_NAME_PREFIX = "dbx_vibe_"
 JOB_NAME_SUFFIX = "_pipeline_ecm_mvm_v1"
 CLOUDS = [
@@ -133,9 +137,33 @@ def _model_counts(model_obj):
     return n_d, n_p, n_a, n_mv
 
 
+def _read_volume_manifest(profile, industry_snake):
+    """Download and parse the orchestrator's per-industry _manifest.json from the
+    global volume. Returns parsed dict on success, None on failure."""
+    remote = f"dbfs:{GLOBAL_VOLUME}/{industry_snake}/_manifest.json"
+    local = f"/tmp/qg_manifest_{industry_snake}_{int(time.time())}.json"
+    try:
+        if os.path.isfile(local):
+            os.remove(local)
+        out = subprocess.run(
+            ["databricks", "fs", "cp", remote, local, "--overwrite", "--profile", profile],
+            capture_output=True, text=True, timeout=60,
+        )
+        if out.returncode != 0:
+            return None
+        return json.loads(Path(local).read_text())
+    except Exception:
+        return None
+    finally:
+        try:
+            os.remove(local)
+        except OSError:
+            pass
+
+
 def passes_quality_gate(profile, industry_snake, cloud_name, log_fn=log):
-    """v0.7.4 (alias=sync-watchdog-quality-gate) — verify ECM model.json has real
-    content before pushing.
+    """v0.7.4 (alias=sync-watchdog-quality-gate) — verify the orchestrator's volume
+    manifest declares a real, finished model before pushing.
 
     ROOT CAUSE this fixes (within v0.7.4):
     The first watchdog cycle pushed `semiconductors`, `chemical_mfg`, and
@@ -144,44 +172,50 @@ def passes_quality_gate(profile, industry_snake, cloud_name, log_fn=log):
     aborted very early but the run still terminated TERMINATED/SUCCESS due to a
     soft-accept hatch). Without a content gate, any TERMINATED/SUCCESS pipeline
     run was eligible for push. Reverted those 3 commits via force-push, then
-    added this gate so the watchdog only publishes industries with REAL models.
+    added this gate.
+
+    Originally tried to download model.json from the workspace, but the CLI's
+    `workspace export` has a 10MB limit and real models are 14MB+. Switched to
+    the orchestrator's volume `_manifest.json` (always small, written ONLY when
+    all 5 task states are OK, contains per-scope file counts that distinguish
+    real models from empty shells).
 
     Gate criteria (must satisfy ALL):
-      - ECM model.json exists at <workspace_root>/<industry>/ecm_v1/model.json
-      - n_domains  >= QUALITY_GATE_MIN_DOMAINS (3)
-      - n_products >= QUALITY_GATE_MIN_PRODUCTS (5)
-      - n_attrs    >= QUALITY_GATE_MIN_ATTRIBUTES (50)
+      - manifest exists at <GLOBAL_VOLUME>/<industry>/_manifest.json
+      - manifest['run_metadata']['all_tasks_succeeded'] == True
+      - manifest['files_copied'] >= QUALITY_GATE_MIN_FILES_COPIED (30)
+      - manifest['scopes']['ecm_v1']['files'] >= QUALITY_GATE_MIN_FILES_ECM (20)
+      - manifest['scopes']['mvm_v1']['files'] >= QUALITY_GATE_MIN_FILES_MVM (15)
+    Reference: healthcare manifest = 211 files copied, ecm_v1=59, mvm_v1=47.
+    Empty shells produce <10 files because metric-view + schema generation
+    aborts before the volume mirror runs.
     """
-    workspace_root = "/Users/amr.ali@databricks.com/vibe_runner_models"
-    ecm_path = f"{workspace_root}/{industry_snake}/ecm_v1/model.json"
-    local_tmp = f"/tmp/quality_gate_{cloud_name}_{industry_snake}_{int(time.time())}.json"
-    try:
-        out = subprocess.run(
-            ["databricks", "workspace", "export", ecm_path, "--format", "AUTO",
-             "--file", local_tmp, "--profile", profile, "--overwrite"],
-            capture_output=True, text=True, timeout=120,
-        )
-        if out.returncode != 0:
-            log_fn(f"  [{cloud_name}] [quality-gate REJECT] {industry_snake}: ECM model.json not exportable ({out.stderr[:120]})")
-            return False
-        model_obj = json.loads(Path(local_tmp).read_text())
-    except Exception as e:
-        log_fn(f"  [{cloud_name}] [quality-gate REJECT] {industry_snake}: read failed: {str(e)[:200]}")
+    manifest = _read_volume_manifest(profile, industry_snake)
+    if not manifest:
+        log_fn(f"  [{cloud_name}] [quality-gate REJECT] {industry_snake}: no _manifest.json on volume")
         return False
-    finally:
-        try:
-            os.remove(local_tmp)
-        except OSError:
-            pass
-    nd, np_, na, nmv = _model_counts(model_obj)
-    if (nd < QUALITY_GATE_MIN_DOMAINS or np_ < QUALITY_GATE_MIN_PRODUCTS or na < QUALITY_GATE_MIN_ATTRIBUTES):
+    rm = manifest.get("run_metadata", {})
+    if not rm.get("all_tasks_succeeded"):
+        log_fn(f"  [{cloud_name}] [quality-gate REJECT] {industry_snake}: all_tasks_succeeded=False (failed_parts={rm.get('failed_parts')})")
+        return False
+    files_copied = manifest.get("files_copied", 0)
+    scopes = manifest.get("scopes", {})
+    ecm_files = scopes.get("ecm_v1", {}).get("files", 0)
+    mvm_files = scopes.get("mvm_v1", {}).get("files", 0)
+    if (files_copied < QUALITY_GATE_MIN_FILES_COPIED
+            or ecm_files < QUALITY_GATE_MIN_FILES_ECM
+            or mvm_files < QUALITY_GATE_MIN_FILES_MVM):
         log_fn(
             f"  [{cloud_name}] [quality-gate REJECT] {industry_snake}: "
-            f"domains={nd} products={np_} attrs={na} mv={nmv} — below thresholds "
-            f"(min d={QUALITY_GATE_MIN_DOMAINS} p={QUALITY_GATE_MIN_PRODUCTS} a={QUALITY_GATE_MIN_ATTRIBUTES})"
+            f"files_copied={files_copied} ecm={ecm_files} mvm={mvm_files} — "
+            f"below thresholds (min copied={QUALITY_GATE_MIN_FILES_COPIED} "
+            f"ecm={QUALITY_GATE_MIN_FILES_ECM} mvm={QUALITY_GATE_MIN_FILES_MVM})"
         )
         return False
-    log_fn(f"  [{cloud_name}] [quality-gate PASS] {industry_snake}: domains={nd} products={np_} attrs={na} mv={nmv}")
+    log_fn(
+        f"  [{cloud_name}] [quality-gate PASS] {industry_snake}: "
+        f"files_copied={files_copied} ecm={ecm_files} mvm={mvm_files}"
+    )
     return True
 
 

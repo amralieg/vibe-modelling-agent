@@ -386,20 +386,31 @@ def test_v074_watchdog_quality_gate_helper_exists():
 
 
 def test_v074_watchdog_quality_gate_thresholds_are_strict():
-    """Empty shell models had 3 domains / 0 products / 0 attributes. Threshold for
-    real models must require at least 5 products + 50 attributes (every real industry
-    pushed so far has 100+ products and 5000+ attrs)."""
+    """Empty shell models produced <10 files; real models produce 50-200.
+    Manifest-based threshold must require ≥30 files copied + ≥20 ECM + ≥15 MVM."""
     sys.path.insert(0, str(REPO_ROOT / "runner"))
     try:
         m = importlib.import_module("sync_watchdog")
     finally:
         sys.path.pop(0)
-    assert m.QUALITY_GATE_MIN_PRODUCTS >= 5
-    assert m.QUALITY_GATE_MIN_ATTRIBUTES >= 50
-    assert m.QUALITY_GATE_MIN_DOMAINS >= 3
+    assert m.QUALITY_GATE_MIN_FILES_COPIED >= 30
+    assert m.QUALITY_GATE_MIN_FILES_ECM >= 20
+    assert m.QUALITY_GATE_MIN_FILES_MVM >= 15
+
+
+def test_v074_watchdog_uses_global_volume_manifest():
+    """Workspace export hits 10MB limit on real models (healthcare = 14MB).
+    Switched to volume _manifest.json which is always small and authoritative."""
+    src = WATCHDOG_FILE.read_text()
+    assert "_read_volume_manifest" in src, "watchdog must define _read_volume_manifest helper"
+    assert "/Volumes/_root/default/root_vol" in src, (
+        "watchdog must reference the global volume root path"
+    )
+    assert "_manifest.json" in src, "watchdog must read the orchestrator's _manifest.json"
 
 
 def test_v074_watchdog_model_counts_handles_nested_and_flat():
+    """Helper still useful for ad-hoc inspection even though gate uses manifest."""
     sys.path.insert(0, str(REPO_ROOT / "runner"))
     try:
         m = importlib.import_module("sync_watchdog")
@@ -423,71 +434,103 @@ def test_v074_watchdog_model_counts_handles_nested_and_flat():
     assert m._model_counts({"domains": []}) == (0, 0, 0, 0)
 
 
-def test_v074_watchdog_quality_gate_rejects_empty_shells():
-    """Simulate the actual bug: an Azure 'semiconductors' run that produced 3
-    domains / 0 products / 0 attributes. Must REJECT, not PASS."""
+def _make_fake_manifest_runner(manifest_dict):
+    """Helper: returns a subprocess.run replacement that writes manifest_dict
+    to whatever local file the CLI was asked to copy to, and returns rc=0."""
+    import json as _json
+    fake = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    def fake_run(cmd, capture_output=True, text=True, timeout=None):
+        if "fs" in cmd and "cp" in cmd and len(cmd) >= 5:
+            local_idx = cmd.index("cp") + 2
+            local = cmd[local_idx]
+            _json.dump(manifest_dict, open(local, "w"))
+        return fake
+
+    return fake_run
+
+
+def test_v074_watchdog_quality_gate_rejects_empty_shells_via_manifest():
+    """Empty shell run produces a manifest with files_copied <30 (or no manifest at all).
+    Must REJECT."""
     sys.path.insert(0, str(REPO_ROOT / "runner"))
     try:
         m = importlib.import_module("sync_watchdog")
     finally:
         sys.path.pop(0)
-    import json as _json
-    empty_shell = {"model": {"domains": [
-        {"name": "core_operations", "products": []},
-        {"name": "customer_management", "products": []},
-        {"name": "shared", "products": []},
-    ], "metric_views": []}}
-    fake_export = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
-
-    def fake_run(cmd, capture_output=True, text=True, timeout=None):
-        if "--file" in cmd:
-            file_path = cmd[cmd.index("--file") + 1]
-            _json.dump(empty_shell, open(file_path, "w"))
-        return fake_export
-
+    empty_manifest = {
+        "alias": "global-collection-volume-manifest",
+        "business_name": "Semiconductors",
+        "scopes": {"ecm_v1": {"status": "ok", "files": 5}, "mvm_v1": {"status": "ok", "files": 3}},
+        "files_copied": 8,
+        "run_metadata": {"all_tasks_succeeded": True, "warning_count": 0},
+    }
     captured = []
-
-    def fake_log(msg):
-        captured.append(msg)
-
-    with mock.patch.object(m.subprocess, "run", side_effect=fake_run):
-        result = m.passes_quality_gate("emirates-gcp", "semiconductors", "AZURE", log_fn=fake_log)
-    assert result is False, "empty-shell model must FAIL the quality gate"
-    assert any("REJECT" in c for c in captured), "must log a REJECT line"
+    with mock.patch.object(m.subprocess, "run", side_effect=_make_fake_manifest_runner(empty_manifest)):
+        result = m.passes_quality_gate("fe-vm-feip", "semiconductors", "AZURE", log_fn=captured.append)
+    assert result is False, "Manifest with files_copied=8 must FAIL"
+    assert any("REJECT" in c for c in captured), "must log REJECT"
 
 
-def test_v074_watchdog_quality_gate_passes_real_models():
-    """A real model (e.g. healthcare ECM 22d/541p/22423a/104mv) must PASS."""
+def test_v074_watchdog_quality_gate_rejects_when_tasks_failed():
+    """all_tasks_succeeded=False must fail even if files_copied is high enough
+    (e.g. install crashed but partial schema dump succeeded)."""
     sys.path.insert(0, str(REPO_ROOT / "runner"))
     try:
         m = importlib.import_module("sync_watchdog")
     finally:
         sys.path.pop(0)
-    import json as _json
-    real_model = {"model": {"domains": [
-        {"name": f"d{i}", "products": [
-            {"name": f"p{i}_{j}", "attributes": [{"name": f"a{k}"} for k in range(10)]}
-            for j in range(5)
-        ]}
-        for i in range(3)
-    ], "metric_views": [{"name": f"mv{i}"} for i in range(5)]}}
-    fake_export = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+    partial_failure = {
+        "scopes": {"ecm_v1": {"status": "ok", "files": 100}, "mvm_v1": {"status": "ok", "files": 80}},
+        "files_copied": 200,
+        "run_metadata": {"all_tasks_succeeded": False, "failed_parts": ["mvm_install"]},
+    }
+    captured = []
+    with mock.patch.object(m.subprocess, "run", side_effect=_make_fake_manifest_runner(partial_failure)):
+        result = m.passes_quality_gate("emirates-gcp", "test_industry", "GCP", log_fn=captured.append)
+    assert result is False, "all_tasks_succeeded=False must REJECT regardless of file count"
+    assert any("all_tasks_succeeded=False" in c for c in captured), "must cite the failure reason"
+
+
+def test_v074_watchdog_quality_gate_passes_real_manifest():
+    """Healthcare-class manifest (211 files copied, ecm=59, mvm=47) must PASS."""
+    sys.path.insert(0, str(REPO_ROOT / "runner"))
+    try:
+        m = importlib.import_module("sync_watchdog")
+    finally:
+        sys.path.pop(0)
+    real_manifest = {
+        "alias": "global-collection-volume-manifest",
+        "business_name": "Healthcare",
+        "scopes": {"ecm_v1": {"status": "ok", "files": 59}, "mvm_v1": {"status": "ok", "files": 47}},
+        "files_copied": 211,
+        "run_metadata": {"all_tasks_succeeded": True, "warning_count": 0, "failed_parts": []},
+    }
+    captured = []
+    with mock.patch.object(m.subprocess, "run", side_effect=_make_fake_manifest_runner(real_manifest)):
+        result = m.passes_quality_gate("emirates-gcp", "healthcare", "GCP", log_fn=captured.append)
+    assert result is True, "Healthcare-class manifest must PASS"
+    assert any("PASS" in c for c in captured), "must log PASS"
+
+
+def test_v074_watchdog_quality_gate_rejects_missing_manifest():
+    """If no manifest exists on the volume, run is incomplete — REJECT."""
+    sys.path.insert(0, str(REPO_ROOT / "runner"))
+    try:
+        m = importlib.import_module("sync_watchdog")
+    finally:
+        sys.path.pop(0)
+    fail = subprocess.CompletedProcess(args=[], returncode=1, stdout="",
+                                       stderr="dbfs file not found")
 
     def fake_run(cmd, capture_output=True, text=True, timeout=None):
-        if "--file" in cmd:
-            file_path = cmd[cmd.index("--file") + 1]
-            _json.dump(real_model, open(file_path, "w"))
-        return fake_export
+        return fail
 
     captured = []
-
-    def fake_log(msg):
-        captured.append(msg)
-
     with mock.patch.object(m.subprocess, "run", side_effect=fake_run):
-        result = m.passes_quality_gate("emirates-gcp", "healthcare", "GCP", log_fn=fake_log)
-    assert result is True, "real model with 3 domains × 5 products × 10 attrs must PASS"
-    assert any("PASS" in c for c in captured), "must log a PASS line"
+        result = m.passes_quality_gate("emirates-gcp", "no_such_industry", "GCP", log_fn=captured.append)
+    assert result is False, "Missing manifest must REJECT"
+    assert any("no _manifest.json" in c for c in captured), "must cite missing manifest"
 
 
 def test_v074_watchdog_quality_gate_called_before_push():
