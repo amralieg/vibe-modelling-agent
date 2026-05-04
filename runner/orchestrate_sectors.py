@@ -21,7 +21,7 @@ DEFAULT_JOB_NAME = "dbx_vibe_modelling_sector_runner_v71"
 KILL_FILE_NAME = "_kill.json"
 PULSE_INTERVAL_S = 600
 POLL_INTERVAL_S = 120
-SECTOR_TIMEOUT_S = 14 * 3600
+SECTOR_TIMEOUT_S = 36 * 3600
 SUBMIT_RETRY_COUNT = 2
 SUBMIT_RETRY_DELAY_S = 60
 
@@ -103,14 +103,59 @@ def log_pulse(msg, pulse_file=DEFAULT_PULSE_FILE):
         f.write(line + "\n")
 
 
+_AUTH_ERROR_HINTS = (
+    "oauth", "token has expired", "refresh token expired", "401", "unauthorized",
+    "invalid_grant", "could not refresh", "token was revoked", "access_token",
+)
+
+
+def _force_token_refresh(profile):
+    """v0.7.4 (alias=oauth-reauth) — force the CLI to refresh its OAuth bearer token.
+
+    `databricks auth token --profile X` triggers the full refresh-token grant
+    against the workspace IDP. If the refresh token is still valid, this returns
+    a fresh access token within seconds; if it's also expired, this errors with
+    a clear message and we fall through (orchestrator will keep retrying with
+    longer back-off).
+    """
+    try:
+        subprocess.run(
+            ["databricks", "auth", "token", "--profile", profile],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+    except Exception:
+        pass
+
+
 def db(args, profile, capture=True, timeout=300):
+    """v0.7.4 (alias=oauth-reauth) — wrap CLI invocation with one auth-error retry.
+
+    ROOT CAUSE this fixes:
+    Pre-v0.7.4 the orchestrator-poll loop caught generic exceptions and slept
+    POLL_INTERVAL_S between retries, producing ~30-60 min stalls when the CLI's
+    cached OAuth token expired (observed 1-2h pauses on AWS+Azure orchestrators
+    May 4 morning). The CLI normally auto-refreshes via the cached refresh
+    token but transient IDP errors / clock-skew can short-circuit that path,
+    leaving the cached token expired with no automatic recovery.
+
+    The fix: detect auth-error signatures in stderr, force one explicit token
+    refresh via `databricks auth token --profile X`, and retry the original
+    command exactly once. If still failing, propagate so the caller's retry
+    loop handles it (longer back-off / pulse warning).
+    """
     cmd = ["databricks"] + args + ["--profile", profile]
     p = subprocess.run(cmd, capture_output=capture, text=True, timeout=timeout)
-    if p.returncode != 0:
-        raise RuntimeError(
-            f"databricks {' '.join(args)} -> code={p.returncode}\nstderr={p.stderr[:1000]}"
-        )
-    return p.stdout
+    if p.returncode == 0:
+        return p.stdout
+    err_lower = (p.stderr or "").lower()
+    if any(h in err_lower for h in _AUTH_ERROR_HINTS):
+        _force_token_refresh(profile)
+        p = subprocess.run(cmd, capture_output=capture, text=True, timeout=timeout)
+        if p.returncode == 0:
+            return p.stdout
+    raise RuntimeError(
+        f"databricks {' '.join(args)} -> code={p.returncode}\nstderr={p.stderr[:1000]}"
+    )
 
 
 def db_json(args, profile, timeout=300):
@@ -345,6 +390,49 @@ def build_single_industry_payload(sector_payload, industry_name):
     }
 
 
+def _sync_one_industry_now(profile, industry_name, pulse_file, state, state_file, sector_label):
+    """v0.7.4 (alias=per-industry-sync) — push ONE green industry to repo immediately
+    instead of waiting for sector end.
+
+    ROOT CAUSE this fixes:
+    Pre-v0.7.4 sync_to_repo only fired at sector end (line 463 below). When a
+    sector_runner timed out (e.g. AWS Retail 8.5h burned the 14h budget; Azure
+    Oil Gas 17h burned it; both forced 6+/3+ siblings into one-by-one retry),
+    green industries sat on the workspace volume for HOURS waiting for the
+    sector hook. This per-industry hook publishes them within seconds of
+    confirmation, drastically tightening the artifact freshness loop.
+    """
+    try:
+        from runner import sync_to_repo as _str_mod
+    except Exception:
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import sync_to_repo as _str_mod
+        except Exception as _imp_err:
+            log_pulse(f"  [{sector_label}] [per-industry-sync] skipped {industry_name}: import failed: {str(_imp_err)[:200]}", pulse_file)
+            return
+    log_pulse(f"  [{sector_label}] [per-industry-sync FIRED] pushing '{industry_name}'", pulse_file)
+    try:
+        sync_result = _str_mod.sync_completed_industries(
+            profile=profile,
+            industry_allowlist=[industry_name],
+            log=lambda m: log_pulse(m, pulse_file),
+        )
+        synced = sync_result.get("synced", [])
+        skipped = sync_result.get("skipped_existing", [])
+        failed = sync_result.get("failed", [])
+        state.setdefault("repo_sync_per_industry", {})[industry_name] = {
+            "ts": now_utc(), "synced": synced, "skipped_existing": skipped, "failed": failed,
+        }
+        save_state(state, state_file)
+        log_pulse(
+            f"  [{sector_label}] [per-industry-sync RESULT] {industry_name}: synced={synced} skipped={skipped} failed={failed}",
+            pulse_file,
+        )
+    except Exception as _e:
+        log_pulse(f"  [{sector_label}] [per-industry-sync] threw on {industry_name}: {str(_e)[:300]}", pulse_file)
+
+
 def process_sector(profile, job_id, sector_label, sector_local_path, global_volume,
                    sector_upload_dir, pulse_file, state, state_file):
     sector_payload = json.loads(Path(sector_local_path).read_text())
@@ -407,6 +495,7 @@ def process_sector(profile, job_id, sector_label, sector_local_path, global_volu
                 state.setdefault("completed_industries", []).append(ind)
             state.setdefault("industries", {})[ind] = {"status": "green", "ts": now_utc(), "run_id": run_id}
             log_pulse(f"    GREEN {ind}", pulse_file)
+            _sync_one_industry_now(profile, ind, pulse_file, state, state_file, sector_label)
         else:
             failed.append(ind)
             state.setdefault("industries", {})[ind] = {"status": "red", "ts": now_utc(), "run_id": run_id}
@@ -431,6 +520,7 @@ def process_sector(profile, job_id, sector_label, sector_local_path, global_volu
                         state.setdefault("completed_industries", []).append(ind)
                     state["industries"][ind] = {"status": "green_after_retry", "ts": now_utc(), "run_id": retry_run_id}
                     log_pulse(f"    RECOVERED {ind} after retry", pulse_file)
+                    _sync_one_industry_now(profile, ind, pulse_file, state, state_file, sector_label)
                 else:
                     state["industries"][ind] = {"status": "red_after_retry", "ts": now_utc(), "run_id": retry_run_id}
                     log_pulse(f"    PERMANENT-RED {ind} after retry", pulse_file)
