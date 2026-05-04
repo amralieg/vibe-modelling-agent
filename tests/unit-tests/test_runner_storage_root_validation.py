@@ -210,37 +210,143 @@ class TestResolveManagedLocationWithValidation:
         assert helpers._resolve_managed_location(spark) == ""
 
 
+@pytest.fixture(autouse=True)
+def _reset_ml_cache(helpers):
+    """v0.7.3 — _create_catalog_with_managed_location memoises the MANAGED LOCATION
+    via a function attribute. Reset between tests so cached state from one test
+    doesn't bleed into the next."""
+    fn = helpers._create_catalog_with_managed_location
+    if hasattr(fn, "_ml_cache"):
+        delattr(fn, "_ml_cache")
+    yield
+    if hasattr(fn, "_ml_cache"):
+        delattr(fn, "_ml_cache")
+
+
 class TestCreateCatalogFallback:
-    def test_managed_location_succeeds_no_fallback(self, helpers):
-        helpers.dbutils = _FakeDbu({"abfss://ok@x/y": []})
-        calls = []
-
-        class _S:
-            def sql(self, q):
-                calls.append(q)
-                if "DESCRIBE METASTORE" in q.upper():
-                    return _DF([_Row("storage_root", "abfss://ok@x/y")])
-                if "SHOW CATALOGS" in q.upper():
-                    return _DF([])
-                if "CREATE CATALOG" in q.upper():
-                    return _DF([])
-                raise RuntimeError(f"unexpected: {q}")
-
-        helpers._create_catalog_with_managed_location(_S(), "test_cat")
-        # Exactly one CREATE CATALOG with MANAGED LOCATION
-        creates = [c for c in calls if "CREATE CATALOG" in c.upper()]
-        assert len(creates) == 1
-        assert "MANAGED LOCATION 'abfss://ok@x/y'" in creates[0]
-
-    def test_managed_location_perm_denied_falls_back_to_bare(self, helpers):
-        """The Azure failure mode where validate said OK but CREATE still failed."""
-        helpers.dbutils = _FakeDbu({"abfss://passed-validate@x/y": []})
+    def test_v73_bare_create_succeeds_no_resolve_called(self, helpers):
+        """v0.7.3 (alias=storage-root-v73-bare-first) — on default-storage workspaces
+        (AWS, GCP, modern Azure) bare CREATE works on first try. Helper MUST NOT call
+        _resolve_managed_location (which would scan thousands of catalogs on shared AWS).
+        """
+        helpers.dbutils = _FakeDbu({})
         calls = []
 
         class _S:
             def sql(self, q):
                 calls.append(q)
                 qu = q.upper()
+                if "CREATE CATALOG" in qu and "MANAGED LOCATION" not in qu:
+                    return _DF([])
+                raise RuntimeError(f"unexpected (v73 should not have called this): {q}")
+
+        helpers._create_catalog_with_managed_location(_S(), "aws_default_storage_cat")
+        creates = [c for c in calls if "CREATE CATALOG" in c.upper()]
+        assert len(creates) == 1, f"v73 should issue exactly 1 bare CREATE, got: {creates}"
+        assert "MANAGED LOCATION" not in creates[0]
+        scans = [c for c in calls if "SHOW CATALOGS" in c.upper() or "DESCRIBE METASTORE" in c.upper()]
+        assert scans == [], f"v73 should NOT scan when bare CREATE works, got: {scans}"
+
+    def test_v73_bare_create_unrelated_error_propagates_without_resolve(self, helpers):
+        """v0.7.3 — if bare CREATE fails for a NON-managed-location reason
+        (e.g. INVALID_PARAMETER_VALUE on bad name), re-raise immediately without
+        wasting cycles on the catalog scan."""
+        helpers.dbutils = _FakeDbu({})
+        calls = []
+
+        class _S:
+            def sql(self, q):
+                calls.append(q)
+                qu = q.upper()
+                if "CREATE CATALOG" in qu and "MANAGED LOCATION" not in qu:
+                    raise Exception("INVALID_PARAMETER_VALUE: bad name 'foo bar'")
+                raise RuntimeError(f"unexpected: {q}")
+
+        with pytest.raises(Exception, match="INVALID_PARAMETER_VALUE"):
+            helpers._create_catalog_with_managed_location(_S(), "foo bar")
+        scans = [c for c in calls if "SHOW CATALOGS" in c.upper() or "DESCRIBE METASTORE" in c.upper()]
+        assert scans == [], f"v73 must not scan on non-ML errors, got: {scans}"
+
+    def test_v73_bare_create_needs_ml_then_resolve_and_succeed(self, helpers):
+        """v0.7.3 — when bare CREATE explicitly says workspace requires MANAGED LOCATION,
+        helper MUST resolve and retry with that location."""
+        helpers.dbutils = _FakeDbu({"abfss://meta@x/y": []})
+        calls = []
+
+        class _S:
+            def sql(self, q):
+                calls.append(q)
+                qu = q.upper()
+                if "CREATE CATALOG" in qu and "MANAGED LOCATION" not in qu:
+                    raise Exception(
+                        "Metastore storage root URL does not exist. Please provide a storage location for the catalog"
+                    )
+                if "DESCRIBE METASTORE" in qu:
+                    return _DF([_Row("storage_root", "abfss://meta@x/y")])
+                if "CREATE CATALOG" in qu and "MANAGED LOCATION" in qu:
+                    return _DF([])
+                if "SHOW CATALOGS" in qu:
+                    return _DF([])
+                raise RuntimeError(f"unexpected: {q}")
+
+        helpers._create_catalog_with_managed_location(_S(), "azure_no_default")
+        creates = [c for c in calls if "CREATE CATALOG" in c.upper()]
+        assert len(creates) == 2, f"expected 2 CREATEs (bare + ML), got {len(creates)}"
+        assert "MANAGED LOCATION" not in creates[0]
+        assert "MANAGED LOCATION 'abfss://meta@x/y'" in creates[1]
+
+    def test_v73_ml_cache_reused_across_multiple_calls(self, helpers):
+        """v0.7.3 — when bare CREATE needs ML, _resolve_managed_location is called once
+        and the result cached on the function attribute. Subsequent calls reuse cached
+        value; SHOULD NOT re-scan SHOW CATALOGS for each catalog. Critical to avoid
+        the O(N_industries × N_catalogs) AWS slowdown."""
+        helpers.dbutils = _FakeDbu({"abfss://meta@x/y": []})
+        scan_count = {"describe_meta": 0, "show_catalogs": 0}
+
+        class _S:
+            def sql(self, q):
+                qu = q.upper()
+                if "CREATE CATALOG" in qu and "MANAGED LOCATION" not in qu:
+                    raise Exception("managed location required by metastore policy")
+                if "DESCRIBE METASTORE" in qu:
+                    scan_count["describe_meta"] += 1
+                    return _DF([_Row("storage_root", "abfss://meta@x/y")])
+                if "SHOW CATALOGS" in qu:
+                    scan_count["show_catalogs"] += 1
+                    return _DF([])
+                if "CREATE CATALOG" in qu and "MANAGED LOCATION" in qu:
+                    return _DF([])
+                raise RuntimeError(f"unexpected: {q}")
+
+        s = _S()
+        for cat in ["industry_a_ecm", "industry_a_ecm_v1", "industry_a_mvm_v1",
+                    "industry_b_ecm", "industry_b_ecm_v1", "industry_b_mvm_v1"]:
+            helpers._create_catalog_with_managed_location(s, cat)
+        assert scan_count["describe_meta"] == 1, (
+            f"_resolve should be called once across all catalogs, got describe_meta="
+            f"{scan_count['describe_meta']}"
+        )
+
+    def test_v73_managed_location_perm_denied_falls_back_to_bare_final(self, helpers):
+        """v0.7.3 — if ML attempt fails with PERMISSION_DENIED (e.g. metastore-leaked
+        External Location not granted to this workspace), final bare-CREATE fallback fires."""
+        helpers.dbutils = _FakeDbu({"abfss://passed-validate@x/y": []})
+        calls = []
+
+        class _S:
+            def __init__(self):
+                self.bare_attempts = 0
+
+            def sql(self, q):
+                calls.append(q)
+                qu = q.upper()
+                if "CREATE CATALOG" in qu and "MANAGED LOCATION" not in qu:
+                    self.bare_attempts += 1
+                    if self.bare_attempts == 1:
+                        raise Exception(
+                            "Metastore storage root URL does not exist. Please provide a storage location for the catalog"
+                        )
+                    return _DF([])
                 if "DESCRIBE METASTORE" in qu:
                     return _DF([_Row("storage_root", "abfss://passed-validate@x/y")])
                 if "SHOW CATALOGS" in qu:
@@ -249,30 +355,31 @@ class TestCreateCatalogFallback:
                     raise Exception(
                         "PERMISSION_DENIED: External Location 'delta_dore_azure' is not accessible in current workspace"
                     )
-                if "CREATE CATALOG" in qu:
-                    return _DF([])
                 raise RuntimeError(f"unexpected: {q}")
 
-        helpers._create_catalog_with_managed_location(_S(), "fallback_cat")
+        helpers._create_catalog_with_managed_location(_S(), "azure_leaked_external_loc")
         creates = [c for c in calls if "CREATE CATALOG" in c.upper()]
-        assert len(creates) == 2
-        assert "MANAGED LOCATION" in creates[0]
-        assert "MANAGED LOCATION" not in creates[1]
-        assert "fallback_cat" in creates[1]
+        assert len(creates) == 3, f"expected 3 CREATEs (bare → ML → bare), got {len(creates)}"
+        assert "MANAGED LOCATION" not in creates[0]
+        assert "MANAGED LOCATION" in creates[1]
+        assert "MANAGED LOCATION" not in creates[2]
+        assert "azure_leaked_external_loc" in creates[2]
 
-    def test_unrelated_create_error_propagates(self, helpers):
-        helpers.dbutils = _FakeDbu({"abfss://passed@x/y": []})
+    def test_v73_bare_needs_ml_but_resolve_returns_empty_raises_informative(self, helpers):
+        """v0.7.3 — workspace needs ML, but no candidate is accessible → raise an
+        informative RuntimeError rather than silently doing nothing."""
+        helpers.dbutils = _FakeDbu({})
 
         class _S:
             def sql(self, q):
                 qu = q.upper()
+                if "CREATE CATALOG" in qu and "MANAGED LOCATION" not in qu:
+                    raise Exception("managed location required")
                 if "DESCRIBE METASTORE" in qu:
-                    return _DF([_Row("storage_root", "abfss://passed@x/y")])
+                    raise Exception("no metastore storage_root")
                 if "SHOW CATALOGS" in qu:
                     return _DF([])
-                if "CREATE CATALOG" in qu and "MANAGED LOCATION" in qu:
-                    raise Exception("INVALID_PARAMETER_VALUE: bad name")
                 raise RuntimeError(f"unexpected: {q}")
 
-        with pytest.raises(Exception, match="INVALID_PARAMETER_VALUE"):
-            helpers._create_catalog_with_managed_location(_S(), "bad")
+        with pytest.raises(RuntimeError, match="MANAGED LOCATION but no accessible storage_root"):
+            helpers._create_catalog_with_managed_location(_S(), "no_storage_anywhere")
