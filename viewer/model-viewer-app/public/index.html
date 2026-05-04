@@ -840,6 +840,341 @@ function NodeInfoPanel({selectedNode,selectedEdge,treeClick,graphData,domainSize
   return null;
 }
 
+// ── GitHub repo browser ───────────────────────────────────
+const REPO_LS_KEY='model_viewer:last_repo';
+const CACHE_PREFIX='model_viewer:cache:';
+const MODEL_DIR_RE=/^(ecm|mvm)_v?\d+$/i;
+
+function parseRepoSpec(raw){
+  if(!raw)return null;
+  let s=String(raw).trim().replace(/\.git$/,'').replace(/\/+$/,'');
+  let m=s.match(/^https?:\/\/github\.com\/([^\/\s]+)\/([^\/\s]+?)(?:\/tree\/([^\/\s]+)(?:\/(.*))?)?$/i);
+  if(m)return {owner:m[1],repo:m[2],branch:m[3]||null,path:m[4]||''};
+  m=s.match(/^git@github\.com:([^\/\s]+)\/(.+)$/i);
+  if(m)return {owner:m[1],repo:m[2].replace(/\/+$/,''),branch:null,path:''};
+  m=s.match(/^([^\/\s]+)\/([^\/\s]+)$/);
+  if(m)return {owner:m[1],repo:m[2],branch:null,path:''};
+  return null;
+}
+
+async function ghFetch(url,token,accept){
+  const headers={'Accept':accept||'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+  if(token)headers['Authorization']='Bearer '+token;
+  const r=await fetch(url,{headers});
+  if(!r.ok){
+    let body='';try{body=await r.text();}catch(_){}
+    let msg=`GitHub API ${r.status}`;
+    try{const j=JSON.parse(body);if(j&&j.message)msg+=`: ${j.message}`;}catch(_){msg+=': '+body.slice(0,200);}
+    if(r.status===404)msg+=' (repo/branch/path not found, or token lacks access to a private repo)';
+    if(r.status===401||r.status===403)msg+=' (auth or rate-limit; supply a token with repo scope)';
+    const e=new Error(msg);e.status=r.status;throw e;
+  }
+  return r;
+}
+async function ghJson(url,token){return (await ghFetch(url,token)).json();}
+
+async function fetchDefaultBranch(owner,repo,token){
+  const info=await ghJson(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,token);
+  return info.default_branch||'main';
+}
+
+async function fetchRepoTree(owner,repo,branch,token){
+  // Resolve branch -> commit SHA -> tree SHA -> recursive tree
+  const ref=await ghJson(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/ref/heads/${encodeURIComponent(branch)}`,token);
+  const commitSha=ref&&ref.object&&ref.object.sha;
+  if(!commitSha)throw new Error(`Branch '${branch}' not found`);
+  const commit=await ghJson(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/commits/${commitSha}`,token);
+  const treeSha=commit&&commit.tree&&commit.tree.sha;
+  if(!treeSha)throw new Error('Could not resolve tree SHA from commit');
+  return ghJson(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${treeSha}?recursive=1`,token);
+}
+
+async function fetchModelJsonRaw(owner,repo,branch,dirPath,token){
+  const filePath=(dirPath?dirPath.replace(/^\/+|\/+$/g,'')+'/':'')+'model.json';
+  const url=`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${filePath.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(branch)}`;
+  const r=await ghFetch(url,token,'application/vnd.github.raw');
+  return r.text();
+}
+
+function cacheKey(owner,repo,branch,dirPath){return `${CACHE_PREFIX}${owner}/${repo}@${branch}:${dirPath||''}`;}
+function readCachedModel(owner,repo,branch,dirPath){
+  try{
+    const raw=localStorage.getItem(cacheKey(owner,repo,branch,dirPath));
+    if(!raw)return null;
+    const parsed=JSON.parse(raw);
+    return parsed&&typeof parsed.content==='string'?parsed:null;
+  }catch(_){return null;}
+}
+function writeCachedModel(owner,repo,branch,dirPath,content){
+  const k=cacheKey(owner,repo,branch,dirPath);
+  const v=JSON.stringify({ts:Date.now(),content});
+  try{localStorage.setItem(k,v);return;}catch(_){}
+  // Quota: evict oldest 25% of cache entries and retry
+  try{
+    const keys=Object.keys(localStorage).filter(x=>x.startsWith(CACHE_PREFIX));
+    const aged=keys.map(x=>{
+      let ts=0;try{ts=JSON.parse(localStorage.getItem(x)||'{}').ts||0;}catch(_){}
+      return [x,ts];
+    }).sort((a,b)=>a[1]-b[1]);
+    const trim=Math.max(1,Math.floor(aged.length/4));
+    aged.slice(0,trim).forEach(([x])=>localStorage.removeItem(x));
+    localStorage.setItem(k,v);
+  }catch(_){/* give up silently */}
+}
+function readLastRepo(){try{const raw=localStorage.getItem(REPO_LS_KEY);return raw?JSON.parse(raw):null;}catch(_){return null;}}
+function writeLastRepo(spec){try{localStorage.setItem(REPO_LS_KEY,JSON.stringify(spec));}catch(_){}}
+
+// Build a hierarchical tree from a flat git/trees response
+function buildFolderTree(treeEntries){
+  const root={name:'',path:'',type:'tree',children:{},hasModelJson:false};
+  (treeEntries||[]).forEach(e=>{
+    if(!e||!e.path)return;
+    const parts=e.path.split('/');
+    let node=root;
+    for(let i=0;i<parts.length;i++){
+      const name=parts[i];
+      const isLeaf=i===parts.length-1;
+      const childPath=parts.slice(0,i+1).join('/');
+      if(!node.children[name]){
+        node.children[name]={name,path:childPath,type:isLeaf?e.type:'tree',children:{},hasModelJson:false};
+      }
+      if(isLeaf&&e.type==='blob'&&name==='model.json'){node.hasModelJson=true;}
+      node=node.children[name];
+    }
+  });
+  return root;
+}
+
+function hasSelectableDescendant(node){
+  if(!node||node.type!=='tree')return false;
+  if(MODEL_DIR_RE.test(node.name)&&node.hasModelJson)return true;
+  for(const c of Object.values(node.children||{})){if(hasSelectableDescendant(c))return true;}
+  return false;
+}
+function nodeOrDescendantMatches(node,filterLower){
+  if(!node)return false;
+  if((node.path||'').toLowerCase().includes(filterLower))return true;
+  for(const c of Object.values(node.children||{})){if(nodeOrDescendantMatches(c,filterLower))return true;}
+  return false;
+}
+
+function RepoTreeNode({node,depth,expanded,setExpanded,filter,onSelect,loadingPath,resolved,cacheTick}){
+  if(!node||node.type!=='tree')return null;
+  const filterLower=(filter||'').toLowerCase();
+  if(filterLower&&!nodeOrDescendantMatches(node,filterLower))return null;
+  const isSelectable=MODEL_DIR_RE.test(node.name)&&node.hasModelJson;
+  // Stop at mvm/ecm level: prune blob entries and any subtree that doesn't lead
+  // to a selectable model dir; selectable nodes themselves render as leaves.
+  const visibleChildren=isSelectable?[]:Object.values(node.children)
+    .filter(c=>c.type==='tree')
+    .filter(c=>(MODEL_DIR_RE.test(c.name)&&c.hasModelJson)||hasSelectableDescendant(c))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  const isExp=expanded.has(node.path);
+  const cached=isSelectable&&resolved?!!readCachedModel(resolved.owner,resolved.repo,resolved.branch,node.path):false;
+  const isLoading=loadingPath===node.path;
+  const showChildren=visibleChildren.length>0&&(isExp||!!filterLower);
+  const toggle=()=>{
+    setExpanded(prev=>{const n=new Set(prev);if(n.has(node.path))n.delete(node.path);else n.add(node.path);return n;});
+  };
+  const rowStyle={display:'flex',alignItems:'center',padding:'4px 0',cursor:'pointer',borderRadius:3};
+  return h('div',{style:{marginLeft:depth>0?14:0}},
+    node.name?h('div',{className:'tree-item',style:rowStyle,onClick:isSelectable?()=>onSelect(node.path):toggle},
+      h('span',{style:{width:14,fontSize:11,color:'#888',flexShrink:0,textAlign:'center'}},
+        isSelectable?' ':(visibleChildren.length?(isExp||filterLower?'▾':'▸'):' ')),
+      h('span',{style:{marginRight:6,flexShrink:0,fontSize:13}},isSelectable?'📦':(isExp||filterLower?'📂':'📁')),
+      h('span',{style:{flex:1,fontSize:12,color:isSelectable?'#4ECDC4':'#ddd',
+                       fontWeight:isSelectable?600:400,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},
+        node.name),
+      cached&&h('span',{style:{fontSize:9,color:'#96CEB4',marginLeft:6,padding:'1px 6px',
+                               background:'rgba(150,206,180,0.15)',borderRadius:8}},'✓ cached'),
+      isSelectable&&h('button',{onClick:e=>{e.stopPropagation();onSelect(node.path);},
+        disabled:isLoading,
+        style:{padding:'3px 10px',marginLeft:8,background:isLoading?'#666':'#4ECDC4',color:'#fff',
+               border:'none',borderRadius:3,fontSize:10,cursor:isLoading?'wait':'pointer',fontWeight:600}},
+        isLoading?'Loading…':'Load')
+    ):null,
+    showChildren&&visibleChildren.map(c=>h(RepoTreeNode,{
+      key:c.path,node:c,depth:node.name?depth+1:depth,
+      expanded,setExpanded,filter,onSelect,loadingPath,resolved,cacheTick
+    }))
+  );
+}
+
+function RepoBrowser({onLoadModel,onClose}){
+  const last=useMemo(()=>readLastRepo()||{},[]);
+  const [repoInput,setRepoInput]=useState(last.owner&&last.repo?`https://github.com/${last.owner}/${last.repo}`:'');
+  const [branchInput,setBranchInput]=useState(last.branch||'');
+  const [tokenInput,setTokenInput]=useState(last.token||'');
+  const [showToken,setShowToken]=useState(false);
+  const [tree,setTree]=useState(null);
+  const [resolved,setResolved]=useState(null);
+  const [truncated,setTruncated]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState(null);
+  const [filter,setFilter]=useState('');
+  const [expanded,setExpanded]=useState(new Set(['']));
+  const [loadingPath,setLoadingPath]=useState(null);
+  const [cacheTick,setCacheTick]=useState(0); // bump to force tree re-eval after cache writes
+
+  const browseRepo=useCallback(async(opts)=>{
+    setError(null);setTree(null);setLoading(true);setTruncated(false);setResolved(null);
+    try{
+      const spec=parseRepoSpec(repoInput);
+      if(!spec)throw new Error('Could not parse repo. Use https://github.com/owner/repo, owner/repo, or git@github.com:owner/repo');
+      let branch=(branchInput||'').trim()||spec.branch||'';
+      if(!branch){branch=await fetchDefaultBranch(spec.owner,spec.repo,tokenInput||null);}
+      const treeData=await fetchRepoTree(spec.owner,spec.repo,branch,tokenInput||null);
+      const built=buildFolderTree(treeData.tree||[]);
+      setTree(built);
+      setResolved({owner:spec.owner,repo:spec.repo,branch});
+      setTruncated(!!treeData.truncated);
+      writeLastRepo({owner:spec.owner,repo:spec.repo,branch,token:tokenInput||''});
+      // Auto-expand any folder ancestor that contains a selectable model dir
+      const exp=new Set(['']);
+      const walk=(node)=>{
+        Object.values(node.children).forEach(child=>{
+          if(child.type==='tree'){
+            if(hasSelectableDescendant(child))exp.add(child.path);
+            walk(child);
+          }
+        });
+      };
+      walk(built);
+      setExpanded(exp);
+    }catch(e){setError(e.message||String(e));}
+    finally{setLoading(false);}
+  },[repoInput,branchInput,tokenInput]);
+
+  // Auto-load saved repo on first open
+  const autoRanRef=useRef(false);
+  useEffect(()=>{
+    if(autoRanRef.current)return;
+    autoRanRef.current=true;
+    if(last.owner&&last.repo){browseRepo();}
+  },[]); // eslint-disable-line
+
+  const handleSelect=useCallback(async(dirPath)=>{
+    if(!resolved)return;
+    setLoadingPath(dirPath);setError(null);
+    try{
+      const cached=readCachedModel(resolved.owner,resolved.repo,resolved.branch,dirPath);
+      let content,fromCache=false;
+      if(cached){content=cached.content;fromCache=true;}
+      else{
+        content=await fetchModelJsonRaw(resolved.owner,resolved.repo,resolved.branch,dirPath,tokenInput||null);
+        writeCachedModel(resolved.owner,resolved.repo,resolved.branch,dirPath,content);
+      }
+      const data=JSON.parse(content);
+      const label=`${resolved.owner}/${resolved.repo}@${resolved.branch}/${dirPath}/model.json${fromCache?' (cached)':''}`;
+      onLoadModel(data,label);
+      onClose();
+    }catch(e){setError((e&&e.message)||String(e));}
+    finally{setLoadingPath(null);setCacheTick(t=>t+1);}
+  },[resolved,tokenInput,onLoadModel,onClose]);
+
+  const clearCache=useCallback(()=>{
+    if(!resolved){
+      Object.keys(localStorage).filter(k=>k.startsWith(CACHE_PREFIX)).forEach(k=>localStorage.removeItem(k));
+    }else{
+      const pref=`${CACHE_PREFIX}${resolved.owner}/${resolved.repo}@${resolved.branch}:`;
+      Object.keys(localStorage).filter(k=>k.startsWith(pref)).forEach(k=>localStorage.removeItem(k));
+    }
+    setCacheTick(t=>t+1);
+  },[resolved]);
+
+  const inputStyle={background:'#0f0f1a',color:'#fff',border:'1px solid #444',borderRadius:4,padding:'8px 10px',fontSize:12,outline:'none',width:'100%'};
+  const labelStyle={display:'block',color:'#888',fontSize:10,marginBottom:4,letterSpacing:0.5,textTransform:'uppercase'};
+
+  return h('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',
+                          display:'flex',alignItems:'center',justifyContent:'center',zIndex:5000},
+                  onClick:e=>{if(e.target===e.currentTarget)onClose();}},
+    h('div',{style:{width:'min(720px, 92vw)',height:'min(720px, 88vh)',background:'#1a1a2e',
+                    borderRadius:10,border:'1px solid #333',boxShadow:'0 20px 60px rgba(0,0,0,0.5)',
+                    display:'flex',flexDirection:'column',overflow:'hidden'}},
+      // Header
+      h('div',{style:{padding:'14px 18px',borderBottom:'1px solid #333',
+                       display:'flex',alignItems:'center',gap:10,flexShrink:0}},
+        h('span',{style:{fontSize:18}},'📁'),
+        h('h2',{style:{margin:0,fontSize:15,fontWeight:600,flex:1,color:'#fff'}},'Load model.json from GitHub repo'),
+        h('button',{onClick:onClose,style:{background:'transparent',color:'#888',border:'none',
+          fontSize:20,cursor:'pointer',padding:'0 6px',lineHeight:1}},'×')
+      ),
+      // Form
+      h('div',{style:{padding:'14px 18px',borderBottom:'1px solid #2a2a3e',flexShrink:0}},
+        h('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:10,marginBottom:8}},
+          h('div',{},
+            h('label',{style:labelStyle},'Repository'),
+            h('input',{type:'text',value:repoInput,onChange:e=>setRepoInput(e.target.value),
+              placeholder:'https://github.com/owner/repo  or  owner/repo',
+              style:inputStyle,
+              onKeyDown:e=>{if(e.key==='Enter')browseRepo();}})
+          ),
+          h('div',{},
+            h('label',{style:labelStyle},'Branch (blank = default)'),
+            h('input',{type:'text',value:branchInput,onChange:e=>setBranchInput(e.target.value),
+              placeholder:'main',style:inputStyle,
+              onKeyDown:e=>{if(e.key==='Enter')browseRepo();}})
+          )
+        ),
+        h('div',{style:{display:'flex',alignItems:'center',gap:10,marginBottom:8}},
+          h('div',{style:{flex:1}},
+            h('label',{style:labelStyle},'GitHub Token (optional, needed for private repos / rate limit)'),
+            h('input',{type:showToken?'text':'password',value:tokenInput,onChange:e=>setTokenInput(e.target.value),
+              placeholder:'ghp_… (stored in your browser localStorage)',style:inputStyle,
+              onKeyDown:e=>{if(e.key==='Enter')browseRepo();}})
+          ),
+          h('div',{style:{display:'flex',flexDirection:'column',gap:4,paddingTop:14}},
+            h('button',{onClick:()=>setShowToken(s=>!s),
+              style:{padding:'6px 10px',background:'#333',color:'#ccc',border:'1px solid #444',
+                     borderRadius:4,fontSize:10,cursor:'pointer',whiteSpace:'nowrap'}},
+              showToken?'Hide':'Show')
+          )
+        ),
+        h('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+          h('button',{onClick:()=>browseRepo(),disabled:loading,
+            style:{padding:'8px 16px',background:loading?'#555':'#4ECDC4',color:'#fff',border:'none',
+                   borderRadius:4,fontSize:12,cursor:loading?'wait':'pointer',fontWeight:600}},
+            loading?'Loading…':'Browse repo'),
+          tree&&h('input',{type:'text',value:filter,onChange:e=>setFilter(e.target.value),
+            placeholder:'Filter folders…',
+            style:{...inputStyle,padding:'6px 10px',width:'auto',flex:1}}),
+          tree&&h('button',{onClick:clearCache,title:'Clear cached model.json files for this repo',
+            style:{padding:'6px 10px',background:'#333',color:'#ccc',border:'1px solid #444',
+                   borderRadius:4,fontSize:10,cursor:'pointer',whiteSpace:'nowrap'}},
+            'Clear cache')
+        ),
+        resolved&&h('div',{style:{color:'#666',fontSize:10,marginTop:8}},
+          `Browsing ${resolved.owner}/${resolved.repo} @ ${resolved.branch}`,
+          truncated?h('span',{style:{color:'#FFB347',marginLeft:8}},'(tree truncated by GitHub — use a more specific repo)'):null)
+      ),
+      // Body — tree
+      h('div',{style:{flex:1,overflowY:'auto',padding:'12px 18px',background:'#0f0f1a'}},
+        error&&h('div',{style:{padding:12,background:'rgba(255,107,107,0.1)',border:'1px solid #FF6B6B',
+                               borderRadius:6,color:'#FFB347',fontSize:12,marginBottom:12,wordBreak:'break-word'}},
+          h('strong',{style:{color:'#FF6B6B'}},'Error: '),error),
+        loading&&h('div',{style:{textAlign:'center',padding:30,color:'#888',fontSize:12}},
+          h('div',{className:'spinner',style:{margin:'0 auto 12px'}}),'Loading repository tree…'),
+        !loading&&tree&&(hasSelectableDescendant(tree)
+          ? h('div',{},
+              h(RepoTreeNode,{node:tree,depth:0,expanded,setExpanded,filter,onSelect:handleSelect,
+                              loadingPath,resolved,cacheTick}))
+          : h('div',{style:{textAlign:'center',padding:40,color:'#888',fontSize:12}},
+              h('div',{style:{fontSize:32,marginBottom:10}},'🤷'),
+              'No ',h('code',{style:{color:'#4ECDC4'}},'ecm_*'),' / ',h('code',{style:{color:'#4ECDC4'}},'mvm_*'),
+              ' folders with a model.json found in this repo/branch.')),
+        !loading&&!tree&&!error&&h('div',{style:{textAlign:'center',padding:40,color:'#666',fontSize:12}},
+          h('div',{style:{fontSize:32,marginBottom:10}},'🗂️'),
+          'Enter a repo above and click ',h('strong',{},'Browse repo'),' to start.'),
+      ),
+      // Footer hint
+      h('div',{style:{padding:'10px 18px',borderTop:'1px solid #333',fontSize:10,color:'#666',flexShrink:0}},
+        'Folders matching ',h('code',{style:{color:'#4ECDC4'}},'ecm_<num>'),' or ',
+        h('code',{style:{color:'#4ECDC4'}},'mvm_<num>'),' (with optional ',h('code',{},'v'),
+        ' prefix) that contain a model.json are selectable. Loaded files are cached in your browser.')
+    )
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────
 function App(){
   // Graph state
@@ -867,6 +1202,7 @@ function App(){
   const [isLoading,setIsLoading]=useState(false);
   const [loadError,setLoadError]=useState(null);
   const [uploadStatus,setUploadStatus]=useState('');
+  const [showRepoDialog,setShowRepoDialog]=useState(false);
 
   // Databricks browser state
   // Double-click detection
@@ -1370,6 +1706,9 @@ function App(){
           'Upload JSON',
           h('input',{type:'file',accept:'.json',style:{display:'none'},onChange:handleUpload})
         ),
+        h('button',{onClick:()=>setShowRepoDialog(true),
+          style:{...btnStyle,background:'#BB8FCE',padding:'6px 10px',fontSize:11}},
+          'From Repo'),
         uploadStatus&&h('span',{style:{color:'#4ECDC4',fontSize:10,marginRight:4}},uploadStatus),
         h('button',{style:{...btnStyle,padding:'6px 10px'},onClick:()=>cyRef.current&&cyRef.current.zoom(cyRef.current.zoom()*0.8)},'−'),
         h('button',{style:{...btnStyle,padding:'6px 10px'},onClick:()=>cyRef.current&&cyRef.current.zoom(cyRef.current.zoom()*1.25)},'+'),
@@ -1505,7 +1844,20 @@ function App(){
     // Version badge
     h('div',{style:{position:'fixed',bottom:10,right:14,zIndex:3000,
                     padding:'4px 10px',background:'rgba(0,0,0,0.6)',border:'1px solid #444',
-                    borderRadius:12,fontSize:11,color:'#bbb'}},'v1.0')
+                    borderRadius:12,fontSize:11,color:'#bbb'}},'v1.1'),
+
+    // Repo browser dialog
+    showRepoDialog&&h(RepoBrowser,{
+      onLoadModel:(data,label)=>{
+        setIsLoading(true);setLoadError(null);
+        setUploadStatus(`Loading ${label.split('/').slice(-2).join('/')}…`);
+        setTimeout(()=>{
+          try{processModel(data,label);setUploadStatus('✓ '+label.split('/').slice(-2,-1)[0]+'/model.json');}
+          catch(err){setLoadError('Processing error: '+err.message);setIsLoading(false);setUploadStatus('✗ Error');}
+        },50);
+      },
+      onClose:()=>setShowRepoDialog(false)
+    })
   );
 }
 
