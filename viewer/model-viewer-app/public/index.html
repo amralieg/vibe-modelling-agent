@@ -928,79 +928,74 @@ function writeCachedModel(owner,repo,branch,dirPath,content){
 function readLastRepo(){try{const raw=localStorage.getItem(REPO_LS_KEY);return raw?JSON.parse(raw):null;}catch(_){return null;}}
 function writeLastRepo(spec){try{localStorage.setItem(REPO_LS_KEY,JSON.stringify(spec));}catch(_){}}
 
-// Build a hierarchical tree from a flat git/trees response
-function buildFolderTree(treeEntries){
-  const root={name:'',path:'',type:'tree',children:{},hasModelJson:false};
+// Scan flat git/trees output for every <industry>/(ecm|mvm)_v?N/model.json blob
+// and group by industry name. Industry = the directory immediately above the
+// model-version dir. Returns sorted rows: [{industry, parentPath,
+//   ecm:[{ver,name,path}], mvm:[...]}], versions sorted newest-first per scope.
+function buildIndustryRows(treeEntries){
+  const byParent={}; // key = parentPath so two industries with the same name in different prefixes stay distinct
   (treeEntries||[]).forEach(e=>{
-    if(!e||!e.path)return;
-    const parts=e.path.split('/');
-    let node=root;
-    for(let i=0;i<parts.length;i++){
-      const name=parts[i];
-      const isLeaf=i===parts.length-1;
-      const childPath=parts.slice(0,i+1).join('/');
-      if(!node.children[name]){
-        node.children[name]={name,path:childPath,type:isLeaf?e.type:'tree',children:{},hasModelJson:false};
-      }
-      if(isLeaf&&e.type==='blob'&&name==='model.json'){node.hasModelJson=true;}
-      node=node.children[name];
-    }
+    if(!e||e.type!=='blob')return;
+    const p=e.path||'';
+    if(!p.endsWith('/model.json'))return;
+    const parts=p.split('/');
+    if(parts.length<3)return; // need <industry>/<scope_dir>/model.json at minimum
+    const dirName=parts[parts.length-2];
+    const m=dirName.match(/^(ecm|mvm)_v?(\d+)$/i);
+    if(!m)return;
+    const scope=m[1].toLowerCase();
+    const ver=parseInt(m[2],10);
+    const dirPath=parts.slice(0,-1).join('/');
+    const parentPath=parts.slice(0,-2).join('/');
+    const industry=parts[parts.length-3];
+    if(!byParent[parentPath]){byParent[parentPath]={industry,parentPath,ecm:[],mvm:[]};}
+    byParent[parentPath][scope].push({ver,name:dirName,path:dirPath});
   });
-  return root;
+  return Object.values(byParent).map(r=>({
+    ...r,
+    ecm:r.ecm.sort((a,b)=>b.ver-a.ver),
+    mvm:r.mvm.sort((a,b)=>b.ver-a.ver),
+  })).sort((a,b)=>a.industry.localeCompare(b.industry)||a.parentPath.localeCompare(b.parentPath));
 }
 
-function hasSelectableDescendant(node){
-  if(!node||node.type!=='tree')return false;
-  if(MODEL_DIR_RE.test(node.name)&&node.hasModelJson)return true;
-  for(const c of Object.values(node.children||{})){if(hasSelectableDescendant(c))return true;}
-  return false;
-}
-function nodeOrDescendantMatches(node,filterLower){
-  if(!node)return false;
-  if((node.path||'').toLowerCase().includes(filterLower))return true;
-  for(const c of Object.values(node.children||{})){if(nodeOrDescendantMatches(c,filterLower))return true;}
-  return false;
-}
-
-function RepoTreeNode({node,depth,expanded,setExpanded,filter,onSelect,loadingPath,resolved,cacheTick}){
-  if(!node||node.type!=='tree')return null;
-  const filterLower=(filter||'').toLowerCase();
-  if(filterLower&&!nodeOrDescendantMatches(node,filterLower))return null;
-  const isSelectable=MODEL_DIR_RE.test(node.name)&&node.hasModelJson;
-  // Stop at mvm/ecm level: prune blob entries and any subtree that doesn't lead
-  // to a selectable model dir; selectable nodes themselves render as leaves.
-  const visibleChildren=isSelectable?[]:Object.values(node.children)
-    .filter(c=>c.type==='tree')
-    .filter(c=>(MODEL_DIR_RE.test(c.name)&&c.hasModelJson)||hasSelectableDescendant(c))
-    .sort((a,b)=>a.name.localeCompare(b.name));
-  const isExp=expanded.has(node.path);
-  const cached=isSelectable&&resolved?!!readCachedModel(resolved.owner,resolved.repo,resolved.branch,node.path):false;
-  const isLoading=loadingPath===node.path;
-  const showChildren=visibleChildren.length>0&&(isExp||!!filterLower);
-  const toggle=()=>{
-    setExpanded(prev=>{const n=new Set(prev);if(n.has(node.path))n.delete(node.path);else n.add(node.path);return n;});
+function IndustryTable({rows,onSelect,loadingPath,resolved,cacheTick}){
+  if(!rows||!rows.length){
+    return h('div',{style:{textAlign:'center',padding:40,color:'#888',fontSize:12}},
+      h('div',{style:{fontSize:32,marginBottom:10}},'🤷'),
+      'No industry models found. Looking for ',
+      h('code',{style:{color:'#4ECDC4'}},'<industry>/ecm_v*/model.json'),' or ',
+      h('code',{style:{color:'#4ECDC4'}},'<industry>/mvm_v*/model.json'),' anywhere in the repo.');
+  }
+  const versionBtn=(scope,item)=>{
+    const cached=resolved?!!readCachedModel(resolved.owner,resolved.repo,resolved.branch,item.path):false;
+    const isLoading=loadingPath===item.path;
+    const bg=isLoading?'#666':(scope==='ecm'?'#4ECDC4':'#BB8FCE');
+    return h('button',{key:item.path,onClick:()=>onSelect(item.path),disabled:isLoading,
+      title:`Load ${item.path}/model.json`,
+      style:{padding:'4px 10px',background:bg,color:'#fff',border:'none',borderRadius:4,
+             fontSize:11,fontWeight:600,cursor:isLoading?'wait':'pointer',
+             display:'inline-flex',alignItems:'center',gap:5,marginRight:6,marginBottom:4}},
+      isLoading?'Loading…':`Load ${item.name}`,
+      cached&&!isLoading&&h('span',{style:{fontSize:9,background:'rgba(0,0,0,0.25)',
+        padding:'1px 5px',borderRadius:6}},'✓'));
   };
-  const rowStyle={display:'flex',alignItems:'center',padding:'4px 0',cursor:'pointer',borderRadius:3};
-  return h('div',{style:{marginLeft:depth>0?14:0}},
-    node.name?h('div',{className:'tree-item',style:rowStyle,onClick:isSelectable?()=>onSelect(node.path):toggle},
-      h('span',{style:{width:14,fontSize:11,color:'#888',flexShrink:0,textAlign:'center'}},
-        isSelectable?' ':(visibleChildren.length?(isExp||filterLower?'▾':'▸'):' ')),
-      h('span',{style:{marginRight:6,flexShrink:0,fontSize:13}},isSelectable?'📦':(isExp||filterLower?'📂':'📁')),
-      h('span',{style:{flex:1,fontSize:12,color:isSelectable?'#4ECDC4':'#ddd',
-                       fontWeight:isSelectable?600:400,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},
-        node.name),
-      cached&&h('span',{style:{fontSize:9,color:'#96CEB4',marginLeft:6,padding:'1px 6px',
-                               background:'rgba(150,206,180,0.15)',borderRadius:8}},'✓ cached'),
-      isSelectable&&h('button',{onClick:e=>{e.stopPropagation();onSelect(node.path);},
-        disabled:isLoading,
-        style:{padding:'3px 10px',marginLeft:8,background:isLoading?'#666':'#4ECDC4',color:'#fff',
-               border:'none',borderRadius:3,fontSize:10,cursor:isLoading?'wait':'pointer',fontWeight:600}},
-        isLoading?'Loading…':'Load')
-    ):null,
-    showChildren&&visibleChildren.map(c=>h(RepoTreeNode,{
-      key:c.path,node:c,depth:node.name?depth+1:depth,
-      expanded,setExpanded,filter,onSelect,loadingPath,resolved,cacheTick
-    }))
+  const cell=(scope,items)=>!items||!items.length
+    ? h('span',{style:{color:'#555'}}, '—')
+    : h('div',{style:{display:'flex',flexWrap:'wrap'}}, items.map(it=>versionBtn(scope,it)));
+  const thStyle={textAlign:'left',padding:'10px 14px',fontSize:11,color:'#888',
+                 textTransform:'uppercase',letterSpacing:0.5,borderBottom:'1px solid #333',
+                 background:'#0f0f1a',position:'sticky',top:0,zIndex:1};
+  const tdStyle={padding:'12px 14px',borderBottom:'1px solid #222',verticalAlign:'middle'};
+  return h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
+    h('thead',{},h('tr',{},
+      h('th',{style:thStyle},'Industry'),
+      h('th',{style:thStyle},'Load ECM'),
+      h('th',{style:thStyle},'Load MVM'))),
+    h('tbody',{},rows.map(row=>h('tr',{key:row.parentPath},
+      h('td',{style:{...tdStyle,color:'#fff',fontWeight:600}}, row.industry,
+        row.parentPath!==row.industry&&h('div',{style:{color:'#666',fontSize:10,fontWeight:400,marginTop:2}},row.parentPath)),
+      h('td',{style:tdStyle}, cell('ecm',row.ecm)),
+      h('td',{style:tdStyle}, cell('mvm',row.mvm)))))
   );
 }
 
@@ -1017,41 +1012,27 @@ function RepoBrowser({onLoadModel,onClose}){
   const [branchInput,setBranchInput]=useState(initialBranch);
   const [tokenInput,setTokenInput]=useState(last.token||'');
   const [showToken,setShowToken]=useState(false);
-  const [tree,setTree]=useState(null);
+  const [rows,setRows]=useState(null);
   const [resolved,setResolved]=useState(null);
   const [truncated,setTruncated]=useState(false);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState(null);
-  const [filter,setFilter]=useState('');
-  const [expanded,setExpanded]=useState(new Set(['']));
   const [loadingPath,setLoadingPath]=useState(null);
-  const [cacheTick,setCacheTick]=useState(0); // bump to force tree re-eval after cache writes
+  const [cacheTick,setCacheTick]=useState(0); // bump to force re-render after cache writes
 
-  const browseRepo=useCallback(async(opts)=>{
-    setError(null);setTree(null);setLoading(true);setTruncated(false);setResolved(null);
+  const browseRepo=useCallback(async()=>{
+    setError(null);setRows(null);setLoading(true);setTruncated(false);setResolved(null);
     try{
       const spec=parseRepoSpec(repoInput);
       if(!spec)throw new Error('Could not parse repo. Use https://github.com/owner/repo, owner/repo, or git@github.com:owner/repo');
       let branch=(branchInput||'').trim()||spec.branch||'';
       if(!branch){branch=await fetchDefaultBranch(spec.owner,spec.repo,tokenInput||null);}
       const treeData=await fetchRepoTree(spec.owner,spec.repo,branch,tokenInput||null);
-      const built=buildFolderTree(treeData.tree||[]);
-      setTree(built);
+      const built=buildIndustryRows(treeData.tree||[]);
+      setRows(built);
       setResolved({owner:spec.owner,repo:spec.repo,branch});
       setTruncated(!!treeData.truncated);
       writeLastRepo({owner:spec.owner,repo:spec.repo,branch,token:tokenInput||''});
-      // Auto-expand any folder ancestor that contains a selectable model dir
-      const exp=new Set(['']);
-      const walk=(node)=>{
-        Object.values(node.children).forEach(child=>{
-          if(child.type==='tree'){
-            if(hasSelectableDescendant(child))exp.add(child.path);
-            walk(child);
-          }
-        });
-      };
-      walk(built);
-      setExpanded(exp);
     }catch(e){setError(e.message||String(e));}
     finally{setLoading(false);}
   },[repoInput,branchInput,tokenInput]);
@@ -1145,43 +1126,35 @@ function RepoBrowser({onLoadModel,onClose}){
           h('button',{onClick:()=>browseRepo(),disabled:loading,
             style:{padding:'8px 16px',background:loading?'#555':'#4ECDC4',color:'#fff',border:'none',
                    borderRadius:4,fontSize:12,cursor:loading?'wait':'pointer',fontWeight:600}},
-            loading?'Loading…':'Browse repo'),
-          tree&&h('input',{type:'text',value:filter,onChange:e=>setFilter(e.target.value),
-            placeholder:'Filter folders…',
-            style:{...inputStyle,padding:'6px 10px',width:'auto',flex:1}}),
-          tree&&h('button',{onClick:clearCache,title:'Clear cached model.json files for this repo',
+            loading?'Loading…':(rows?'Refresh':'Browse repo')),
+          rows&&h('button',{onClick:clearCache,title:'Clear cached model.json files for this repo',
             style:{padding:'6px 10px',background:'#333',color:'#ccc',border:'1px solid #444',
                    borderRadius:4,fontSize:10,cursor:'pointer',whiteSpace:'nowrap'}},
-            'Clear cache')
+            'Clear cache'),
+          rows&&h('span',{style:{color:'#666',fontSize:10,marginLeft:'auto'}},
+            `${rows.length} ${rows.length===1?'industry':'industries'}`)
         ),
         resolved&&h('div',{style:{color:'#666',fontSize:10,marginTop:8}},
           `Browsing ${resolved.owner}/${resolved.repo} @ ${resolved.branch}`,
           truncated?h('span',{style:{color:'#FFB347',marginLeft:8}},'(tree truncated by GitHub — use a more specific repo)'):null)
       ),
-      // Body — tree
-      h('div',{style:{flex:1,overflowY:'auto',padding:'12px 18px',background:'#0f0f1a'}},
-        error&&h('div',{style:{padding:12,background:'rgba(255,107,107,0.1)',border:'1px solid #FF6B6B',
-                               borderRadius:6,color:'#FFB347',fontSize:12,marginBottom:12,wordBreak:'break-word'}},
+      // Body — industry table
+      h('div',{style:{flex:1,overflowY:'auto',background:'#0f0f1a'}},
+        error&&h('div',{style:{margin:18,padding:12,background:'rgba(255,107,107,0.1)',border:'1px solid #FF6B6B',
+                               borderRadius:6,color:'#FFB347',fontSize:12,wordBreak:'break-word'}},
           h('strong',{style:{color:'#FF6B6B'}},'Error: '),error),
         loading&&h('div',{style:{textAlign:'center',padding:30,color:'#888',fontSize:12}},
-          h('div',{className:'spinner',style:{margin:'0 auto 12px'}}),'Loading repository tree…'),
-        !loading&&tree&&(hasSelectableDescendant(tree)
-          ? h('div',{},
-              h(RepoTreeNode,{node:tree,depth:0,expanded,setExpanded,filter,onSelect:handleSelect,
-                              loadingPath,resolved,cacheTick}))
-          : h('div',{style:{textAlign:'center',padding:40,color:'#888',fontSize:12}},
-              h('div',{style:{fontSize:32,marginBottom:10}},'🤷'),
-              'No ',h('code',{style:{color:'#4ECDC4'}},'ecm_*'),' / ',h('code',{style:{color:'#4ECDC4'}},'mvm_*'),
-              ' folders with a model.json found in this repo/branch.')),
-        !loading&&!tree&&!error&&h('div',{style:{textAlign:'center',padding:40,color:'#666',fontSize:12}},
-          h('div',{style:{fontSize:32,marginBottom:10}},'🗂️'),
+          h('div',{className:'spinner',style:{margin:'0 auto 12px'}}),'Loading repository…'),
+        !loading&&rows&&h(IndustryTable,{rows,onSelect:handleSelect,loadingPath,resolved,cacheTick}),
+        !loading&&!rows&&!error&&h('div',{style:{textAlign:'center',padding:40,color:'#666',fontSize:12}},
+          h('div',{style:{fontSize:32,marginBottom:10}},'📊'),
           'Enter a repo above and click ',h('strong',{},'Browse repo'),' to start.'),
       ),
       // Footer hint
       h('div',{style:{padding:'10px 18px',borderTop:'1px solid #333',fontSize:10,color:'#666',flexShrink:0}},
-        'Folders matching ',h('code',{style:{color:'#4ECDC4'}},'ecm_<num>'),' or ',
-        h('code',{style:{color:'#4ECDC4'}},'mvm_<num>'),' (with optional ',h('code',{},'v'),
-        ' prefix) that contain a model.json are selectable. Loaded files are cached in your browser.')
+        'Each row is one industry. ECM / MVM buttons load the corresponding ',
+        h('code',{style:{color:'#4ECDC4'}},'<industry>/(ecm|mvm)_v<N>/model.json'),
+        '. Newest version first. Loaded files are cached in your browser.')
     )
   );
 }
