@@ -844,6 +844,10 @@ function NodeInfoPanel({selectedNode,selectedEdge,treeClick,graphData,domainSize
 const REPO_LS_KEY='model_viewer:last_repo';
 const CACHE_PREFIX='model_viewer:cache:';
 const MODEL_DIR_RE=/^(ecm|mvm)_v?\d+$/i;
+// Default repo shown in the From Repo dialog when no saved repo exists.
+// Change this single constant if you fork this viewer for a different project.
+const DEFAULT_REPO='amralieg/vibe-modelling-agent';
+const DEFAULT_BRANCH='main';
 
 function parseRepoSpec(raw){
   if(!raw)return null;
@@ -1001,9 +1005,16 @@ function RepoTreeNode({node,depth,expanded,setExpanded,filter,onSelect,loadingPa
 }
 
 function RepoBrowser({onLoadModel,onClose}){
+  // Resolution order for the initial repo / branch:
+  //   1. last_repo from localStorage (user's most recent pick)
+  //   2. DEFAULT_REPO / DEFAULT_BRANCH constants (this viewer's baseline)
   const last=useMemo(()=>readLastRepo()||{},[]);
-  const [repoInput,setRepoInput]=useState(last.owner&&last.repo?`https://github.com/${last.owner}/${last.repo}`:'');
-  const [branchInput,setBranchInput]=useState(last.branch||'');
+  const initialRepo=(last.owner&&last.repo)
+    ? `https://github.com/${last.owner}/${last.repo}`
+    : (DEFAULT_REPO?`https://github.com/${DEFAULT_REPO}`:'');
+  const initialBranch=last.branch||(DEFAULT_REPO?DEFAULT_BRANCH:'');
+  const [repoInput,setRepoInput]=useState(initialRepo);
+  const [branchInput,setBranchInput]=useState(initialBranch);
   const [tokenInput,setTokenInput]=useState(last.token||'');
   const [showToken,setShowToken]=useState(false);
   const [tree,setTree]=useState(null);
@@ -1045,12 +1056,12 @@ function RepoBrowser({onLoadModel,onClose}){
     finally{setLoading(false);}
   },[repoInput,branchInput,tokenInput]);
 
-  // Auto-load saved repo on first open
+  // Auto-load on first open if we have either a saved repo OR a default.
   const autoRanRef=useRef(false);
   useEffect(()=>{
     if(autoRanRef.current)return;
     autoRanRef.current=true;
-    if(last.owner&&last.repo){browseRepo();}
+    if((last.owner&&last.repo)||DEFAULT_REPO){browseRepo();}
   },[]); // eslint-disable-line
 
   const handleSelect=useCallback(async(dirPath)=>{
