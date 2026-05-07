@@ -44,6 +44,9 @@ LOG_FILE = os.path.expanduser("~/claude/vibe-agent/sync_watchdog.log")
 LOCK_FILE = os.path.expanduser("~/claude/vibe-agent/repo_sync.lock")
 POLL_INTERVAL_S = 120
 
+DASHBOARD_REFRESH_SCRIPT = os.path.expanduser("~/claude/vibe-agent/refresh_dashboard.py")
+DASHBOARD_REFRESH_TIMEOUT_S = 600
+
 QUALITY_GATE_MIN_PRODUCTS = 5
 QUALITY_GATE_MIN_ATTRIBUTES = 50
 QUALITY_GATE_MIN_DOMAINS = 3
@@ -322,6 +325,42 @@ def poll_one_cloud(cloud, state):
     return pushed_count
 
 
+def refresh_dashboard_xlsx():
+    """Full refresh of cost+runtime data + xlsx rebuild after a successful push cycle.
+
+    Runs refresh_dashboard.py which:
+      1. Pulls fresh cost data from Databricks volumes for any new shipped industries
+      2. Fetches runtime info from orchestrator state files / job runs
+      3. Detects in-flight pipelines per cloud
+      4. Saves to ~/claude/vibe-agent/state/cost_results.json + runtime_results.json
+      5. Triggers json_to_excel.py / build_cost_xlsx.py to rebuild xlsx
+
+    Best-effort: failures logged but never raised. ~30-120s when industries shipped
+    (Databricks API calls per cloud); ~5s if state already fresh. Capped at
+    DASHBOARD_REFRESH_TIMEOUT_S so a hung Databricks API doesn't block the watchdog.
+    """
+    if not os.path.exists(DASHBOARD_REFRESH_SCRIPT):
+        log(f"  [dashboard-refresh SKIP] {DASHBOARD_REFRESH_SCRIPT} not found")
+        return
+    log(f"  [dashboard-refresh FIRED] running {DASHBOARD_REFRESH_SCRIPT} (timeout={DASHBOARD_REFRESH_TIMEOUT_S}s)")
+    try:
+        proc = subprocess.run(
+            [sys.executable, DASHBOARD_REFRESH_SCRIPT],
+            capture_output=True, text=True, timeout=DASHBOARD_REFRESH_TIMEOUT_S,
+        )
+        tail = (proc.stdout or "").strip().splitlines()[-3:]
+        for ln in tail:
+            log(f"    [dashboard-refresh stdout] {ln}")
+        if proc.returncode != 0:
+            log(f"  [dashboard-refresh FAILED] rc={proc.returncode} err={(proc.stderr or '')[:300]}")
+        else:
+            log(f"  [dashboard-refresh DONE] xlsx rebuilt")
+    except subprocess.TimeoutExpired:
+        log(f"  [dashboard-refresh TIMEOUT] >{DASHBOARD_REFRESH_TIMEOUT_S}s — best-effort, continuing")
+    except Exception as _e:
+        log(f"  [dashboard-refresh THREW] {str(_e)[:200]} — best-effort, continuing")
+
+
 def main():
     log(f"=== sync_watchdog starting (poll_interval={POLL_INTERVAL_S}s) ===")
     log(f"  repo: {REPO_PATH}")
@@ -345,6 +384,8 @@ def main():
                 log(f"  [{cloud['name']}] cycle {cycle} threw: {str(e)[:300]}")
         elapsed = time.time() - cycle_start
         log(f"--- cycle {cycle} done in {elapsed:.0f}s, cycle_pushed={cycle_pushed}, total_pushed={sum(len(v) for v in state.get('pushed',{}).values())} ---")
+        if cycle_pushed > 0:
+            refresh_dashboard_xlsx()
         time.sleep(POLL_INTERVAL_S)
 
 

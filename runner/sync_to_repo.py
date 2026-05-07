@@ -30,6 +30,9 @@ GIT_OP_TIMEOUT_S = 600
 EXPORT_TIMEOUT_S = 600
 WS_LIST_TIMEOUT_S = 60
 
+XLSX_BUILDER_PATH = os.path.expanduser("~/claude/vibe-agent/json_to_excel.py")
+XLSX_REBUILD_TIMEOUT_S = 30
+
 
 _TABLE_SEP_RE = re.compile(r"^\|[\s\-:|]+\|\s*$")
 _ANCHOR_RE = re.compile(r'^\s*<a\s+id="(domain-[^"]+)"></a>\s*$')
@@ -295,6 +298,37 @@ def _commit_and_push(repo_path: str, industry: str, branch: str,
     return True
 
 
+def _rebuild_state_xlsx(log: Callable[[str], None]) -> None:
+    """Fast rebuild of ~/claude/vibe-agent/state/vibe_state_raw.xlsx after a push.
+
+    Reads existing cost_results.json + runtime_results.json + the now-updated
+    repo to refresh the dashboard. ~1.5s. Best-effort: any failure is logged
+    but never raised — repo-sync MUST NEVER block on dashboard refresh.
+
+    Cost+runtime data is refreshed separately by sync_watchdog.py after each
+    cycle that pushed (calls refresh_dashboard.py). This hook just refreshes
+    the model-metric / status columns instantly.
+    """
+    if not os.path.exists(XLSX_BUILDER_PATH):
+        log(f"  [xlsx-rebuild SKIP] {XLSX_BUILDER_PATH} not found")
+        return
+    try:
+        import sys as _sys
+        proc = subprocess.run(
+            [_sys.executable, XLSX_BUILDER_PATH],
+            capture_output=True, text=True, timeout=XLSX_REBUILD_TIMEOUT_S,
+        )
+        if proc.returncode == 0:
+            tail = (proc.stdout or "").strip().splitlines()[-1:] or [""]
+            log(f"  [xlsx-rebuild FIRED] vibe_state_raw.xlsx refreshed: {tail[0]}")
+        else:
+            log(f"  [xlsx-rebuild FAILED] rc={proc.returncode} err={(proc.stderr or '')[:200]}")
+    except subprocess.TimeoutExpired:
+        log(f"  [xlsx-rebuild TIMEOUT] >{XLSX_REBUILD_TIMEOUT_S}s — best-effort, continuing")
+    except Exception as _e:
+        log(f"  [xlsx-rebuild THREW] {str(_e)[:200]} — best-effort, continuing")
+
+
 def sync_completed_industries(
     repo_path: str = DEFAULT_REPO_PATH,
     workspace_root: str = DEFAULT_WORKSPACE_ROOT,
@@ -357,6 +391,10 @@ def sync_completed_industries(
             result["synced"].append(ind)
         else:
             result["failed"].append(ind)
+
+    if result["synced"]:
+        log(f"  [repo-sync] {len(result['synced'])} industries pushed — rebuilding xlsx dashboard")
+        _rebuild_state_xlsx(log)
     return result
 
 
