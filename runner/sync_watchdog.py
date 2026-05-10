@@ -46,6 +46,8 @@ POLL_INTERVAL_S = 120
 
 DASHBOARD_REFRESH_SCRIPT = os.path.expanduser("~/claude/vibe-agent/refresh_dashboard.py")
 DASHBOARD_REFRESH_TIMEOUT_S = 600
+XLSX_STATE_FILE = os.path.expanduser("~/claude/vibe-agent/state/vibe_state_raw.xlsx")
+XLSX_STALE_GRACE_S = 30
 
 QUALITY_GATE_MIN_PRODUCTS = 5
 QUALITY_GATE_MIN_ATTRIBUTES = 50
@@ -281,9 +283,37 @@ def push_industry(profile, industry_snake, cloud_name):
     finally:
         release_repo_lock()
     out_tail = "\n".join((proc.stdout + proc.stderr).splitlines()[-15:])
-    if proc.returncode == 0 and '"synced"' in proc.stdout and industry_snake in proc.stdout:
+    parsed = None
+    if proc.returncode == 0 and proc.stdout.strip():
+        try:
+            parsed = json.loads(proc.stdout)
+        except Exception:
+            try:
+                start = proc.stdout.rfind("{\n")
+                if start == -1:
+                    start = proc.stdout.rfind("{")
+                end = proc.stdout.rfind("}")
+                if start != -1 and end != -1 and end > start:
+                    parsed = json.loads(proc.stdout[start:end + 1])
+            except Exception:
+                parsed = None
+    truly_synced = bool(parsed and industry_snake in (parsed.get("synced") or []))
+    repo_root_local = os.path.expanduser("~/Documents/projects/vibe-business-data-models")
+    ecm_ok = os.path.isfile(os.path.join(repo_root_local, industry_snake, "ecm_v1", "model.json"))
+    mvm_ok = os.path.isfile(os.path.join(repo_root_local, industry_snake, "mvm_v1", "model.json"))
+    readme_ok = os.path.isfile(os.path.join(repo_root_local, industry_snake, "readme.md"))
+    artifacts_ok = ecm_ok and mvm_ok and readme_ok
+    if proc.returncode == 0 and truly_synced and artifacts_ok:
+        log(f"  [{cloud_name}] [watchdog-success-strict FIRED] {industry_snake} pushed (synced=YES, ecm_v1/model.json={ecm_ok}, mvm_v1/model.json={mvm_ok}, readme.md={readme_ok})")
         log(f"  [{cloud_name}] [sync-watchdog SUCCESS] {industry_snake} pushed")
         return True
+    failed_list = (parsed or {}).get("failed") or []
+    skipped_list = (parsed or {}).get("skipped_existing") or []
+    log(
+        f"  [{cloud_name}] [watchdog-success-tautology FIRED] {industry_snake} sync FAILED — rc={proc.returncode} "
+        f"truly_synced={truly_synced} artifacts_ok={artifacts_ok} (ecm={ecm_ok} mvm={mvm_ok} readme={readme_ok}) "
+        f"in_failed={industry_snake in failed_list} in_skipped={industry_snake in skipped_list} parsed_ok={parsed is not None}"
+    )
     log(f"  [{cloud_name}] [sync-watchdog FAILED] {industry_snake} sync did not complete cleanly:\n{out_tail}")
     return False
 
@@ -323,6 +353,95 @@ def poll_one_cloud(cloud, state):
             pushed_count += 1
             save_state(state)
     return pushed_count
+
+
+XLSX_PATH = os.path.expanduser("~/claude/vibe-agent/state/vibe_state_raw.xlsx")
+
+
+def xlsx_is_stale():
+    """v0.7.5 (alias=xlsx-stale-detect) — return True if the canonical xlsx mtime is
+    older than ANY shipped model.json mtime in the repo, OR if the xlsx is missing.
+
+    ROOT CAUSE this fixes:
+    refresh_dashboard_xlsx() was only invoked when cycle_pushed > 0 (i.e. when THIS
+    watchdog cycle pushed at least one industry to the repo). Industries that landed
+    via OTHER paths (orchestrator's own sync_completed_industries hook, sector_runner
+    direct push, or any manual git operation) never trigger the dashboard refresh,
+    leaving the xlsx stale for hours. Real example: sports_entertainment landed at
+    May 10 00:00 UTC; xlsx last refresh was 23:57; nine watchdog cycles between
+    00:08 and 00:31 all reported cycle_pushed=0 because the industry was already
+    in the repo by the time the watchdog polled — yet the xlsx still showed it as
+    'Waiting'. User asked "the sheet says sports entertainment still running" at
+    00:29 — 32 min after the artifact landed.
+
+    This function is the second-line guarantee: regardless of WHO synced the
+    industry, if the xlsx is older than the newest shipped model.json, refresh.
+    """
+    if not os.path.isfile(XLSX_PATH):
+        return True
+    try:
+        xlsx_mtime = os.path.getmtime(XLSX_PATH)
+    except OSError:
+        return True
+    if not os.path.isdir(REPO_PATH):
+        return False
+    newest_artifact_mtime = 0.0
+    for ind_dir in os.scandir(REPO_PATH):
+        if not ind_dir.is_dir() or ind_dir.name.startswith("."):
+            continue
+        for sub in ("ecm_v1", "mvm_v1"):
+            mj = os.path.join(ind_dir.path, sub, "model.json")
+            try:
+                m = os.path.getmtime(mj)
+                if m > newest_artifact_mtime:
+                    newest_artifact_mtime = m
+            except OSError:
+                continue
+    return newest_artifact_mtime > xlsx_mtime
+
+
+def _xlsx_is_stale():
+    """v0.7.5 (alias=xlsx-stale-detect) — detect xlsx staleness via repo mtime probe.
+
+    ROOT CAUSE this fixes:
+    The previous refresh-trigger only fired when ``cycle_pushed > 0``. If an
+    industry's artifacts landed in the repo via a path that bypassed
+    ``push_industry`` (orchestrator's own ``sync_completed_industries`` call,
+    manual ``git push`` from a sibling shell, or a sector-runner that finished
+    AFTER its terminal flush), the watchdog observed ``industry_in_repo(ind) ==
+    True`` immediately, treated the industry as already-pushed, and never bumped
+    the xlsx. Concrete burn (2026-05-10): ``sports_entertainment`` landed at
+    00:00 UTC, the watchdog ran 9 cycles between 00:08 and 00:31 with
+    ``cycle_pushed=0`` each time, and the xlsx remained on its 23:57 snapshot
+    (status="Waiting") until forced. Users opened a stale dashboard and
+    misattributed run state.
+
+    Reactive-only refresh is brittle. This proactive probe checks the newest
+    ``model.json`` mtime under the repo against the xlsx mtime; if anything is
+    newer (with a small grace to avoid races), the xlsx is stale and must be
+    rebuilt regardless of ``cycle_pushed``.
+
+    Returns True iff a refresh is warranted. Fail-open: if any I/O probe throws
+    we return False so a flaky probe never blocks the watchdog loop.
+    """
+    try:
+        if not os.path.isfile(XLSX_STATE_FILE):
+            return True
+        xlsx_mtime = os.path.getmtime(XLSX_STATE_FILE)
+        newest_model_mtime = 0.0
+        for ind in os.listdir(REPO_PATH):
+            ind_dir = os.path.join(REPO_PATH, ind)
+            if not os.path.isdir(ind_dir) or ind.startswith("."):
+                continue
+            for scope in ("ecm_v1", "mvm_v1"):
+                model_path = os.path.join(ind_dir, scope, "model.json")
+                if os.path.isfile(model_path):
+                    m = os.path.getmtime(model_path)
+                    if m > newest_model_mtime:
+                        newest_model_mtime = m
+        return newest_model_mtime > (xlsx_mtime + XLSX_STALE_GRACE_S)
+    except Exception:
+        return False
 
 
 def refresh_dashboard_xlsx():
@@ -385,6 +504,9 @@ def main():
         elapsed = time.time() - cycle_start
         log(f"--- cycle {cycle} done in {elapsed:.0f}s, cycle_pushed={cycle_pushed}, total_pushed={sum(len(v) for v in state.get('pushed',{}).values())} ---")
         if cycle_pushed > 0:
+            refresh_dashboard_xlsx()
+        elif _xlsx_is_stale():
+            log(f"  [xlsx-stale-detect FIRED] cycle_pushed=0 but repo has newer model.json than xlsx — forcing refresh")
             refresh_dashboard_xlsx()
         time.sleep(POLL_INTERVAL_S)
 
