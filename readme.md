@@ -41,6 +41,7 @@
 - [The Complete Action Catalog](#-the-complete-action-catalog)
 - [Pipeline Stages](#-pipeline-stages)
 - [Output Artifacts](#-output-artifacts)
+- [Viewing a Generated Model](#-viewing-a-generated-model)
 - [Quality Rules & Enforcement](#-quality-rules--enforcement)
 - [LLM Architecture](#-llm-architecture)
 - [Metric Views](#-metric-views)
@@ -868,6 +869,56 @@ When you run the agent, it executes these progress stages in order (the `#` colu
 | **Tags** | Unity Catalog tags on schemas, tables, and columns |
 | **Metric Views** | Databricks metric views for KPI calculation |
 | **Sample Data** | Synthetic records with valid FK references |
+
+---
+
+## 👁️ Viewing a Generated Model
+
+Once the agent has produced a model (a `model.json` file plus the artifacts under `<industry>/<scope>_v1/`), you have two ways to explore it: open it in the **model-viewer Databricks App** for an interactive ER-graph view, or load `model.json` programmatically.
+
+### The model-viewer app
+
+The `viewer/model_viewer_app_installer.ipynb` notebook in this repo provisions a Databricks App that renders any `model.json` as an interactive entity-relationship graph. It exposes three navigable views — full model, single domain, single product — and lets you load models either directly from a GitHub repo (e.g. [`amralieg/vibe-business-data-models`](https://github.com/amralieg/vibe-business-data-models)) or by uploading a local `model.json` file.
+
+#### Install the viewer
+
+1. Open `viewer/model_viewer_app_installer.ipynb` in your Databricks workspace.
+2. Run all cells. The installer creates the Databricks App and prints the app URL when it completes.
+3. Open the app URL in a browser.
+
+#### Load a model
+
+Inside the app you have two loaders:
+
+- **Load from repo** — paste any GitHub `owner/repo` (default: `amralieg/vibe-business-data-models`) and pick the industry + flavour from the dropdown. Note: GitHub rate-limits anonymous API calls — if you hit a 429 / "rate limit exceeded" message, fall back to the JSON loader.
+- **Load from JSON** — upload a `model.json` directly. Use this when (a) you just generated a model with the agent and want to inspect it before deploying, or (b) GitHub is rate-limiting the repo loader.
+
+#### What you see — three views
+
+**1. Full-model overview.** Every entity in the model arranged on a single canvas, FK relationships drawn between them, domains colour-coded as rectangles, products on the perimeter:
+
+![Full-model overview — Retail MVM](./images/retail_mvm.png)
+
+**2. Domain drill-down.** Click any domain to zoom in. You see the domain's sub-domains as named groups and the products inside each, with the FK web restricted to within-domain links:
+
+![Domain drill-down — order domain in Retail MVM](./images/order_domain.png)
+
+**3. Single-product radial view.** Click any product (table) to centre it. Every other product it relates to via FK fans out around it, grouped by domain, so you can see at a glance every join path leaving that table:
+
+![Single-product radial view — order.order_line in Retail MVM](./images/order_line_product.png)
+
+### Programmatic inspection (no app required)
+
+```python
+import json
+m = json.load(open('<industry>/mvm_v1/model.json'))['model']
+for d in m['domains']:
+    for p in d.get('products', []):
+        print(f"{d['name']}.{p['name']}: {len(p['attributes'])} columns, "
+              f"{sum(1 for a in p['attributes'] if a.get('foreign_key_to'))} FKs")
+```
+
+The `_manifest.json` next to every `model.json` gives you a quick counts summary (domains, products, attributes, FKs, metric views) without parsing the full model.
 
 ---
 
