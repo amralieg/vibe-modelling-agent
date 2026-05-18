@@ -173,12 +173,13 @@ def test_orchestrator_pulse_interval_is_10_minutes():
 
 
 def test_orchestrator_sector_timeout_is_14h():
+    """SUPERSEDED by user directive 2026-05-18: "set timeout is always 15hrs for all jobs
+    in all workflows". The v0.7.5 global is 15 * 3600 = 54000s. Function name kept for
+    git-blame continuity. See test_orchestrator_sector_timeout_is_15h_global below."""
     src = ORCHESTRATOR.read_text()
-    assert "SECTOR_TIMEOUT_S = 14 * 3600" in src, (
-        "SECTOR_TIMEOUT_S MUST be 14 * 3600 (50400s, 14 hours) per user directive 2026-05-01. "
-        "Original 6h cap killed Agriculture run at 99% completion (post-finalize normalization) "
-        "wasting all 14160 attrs / 357 products / clean DAG. User stated tier-1 takes ~10h "
-        "so 14h gives 4h safety margin."
+    assert "SECTOR_TIMEOUT_S = 15 * 3600" in src, (
+        "SECTOR_TIMEOUT_S MUST be 15 * 3600 (54000s) per user directive 2026-05-18. "
+        'Setting timeout to "15hrs for all jobs in all workflows" supersedes earlier 14h/36h caps.'
     )
 
 
@@ -437,17 +438,23 @@ def test_orchestrator_sector_loop_calls_assert_runner_fresh():
 
 
 def test_agent_version_constant_unchanged_at_071():
+    """v0.7.1 historical invariant; relaxed to >=0.7.1 with single-digit semver
+    so later patches (v0.7.2, v0.7.3, v0.7.4, v0.7.5+) don't break it. Function
+    name kept for git-blame continuity."""
     nb = json.loads(open(REPO / "agent" / "dbx_vibe_modelling_agent.ipynb").read())
     cell0_src = "".join(nb["cells"][0].get("source", [])) if nb["cells"][0].get("cell_type") == "code" else ""
     cell1_src = "".join(nb["cells"][1].get("source", [])) if len(nb["cells"]) > 1 and nb["cells"][1].get("cell_type") == "code" else ""
     text = cell0_src + "\n" + cell1_src
     import re
-    matches = re.findall(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', text)
-    assert matches, "agent notebook missing __AGENT_VERSION__"
-    assert matches[0] in ("0.7.1", "0.8.1"), (
-        f"agent __AGENT_VERSION__ unexpected value: {matches[0]} "
-        "(should be 0.7.1 for v0.7.1 deploy, or 0.8.1 if dev iteration)"
+    m = re.search(r'__AGENT_VERSION__\s*=\s*"(\d+)\.(\d+)\.(\d+)"', text)
+    assert m, "agent notebook missing __AGENT_VERSION__"
+    major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    assert (major, minor, patch) >= (0, 7, 1), (
+        f"agent __AGENT_VERSION__ unexpected value: {major}.{minor}.{patch} "
+        "(must be >= 0.7.1 per §3a single-digit semver)"
     )
+    for seg in (major, minor, patch):
+        assert 0 <= seg <= 9, f"version segment {seg} violates §3a single-digit semver"
 
 
 def test_orchestrator_exposes_kill_orphan_pipeline_runs_helper():

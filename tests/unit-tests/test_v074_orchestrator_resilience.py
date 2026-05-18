@@ -265,14 +265,20 @@ def test_v074_oauth_reauth_force_refresh_is_safe_on_failure():
 
 
 def test_v074_sector_timeout_raised_to_36h():
-    """Pre-v0.7.4: 14h, killed sector_runner before all industries in a sector ran.
-    v0.7.4: 36h, accommodates worst-case 7 industries × 5h average = 35h."""
+    """v0.7.5 (2026-05-18): user directive "15h for all jobs in all workflows" supersedes
+    the v0.7.4 36h cap. The sector-runner is also subject to the 15h ceiling per §3c
+    USER-VIBE AUTHORITY. WARNING: multi-industry sector runs (e.g. retail+CPG 7 industries)
+    may exceed 15h and get killed; user accepted this risk explicitly."""
     src = ORCH_FILE.read_text()
-    assert "SECTOR_TIMEOUT_S = 36 * 3600" in src, (
-        "SECTOR_TIMEOUT_S must be raised from 14h to 36h to prevent timeout cascades"
+    assert "SECTOR_TIMEOUT_S = 15 * 3600" in src, (
+        "SECTOR_TIMEOUT_S MUST be 15 * 3600 (54000s) per user directive 2026-05-18 "
+        '"set timeout is always 15hrs for all jobs in all workflows"'
+    )
+    assert "SECTOR_TIMEOUT_S = 36 * 3600" not in src, (
+        "Old 36h timeout constant must be removed (user directive 2026-05-18 caps all jobs at 15h)"
     )
     assert "SECTOR_TIMEOUT_S = 14 * 3600" not in src, (
-        "Old 14h timeout constant must be removed (no fallback to old value)"
+        "Old 14h timeout constant must be removed"
     )
 
 

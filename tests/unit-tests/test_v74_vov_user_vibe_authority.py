@@ -418,10 +418,12 @@ def test_v74_agent_version_constant_is_074():
         if isinstance(src, list):
             src = "".join(src)
         if "__AGENT_VERSION__" in src:
-            m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', src)
+            m = re.search(r'__AGENT_VERSION__\s*=\s*"(\d+)\.(\d+)\.(\d+)"', src)
             if m:
-                assert m.group(1) == "0.7.4", (
-                    f"agent version literal is '{m.group(1)}', expected '0.7.4'"
+                major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                assert (major, minor, patch) >= (0, 7, 4), (
+                    f"agent version literal is '{major}.{minor}.{patch}', expected >= 0.7.4 "
+                    "(v0.7.4 invariant; later versions inherit it)"
                 )
                 found = True
                 break
