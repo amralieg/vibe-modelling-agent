@@ -316,6 +316,7 @@ def test_diff_guard_no_op_when_perfect_additive():
 # ---------- VERSION TESTS (P0: ensure __AGENT_VERSION__ is bumped) ----------
 
 def test_agent_version_constant_bumped_to_073():
+    """v0.7.3 invariant: agent version must be >= 0.7.3 (bumped to 0.7.4+ by later patches)."""
     nb = json.loads(NOTEBOOK_PATH.read_text(encoding="utf-8"))
     for cell in nb.get("cells", []):
         if cell.get("cell_type") != "code":
@@ -323,9 +324,12 @@ def test_agent_version_constant_bumped_to_073():
         src = cell.get("source", "")
         if isinstance(src, list):
             src = "".join(src)
-        m = re.search(r'__AGENT_VERSION__\s*=\s*"(\d+\.\d+\.\d+)"', src)
+        m = re.search(r'__AGENT_VERSION__\s*=\s*"(\d+)\.(\d+)\.(\d+)"', src)
         if m:
-            assert m.group(1) == "0.7.3", f"expected v0.7.3, found {m.group(1)}"
+            major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            assert (major, minor, patch) >= (0, 7, 3), (
+                f"expected v>=0.7.3 (single-digit semver), found {major}.{minor}.{patch}"
+            )
             return
     pytest.fail("__AGENT_VERSION__ literal not found in any code cell")
 
