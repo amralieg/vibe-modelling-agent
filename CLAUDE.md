@@ -347,6 +347,32 @@ Added 2026-04-23 after an audit exposed a "v0.8.0 shipped, 66/100 implemented" c
 
 **DON'T** accept "looks green" as proof.
 **DON'T** skip §6 self-score because "session complete."
+
+### 8.10 No-op patches are §8.4 violations (added 2026-05-19 from v0.7.6 P26 audit)
+
+A patch that LOGS a `FIRED` line but does NOT mutate the system state is a **no-op observability patch**, not a fix. It satisfies the static-grep test ("alias is in the file") but does not change downstream behavior. v0.7.6 P26 (`vreq-target-revalidate-on-execute`) was the canonical violation: it computed `_revalidate_resolved` via last-component fuzzy match, logged FIRED, then still appended the mutation to `skipped` without retrying — so the v0.7.5 healthcare `unlinked_fk REMEDIATE` adherence ceiling (84.2%) persisted into v0.7.6 despite the "fix".
+
+**DO** for every patch claiming to fix a failure mode:
+1. Identify the OBSERVABLE downstream state change the patch must produce (e.g. "FK column gets `foreign_key_to` set", "domain gets removed from output model", "config flag becomes True").
+2. Write a BEHAVIORAL test that:
+   - Sets up minimal model state where the failure mode would fire pre-patch.
+   - Calls the production code path (NOT a stub) end-to-end.
+   - Asserts the OBSERVABLE state change.
+   - **Proves it fails on pre-patch HEAD** (run `git stash push` → `pytest` → expect failure) before claiming the patch fixes anything.
+3. Static-grep contracts (`assert "string" in src`) are SMOKE checks only — they prove code shape, not behavior. Every patch needs ≥1 behavioral test alongside.
+
+**DON'T**:
+- Ship a patch whose ONLY effect is a log line (FIRED / MISS / SKIP).
+- Ship a patch where the FIRED log fires but the downstream code path takes the same branch it would have taken without the patch.
+- Count a static-grep `assert "alias=foo" in src` test as proof the patch fixes the failure mode — that's §8.3 tautology dressed up as testing.
+- Accept "the test passes" without first verifying the test FAILS on the pre-patch HEAD (otherwise it's tautological).
+
+**Sentinel: at audit time, every alias in `__AGENT_VERSION__` history must have BOTH:**
+- A `[<alias> FIRED]` log emission site in the agent notebook.
+- A behavioral test (not just a static-grep assertion) that demonstrates the patch changes observable state.
+
+**Why this rule exists:** The v0.7.6 P26 no-op was caught only because v0.7.7 review re-read the actual code. A weaker reviewer would have seen "23/23 tests pass" + "FIRED log present in code" and shipped the run, then watched the same v0.7.5 84.2% adherence ceiling re-appear and called it "stubborn LLM behavior". The honest cost of skipping behavioral testing is one wasted ~$200 tier-1 industry pipeline run. The rule pays for itself per shipped patch.
+
 ## 9. Model-level validation methodology — what to check, how to check it, what to report
 
 This section captures the **model-level validation protocol** used to audit every pipeline run (new base model, vibe-modeling-of-version, shrink, enlarge, install). It is distinct from §7 (code review). Apply §9 after every pipeline terminal state before claiming "run looks good."

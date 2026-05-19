@@ -84,7 +84,7 @@ The name **"Vibe"** reflects the core workflow:
 
 Each iteration produces a new version. The agent carries forward your context so nothing is lost between runs. You are never locked into a static template — the model evolves with your business.
 
-Current version: **v0.7.1** — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v08x) below.
+Current version: **v0.7.7** — see [Version history](#version-history) and [Recent fixes](#recent-fixes-v06x--v08x) below.
 
 > **Note on numbering:** the dev branch tracked four internal iterations labelled `v0.7.1`, `v0.7.2`, `v0.7.3`, `v0.7.4` between the `v0.7.0` and `v0.7.1` release tags. The `v0.7.1` release tag on `main` consolidates all of those iterations into a single public release, so `__AGENT_VERSION__ = "0.7.1"` is stamped into every model.json produced from this point forward. The earlier per-iteration version-history rows below are kept verbatim as the engineering trace.
 
