@@ -1,0 +1,1 @@
+Healthcare is a vast industry operating hospitals, clinics, outpatient facilities, and integrated care systems, delivering patient care, medical research, diagnostics, and health education across diverse populations and regions.

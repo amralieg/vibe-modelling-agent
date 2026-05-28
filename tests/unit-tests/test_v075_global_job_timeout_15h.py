@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+from notebook_source_util import notebook_concat_source
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 AGENT_NB = REPO_ROOT / "agent" / "dbx_vibe_modelling_agent.ipynb"
 RUNNER_NB = REPO_ROOT / "runner" / "vibe_runner.ipynb"
@@ -39,7 +41,7 @@ CANONICAL_TIMEOUT_SECONDS = 54000  # 15 * 3600
 
 
 def test_agent_joblauncher_task_timeout_is_15h():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert re.search(
         r'task_key="vibe_modeling_task"[^"]*?notebook_task[^}]*?timeout_seconds=54000',
         src,
@@ -55,7 +57,7 @@ def test_agent_joblauncher_task_timeout_is_15h():
 def test_agent_wait_for_run_terminal_default_is_15h():
     """Both copies of wait_for_run_terminal (the original + v0.8.2 P7 duplicate)
     must default timeout_seconds=54000."""
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     matches = re.findall(
         r"def wait_for_run_terminal\(run_id, heartbeat_seconds=60, timeout_seconds=(\d+)",
         src,
@@ -142,7 +144,7 @@ def test_no_stale_14400_timeouts_in_job_creation_paths():
 
 def test_agent_version_constant_is_075():
     """v0.7.5 ships the 15h-everywhere change; constant must reflect it."""
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     m = re.search(r'__AGENT_VERSION__\s*=\s*\\?"(\d+)\.(\d+)\.(\d+)\\?"', src)
     assert m, "__AGENT_VERSION__ literal not found in agent notebook"
     major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))

@@ -32,6 +32,31 @@ Short, emoji-filled, or pure-feature-list changelogs are NOT acceptable for tag-
 
 AFTER FINISHING YOUR JOB, FIND EVERY SINGLE REGRESSION ERROR AND RACTIFY THE ROOT CAUSE BEFORE YOU DELIVER, AND THEN SHOW ME REGRESSION RESPORT WITH HOW CRITICAL THE ISSUE IS.
 
+## 1a-bis. NO COMMIT UNTIL SUCCESS-VERIFIED — HARD RULE (added 2026-05-19)
+
+**"DO NOT COMMIT UNTIL IT IS A SUCCESS. This must be the theme ALWAYS."**
+
+The git history is a record of WHAT SHIPPED AND WORKED. It is NOT a scratchpad for in-flight attempts. Every commit on `main`/`dev` MUST represent a version that has been verified end-to-end on live runs to satisfy the user's success criteria (typically: 100% adherence to user vibes + ZERO §10.6 hard signatures).
+
+**Workflow (HARD):**
+
+1. Make local code changes on disk in the working tree. **Do NOT `git commit` yet.**
+2. Bump `__AGENT_VERSION__` to the next single-digit semver (per §3a).
+3. **Deploy directly from the working-tree file to the workspace** as `dbx_vibe_modelling_agent_v<NN>` via `databricks workspace import` (CLI reads from disk, no commit required).
+4. Patch the JOB notebook_path → `_v<NN>`.
+5. Drop catalogs, prior runs, submit fresh runs.
+6. Monitor per §11. KILL early on RED trajectory, iterate (re-deploy from working tree without committing).
+7. **ONLY AFTER** the run terminates with `result_state=SUCCESS` AND adherence audit passes success criteria, `git add` + `git commit` + `git push`.
+8. The commit message references the live run_id that proved the fix worked.
+
+**Hard prohibitions:**
+- ❌ `git commit` before the live run terminates with SUCCESS + 100% adherence.
+- ❌ `git push` before commit verification.
+- ❌ "Let me just commit so we don't lose the work" — local files don't get lost; use `git tag -a v0.7.8-attempt-1 -m "draft"` locally, not a public commit.
+- ❌ Bypassing with "the test passes locally, that's good enough" — local tests cover ~20% of production behavior.
+
+**Single permitted exception:** Files the runtime never reads — `CLAUDE.md`, `readme.md`, `tests/*`, `runner/*.py` that no JOB references. These may be committed independently when the user explicitly asks; they have no runtime risk.
+
 ## 2. Databricks Serverless compatibility (hard constraint)
 
 ALL THE CODE YOU GENERATE MUST ALWAYS WORKS WITH DATABRIKC SERVERLESS ENVIRONMENT, No Cache, persist, uncache, sparkcontext etc.

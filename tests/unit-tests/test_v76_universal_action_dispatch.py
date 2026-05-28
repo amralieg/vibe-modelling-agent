@@ -34,6 +34,8 @@ from pathlib import Path
 
 import pytest
 
+from notebook_source_util import notebook_concat_source
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 AGENT_NB = REPO_ROOT / "agent" / "dbx_vibe_modelling_agent.ipynb"
 
@@ -42,7 +44,7 @@ AGENT_NB = REPO_ROOT / "agent" / "dbx_vibe_modelling_agent.ipynb"
 
 
 def test_agent_version_is_0_7_6():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     m = re.search(r'__AGENT_VERSION__\s*=\s*\\?"(\d+)\.(\d+)\.(\d+)\\?"', src)
     assert m, "__AGENT_VERSION__ literal not found in agent notebook"
     major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
@@ -57,7 +59,7 @@ def test_agent_version_is_0_7_6():
 
 
 def test_p22_helper_function_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "_vov_user_authority_active" in src, (
         "P22 helper _vov_user_authority_active() must be defined to centralize VOV authority "
         "detection across contract gates"
@@ -68,7 +70,7 @@ def test_p22_helper_function_present():
 
 
 def test_p22_evaluate_action_against_contract_accepts_widgets_values():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "def evaluate_action_against_contract(action, contract, widgets_values=None)" in src, (
         "P22: evaluate_action_against_contract() must accept widgets_values kwarg so it can "
         "check VOV authority and bypass rejections"
@@ -76,14 +78,14 @@ def test_p22_evaluate_action_against_contract_accepts_widgets_values():
 
 
 def test_p22_filter_actions_by_contract_accepts_widgets_values():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "def filter_actions_by_contract(actions, contract, logger, widgets_values=None)" in src, (
         "P22: filter_actions_by_contract() must accept widgets_values kwarg"
     )
 
 
 def test_p22_contract_gates_emit_override_log():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "vov_user_authority_override:forbidden_op" in src, (
         "P22: forbidden_op rejection must be converted to override under VOV authority"
     )
@@ -99,14 +101,14 @@ def test_p22_contract_gates_emit_override_log():
 
 
 def test_p22_call_site_passes_widgets_values():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert (
         "filter_actions_by_contract(actions, vibe_contract, logger, widgets_values=widgets_values)" in src
     ), "P22: production call site in step_interpret must pass widgets_values to enable bypass"
 
 
 def test_p22_step_setup_marks_vov_authority_active():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "_vov_user_authority_active" in src
     # config sentinel set at step_setup when operation == vibe modeling of version
     assert "VOV_USER_AUTHORITY" in src, (
@@ -118,7 +120,7 @@ def test_p22_step_setup_marks_vov_authority_active():
 
 
 def test_p23_universal_dispatch_log_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "[vov-action-dispatch-universal FIRED]" in src, (
         "P23: every action dispatch must self-report so audit can prove the user-vibe-derived "
         "action_type reached the LLM fallback handler (not silently dropped)"
@@ -135,7 +137,7 @@ def test_p23_unknown_action_never_hard_rejected():
     """P23 contract: there must be NO `return False` immediately after an
     'Unknown action type' warning. Unknown actions must always flow through
     _llm_fallback_handler — never hard-stop."""
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     # Find the unknown-action warning + ensure it's accompanied by NO-AGENT alias
     assert "vov-action-dispatch-universal-no-agent" in src, (
         "P23: unknown action warning must use NO-AGENT alias (signals attempted-but-no-route, "
@@ -147,9 +149,12 @@ def test_p23_unknown_action_never_hard_rejected():
 
 
 def test_p24_diff_guard_accepts_applied_actions():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
+    # Loosened in v0.7.8 P36 — v0.7.8 added preserve_v1_domains=None after applied_actions.
+    # The contract is "applied_actions=None must be in the signature", not "signature must
+    # END at applied_actions=None".
     assert (
-        "def _strict_vov_diff_guard(input_model_json, data_model, user_closure, user_new_entities, logger=None, applied_actions=None)"
+        "def _strict_vov_diff_guard(input_model_json, data_model, user_closure, user_new_entities, logger=None, applied_actions=None"
         in src
     ), "P24: _strict_vov_diff_guard() must accept applied_actions kwarg"
     assert "vov-closure-action-aware FIRED" in src, (
@@ -158,14 +163,14 @@ def test_p24_diff_guard_accepts_applied_actions():
 
 
 def test_p24_call_site_passes_applied_actions():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "applied_actions=_vov_applied_actions_for_closure" in src, (
         "P24: call site must pass applied_actions (from contract_allowed_actions or vibe_master_actions)"
     )
 
 
 def test_p24_creates_widgets_entry_for_allowed_actions():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     # Notebook .ipynb is JSON-escaped; quote is \\\" in raw text
     assert 'contract_allowed_actions' in src, (
         "P24: filter_actions_by_contract call site must persist contract_allowed_actions for diff-guard"
@@ -179,7 +184,7 @@ def test_p24_creates_widgets_entry_for_allowed_actions():
 
 
 def test_p25_ssot_resolver_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "[vov-ssot-user-wins FIRED]" in src, (
         "P25: SSOT REMOVE branch must check user-vibe closure and prefer the user-mentioned entity"
     )
@@ -193,7 +198,7 @@ def test_p25_ssot_resolver_present():
 
 
 def test_p25_closure_mirrored_to_config():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert '_vov_user_closure_for_ssot' in src, (
         "P25: step_setup must mirror closure to config[_vov_user_closure_for_ssot] so dedup can see it"
     )
@@ -206,7 +211,7 @@ def test_p25_closure_mirrored_to_config():
 
 
 def test_p26_revalidate_fired_log_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "[vreq-target-revalidate-on-execute FIRED]" in src, (
         "P26: fuzzy last-component revalidation must self-report on successful match"
     )
@@ -216,7 +221,7 @@ def test_p26_revalidate_fired_log_present():
 
 
 def test_p26_skip_entry_includes_revalidate_resolved():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "'revalidate_resolved'" in src, (
         "P26: skipped mutation dict must include revalidate_resolved field for audit trail"
     )
@@ -226,7 +231,7 @@ def test_p26_skip_entry_includes_revalidate_resolved():
 
 
 def test_p27_sizing_source_scale_guard_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "[vov-sizing-source-scale-guard FIRED]" in src, (
         "P27: sizing-source-scale guard must self-report stripped clamps"
     )
@@ -240,7 +245,7 @@ def test_p27_sizing_source_scale_guard_present():
 
 
 def test_p27_strips_max_domains_when_shrink_over_20pct():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     # Sentinel: when stripped, max_domains is set to None
     assert "_merged_sd['max_domains'] = None" in src, (
         "P27: guard must STRIP (set to None) max_domains when it would shrink source >20%"
@@ -254,7 +259,7 @@ def test_p27_strips_max_domains_when_shrink_over_20pct():
 
 
 def test_p28_master_failure_sets_user_authority_for_vov():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "[vov-master-failure-user-authority FIRED]" in src, (
         "P28: master classification failure under VOV must self-report USER-AUTHORITY fallback"
     )
@@ -268,7 +273,7 @@ def test_p28_master_failure_sets_user_authority_for_vov():
 
 
 def test_p29_skip_regen_action_aware_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "[vov-skip-regen-action-aware FIRED]" in src, (
         "P29: skip-regen must self-report when SURGICAL/HOLISTIC mode is overridden by pending "
         "regen queues from user-vibe-derived actions"
@@ -282,12 +287,12 @@ def test_p29_skip_regen_action_aware_present():
 
 
 def test_v075_15h_timeout_still_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "timeout_seconds=54000" in src, "v0.7.5 15h timeout fix must remain intact"
 
 
 def test_v074_vov_strict_guard_still_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "alias=vov-strict-diff-guard" in src, "v0.7.3/v0.7.4 vov-strict-diff-guard must remain intact"
     assert "alias=vov-closure-extract" in src, "v0.7.3 vov-closure-extract must remain intact"
 

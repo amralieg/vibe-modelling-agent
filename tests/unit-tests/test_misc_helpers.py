@@ -6,9 +6,6 @@ class TestModuleLoads:
     """Baseline: verify agent_helpers module loaded with expected critical functions."""
     def test_core_functions_present(self):
         import agent_helpers as ah
-        # Core parsing / validation
-        assert hasattr(ah, '_parse_ce_counts')
-        assert hasattr(ah, '_is_link_excluded_by_candidate_eval')
         # Catalog / DDL
         assert hasattr(ah, '_ensure_catalog_exists')
         assert hasattr(ah, '_resolve_managed_location')
@@ -20,6 +17,8 @@ class TestModuleLoads:
         # Sanitization
         assert hasattr(ah, 'sanitize_name')
         assert hasattr(ah, 'replace_single_quote')
+        # LLM entry (stubbed in unit tests)
+        assert hasattr(ah, 'AIAgent')
 
     def test_no_critical_load_errors(self):
         import agent_helpers as ah

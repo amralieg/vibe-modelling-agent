@@ -33,12 +33,12 @@ def _load_vov_helpers():
         src = cell.get("source", "")
         if isinstance(src, list):
             src = "".join(src)
-        if "_compute_vov_user_closure" not in src or "_strict_vov_diff_guard" not in src:
+        if "def _compute_vov_user_closure" not in src or "def _strict_vov_diff_guard" not in src:
             continue
         start = src.find("def _compute_vov_user_closure")
         end = src.find("def step_setup_and_clean")
         if start < 0 or end < 0:
-            raise RuntimeError("Could not locate VOV helpers in notebook")
+            continue
         helpers_code = src[start:end]
         tree = ast.parse(helpers_code)
         for node in tree.body:

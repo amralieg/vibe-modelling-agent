@@ -6,6 +6,10 @@ legitimate FK proposals and we get the "Created 0 FK(s)" regression.
 """
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason="_parse_ce_counts removed from agent; candidate_evaluation is audit-only prose"
+)
+
 
 def _load_fn():
     from agent_helpers import _parse_ce_counts  # noqa

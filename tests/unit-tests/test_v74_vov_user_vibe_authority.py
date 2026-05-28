@@ -245,20 +245,31 @@ def test_p13_hydrate_idempotent_does_not_duplicate_existing():
     assert len(member_profile_prods) == 1, "hydrator must not duplicate existing products"
 
 
-def test_p13_hydrate_falls_back_to_master_record_stub_when_vibe_has_no_product_list():
+def test_p13_hydrate_does_NOT_fall_back_to_master_record_stub_per_v081_p44():
+    """v0.8.1 P44 (alias=vov-no-forced-master-record-stub) DELETED the hardcoded
+    <domain>_master_record fallback that previously stubbed a phantom product when a
+    user vibe added a new domain without enumerating products. Per the user directive
+    ('EVERYTHING MUST COME FROM LLM, REVIEW ALL THESE ISSUES AND FIX ALL OF THEM'),
+    the hydrator must now return n_p == 0 in this case, leaving downstream LLM steps
+    to either populate the domain organically OR let the empty-domain pruner drop it
+    if the user did not actually request meaningful structure. NEVER forcibly create
+    a <domain>_master_record stub."""
     domains_data = [{"domain": "abstract_domain"}]
     products_data = []
     attributes_data = []
     user_new_entities = {("abstract_domain",)}
-    # Vibe doesn't enumerate products
     vibe = "Add a new domain abstract_domain to capture some concept."
     n_p, n_a = VOV._vov_hydrate_new_domains_from_vibe(
         domains_data, products_data, attributes_data,
         vibe, user_new_entities, logger=None,
     )
-    # Hydrator must still create at least 1 stub product so the domain isn't dropped
-    assert n_p >= 1, "hydrator fallback must create at least 1 stub product per domain"
-    assert any(p.get("domain") == "abstract_domain" for p in products_data)
+    assert n_p == 0, (
+        f"P44 regression: hydrator created {n_p} stub product(s) when vibe was vague; "
+        "expected 0 — must NEVER auto-create <domain>_master_record stubs"
+    )
+    assert not any(
+        "master_record" in (p.get("product") or "").lower() for p in products_data
+    ), "P44 regression: a master_record stub leaked into products_data"
 
 
 def test_p13_hydrate_no_op_when_no_user_new_entities():

@@ -1,0 +1,63 @@
+{
+  "_schema_version": "1.0.0",
+  "_captured_from": "agent/dbx_vibe_modelling_agent.ipynb @ __AGENT_VERSION__=0.8.1, Cell 1 TECHNICAL_CONTEXT lines 22-309 (minus models + prompts_models which have dedicated fixtures).",
+  "_purpose": "Byte-exact snapshot of every non-model, non-prompt constant in the v0.8.1 TECHNICAL_CONTEXT dict. The rewrite core/constants.py MUST import this and assert every scalar and every nested dict matches byte-for-byte at boot.",
+  "_notes": [
+    "DATA_MODEL_SCOPES.SIZING_FACTORS and the ECM/MVM tier_1..tier_5 sub-trees are the authoritative model-sizing source — every prompt that references min/max domain/product/attribute/subdomain counts reads from here.",
+    "default_model_conventions are the FALLBACK values used if the widget is blank or malformed.",
+    "ai_query_timeout_seconds=480 is the per-LLM-call timeout; domain_metrics_timeout_seconds=720 applies only to DOMAIN_METRICS_PROMPT which returns larger payloads.",
+    "max_concurrent_batches and batch_size=20/20 are the async-pool parameters.",
+    "model_demotion_after_n_failures=3 is the ensemble health threshold (OPS-RUL-004).",
+    "min_honesty_score_threshold=65 is the LLM-response honesty floor enforced by smart_worker_loop's honesty_self_score gate."
+  ],
+  "reuse_business_catalog": "no",
+  "drop_metamodel_database_before_start": "false",
+  "drop_business_catalog_before_start": "no",
+  "default_model_conventions": {
+    "data_classification_levels": "restricted=restricted, confidential=confidential, internal=Internal, public=public",
+    "data_asset_naming_convention": "snake_case",
+    "primary_key_suffix": "id",
+    "foreign_key_suffix": "",
+    "schema_prefix": "",
+    "tag_prefix": "dbx_",
+    "table_id_type": "BIGINT",
+    "boolean_format": "Boolean (True/False)",
+    "date_format": "yyyy-MM-dd",
+    "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+    "add_house_keeping_columns": "No",
+    "add_history_tracking_columns": "No"
+  },
+  "product_sample_records": 10,
+  "max_concurrent_batches": 20,
+  "batch_size": 20,
+  "max_retries": 3,
+  "product_attributes_dedupe_threshold": 40,
+  "min_honesty_score_threshold": 65,
+  "ai_query_timeout_seconds": 480,
+  "domain_metrics_timeout_seconds": 720,
+  "model_demotion_after_n_failures": 3,
+  "DATA_MODEL_SCOPES": {
+    "SIZING_FACTORS": {
+      "association_table_uplift": 1.2,
+      "max_attributes_buffer_factor": 1.2,
+      "max_attributes_hard_reject_factor": 1.4,
+      "domain_hard_ceiling_factor": 1.5,
+      "resize_tolerance_pct": 15
+    },
+    "ecm": {
+      "tier_1": {"label": "Ultra-Complex", "description": "5+ regulatory bodies, multi-entity corporate structures, industry-standard canonical data models, complex product hierarchies, multi-jurisdiction compliance", "min_business_domains": 15, "max_business_domains": 22, "min_data_products_per_domain": 14, "max_data_products_per_domain": 28, "min_attributes_per_product": 15, "max_attributes_per_product": 50, "min_business_subdomains": 3, "max_business_subdomains": 6, "min_products_per_subdomain": 3},
+      "tier_2": {"label": "Complex",       "description": "2-4 regulatory bodies, multi-channel distribution, significant supply chain or portfolio management, 5+ distinct operational systems",                                          "min_business_domains": 12, "max_business_domains": 18, "min_data_products_per_domain": 14, "max_data_products_per_domain": 26, "min_attributes_per_product": 12, "max_attributes_per_product": 50, "min_business_subdomains": 2, "max_business_subdomains": 5, "min_products_per_subdomain": 3},
+      "tier_3": {"label": "Moderate",      "description": "1-2 regulatory bodies, multi-domain operations spanning 3+ business functions, moderate product catalog, 2-3 major operational systems",                                  "min_business_domains": 10, "max_business_domains": 15, "min_data_products_per_domain": 12, "max_data_products_per_domain": 24, "min_attributes_per_product": 10, "max_attributes_per_product": 45, "min_business_subdomains": 2, "max_business_subdomains": 5, "min_products_per_subdomain": 3},
+      "tier_4": {"label": "Standard",      "description": "Light regulation (1 primary body), production/facility operations focus, moderate linear supply chain, regional complexity",                                             "min_business_domains":  8, "max_business_domains": 12, "min_data_products_per_domain": 10, "max_data_products_per_domain": 20, "min_attributes_per_product": 10, "max_attributes_per_product": 40, "min_business_subdomains": 2, "max_business_subdomains": 4, "min_products_per_subdomain": 3},
+      "tier_5": {"label": "Simple",        "description": "Minimal industry-specific regulation, service/project/engagement-based revenue, people-driven, fewer transaction types, simple data structures",                         "min_business_domains":  5, "max_business_domains":  8, "min_data_products_per_domain":  8, "max_data_products_per_domain": 18, "min_attributes_per_product":  8, "max_attributes_per_product": 35, "min_business_subdomains": 2, "max_business_subdomains": 4, "min_products_per_subdomain": 2}
+    },
+    "mvm": {
+      "tier_1": {"label": "Ultra-Complex", "description": "5+ regulatory bodies, multi-entity corporate structures, industry-standard canonical data models, complex product hierarchies, multi-jurisdiction compliance", "min_business_domains":  9, "max_business_domains": 14, "min_data_products_per_domain":  8, "max_data_products_per_domain": 16, "min_attributes_per_product": 15, "max_attributes_per_product": 50, "min_business_subdomains": 2, "max_business_subdomains": 4, "min_products_per_subdomain": 3},
+      "tier_2": {"label": "Complex",       "description": "2-4 regulatory bodies, multi-channel distribution, significant supply chain or portfolio management, 5+ distinct operational systems",                                          "min_business_domains":  8, "max_business_domains": 12, "min_data_products_per_domain":  8, "max_data_products_per_domain": 14, "min_attributes_per_product": 12, "max_attributes_per_product": 50, "min_business_subdomains": 2, "max_business_subdomains": 4, "min_products_per_subdomain": 3},
+      "tier_3": {"label": "Moderate",      "description": "1-2 regulatory bodies, multi-domain operations spanning 3+ business functions, moderate product catalog, 2-3 major operational systems",                                  "min_business_domains":  6, "max_business_domains": 10, "min_data_products_per_domain":  7, "max_data_products_per_domain": 13, "min_attributes_per_product": 10, "max_attributes_per_product": 45, "min_business_subdomains": 2, "max_business_subdomains": 4, "min_products_per_subdomain": 3},
+      "tier_4": {"label": "Standard",      "description": "Light regulation (1 primary body), production/facility operations focus, moderate linear supply chain, regional complexity",                                             "min_business_domains":  5, "max_business_domains":  8, "min_data_products_per_domain":  6, "max_data_products_per_domain": 11, "min_attributes_per_product": 10, "max_attributes_per_product": 40, "min_business_subdomains": 2, "max_business_subdomains": 3, "min_products_per_subdomain": 2},
+      "tier_5": {"label": "Simple",        "description": "Minimal industry-specific regulation, service/project/engagement-based revenue, people-driven, fewer transaction types, simple data structures",                         "min_business_domains":  3, "max_business_domains":  6, "min_data_products_per_domain":  5, "max_data_products_per_domain": 10, "min_attributes_per_product":  8, "max_attributes_per_product": 35, "min_business_subdomains": 2, "max_business_subdomains": 3, "min_products_per_subdomain": 2}
+    }
+  },
+  "query_tag_label": "dbx_vibe_data_modelling_agent_run_summary"
+}
