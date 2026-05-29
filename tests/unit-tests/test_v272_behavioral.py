@@ -81,6 +81,21 @@ def test_directive_detects_exactly_3_digit():
     assert "metric views" in low
 
 
+def test_directive_detects_real_ncdot_filler_phrasing():
+    """v2.7.3 regression: the REAL NCDOT vibe says 'build EXACTLY these 3 metric views'.
+    The word 'these' between 'exactly' and '3' broke v2.7.2's rigid regex -> 14 MVs live.
+    This is the exact phrasing that must now parse to 3."""
+    fn = _load_directive_fn()
+    for phrasing in (
+        "### Metric views (build EXACTLY these 3 metric views)",
+        "build the following 3 metric views",
+        "produce only these three metric views",
+        "create exactly the 2 metric views below",
+    ):
+        n, _ = fn({"model_vibes": phrasing})
+        assert n in (2, 3), f"filler phrasing not parsed: {phrasing!r} -> {n}"
+
+
 def test_directive_detects_word_number():
     fn = _load_directive_fn()
     n, _ = fn({"business_description": "Produce only three metric views for executives."})
