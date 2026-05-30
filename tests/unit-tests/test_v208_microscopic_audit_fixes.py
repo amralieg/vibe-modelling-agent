@@ -82,7 +82,7 @@ EXPECTED_ALIASES = [
     "vov-noop-applied-guard",
     "vov-orphan-vreq-reconcile",
     "vov-coverage-honest",
-    "vov-strict-guard-respects-sandbox",
+    # vov-strict-guard-respects-sandbox REMOVED in v2.7.0 (strict diff guard deleted)
     "vov-result-target-entities",
 ]
 
@@ -311,17 +311,11 @@ def test_g1_old_formula_removed():
 
 # ---------------------------------------------------------------------------
 # H1 — strict guard must extend closure with sandbox-applied targets
+# v2.7.0: test_h1_strict_guard_extends_with_sandbox_targets REMOVED — the
+# _strict_vov_diff_guard was deleted in the architectural collapse, so there
+# is no closure-extension-before-guard step to assert. The pipeline-result
+# target_entities persistence test below remains valid and is retained.
 # ---------------------------------------------------------------------------
-
-def test_h1_strict_guard_extends_with_sandbox_targets():
-    src = _strict_guard_site_source()
-    m = re.search(r"_vov_applied_actions_for_closure = .*?_strict_vov_diff_guard\(_vov_input_root", src, re.DOTALL)
-    assert m is not None
-    body = m.group(0)
-    assert "_vov_2_pipeline_result" in body, "H1: pipeline_result read missing"
-    assert "_applied_target_entities" in body, "H1: applied_target_entities list missing"
-    assert "vov-strict-guard-respects-sandbox" in body, "H1 alias missing"
-
 
 def test_h1_pipeline_result_persists_target_entities():
     src = _vov_shim_source()

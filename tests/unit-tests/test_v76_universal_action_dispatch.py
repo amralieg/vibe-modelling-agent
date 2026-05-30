@@ -148,25 +148,10 @@ def test_p23_unknown_action_never_hard_rejected():
 # ---------- P24 — vov-closure-action-aware ----------
 
 
-def test_p24_diff_guard_accepts_applied_actions():
-    src = notebook_concat_source()
-    # Loosened in v0.7.8 P36 — v0.7.8 added preserve_v1_domains=None after applied_actions.
-    # The contract is "applied_actions=None must be in the signature", not "signature must
-    # END at applied_actions=None".
-    assert (
-        "def _strict_vov_diff_guard(input_model_json, data_model, user_closure, user_new_entities, logger=None, applied_actions=None"
-        in src
-    ), "P24: _strict_vov_diff_guard() must accept applied_actions kwarg"
-    assert "vov-closure-action-aware FIRED" in src, (
-        "P24: closure must self-report when extended by applied actions"
-    )
-
-
-def test_p24_call_site_passes_applied_actions():
-    src = notebook_concat_source()
-    assert "applied_actions=_vov_applied_actions_for_closure" in src, (
-        "P24: call site must pass applied_actions (from contract_allowed_actions or vibe_master_actions)"
-    )
+# v2.7.0: test_p24_diff_guard_accepts_applied_actions and
+# test_p24_call_site_passes_applied_actions REMOVED — _strict_vov_diff_guard
+# was deleted in the architectural collapse (sandbox is authoritative), so
+# there is no guard signature or call site to assert.
 
 
 def test_p24_creates_widgets_entry_for_allowed_actions():
@@ -291,10 +276,9 @@ def test_v075_15h_timeout_still_present():
     assert "timeout_seconds=54000" in src, "v0.7.5 15h timeout fix must remain intact"
 
 
-def test_v074_vov_strict_guard_still_present():
-    src = notebook_concat_source()
-    assert "alias=vov-strict-diff-guard" in src, "v0.7.3/v0.7.4 vov-strict-diff-guard must remain intact"
-    assert "alias=vov-closure-extract" in src, "v0.7.3 vov-closure-extract must remain intact"
+# v2.7.0: test_v074_vov_strict_guard_still_present REMOVED — the
+# vov-strict-diff-guard was intentionally deleted in the architectural
+# collapse. Asserting its continued presence is now incorrect.
 
 
 # ---------- Integration: parsed notebook JSON is valid ----------

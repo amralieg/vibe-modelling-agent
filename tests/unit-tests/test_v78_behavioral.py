@@ -40,6 +40,8 @@ from pathlib import Path
 
 import pytest
 
+from notebook_source_util import notebook_concat_source
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 AGENT_NB = REPO_ROOT / "agent" / "dbx_vibe_modelling_agent.ipynb"
 
@@ -94,10 +96,11 @@ def _load_cell9_helpers():
     from notebook_source_util import slice_function_source
 
     ns = {"__name__": "_v78test_c9", "logging": logging, "re": re}
+    # v2.7.0: _vov_diff_guard_products and _strict_vov_diff_guard were removed
+    # in the architectural collapse (sandbox is now authoritative). Only the
+    # still-live closure helper is loaded here.
     for fn in (
-        "_vov_diff_guard_products",
         "_compute_vov_user_closure",
-        "_strict_vov_diff_guard",
     ):
         exec(compile(slice_function_source(fn), f"<v78_{fn}>", "exec"), ns)
     return ns
@@ -427,70 +430,12 @@ def test_p35_above_instruction_needs_filtered(c9):
 
 
 # ============================================================================
-# P36 vov-preserve-v1-domains — strict-diff-guard restores v1 domains
+# P36 vov-preserve-v1-domains — strict-diff-guard tests REMOVED in v2.7.0.
+# The _strict_vov_diff_guard was deleted in the architectural collapse: the
+# sandbox (run_vov_pipeline) is now the single authoritative mutation engine,
+# so there is no additive-diff guard to revert/restore domains. The cleanup
+# integration test below (c3-based) remains valid and is retained.
 # ============================================================================
-
-
-def test_p36_strict_diff_guard_restores_preserved_domain(c9):
-    guard = c9["_strict_vov_diff_guard"]
-    input_model = {"model": {"domains": [
-        {"name": "billing", "products": []},
-        {"name": "court", "products": []},   # the legal-VOV dropped domain
-        {"name": "matter", "products": []},
-    ]}}
-    data_model = {"domains": [
-        {"name": "billing", "products": []},
-        # court missing -- this is the bug
-        {"name": "matter", "products": []},
-    ]}
-    user_closure = {("court",), ("matter",), ("billing",)}
-    user_new_entities = set()
-    reverts_n, reverts_list = guard(
-        input_model, data_model, user_closure, user_new_entities,
-        logger=_logger(),
-        applied_actions=[],
-        preserve_v1_domains=["billing", "court", "matter"],
-    )
-    final_names = [d.get("name") for d in data_model.get("domains", [])]
-    assert "court" in final_names, (
-        "P36: a v1 input-model domain in preserve_v1_domains must be restored "
-        "even when its name appears in user_closure"
-    )
-    assert any(op == "RESTORE_DOMAIN" and tgt == "court" for op, tgt in reverts_list), (
-        f"P36: must emit RESTORE_DOMAIN court action, got {reverts_list!r}"
-    )
-
-
-def test_p36_strict_diff_guard_does_not_restore_explicitly_dropped(c9):
-    """If the vibe explicitly says 'remove domain court', the preserve list must
-    have already excluded it. This test passes the empty preserve list."""
-    guard = c9["_strict_vov_diff_guard"]
-    input_model = {"model": {"domains": [
-        {"name": "billing", "products": []},
-        {"name": "court", "products": []},
-    ]}}
-    data_model = {"domains": [
-        {"name": "billing", "products": []},
-    ]}
-    reverts_n, reverts_list = guard(
-        input_model, data_model, {("court",)}, set(),
-        logger=_logger(),
-        applied_actions=[],
-        preserve_v1_domains=["billing"],  # court intentionally absent
-    )
-    final_names = [d.get("name") for d in data_model.get("domains", [])]
-    assert "court" not in final_names, (
-        "P36: when preserve_v1_domains excludes 'court', RESTORE_DOMAIN must not fire"
-    )
-
-
-def test_p36_strict_diff_guard_backwards_compatible_without_preserve_arg(c9):
-    """Pre-v0.7.8 call sites pass no preserve_v1_domains. Must still work."""
-    guard = c9["_strict_vov_diff_guard"]
-    input_model = {"model": {"domains": [{"name": "billing", "products": []}]}}
-    data_model = {"domains": [{"name": "billing", "products": []}]}
-    reverts_n, reverts_list = guard(input_model, data_model, set(), set(), logger=_logger())
-    assert reverts_n == 0
 
 
 # ============================================================================
