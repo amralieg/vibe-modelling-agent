@@ -1,17 +1,17 @@
 {
   "agent_helpers": {
-    "module_functions": 566,
-    "class_methods": 333,
+    "module_functions": 571,
+    "class_methods": 334,
     "classes": 54,
-    "module_globals": 271,
-    "callable_total": 899,
-    "symbols_total": 1224,
+    "module_globals": 273,
+    "callable_total": 905,
+    "symbols_total": 1232,
     "load_errors": 0
   },
   "notebook_ast": {
-    "module_functions": 544,
-    "methods": 250,
-    "total": 794
+    "module_functions": 549,
+    "methods": 251,
+    "total": 800
   },
   "coverage_pct": {
     "module_functions_smoke": 100.0,
@@ -21,5 +21,5 @@
     "notebook_methods_in_helpers": 98.8,
     "notebook_module_funcs_in_helpers": 100.0
   },
-  "tests_run": 61
+  "tests_run": 1
 }

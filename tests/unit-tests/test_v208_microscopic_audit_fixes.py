@@ -295,9 +295,16 @@ def test_c1_orphan_reconcile_present_in_pipeline():
 
 def test_g1_coverage_pct_divides_by_extracted():
     src = _vov_runtime_source()
-    # New formula must reference n_extracted
-    assert "n_extracted = len(deduped)" in src, (
-        "G1 fix not applied: coverage_pct still uses batched VREQs as denominator"
+    # v2.9.2 (vov-coverage-honest-v292): the denominator was upgraded from len(deduped)
+    # to the SAME-POPULATION universe of committed requirement ids (deduped, post
+    # extraction-completeness audit). The original G1 intent — never divide by batched
+    # VREQs — is preserved, and the numerator (applied INTERSECT universe) can no longer
+    # exceed the denominator, killing the >100% impossibility.
+    assert "_universe_ids = {str(getattr(_v, 'vreq_id', _v)) for _v in deduped}" in src, (
+        "G1/v292: same-population universe denominator missing"
+    )
+    assert "n_extracted = len(_universe_ids)" in src, (
+        "G1/v292: coverage denominator must be the deduped universe, not batched VREQs"
     )
     assert "_applied_vreq_set" in src, "G1: per-VREQ applied set missing"
 
