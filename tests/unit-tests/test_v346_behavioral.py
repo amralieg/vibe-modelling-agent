@@ -179,6 +179,26 @@ def test_v346_trace_tag_harvest_from_description():
     assert hit[0]["source"] == "harvested"
 
 
+def test_v346_physical_mirror_promotes_description_trace_into_tags_string():
+    # VREQ-011 PHYSICAL: step_apply_tags reads the flat 'tags' string. The mirror must move a
+    # description-buried trace tag into 'tags' so it becomes a real UC tag. (flat-list signature)
+    ns = _exec_tag_helpers()
+    mirror = ns["_mirror_trace_tags_into_tags_string"]
+    attrs = [
+        {"name": "employee_id", "tags": "primary_key",
+         "description": "Key. ncdot_source_attribute=PERNR maps to SAP."},
+        {"name": "x", "tags": "", "description": "no trace token here"},
+    ]
+    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+    mirror([], attrs, cfg, None)
+    assert "ncdot_source_attribute=PERNR" in attrs[0]["tags"]
+    assert "primary_key" in attrs[0]["tags"]  # existing tag preserved
+    assert attrs[1]["tags"] == ""  # no false promotion
+    # idempotent
+    mirror([], attrs, cfg, None)
+    assert attrs[0]["tags"].count("ncdot_source_attribute") == 1
+
+
 def test_v346_harvest_ignores_non_trace_kv():
     # NON-TAUTOLOGY: a random key=value in prose must NOT become a tag (only prefix/trace keys).
     ns = _exec_tag_helpers()
