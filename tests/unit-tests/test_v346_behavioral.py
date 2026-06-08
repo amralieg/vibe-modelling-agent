@@ -84,3 +84,161 @@ def test_v346_dedup_excludes_shared_when_closed():
     assert "valid_domains_set.add('shared')" in seg
     # last-resort fallback is a real user domain when closed, never 'shared'
     assert "_last_resort" in seg
+
+
+# ============================================================================
+# model-json-authoritative-tags (v3.4.6) — make model.json the single source
+# of truth for tags at domain / subdomain / table / column levels.
+# ============================================================================
+
+def _exec_tag_helpers():
+    full = _full()
+    i = full.index("def _tagset_from_string(")
+    j = full.index("\ndef _cleanup_phantom_domains", i)
+    block = full[i:j]
+    ns = {}
+    exec(block, ns)
+    return ns
+
+
+def test_v346_tag_alias_and_callsite_present():
+    full = _full()
+    # function defined + at least one production call site (wired into model.json write)
+    assert "def _enrich_model_authoritative_tags(" in full
+    assert "model-json-authoritative-tags" in full
+    assert full.count("_enrich_model_authoritative_tags(") >= 2  # def + >=1 call
+
+
+def test_v346_tagset_from_string_parses_kv_and_labels():
+    ns = _exec_tag_helpers()
+    fn = ns["_tagset_from_string"]
+    ts = fn("ncdot_source_table=emp_history, primary_key, pii_identifier")
+    keys = {t["key"]: t for t in ts}
+    assert keys["ncdot_source_table"]["value"] == "emp_history"
+    assert keys["ncdot_source_table"]["kind"] == "key_value"
+    assert keys["primary_key"]["kind"] == "label"
+    assert keys["pii_identifier"]["kind"] == "label"
+
+
+def test_v346_enrich_adds_tagset_all_levels_and_subdomains():
+    ns = _exec_tag_helpers()
+    enrich = ns["_enrich_model_authoritative_tags"]
+    dm = {
+        "domains": [{
+            "domain": "hr", "division": "corporate",
+            "products": [{
+                "name": "employee", "subdomain": "workforce",
+                "tags": "ncdot_source_table=emp_history", "data_type": "master_data",
+                "attributes": [
+                    {"name": "employee_id", "data_type": "BIGINT",
+                     "tags": "primary_key, pii_identifier",
+                     "business_glossary_term": "Employee Identifier"},
+                ],
+            }],
+        }]
+    }
+    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+    enrich(dm, cfg, None)
+    d0 = dm["domains"][0]
+    # DOMAIN level
+    dkeys = {t["key"] for t in d0["tag_set"]}
+    assert "ncdot_domain" in dkeys and "ncdot_division" in dkeys
+    # SUBDOMAIN promoted to first-class object with its own tag_set
+    assert d0.get("subdomains"), "subdomains not promoted"
+    sd = d0["subdomains"][0]
+    assert sd["name"] == "workforce"
+    assert any(t["key"] == "ncdot_subdomain" for t in sd["tag_set"])
+    assert "steward" in sd
+    # TABLE level
+    p0 = d0["products"][0]
+    pkeys = {t["key"] for t in p0["tag_set"]}
+    assert "ncdot_source_table" in pkeys and "ncdot_data_type" in pkeys
+    assert "ncdot_subdomain" in pkeys
+    # COLUMN level
+    a0 = p0["attributes"][0]
+    akeys = {t["key"] for t in a0["tag_set"]}
+    assert "primary_key" in akeys and "pii_identifier" in akeys
+    assert "ncdot_business_glossary_term" in akeys
+
+
+def test_v346_trace_tag_harvest_from_description():
+    # VREQ-011: ncdot_source_attribute buried in description prose must be promoted to a tag.
+    ns = _exec_tag_helpers()
+    enrich = ns["_enrich_model_authoritative_tags"]
+    dm = {"domains": [{"domain": "hr", "products": [{
+        "name": "employee", "attributes": [
+            {"name": "employee_id", "type": "BIGINT",
+             "description": "Canonical employee key. ncdot_source_attribute=PERNR maps to SAP."},
+        ]}]}]}
+    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+    enrich(dm, cfg, None)
+    ts = dm["domains"][0]["products"][0]["attributes"][0]["tag_set"]
+    hit = [t for t in ts if t["key"] == "ncdot_source_attribute"]
+    assert hit, "trace tag not harvested from description"
+    assert hit[0]["value"] == "PERNR"
+    assert hit[0]["source"] == "harvested"
+
+
+def test_v346_harvest_ignores_non_trace_kv():
+    # NON-TAUTOLOGY: a random key=value in prose must NOT become a tag (only prefix/trace keys).
+    ns = _exec_tag_helpers()
+    enrich = ns["_enrich_model_authoritative_tags"]
+    dm = {"domains": [{"domain": "hr", "products": [{
+        "name": "employee", "attributes": [
+            {"name": "x", "description": "threshold=0.85 and ratio=12 are tuning knobs."},
+        ]}]}]}
+    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+    enrich(dm, cfg, None)
+    ts = dm["domains"][0]["products"][0]["attributes"][0]["tag_set"]
+    assert not any(t["key"] in ("threshold", "ratio") for t in ts)
+
+
+# ---- subdomain-user-sizing-respect: subdomain counts survive clamp under user override ----
+def test_v346_subdomain_keys_in_sizing_set():
+    full = _full()
+    i = full.index("_SIZING_PARAM_KEYS = {")
+    seg = full[i:full.index("}", i + 1500)]
+    assert "max_business_subdomains" in seg
+    assert "min_business_subdomains" in seg
+    assert "min_products_per_subdomain" in seg
+    assert "subdomain-user-sizing-respect" in full
+
+
+def test_v346_clamp_respects_subdomains_under_override():
+    # Behavioral: with user_sizing_override, max_business_subdomains=9 must NOT be clamped to tier max.
+    full = _full()
+    i = full.index("_SIZING_PARAM_KEYS = {")
+    j = full.index("\ndef _determine_model_parameters", i)
+    block = full[i:j]
+    # provide guardrails that would clamp 9 -> 4 if the key were not override-exempt
+    ns = {
+        "_MODEL_PARAM_GUARDRAILS": {"mvm_model": {"max_business_subdomains": {"min": 3, "max": 4}}},
+        "_MODEL_PARAM_MIN_MAX_PAIRS": [],
+    }
+    exec(block, ns)
+    clamp = ns["_clamp_and_validate_model_params"]
+
+    class _L:
+        def info(self, *a, **k): pass
+        def warning(self, *a, **k): pass
+    out = clamp("mvm_model", {"max_business_subdomains": 9}, _L(), user_sizing_override=True)
+    assert out["max_business_subdomains"] == 9, f"user-mandated 9 subdomains was clamped to {out['max_business_subdomains']}"
+    # NON-TAUTOLOGY: without override, the tier guardrail DOES clamp 9 -> 4
+    out2 = clamp("mvm_model", {"max_business_subdomains": 9}, _L(), user_sizing_override=False)
+    assert out2["max_business_subdomains"] == 4
+
+
+def test_v346_enrich_is_idempotent_and_preserves_legacy_tags():
+    ns = _exec_tag_helpers()
+    enrich = ns["_enrich_model_authoritative_tags"]
+    dm = {"domains": [{"domain": "hr", "products": [
+        {"name": "employee", "tags": "ncdot_source_table=emp_history", "attributes": []}]}]}
+    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+    enrich(dm, cfg, None)
+    n1 = len(dm["domains"][0]["products"][0]["tag_set"])
+    # legacy flat string preserved for backward compat
+    assert dm["domains"][0]["products"][0]["tags"] == "ncdot_source_table=emp_history"
+    # second pass must not duplicate tags (derived view, re-computed cleanly)
+    enrich(dm, cfg, None)
+    n2 = len(dm["domains"][0]["products"][0]["tag_set"])
+    assert n1 == n2, f"enrich not idempotent: {n1} -> {n2}"
