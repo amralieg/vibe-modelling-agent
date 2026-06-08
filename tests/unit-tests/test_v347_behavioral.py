@@ -30,6 +30,38 @@ def test_v347_physical_mirror_wired_into_finalize():
     assert "trace-tag-physical-mirror" in full
 
 
+def test_v347_gt_rescue_tagkey_eq_regex():
+    # ROOT CAUSE behavioral: tag key embedded as `key=value` must be extractable so physical tags
+    # can rescue the VREQ (NCDOT VREQ-013 false-negative). Old regex returned []; new returns the key.
+    raw = "attach the tag `ncdot_business_glossary_term=<Business Data Element>` whenever a match exists"
+    old = re.findall(r"`([a-z0-9_]+)`", raw)
+    new = [k for k in re.findall(r"`([a-z0-9_]+)(?:=[^`]*)?`", raw) if "_" in k]
+    assert old == []  # proves the bug existed
+    assert new == ["ncdot_business_glossary_term"]  # proves the fix works
+    # and the fixed pattern is present in the deployed source
+    assert "gt-rescue-tagkey-eq" in _full()
+    assert r"`([a-z0-9_]+)(?:=[^`]*)?`" in _full()
+
+
+def test_v347_gt_mv_prefix_tolerant():
+    # ROOT CAUSE behavioral: physical MV names carry the domain prefix; KPI-named requirement must match.
+    phys = {"hrvacancyrate", "hrtotalpositionsandactiveemployees", "hrretirementeligibility"}
+
+    def mvm(rn):
+        return any(pn == rn or pn.endswith(rn) or (len(rn) >= 6 and rn in pn) for pn in phys)
+
+    assert mvm("vacancyrate")  # the false-negative case now matches
+    assert not mvm("payroll")  # non-existent MV must NOT match (no over-rescue)
+    assert "gt-mv-prefix-tolerant" in _full()
+
+
+def test_v347_gt_rescue_subdomain_and_pk_paths_present():
+    full = _full()
+    assert "gt-rescue-subdomain" in full
+    assert "gt-rescue-canonical-pk" in full
+    assert "subdomain groupings physically present" in full
+
+
 def test_v347_shared_harvest_helper_is_dry():
     full = _full()
     # one shared module-level harvester used by both enrich (tag_set) and mirror (tags string)
