@@ -19,11 +19,12 @@ def _slice(src, start_marker, end_marker, include_end=False):
     return src[i:j]
 
 
-# ---- version anchor ----
+# ---- version anchor (forward-compatible: v3.4.5 fixes must persist at or beyond 3.4.5) ----
 def test_v345_version_constant():
     src = _cell_src(1)
-    m = re.search(r'__AGENT_VERSION__ = "([0-9.]+)"', src)
-    assert m and m.group(1) == "3.4.5", f"expected 3.4.5, got {m and m.group(1)}"
+    m = re.search(r'__AGENT_VERSION__ = "(\d+)\.(\d+)\.(\d+)"', src)
+    assert m, "version constant not found"
+    assert tuple(int(x) for x in m.groups()) >= (3, 4, 5)
 
 
 # ---- mutator-json-literal-alias: prefix binds null/true/false ----
