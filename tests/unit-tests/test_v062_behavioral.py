@@ -82,7 +82,9 @@ def test_v062_reg1_has_dbutils_fs_head_fallback():
     """If POSIX open fails, fall back to dbutils.fs.head with 1MB cap."""
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
-    window = src[max(0, idx - 2000):idx + 4000]
+    # widened window: code between the marker and the fallback has grown across versions
+    # (the fallback is part of the same vov-auto-next-vibes read path, ~5.3k chars after).
+    window = src[max(0, idx - 2000):idx + 9000]
     assert "dbutils.fs.head(_source_vibes_path" in window
     assert "1024 * 1024" in window
 
