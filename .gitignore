@@ -20,3 +20,7 @@ Thumbs.db
 models/*
 !models/.gitkeep
 __pycache__/
+
+# Pre-edit notebook backups (local working-tree snapshots, never committed)
+*.ipynb.*.bak
+*.bak

@@ -50,6 +50,8 @@ def _build_lineage_namespace():
         '_diff_lineage_snapshots',
         '_match_change_to_requirement',
         '_vibe_lineage_requirements_for_artifact',
+        '_v304_vibe_outcome',
+        '_v304_vibe_missed_rollup',
         'step_generate_vibe_lineage',
     ]
     glued = '\n\n'.join(_extract_function_block(src, fn) for fn in fns)

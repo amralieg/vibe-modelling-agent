@@ -247,7 +247,10 @@ def test_apply_handler_guard_uses_synthesize_handler_path():
     # Find the block that follows the None-guard.
     none_guard_start = fn_src.find("new_model is None")
     assert none_guard_start >= 0
-    next_300 = fn_src[none_guard_start: none_guard_start + 1500]
+    # window widened (was 1500) to span the v2.8.9 vov-surface-sandbox-diag block
+    # that was legitimately inserted between the guard and the synthesize_handler
+    # retry call; the behavior (re-synthesize on retry) is unchanged.
+    next_300 = fn_src[none_guard_start: none_guard_start + 2600]
     assert "synthesize_handler(" in next_300, (
         "v2.2.0 fix should re-synthesize a fresh handler on retry, not skip"
     )

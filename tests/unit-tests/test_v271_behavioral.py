@@ -55,6 +55,9 @@ class RawVREQ:
     target: str
     source_quote: str
     source_chunk_id: str
+    severity: str = "medium"  # v2.9.6 alias=vov-severity-first
+    is_user_directive: bool = False  # v2.9.6 alias=vov-merge-user-first
+    priority_id: int = 9999  # v2.9.6 alias=vov-severity-first
 
 
 @dataclass
@@ -70,7 +73,10 @@ class VReqOutcome:
 
 def test_version_271_and_aliases_present():
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', SRC)
-    assert m and m.group(1) == "2.7.1", f"expected 2.7.1, got {m and m.group(1)}"
+    # Relaxed to >= (test_v295 precedent): the v2.7.1 aliases under test persist in
+    # later versions; pinning an exact string broke spuriously on every version bump.
+    assert m, "version missing"
+    assert tuple(int(x) for x in m.group(1).split(".")) >= (2, 7, 1), f"expected >= 2.7.1, got {m.group(1)}"
     assert "v271-vov-pass1-fixpoint FIRED" in SRC
     assert "verifier-rename-state FIRED" in SRC
 
@@ -97,6 +103,7 @@ def _exec_v251_ns():
         "_v251_parse_priority_details",
         "_v251_prevalidate_priority",
         "_v251_apply_priority_deterministic",
+        "_v310_apply_rename_ledger",
         "_v251_apply_pass1_priorities",
     ]:
         exec(compile(slice_function_source(name, source=SRC), f"<{name}>", "exec"), ns)

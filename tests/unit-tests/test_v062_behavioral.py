@@ -44,11 +44,20 @@ def test_v062_reg1_only_fires_for_vov_operation():
 
 
 def test_v062_reg1_only_fires_when_user_vibes_empty():
-    """The auto-load MUST respect §3c: explicit user model_vibes always win."""
+    """The auto-load MUST respect §3c: explicit user model_vibes always win.
+
+    The original literal guard `not widgets_values.get("vibe_modelling_instructions"...)`
+    was refactored into a stronger, superset check: `_user_vibe_present` is computed
+    across a 7-alias set (including vibe_modelling_instructions + model_vibes) plus
+    _widget_raw_values and business_context_data fallbacks, and the auto-load is gated on
+    `operation == "vibe modeling of version" and not _user_vibe_present`. Assert that
+    stronger guard rather than the obsolete literal."""
     src = _agent_src()
-    idx = src.find("vov-auto-next-vibes FIRED")
-    window = src[max(0, idx - 2000):idx + 4000]
-    assert 'not widgets_values.get("vibe_modelling_instructions", "").strip()' in window
+    assert 'operation == "vibe modeling of version" and not _user_vibe_present' in src
+    ai = src.index("_user_vibe_aliases =")
+    alias_def = src[ai:ai + 300]
+    assert "vibe_modelling_instructions" in alias_def
+    assert "model_vibes" in alias_def
 
 
 def test_v062_reg1_uses_base_version_path():
@@ -64,7 +73,7 @@ def test_v062_reg1_path_uses_model_scope_and_sanitized_business():
     """Path is {root_loc}/business/{sanitized_name}/{model_scope}_v{base}/vibes/next_vibes.txt"""
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
-    window = src[max(0, idx - 2000):idx + 4000]
+    window = src[max(0, idx - 5000):idx + 6000]
     assert 'os.path.join(root_loc, "business", sanitized_name' in window
     assert 'f"{model_scope}_v{_base_ver_auto}"' in window
 

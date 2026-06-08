@@ -34,6 +34,9 @@ class RawVREQ:
     target: str
     source_quote: str
     source_chunk_id: str
+    severity: str = "medium"  # v2.9.6 alias=vov-severity-first
+    is_user_directive: bool = False  # v2.9.6 alias=vov-merge-user-first
+    priority_id: int = 9999  # v2.9.6 alias=vov-severity-first
 
 
 @dataclass
@@ -63,6 +66,7 @@ class PipelineResult:
     outcomes: list[VReqOutcome]
     coverage_pct: float
     rejected_handlers: list[tuple[str, str]]
+    deferred_vreqs: list = None  # v2.9.6 alias=vov-defer-low-severity (defaulted for the test stub)
 
 
 def _exec_v251_namespace():
@@ -81,9 +85,15 @@ def _exec_v251_namespace():
         "InvariantSnapshot": object,
         "LLMClient": object,
         "logger": _ListLogger(),
+        # v2.9.6 alias=vov-severity-first — the sort const used by the extracted helpers.
+        "_V296_SEV_RANK": {"critical": 0, "high": 1, "medium": 2, "low": 3},
     }
     ordered_defs = [
         "_V251_PRIORITY_LINE_RE",
+        # v2.9.6: run_vov_pipeline + _v251_priority_to_vreq now reference these helpers.
+        "_v296_norm_severity",
+        "_v296_sev_rank",
+        "_v296_sort_vreqs",
         "_v251_parse_priorities",
         "_v251_priority_to_vreq",
         "_v251_model_root",
@@ -94,9 +104,12 @@ def _exec_v251_namespace():
         "_v251_iter_attribute_rows",
         "_v251_parse_priority_details",
         "_v251_prevalidate_priority",
+        "_v327_infer_coltype",
         "_v251_apply_priority_deterministic",
+        "_v310_apply_rename_ledger",
         "_v251_apply_pass1_priorities",
         "_apply_handler_with_retry",
+        "_v328_pack_budget",
         "run_vov_pipeline",
     ]
     for name in ordered_defs:

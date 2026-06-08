@@ -42,7 +42,7 @@ def cell0_text() -> str:
 def test_v206_version_bumped(cell0_text: str) -> None:
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([\d.]+)"', cell0_text)
     assert m is not None, "version constant not found"
-    assert m.group(1) == "2.0.6", f"expected 2.0.6, got {m.group(1)!r}"
+    assert tuple(int(_x) for _x in m.group(1).split(".")) >= (2, 0, 6), f"expected 2.0.6, got {m.group(1)!r}"
 
 
 def test_v206_version_is_first_non_comment_statement(cell0_text: str) -> None:

@@ -36,7 +36,7 @@ def test_v204_agent_version_is_204():
     src = _nb_src()
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', src)
     assert m, "missing __AGENT_VERSION__"
-    assert m.group(1) == "2.0.4", f"expected 2.0.4 (single-digit semver), got {m.group(1)}"
+    assert tuple(int(_x) for _x in m.group(1).split(".")) >= (2, 0, 4), f"expected 2.0.4 (single-digit semver), got {m.group(1)}"
 
 
 def test_v204_version_constant_first_code_line_of_cell_1():
@@ -158,7 +158,10 @@ def test_v204_f2_run_vov_pipeline_passes_pinned_through():
         "v204 F2: run_vov_pipeline must convert user_pinned_domains to a tuple and pass it "
         "into synthesize_batch_handlers + _apply_handler_with_retry."
     )
-    assert "synthesize_batch_handlers(batches, llm, parallel=parallel, pinned_domains=_pinned_d_tuple" in src, (
+    # The call was reformatted multi-line and gained model_snapshot/pinned_products
+    # args; assert the pinned tuple is still threaded into the call (whitespace-tolerant)
+    # rather than matching the old single-line signature.
+    assert "pinned_domains=_pinned_d_tuple" in src, (
         "v204 F2: synthesize_batch_handlers call must include pinned_domains=_pinned_d_tuple"
     )
 
@@ -176,9 +179,13 @@ def test_v204_f3_helper_function_exists():
 def test_v204_f3_known_classes_enumerated():
     src = _nb_src()
     # Spot-check the most common violations seen in v203 logs (Import, USub, dunder, scope)
+    # NOTE: "forbidden AST node: USub" was REMOVED from the hint set in v3.0.0
+    # (alias=v300-allow-usub) — unary -x/+x on numerics is now ALLOWED by the
+    # sandbox, so it is no longer a violation class. Replaced here with
+    # "forbidden AST node: Delete" (a class still enumerated by the hints builder).
     for needle in (
         "forbidden AST node: Import",
-        "forbidden AST node: USub",
+        "forbidden AST node: Delete",
         "forbidden dunder name",
         "invariants violated",
         "scope mismatch",

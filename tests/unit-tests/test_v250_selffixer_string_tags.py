@@ -60,7 +60,7 @@ SRC = _read_source()
 def test_v250_version_bump():
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', SRC)
     assert m, "__AGENT_VERSION__ not found"
-    assert m.group(1) == "2.5.0", f"__AGENT_VERSION__ should be 2.5.0, got {m.group(1)}"
+    assert tuple(int(_x) for _x in m.group(1).split(".")) >= (2, 5, 0), f"__AGENT_VERSION__ should be 2.5.0, got {m.group(1)}"
 
 
 def test_v250_aliases_all_present():

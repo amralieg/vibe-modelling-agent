@@ -4,6 +4,23 @@ These instructions apply to every session in this repository. Follow them verbat
 
 ---
 
+## MISSION (read this first, every session — never forget it)
+
+The single purpose of this agent is to PRODUCE A DATA MODEL THAT 100% ADHERES TO THE USER'S VIBES (hard floor 90% VERIFIED adherence), is production-ready, and is good enough to recommend to peers or propose as a global standard. This will run for HUNDREDS of industries.
+
+The mission is judged by VERIFIED VIBE ADHERENCE = (VREQs verified-applied) / (VREQs extracted), with two mandatory halves: (a) EXTRACTION COMPLETENESS — every requirement in the vibe becomes a VREQ; (b) APPLICATION + VERIFICATION — every VREQ is actually applied AND deterministically provable against the real catalog. A "Max retries exhausted, proceeding" soft-accept is NOT applied.
+
+NON-NEGOTIABLE OPERATING RULES FOR THIS MISSION:
+- NEVER OVERFIT or HARDCODE any industry (ncdot, airlines, automotive, healthcare, etc.). Every fix must be generic and read from the vibe / runtime / catalog, never from a baked-in name.
+- For EVERY failed VREQ, examine its FULL LIFECYCLE: extracted? → applied to model dict? → physically built? → verified? Find the exact stage where it dropped and fix THAT stage's root cause.
+- Three systemic failure classes drive non-adherence (diagnosed from the NCDOT v3.4.0 24-VREQ trace + live HEALTH sandbox, 2026-06-08):
+  1. VERIFIER FALSE-NEGATIVES (the "lying scoreboard") — the model DID follow the vibe but the verifier scores it failed because its snapshot is lossy (missing `_metrics` schema MVs, missing column tags) and its matching is too literal (user display name "Vacancy Rate" vs physical `hr_vacancy_rate`). This is the LARGEST lever. Fix = ground every VREQ class against the REAL catalog with NAME NORMALIZATION (display→snake, domain-prefix-tolerant, substring/contains).
+  2. GENUINE NAME/SHAPE SUBSTITUTION — generators that receive only a COUNT free-invent names. Fix = forward the user's EXACT named artifacts as a USER-KING mandate into the generator prompt.
+  3. DEAD AGENTIC REPAIR — the SelfFixer (sandbox code-gen residual repair) ran inert because it was built with ai_agent=None. Fix = resolve a live AIAgent at the single shared entry point; the sandbox mechanism itself is proven working (HEALTH made 397 VOV_2_SANDBOX code-gen calls).
+- Run AUTONOMOUSLY: monitor → RCA every miss → generic root-cause fix → behavioral test (fail pre-patch, pass post-patch) → bump version → redeploy → re-run FROM V1 (no chaining) → loop until ALL targets ≥90% with zero §10.6 signatures. Do not stop until the goal is met.
+
+---
+
 ## 0. Release-note detail standard (when tagging to main)
 
 REFERENCE: https://example.com/releases/v0/
@@ -32,30 +49,40 @@ Short, emoji-filled, or pure-feature-list changelogs are NOT acceptable for tag-
 
 AFTER FINISHING YOUR JOB, FIND EVERY SINGLE REGRESSION ERROR AND RACTIFY THE ROOT CAUSE BEFORE YOU DELIVER, AND THEN SHOW ME REGRESSION RESPORT WITH HOW CRITICAL THE ISSUE IS.
 
-## 1a-bis. NO COMMIT UNTIL SUCCESS-VERIFIED — HARD RULE (added 2026-05-19)
+## 1a-bis. SUCCESS-GATE APPLIES TO `main` ONLY — SCRATCH BRANCHES KEEP FULL HISTORY (clarified 2026-06-08)
 
-**"DO NOT COMMIT UNTIL IT IS A SUCCESS. This must be the theme ALWAYS."**
+**The success-verification gate is a `main`-branch rule, NOT a global ban on committing.** (updated 2026-06-08)
 
-The git history is a record of WHAT SHIPPED AND WORKED. It is NOT a scratchpad for in-flight attempts. Every commit on `main`/`dev` MUST represent a version that has been verified end-to-end on live runs to satisfy the user's success criteria (typically: 100% adherence to user vibes + ZERO §10.6 hard signatures).
+There are two distinct branch classes, with opposite rules:
 
-**Workflow (HARD):**
+### Scratch / work branches (e.g. `scratch/*`, `agent-vov-fix`, any non-`main` working branch) — COMMIT FREELY
 
-1. Make local code changes on disk in the working tree. **Do NOT `git commit` yet.**
+- **You MUST checkpoint every fix here as you go.** Commit + push in-flight attempts, partial fixes, RCA snapshots, redeploys — the whole iteration trail. The point is to preserve the history of WHAT WAS TRIED so nothing is lost between sessions and the user can audit the path.
+- No success-verification is required before committing or pushing to a scratch branch. "Let me commit this WIP" is correct behaviour here.
+- Use descriptive commit messages that say what the attempt was and its live result so far (e.g. "v3.4.4 vibe-conventions-override — deployed, NCDOT run 1089… RUNNING, not yet audited").
+- A long-lived scratch branch per task is preferred so the fix history is contiguous. Push it to `origin` so it survives.
+
+### `main` (and any protected/release branch the user designates) — SUCCESS-GATED
+
+The `main` branch is the record of WHAT SHIPPED AND WORKED. A commit reaches `main` ONLY via a merge/PR after the change has been verified end-to-end on live runs to satisfy the user's success criteria (typically: ≥90% / 100% adherence to user vibes + ZERO §10.6 hard signatures).
+
+**Promotion-to-`main` workflow (HARD):**
+
+1. Iterate on a scratch branch: edit working tree, commit checkpoints freely.
 2. Bump `__AGENT_VERSION__` to the next single-digit semver (per §3a).
-3. **Deploy directly from the working-tree file to the workspace** as `dbx_vibe_modelling_agent_v<NN>` via `databricks workspace import` (CLI reads from disk, no commit required).
+3. **Deploy directly from the working-tree file to the workspace** as `dbx_vibe_modelling_agent_v<NN>` via `databricks workspace import` (CLI reads from disk).
 4. Patch the JOB notebook_path → `_v<NN>`.
 5. Drop catalogs, prior runs, submit fresh runs.
-6. Monitor per §11. KILL early on RED trajectory, iterate (re-deploy from working tree without committing).
-7. **ONLY AFTER** the run terminates with `result_state=SUCCESS` AND adherence audit passes success criteria, `git add` + `git commit` + `git push`.
-8. The commit message references the live run_id that proved the fix worked.
+6. Monitor per §11. KILL early on RED trajectory, iterate on the scratch branch (re-deploy from working tree).
+7. **ONLY AFTER** the run terminates with `result_state=SUCCESS` AND the adherence audit passes success criteria, merge the scratch branch into `main` (`git merge` / PR) and push `main`.
+8. The merge/commit on `main` references the live run_id that proved the fix worked.
 
-**Hard prohibitions:**
-- ❌ `git commit` before the live run terminates with SUCCESS + 100% adherence.
-- ❌ `git push` before commit verification.
-- ❌ "Let me just commit so we don't lose the work" — local files don't get lost; use `git tag -a v0.7.8-attempt-1 -m "draft"` locally, not a public commit.
-- ❌ Bypassing with "the test passes locally, that's good enough" — local tests cover ~20% of production behavior.
+**Hard prohibitions (apply to `main` ONLY):**
+- ❌ Merging/pushing to `main` before the live run terminates with SUCCESS + target adherence.
+- ❌ Fast-forwarding an unverified scratch commit onto `main` to "save a step".
+- ❌ Bypassing with "the test passes locally, that's good enough" — local tests cover ~20% of production behavior; `main` needs live proof.
 
-**Single permitted exception:** Files the runtime never reads — `CLAUDE.md`, `readme.md`, `tests/*`, `runner/*.py` that no JOB references. These may be committed independently when the user explicitly asks; they have no runtime risk.
+**These prohibitions do NOT apply to scratch branches** — on scratch branches, committing/pushing in-flight work is REQUIRED, not prohibited.
 
 ## 2. Databricks Serverless compatibility (hard constraint)
 

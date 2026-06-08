@@ -281,7 +281,9 @@ def test_d1_demotion_order_pre_applied():
 
 def test_c1_orphan_reconcile_present_in_pipeline():
     src = _vov_runtime_source()
-    m = re.search(r"def run_vov_pipeline\([^)]*\)[^:]*:.*?(?=def\s)", src, re.DOTALL)
+    # Stop only at the next MODULE-LEVEL def (col-0 `\ndef `) or end-of-source: a bare
+    # `(?=def\s)` truncated the body at v2.9.6's nested helper defs, hiding the orphan code.
+    m = re.search(r"def run_vov_pipeline\([^)]*\)[^:]*:.*?(?=\ndef\s|\Z)", src, re.DOTALL)
     assert m is not None
     body = m.group(0)
     assert "_orphan_ids" in body, "C1: orphan_ids set not computed"
@@ -371,6 +373,9 @@ def _build_dedupe_namespace():
         "    target: str\n"
         "    source_quote: str\n"
         "    source_chunk_id: str\n"
+        "    severity: str = 'medium'\n"
+        "    is_user_directive: bool = False\n"
+        "    priority_id: int = 9999\n"
         "\n"
         "class LLMClient: ...\n"
     )

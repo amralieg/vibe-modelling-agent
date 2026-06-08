@@ -32,7 +32,7 @@ SRC = notebook_concat_source()
 
 def test_version_285_and_aliases_present():
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', SRC)
-    assert m and m.group(1) == "2.8.5", f"expected 2.8.5, got {m and m.group(1)}"
+    assert m and tuple(int(_x) for _x in m.group(1).split(".")) >= (2, 8, 5), f"expected 2.8.5, got {m and m.group(1)}"
     assert "vov-deterministic-target-resolve FIRED" in SRC
     assert "vov-perf-12workers FIRED" in SRC
     assert "vov-prompt-cap-24-16 FIRED" in SRC

@@ -15,7 +15,7 @@ def test_agent_version_is_v215():
     src = _load_all_source()
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', src)
     assert m is not None
-    assert m.group(1) == "2.1.5", f"Expected 2.1.5, got {m.group(1)}"
+    assert tuple(int(_x) for _x in m.group(1).split(".")) >= (2, 1, 5), f"Expected 2.1.5, got {m.group(1)}"
 
 
 def test_tags_list_tolerant_fix_present():

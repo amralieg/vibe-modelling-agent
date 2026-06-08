@@ -58,6 +58,9 @@ def _load_real():
         target: str
         source_quote: str
         source_chunk_id: str
+        severity: str = "medium"  # v2.9.6 alias=vov-severity-first
+        is_user_directive: bool = False  # v2.9.6 alias=vov-merge-user-first
+        priority_id: int = 9999  # v2.9.6 alias=vov-severity-first
     ns["RawVREQ"] = RawVREQ
     segs = []
     for node in tree.body:
@@ -89,7 +92,11 @@ class _AuditLLM:
 def test_v292_version_is_292():
     import re
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', _src())
-    assert m and m.group(1) == "2.9.2", f"expected 2.9.2, got {m.group(1) if m else None}"
+    assert m, "version missing"
+    # Relaxed to >= (matches test_v295 precedent): the v2.9.2 features under test persist
+    # in all later versions; pinning an exact string broke spuriously on every bump.
+    ver = tuple(int(x) for x in m.group(1).split("."))
+    assert ver >= (2, 9, 2), f"expected >= 2.9.2, got {m.group(1)}"
     assert all(len(seg) == 1 for seg in m.group(1).split(".")), "single-digit semver violated"
 
 
@@ -185,7 +192,10 @@ def test_v292_stalebreak_giveup_removed():
 
 def test_v292_handler_budget_threaded_not_hardcoded_90():
     src = _src()
-    assert "_handler_time_budget = 90.0" in src, "handler budget init missing"
+    # v3.2.1 SUPERSEDED: base per-batch budget raised 90.0 -> 240.0 (alias=vov-perbatch-budget-raise)
+    # because large-model attempt-1 sandbox mutate+verify takes 240-360s; 90s blocked every retry.
+    # The init must still be a single module-level assignment (threaded, not call-site hardcoded).
+    assert "_handler_time_budget = 240.0" in src, "handler budget init missing/expected 240.0"
     # the two apply call-sites no longer pass the bare 90.0 literal
     assert "\n                                        90.0,\n" not in src, "parallel apply still hardcodes 90.0"
     assert "\n                            90.0,\n" not in src, "serial apply still hardcodes 90.0"

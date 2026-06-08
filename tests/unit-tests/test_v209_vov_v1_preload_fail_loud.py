@@ -38,7 +38,7 @@ def src() -> str:
 def test_agent_version_is_209(src: str) -> None:
     m = re.search(r'__AGENT_VERSION__\s*=\s*"(\d+\.\d+\.\d+)"', src)
     assert m is not None, "__AGENT_VERSION__ not found in Cell 1"
-    assert m.group(1) == "2.0.9", f"expected 2.0.9 got {m.group(1)}"
+    assert tuple(int(_x) for _x in m.group(1).split(".")) >= (2, 0, 9), f"expected 2.0.9 got {m.group(1)}"
 
 
 def test_vov_v1_preload_diag_present(src: str) -> None:

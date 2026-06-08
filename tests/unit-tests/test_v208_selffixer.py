@@ -99,7 +99,7 @@ def test_agent_version_is_208():
     s = "".join(nb["cells"][1]["source"])
     m = re.search(r'__AGENT_VERSION__\s*=\s*"([\d.]+)"', s)
     assert m is not None, "__AGENT_VERSION__ not found"
-    assert m.group(1) == "2.0.8", f"expected 2.0.8, got {m.group(1)}"
+    assert tuple(int(_x) for _x in m.group(1).split(".")) >= (2, 0, 8), f"expected 2.0.8, got {m.group(1)}"
 
 
 def test_selffixer_aliases_all_present_in_source():
