@@ -14,7 +14,9 @@ def _full():
 
 def test_v348_version_constant():
     src = _full()
-    assert '__AGENT_VERSION__ = "3.4.8"' in src
+    m = re.search(r'__AGENT_VERSION__ = "(\d+)\.(\d+)\.(\d+)"', src)
+    assert m, "version constant not found"
+    assert tuple(int(x) for x in m.groups()) >= (3, 4, 8)
 
 
 def test_v348_re_provenance_add_missing_present():

@@ -34,8 +34,8 @@ def _load_nb_source(path: Path) -> str:
 
 def test_v074_agent_version_is_071_release():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "2.1.9"' in src, (
-        "v0.7.1 release tag (consolidates dev iterations v0.7.1\u2192v0.7.4) must stamp __AGENT_VERSION__ = '0.7.1'"
+    assert '__AGENT_VERSION__ = "3.5.2"' in src, (
+        "__AGENT_VERSION__ must track the current single-digit semver (CLAUDE.md \u00a73a-bis)"
     )
 
 
@@ -46,8 +46,8 @@ def test_v074_agent_version_is_first_non_comment_line_of_first_code_cell():
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
     assert code_lines, "First code cell must contain at least one code line"
-    assert '__AGENT_VERSION__ = "2.1.9"' in code_lines[0], (
-        "First non-comment code line of first code cell must declare __AGENT_VERSION__ = \"0.7.1\" (CLAUDE.md §3a-bis)"
+    assert '__AGENT_VERSION__ = "3.5.2"' in code_lines[0], (
+        "First non-comment code line of first code cell must declare current __AGENT_VERSION__ (CLAUDE.md §3a-bis)"
     )
 
 
@@ -123,8 +123,12 @@ def test_v074_shrink_fk_densest_fallback_replaces_emptied_raise():
     assert "shrink-fk-densest-fallback" in window, (
         "FK-densest fallback must follow the emptied-orphan signal in the same code block"
     )
-    assert "_v74_fk_count" in window, (
-        "FK-densest fallback must score products by FK in/out degree"
+    # v3.5.1: the FK-density scoring was extracted to the shared module-level helper
+    # _shrink_fk_densest_pick (DRY — replaced two copy-pasted inline _v74_fk_count loops).
+    # The fallback must still score by FK in/out degree, now via the shared helper.
+    assert "_shrink_fk_densest_pick(products_data, attributes_data, _v74_target_size)" in window, (
+        "FK-densest fallback must score products by FK in/out degree via the shared "
+        "_shrink_fk_densest_pick helper"
     )
 
 
@@ -296,8 +300,8 @@ def test_v074_runner_failure_manifest_only_writes_when_not_all_ok():
 
 def test_v074_readme_current_version_matches():
     rd = (REPO_ROOT / "readme.md").read_text()
-    assert "Current version: **v0.7.1**" in rd, (
-        "readme `Current version:` line must match __AGENT_VERSION__ (CLAUDE.md \u00a73a-bis); v0.7.1 release tag consolidates dev iterations"
+    assert "Current version: **v3.5.2**" in rd, (
+        "readme `Current version:` line must match __AGENT_VERSION__ (CLAUDE.md \u00a73a-bis)"
     )
 
 

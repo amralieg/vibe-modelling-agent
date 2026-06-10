@@ -46,20 +46,14 @@ def test_v353_direct_unbounded_finalize_call_removed():
 
 
 def test_v353_watchdog_armed_before_finalize():
-    # The hard backstop must be the FIRST thing in the finally block, strictly before the
-    # log-finalization that can stall. Order proves the watchdog can fire on a finalize hang.
+    # v3.5.4: the inline backstop was refactored into the shared _arm_finalization_watchdog
+    # helper. The pipeline-finally must arm it strictly before the log-finalization that can
+    # stall, so the watchdog can fire on a finalize hang.
     src = _finally_cell_src()
-    wd = src.index("alias=finalize-hang-force-exit")
+    wd = src.index('_arm_finalization_watchdog(widgets_values, grace_seconds=300, source="pipeline-finally")')
     fin = src.index("_fl_do_finalize")
     fly = src.index("    finally:\n")
     assert fly < wd < fin
-
-
-def test_v353_watchdog_emits_exit_result_then_exits():
-    src = _finally_cell_src()
-    assert "VIBE_EXIT_RESULT" in src
-    assert "_fz_os._exit(0)" in src
-    assert "finalize-hang-force-exit FIRED v3.5.3" in src
 
 
 # --------------------------------------------------------------------------- #

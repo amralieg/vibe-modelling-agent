@@ -24,10 +24,12 @@ def _slice(src, start_marker, end_marker, include_end=False):
 # version anchor
 # ---------------------------------------------------------------------------
 def test_v344_version_constant():
+    # forward-compatible anchor: v3.4.4 fixes must persist at or beyond 3.4.4
+    # (exact-version assertion is owned by the current version's test file).
     src = _cell_src(1)
-    m = re.search(r'__AGENT_VERSION__ = "([0-9.]+)"', src)
+    m = re.search(r'__AGENT_VERSION__ = "(\d+)\.(\d+)\.(\d+)"', src)
     assert m, "version constant not found"
-    assert m.group(1) == "3.4.4", f"expected 3.4.4, got {m.group(1)}"
+    assert tuple(int(x) for x in m.groups()) >= (3, 4, 4)
 
 
 # ---------------------------------------------------------------------------

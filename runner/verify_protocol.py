@@ -139,6 +139,21 @@ def matches(req_display, physical_names):
 # --------------------------------------------------------------------------- #
 # model.json traversal                                                          #
 # --------------------------------------------------------------------------- #
+_RE_VREQ_LINE = re.compile(r"^\s*(?:VREQ[-_ ]?\d+|PRIORITY\s+\d+|\[SA:[^\]]+\]|-\s*REQUIREMENT\b)", re.IGNORECASE | re.MULTILINE)
+
+
+def count_agent_vreqs(vibe):
+    """Count the VREQs the AGENT extracted, read from the artifact (next_vibes.txt / manifest).
+
+    Used as the adherence DENOMINATOR fallback when an independent ground-truth count is not
+    supplied. The CORRECT denominator is the TOTAL TRUE VREQ count (see --total-vreqs): scoring
+    verified_applied / agent_extracted hides extraction misses (a true VREQ the agent never
+    extracted can never be applied, so it must count as a MISS in the denominator, not vanish).
+    """
+    n = len(_RE_VREQ_LINE.findall(vibe or ""))
+    return n
+
+
 def _root(model):
     return model.get("model", model)
 
@@ -348,6 +363,11 @@ def main():
     ap.add_argument("--vibes", default=None)
     ap.add_argument("--warehouse", default=None)
     ap.add_argument("--model", default=None, help="local model.json (else pulled from volume)")
+    ap.add_argument("--total-vreqs", type=int, default=None,
+                    help="TOTAL TRUE VREQ count (independent ground-truth extraction). This is the "
+                         "adherence DENOMINATOR: adherence = verified_applied / total_true. If omitted, "
+                         "falls back to the agent-extracted VREQ count from the artifact (a PROXY that "
+                         "hides extraction misses).")
     args = ap.parse_args()
 
     wh = _running_warehouse(args.profile, args.warehouse)
@@ -404,9 +424,40 @@ def main():
         nfail += verdict == "FAIL"
         npart += verdict == "PARTIAL"
         print(f"  [{verdict:7}] {cls:15} {str(key)[:34]:34} {ev[:90]}")
-    tot = len(rows)
-    adh = 100.0 * (npass + 0.5 * npart) / tot if tot else 0
-    print(f"\n  PHYSICAL ADHERENCE: {npass} PASS / {npart} PARTIAL / {nfail} FAIL of {tot} = {adh:.1f}%")
+
+    # verified_applied = mechanical VREQ classes physically PASS (+0.5 PARTIAL). This is the NUMERATOR.
+    verified_applied = npass + 0.5 * npart
+    mech_total = len(rows)
+
+    # DENOMINATOR = TOTAL TRUE VREQs (user formula: adherence = verified_applied / total_true).
+    # Priority: explicit ground-truth count (--total-vreqs) > agent-extracted count from artifact >
+    # mechanical-checked count (last-resort, the OLD buggy behaviour, kept only when nothing else known).
+    agent_extracted = count_agent_vreqs(vibe)
+    if args.total_vreqs:
+        total_true = args.total_vreqs
+        denom_src = "ground-truth (--total-vreqs)"
+    elif agent_extracted:
+        total_true = agent_extracted
+        denom_src = "agent-extracted from artifact (PROXY; hides extraction misses)"
+    else:
+        total_true = mech_total
+        denom_src = "mechanical-checked count (LAST RESORT — denominator likely understated)"
+
+    extraction_cov = (100.0 * agent_extracted / total_true) if (total_true and agent_extracted) else 0.0
+    # formula-correct adherence: unverified/unextracted true VREQs contribute 0 to the numerator.
+    adh = 100.0 * verified_applied / total_true if total_true else 0.0
+    # mechanical-only pass rate (oracle's confidence on the subset it CAN physically check).
+    mech_rate = 100.0 * verified_applied / mech_total if mech_total else 0.0
+
+    print(f"\n  verified_applied (mechanical PASS+0.5*PARTIAL): {verified_applied:.1f}")
+    print(f"  mechanical classes physically checked:          {mech_total}  (pass-rate {mech_rate:.1f}%)")
+    print(f"  agent-extracted VREQs (from artifact):          {agent_extracted}")
+    print(f"  TOTAL TRUE VREQs (denominator):                 {total_true}  [{denom_src}]")
+    print(f"  extraction coverage (agent_extracted/total):    {extraction_cov:.1f}%")
+    print(f"\n  PHYSICAL ADHERENCE (verified_applied / total_true): {verified_applied:.1f}/{total_true} = {adh:.1f}%")
+    if not args.total_vreqs:
+        print("  NOTE: pass --total-vreqs <N> with the independent ground-truth count for the "
+              "formula-correct headline; the agent-extracted proxy cannot see extraction misses.")
     print(f"=== {'>=90% FLOOR MET' if adh >= 90 else 'BELOW 90% FLOOR'} ===\n")
     return 0 if adh >= 90 else 1
 
