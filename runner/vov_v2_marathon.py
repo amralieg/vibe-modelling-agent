@@ -24,8 +24,8 @@ JOB_TIMEOUT_S = 21600
 # timeout-killed-but-functionally-successful task still yields exportable v2 artifacts, and
 # downstream tasks advance via run_if=ALL_DONE.
 INSTALL_TIMEOUT_S = 1800
-VOV_TIMEOUT_S = 7200
-SHRINK_TIMEOUT_S = 2700
+VOV_TIMEOUT_S = 10800
+SHRINK_TIMEOUT_S = 3600
 
 ASSIGN = {
     "fe-gcp": ["travel_hospitality", "consumer_goods", "automotive"],
