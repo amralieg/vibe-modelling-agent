@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v353"
+AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v354"
 STAGE_DIR = "/tmp/vov_stage"
 OUT_DIR = "/tmp/vov_out"
 PULSE_FILE = os.path.expanduser("~/claude/vibe-agent/vov2_pulses.txt")
@@ -18,9 +18,14 @@ KILL_FILE = os.path.expanduser("~/claude/vibe-agent/vov2_KILL")
 POLL_S = 120
 PULSE_S = 900
 JOB_TIMEOUT_S = 21600
-INSTALL_TIMEOUT_S = 10800
-VOV_TIMEOUT_S = 21600
-SHRINK_TIMEOUT_S = 12600
+# Bounded to kill GIL-held post-success teardown hangs (serverless dbutils.notebook.exit /
+# ThreadPoolExecutor non-daemon worker stalls that no Python-thread os._exit watchdog can preempt).
+# Model artifacts (model.json, next_vibes) are written to the volume BEFORE teardown, so a
+# timeout-killed-but-functionally-successful task still yields exportable v2 artifacts, and
+# downstream tasks advance via run_if=ALL_DONE.
+INSTALL_TIMEOUT_S = 1800
+VOV_TIMEOUT_S = 7200
+SHRINK_TIMEOUT_S = 2700
 
 ASSIGN = {
     "fe-gcp": ["travel_hospitality", "consumer_goods", "automotive"],
@@ -261,10 +266,15 @@ def build_job_spec(ind):
                                "base_parameters": params},
              "timeout_seconds": tmo}
         if dep:
+            # run_if=ALL_DONE: upstream task may be killed by the platform timeout while in a
+            # GIL-held teardown hang AFTER its functional work + volume artifacts completed.
+            # ALL_DONE lets the downstream operation proceed (it reads the installed catalog /
+            # volume model.json, both populated before teardown) instead of being skipped.
             t["depends_on"] = [{"task_key": dep}]
+            t["run_if"] = "ALL_DONE"
         return t
     return {
-        "name": f"dbx_vibe_vov2_{ind}_v353",
+        "name": f"dbx_vibe_vov2_{ind}_v354",
         "timeout_seconds": JOB_TIMEOUT_S,
         "max_concurrent_runs": 1,
         "tasks": [
@@ -276,7 +286,7 @@ def build_job_spec(ind):
 
 
 def find_or_create_job(profile, ind):
-    name = f"dbx_vibe_vov2_{ind}_v353"
+    name = f"dbx_vibe_vov2_{ind}_v354"
     jobs = dbj(["jobs", "list", "--limit", "100"], profile)
     items = jobs if isinstance(jobs, list) else jobs.get("jobs", [])
     for j in items:
