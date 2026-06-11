@@ -17,15 +17,23 @@ KILL_FILE = os.path.expanduser("~/claude/vibe-agent/vov2_KILL")
 
 POLL_S = 120
 PULSE_S = 900
-JOB_TIMEOUT_S = 21600
-# Bounded to kill GIL-held post-success teardown hangs (serverless dbutils.notebook.exit /
-# ThreadPoolExecutor non-daemon worker stalls that no Python-thread os._exit watchdog can preempt).
-# Model artifacts (model.json, next_vibes) are written to the volume BEFORE teardown, so a
-# timeout-killed-but-functionally-successful task still yields exportable v2 artifacts, and
-# downstream tasks advance via run_if=ALL_DONE.
-INSTALL_TIMEOUT_S = 1800
-VOV_TIMEOUT_S = 10800
-SHRINK_TIMEOUT_S = 3600
+# Per-task caps reflect the user directive "timeout for any agent run is 15h" applied to the
+# QUALITY-CRITICAL agent run (vov), tempered by the proven teardown-hang reality of install/shrink:
+#   - vov SELF-COMPLETES (writes ECM model.json + finalizes) and is the run whose truncation costs
+#     quality, so it gets the full 15h ceiling => NEVER truncated mid-finalization. (Was 4h, which
+#     sat dangerously close to observed 3.3h vov runtimes on tier-1-size models.)
+#   - install + shrink PROVABLY hang in a GIL-held teardown AFTER writing their artifacts (installs
+#     observed TERMINATED/TIMEDOUT; canary shrinks hit their cap then exported a written mvm). In the
+#     3-task job, run_if=ALL_DONE means the NEXT task waits for the current to be 'done', so a 15h cap
+#     on install/shrink would block the pipeline for up to 15h of pure teardown hang — slower, not
+#     faster. They therefore get generous-but-bounded caps well above measured functional times
+#     (install functional <=40m on the slow my-uae workspace; shrink functional 66-106m), so real work
+#     never truncates while teardown waste stays bounded. Artifacts (model.json, next_vibes) are on the
+#     volume BEFORE teardown, so a cap-killed-but-functionally-complete task still exports + advances.
+JOB_TIMEOUT_S = 82800        # 23h job ceiling (>= 2h install + 15h vov + 5h shrink, with margin)
+INSTALL_TIMEOUT_S = 7200     # 2h: bounds the install teardown hang; ~3x the largest observed functional install
+VOV_TIMEOUT_S = 54000        # 15h: user directive — the quality-critical agent run is never truncated
+SHRINK_TIMEOUT_S = 18000     # 5h: ~3x the slowest observed functional shrink; bounds the shrink teardown hang
 
 ASSIGN = {
     "fe-gcp": ["travel_hospitality", "consumer_goods", "automotive"],
@@ -423,10 +431,22 @@ def _finish(profile, ind, state, info):
     set_ind(state, ind, status="exporting", terminal=info.get("result"),
             tasks=info.get("tasks"), run_url=info.get("url"))
     got = export_industry(profile, ind)
-    status = "green" if (info.get("result") == "SUCCESS" and got.get("ecm")) else \
+    status = "green" if (got.get("ecm") and got.get("mvm")) else \
              ("partial" if got.get("ecm") else "red")
     set_ind(state, ind, status=status, exported=got)
     pulse(f"[{ind}] {status.upper()} exported ecm={got.get('ecm')} mvm={got.get('mvm')}")
+    # User directive: full VReq audit on EVERY industry as it completes (stored for later v3 use).
+    # Runs whenever an ECM exists (green or partial) — audit reads the ECM vov log + exported model.json.
+    if got.get("ecm"):
+        try:
+            import vov_audit_extract as _audit  # lazy: avoids circular import at module load
+            audit = _audit.extract(ind, profile)
+            sb = (audit or {}).get("scoreboard", {})
+            pulse(f"[{ind}] AUDIT stored total={sb.get('total_requirements')} "
+                  f"fulfilled={sb.get('fulfilled')} partial={sb.get('partial')} "
+                  f"failed={sb.get('failed')} precision={sb.get('precision')} recall={sb.get('recall')}")
+        except Exception as e:
+            pulse(f"[{ind}] AUDIT FAILED: {str(e)[:200]}")
 
 
 def tick_profile(profile, state):

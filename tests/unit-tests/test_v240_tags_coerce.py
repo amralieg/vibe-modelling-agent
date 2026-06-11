@@ -32,11 +32,17 @@ def _read_source() -> str:
 
 
 def test_v240_alias_present():
+    """v240's inline _coerce_tags + its alias/sentinel were intentionally REMOVED in the v250
+    DRY refactor (see test_v250_no_inline_v240_coerce_duplication). The tags:string protection
+    that v240 introduced now lives in the module-level _enforce_string_tags_invariant_v250, which
+    enforce_configured_pk_consistency calls. So the live invariant to assert is the v250 mechanism,
+    not the removed v240 alias.
+    """
     src = _read_source()
-    assert "v240-pk-consistency-tags-string-coerce" in src, \
-        "v240-pk-consistency-tags-string-coerce alias missing — patch was lost"
-    assert "[v240-tags-coerced FIRED]" in src, \
-        "[v240-tags-coerced FIRED] sentinel missing — patch was lost"
+    assert "v250-enforce-string-tags-invariant" in src, \
+        "v250-enforce-string-tags-invariant alias missing — the tags-string coercion protection was lost"
+    assert "[v250-enforce-string-tags-invariant FIRED]" in src, \
+        "[v250-enforce-string-tags-invariant FIRED] sentinel missing — coercion protection was lost"
 
 
 def test_v240_coercion_precedes_lower_call():
