@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v354"
+AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v355"
 STAGE_DIR = "/tmp/vov_stage"
 OUT_DIR = "/tmp/vov_out"
 PULSE_FILE = os.path.expanduser("~/claude/vibe-agent/vov2_pulses.txt")
@@ -282,7 +282,7 @@ def build_job_spec(ind):
             t["run_if"] = "ALL_DONE"
         return t
     return {
-        "name": f"dbx_vibe_vov2_{ind}_v354",
+        "name": f"dbx_vibe_vov2_{ind}_v355",
         "timeout_seconds": JOB_TIMEOUT_S,
         "max_concurrent_runs": 1,
         "tasks": [
@@ -294,7 +294,7 @@ def build_job_spec(ind):
 
 
 def find_or_create_job(profile, ind):
-    name = f"dbx_vibe_vov2_{ind}_v354"
+    name = f"dbx_vibe_vov2_{ind}_v355"
     jobs = dbj(["jobs", "list", "--limit", "100"], profile)
     items = jobs if isinstance(jobs, list) else jobs.get("jobs", [])
     for j in items:
