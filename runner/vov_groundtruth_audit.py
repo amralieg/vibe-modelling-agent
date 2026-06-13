@@ -31,6 +31,21 @@ def norm(s):
     return re.sub(r"[^a-z0-9]+", "_", (s or "").strip().lower()).strip("_")
 
 
+_TIER_TOKENS = {"mvm", "ecm", "mvm_tier", "ecm_tier", "metric_view_model",
+                "metric_view_model_tier"}
+
+
+def _is_tier_target(nd):
+    # 'promote X to MVM tier' is a tier/scope op, not a real domain move; the LLM
+    # extractor maps it to move_product{new_domain=mvm...}. Not verifiable from an
+    # ECM model.json (same rationale as add_metric living in MVM scope).
+    if not nd:
+        return False
+    if nd in _TIER_TOKENS:
+        return True
+    return bool(set(nd.split("_")) & {"mvm", "ecm"})
+
+
 def load_model(path):
     try:
         return json.load(open(path))
@@ -175,6 +190,9 @@ def verify(v, v2pd, v2pa, v1_products):
         if not rp:
             return "missed", f"product '{prod}' absent"
         cur = v2pd.get(rp); nd = v.get("new_domain")
+        if _is_tier_target(nd):
+            return ("unverifiable",
+                    f"tier/scope promotion to '{nd}' (MVM/ECM) not verifiable from ECM model")
         if nd and cur == nd:
             return "fulfilled", f"now in domain '{nd}'"
         return "missed", f"still in domain '{cur}', not moved to '{nd}'"
