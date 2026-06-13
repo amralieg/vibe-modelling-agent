@@ -51,6 +51,54 @@ def index_model(mj):
     return prod2domain, prod2attrs
 
 
+_NUMERIC = ("INT", "BIGINT", "SMALLINT", "TINYINT", "DECIMAL", "NUMERIC",
+            "DOUBLE", "FLOAT", "REAL", "LONG")
+
+
+def attr_meta(mj):
+    """Return {product: {attr: {'type': UPPER, 'tags': lower-joined}}} for type/tag verification."""
+    model = (mj or {}).get("model", {})
+    out = {}
+    for d in model.get("domains", []):
+        for p in (d.get("products") or d.get("data_products") or []):
+            pn = norm(p.get("name"))
+            m = {}
+            for a in p.get("attributes", []):
+                an = norm(a.get("name"))
+                bits = []
+                for key in ("tags", "tag_set", "classification"):
+                    val = a.get(key)
+                    if isinstance(val, str):
+                        bits.append(val)
+                    elif isinstance(val, list):
+                        bits.extend(str(x) for x in val)
+                m[an] = {"type": (a.get("type") or a.get("data_type") or "").upper(),
+                         "tags": " ".join(bits).lower()}
+            out[pn] = m
+    return out
+
+
+def metric_names(mj):
+    model = (mj or {}).get("model", {})
+    out = []
+    for x in model.get("metric_views", []):
+        nm = x.get("view_name") or x.get("name") or x.get("metric_name")
+        if nm:
+            out.append(norm(nm))
+    return out
+
+
+def metric_blob(mj):
+    """All metric-view names + SQL + descriptions, lowercased — KPIs like RevPAR live in SQL."""
+    model = (mj or {}).get("model", {})
+    parts = []
+    for x in model.get("metric_views", []):
+        for k in ("view_name", "name", "sql", "description"):
+            if x.get(k):
+                parts.append(str(x[k]))
+    return " ".join(parts).lower()
+
+
 def v1_structure(mj):
     domains, products = set(), set()
     for d in (mj or {}).get("model", {}).get("domains", []):
@@ -154,7 +202,8 @@ LLM_ENDPOINT = "databricks-claude-sonnet-4-6"
 LLM_PROFILE = "fe-aws"
 
 _ACTIONS = ("connect_table", "rename_attribute", "move_product", "remove_fk",
-            "rename_product", "add_entity", "expand_stub", "expand_thin")
+            "rename_product", "add_entity", "expand_stub", "expand_thin",
+            "change_type", "add_tag", "add_metric")
 
 
 def _salvage_vreqs(s):
@@ -296,7 +345,14 @@ def _llm_user_prompt(text, v1_domains, v1_products):
         "- rename_product {product, new_name}\n"
         "- add_entity {entity}  (a NEW table/entity the reviewer says is missing/required)\n"
         "- expand_stub {product, domain?}  (a near-empty table that must gain real attributes)\n"
-        "- expand_thin {product, domain?}  (an under-developed table that must be expanded)\n")
+        "- expand_thin {product, domain?}  (an under-developed table that must be expanded)\n"
+        "- change_type {product, column, new_type}  (a column whose data type must change, "
+        "e.g. STRING -> a numeric/decimal/timestamp type; use 'numeric' if the doc just says "
+        "'make numeric')\n"
+        "- add_tag {product, column?, tag}  (a column/table that must gain a tag or "
+        "classification, e.g. PII; use tag='pii' for any PII/sensitive-data tagging ask)\n"
+        "- add_metric {metric}  (a metric view / KPI / formula that must exist or be fixed, "
+        "e.g. RevPAR, occupancy_rate; metric = the metric/KPI name)\n")
     return (
         f"v1 DOMAINS: {sorted(v1_domains)}\n\n"
         f"v1 PRODUCTS (tables): {sorted(v1_products)}\n\n"
@@ -326,6 +382,10 @@ def _normalize_vreqs(raw_vreqs, idprefix="LLM"):
             vr["entity"] = norm(v.get("entity"))
             if not vr["entity"]:
                 continue
+        elif a == "add_metric":
+            vr["metric"] = norm(v.get("metric") or v.get("entity") or v.get("product"))
+            if not vr["metric"]:
+                continue
         else:
             vr["product"] = norm(v.get("product"))
             if not vr["product"] and a not in ("add_entity",):
@@ -346,6 +406,16 @@ def _normalize_vreqs(raw_vreqs, idprefix="LLM"):
             vr["new_name"] = norm(v.get("new_name"))
         elif a in ("expand_stub", "expand_thin"):
             vr["domain"] = norm(v.get("domain")) if v.get("domain") else ""
+        elif a == "change_type":
+            vr["column"] = norm(v.get("column"))
+            vr["new_type"] = (v.get("new_type") or "").strip().upper()
+            if not vr["column"] or not vr["new_type"]:
+                continue
+        elif a == "add_tag":
+            vr["column"] = norm(v.get("column")) if v.get("column") else ""
+            vr["tag"] = (v.get("tag") or "").strip().lower()
+            if not vr["tag"]:
+                continue
         out.append(vr)
     return out
 
@@ -364,6 +434,12 @@ def _vreq_key(v):
         return (a, v.get("product"), v.get("new_name"))
     if a == "remove_fk":
         return (a, v.get("product"), v.get("column"))
+    if a == "change_type":
+        return (a, v.get("product"), v.get("column"))
+    if a == "add_tag":
+        return (a, v.get("product"), v.get("column"), v.get("tag"))
+    if a == "add_metric":
+        return (a, v.get("metric"))
     return (a, v.get("product"))
 
 
@@ -425,8 +501,23 @@ def llm_extract_vreqs(text, v1_domains, v1_products, profile, endpoint,
     return base
 
 
-def _score_one(v, v2pd, v2pa, v1_products):
+def _norm_type_family(t):
+    t = (t or "").upper()
+    if any(n in t for n in _NUMERIC) or t in ("NUMERIC", "NUMBER"):
+        return "NUMERIC"
+    if "TIMESTAMP" in t or "DATE" in t:
+        return "TEMPORAL"
+    if "BOOL" in t:
+        return "BOOL"
+    if "STRING" in t or "VARCHAR" in t or "CHAR" in t or "TEXT" in t:
+        return "STRING"
+    return t
+
+
+def _score_one(v, v2pd, v2pa, v1_products, meta=None, metrics=None, mblob=""):
     a = v["action"]
+    meta = meta or {}
+    metrics = metrics or []
     if a in ("expand_stub", "expand_thin"):
         rp = find_product(v["product"], v2pd)
         if not rp:
@@ -437,28 +528,82 @@ def _score_one(v, v2pd, v2pa, v1_products):
         if len(nonkey) >= thr:
             return "fulfilled", f"{len(nonkey)} non-key attributes"
         return "partial", f"only {len(nonkey)} non-key attributes (< {thr})"
+    if a == "change_type":
+        rp = find_product(v["product"], v2pd)
+        if not rp:
+            return "missed", f"product '{v['product']}' absent in v2"
+        col = v.get("column")
+        cm = meta.get(rp, {}).get(col)
+        if not cm:
+            return "missed", f"column '{col}' absent in v2 (cannot verify type change)"
+        want = _norm_type_family(v.get("new_type"))
+        got = _norm_type_family(cm["type"])
+        if want == got and got != "STRING":
+            return "fulfilled", f"'{col}' is {cm['type']} (family {got})"
+        if got == "STRING":
+            return "missed", f"'{col}' still STRING ({cm['type']}), expected {v.get('new_type')}"
+        return "partial", f"'{col}' is {cm['type']} (family {got}), asked {v.get('new_type')}"
+    if a == "add_tag":
+        rp = find_product(v["product"], v2pd)
+        if not rp:
+            return "missed", f"product '{v['product']}' absent in v2"
+        tag = (v.get("tag") or "").lower()
+        pm = meta.get(rp, {})
+        col = v.get("column")
+        if col:
+            cm = pm.get(col)
+            if not cm:
+                return "missed", f"column '{col}' absent (cannot verify tag)"
+            if tag in cm["tags"] or (tag == "pii" and "pii" in cm["tags"]):
+                return "fulfilled", f"'{col}' tagged ({cm['tags'][:40]})"
+            return "missed", f"'{col}' lacks tag '{tag}' (has: {cm['tags'][:40] or 'none'})"
+        # product-level: any attribute carrying the tag
+        hits = [an for an, cm in pm.items() if tag in cm["tags"] or (tag == "pii" and "pii" in cm["tags"])]
+        if hits:
+            return "fulfilled", f"{len(hits)} column(s) carry tag '{tag}'"
+        return "missed", f"no column on '{rp}' carries tag '{tag}'"
+    if a == "add_metric":
+        m = v.get("metric") or ""
+        if not metrics and not mblob:
+            return "unverifiable", "no metric views in this model scope (metrics live in MVM)"
+        mt = set(t for t in m.split("_") if len(t) > 2)
+        for mn in metrics:
+            if m and (m in mn or mn in m):
+                return "fulfilled", f"metric view '{mn}' present"
+            mtoks = set(mn.split("_"))
+            if mt and mt.issubset(mtoks):
+                return "fulfilled", f"metric view '{mn}' covers '{m}'"
+        # KPI may live inside metric SQL/description (e.g. RevPAR formula)
+        if m and m.replace("_", " ") in mblob or (m and m in mblob):
+            return "fulfilled", f"'{m}' referenced in metric-view SQL/description"
+        return "missed", f"metric/KPI '{m}' not found among {len(metrics)} metric views"
     return verify(v, v2pd, v2pa, v1_products)
 
 
 def score_against_model(vreqs, model_json, v1_products):
     v2pd, v2pa = index_model(model_json)
+    meta = attr_meta(model_json)
+    metrics = metric_names(model_json)
+    mblob = metric_blob(model_json)
     results = []
     for v in vreqs:
-        status, reason = _score_one(v, v2pd, v2pa, v1_products)
+        status, reason = _score_one(v, v2pd, v2pa, v1_products, meta, metrics, mblob)
         results.append({**v, "status": status, "reason": reason})
     by = {}
     for r in results:
         by[r["status"]] = by.get(r["status"], 0) + 1
-    total = len(results)
+    # adherence denominator excludes out-of-scope 'unverifiable' (neither applied nor a fair miss)
+    scorable = [r for r in results if r["status"] != "unverifiable"]
+    total = len(scorable)
     ful = by.get("fulfilled", 0)
-    imp = [r for r in results if r["source"] != "SEC1"]
+    imp = [r for r in scorable if r["source"] != "SEC1"]
     imp_ful = sum(1 for r in imp if r["status"] == "fulfilled")
     summary = {
-        "total_vreqs": total, "by_status": by, "fulfilled": ful,
+        "total_vreqs": len(results), "scorable_vreqs": total, "by_status": by, "fulfilled": ful,
         "adherence_all": round(100.0 * ful / total, 1) if total else 0.0,
         "improvement_total": len(imp), "improvement_fulfilled": imp_ful,
         "improvement_adherence": round(100.0 * imp_ful / len(imp), 1) if imp else 0.0,
-        "v2_products": len(v2pd)}
+        "unverifiable": by.get("unverifiable", 0), "v2_products": len(v2pd)}
     return results, summary
 
 
@@ -482,7 +627,11 @@ def parse_agent_selfscore(log_text):
         vid = m.group(1)
         body = (m.group(3) or "")
         ids[vid] = body
-        if "preserve the existing model" in body.lower():
+        bl = body.lower()
+        # preserve-equivalent: the bundled preserve directive AND the per-domain
+        # "create the <existing-domain> domain with the following products" recreations
+        if ("preserve the existing model" in bl or "preserve the required model" in bl
+                or re.match(r"create the \w+ domain with the following products", bl)):
             preserve += 1
     if ids:
         out["agent_extracted_total"] = len(ids)
@@ -579,6 +728,15 @@ def _affected(v):
         return {"type": "product", "fqname": f"{p}->{v.get('new_name')}", "blast_radius": "1"}
     if a in ("expand_stub", "expand_thin"):
         return {"type": "product", "fqname": p, "blast_radius": "<N>"}
+    if a == "change_type":
+        return {"type": "attribute", "fqname": f"{p}.{v.get('column')}:{v.get('new_type')}",
+                "blast_radius": "1"}
+    if a == "add_tag":
+        col = v.get("column")
+        return {"type": "tag", "fqname": f"{p}.{col}#{v.get('tag')}" if col else f"{p}#{v.get('tag')}",
+                "blast_radius": "1"}
+    if a == "add_metric":
+        return {"type": "metric", "fqname": v.get("metric"), "blast_radius": "1"}
     return {"type": "unknown", "fqname": p or "", "blast_radius": "1"}
 
 
