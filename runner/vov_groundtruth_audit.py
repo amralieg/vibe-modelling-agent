@@ -683,8 +683,40 @@ def extract_vreqs_for(ind, profile=None, endpoint=None):
     return vreqs, v1_products
 
 
+_STATUS_RANK = {"fulfilled": 3, "partial": 2, "missed": 1, "unverifiable": 0}
+
+
+def _merge_xscope(ecm_results, mvm_results):
+    """Best status per VReq across ECM+MVM scopes. A metric/MVM-tier VReq that is
+    unverifiable in ECM but fulfilled in MVM becomes fulfilled overall."""
+    by_key = {}
+    for r in mvm_results:
+        by_key[r.get("id") or _vreq_key(r)] = r
+    merged = []
+    for r in ecm_results:
+        m = by_key.get(r.get("id") or _vreq_key(r))
+        if m and _STATUS_RANK.get(m["status"], 0) > _STATUS_RANK.get(r["status"], 0):
+            merged.append({**r, "status": m["status"],
+                           "reason": f"[mvm] {m['reason']}", "_scope": "mvm"})
+        else:
+            merged.append({**r, "_scope": "ecm"})
+    by = {}
+    for r in merged:
+        by[r["status"]] = by.get(r["status"], 0) + 1
+    scorable = [r for r in merged if r["status"] != "unverifiable"]
+    total = len(scorable)
+    ful = by.get("fulfilled", 0)
+    imp = [r for r in scorable if r["source"] != "SEC1"]
+    imp_ful = sum(1 for r in imp if r["status"] == "fulfilled")
+    return merged, {
+        "xscope_scorable": total, "xscope_fulfilled": ful, "xscope_by_status": by,
+        "xscope_adherence_all": round(100.0 * ful / total, 1) if total else 0.0,
+        "xscope_improvement_total": len(imp), "xscope_improvement_fulfilled": imp_ful,
+        "xscope_improvement_adherence": round(100.0 * imp_ful / len(imp), 1) if imp else 0.0}
+
+
 def audit_industry(ind, use_llm=True, profile=None, endpoint=None,
-                   v2_path=None, prior_model=None, log_text=None):
+                   v2_path=None, prior_model=None, log_text=None, mvm_model=None):
     v2_path = v2_path or os.path.join(V2REPO, ind, "v2", "ecm", "model.json")
     v2ecm = load_model(v2_path)
     if not v2ecm:
@@ -694,6 +726,12 @@ def audit_industry(ind, use_llm=True, profile=None, endpoint=None,
 
     out = {"industry": ind, "extraction_mode": "llm", "v2_path": v2_path,
            "v1_products": len(v1_products), "results": results, **summary}
+
+    if mvm_model is not None:
+        mvm_results, _ = score_against_model(vreqs, mvm_model, v1_products)
+        merged, xsum = _merge_xscope(results, mvm_results)
+        out["xscope_results"] = merged
+        out.update(xsum)
 
     coverage = parse_agent_selfscore(log_text) if log_text else {}
     if coverage:
