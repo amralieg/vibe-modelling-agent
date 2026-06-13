@@ -169,6 +169,12 @@ def verify(v, v2pd, v2pa, v1_products):
         if not rp:
             return "missed", f"target product '{prod}' absent in v2 (cannot connect)"
         col = v.get("column"); attrs = v2pa.get(rp, {})
+        if not col:
+            # column-less connect_table = table-level "link this table" intent; the
+            # extractor did not name a specific column, so verify at table granularity.
+            if any(attrs[an] for an in attrs):
+                return "fulfilled", "table linked via outbound FK(s) (no specific column required)"
+            return "missed", "table has no outbound FK (still isolated)"
         if col and col in attrs and fk_matches(attrs[col], v.get("fk_to", "")):
             return "fulfilled", f"column '{col}' present with FK -> {attrs[col]}"
         if col and col in attrs:
@@ -207,7 +213,9 @@ def verify(v, v2pd, v2pa, v1_products):
         return "missed", f"FK still present on '{col}' (-> {attrs[col]})"
     if a == "rename_product":
         new = v.get("new_name")
-        if new and new in v2pd:
+        if not new:
+            return "unverifiable", "rename target name not captured in extraction"
+        if new in v2pd:
             return "fulfilled", f"product renamed to '{new}'"
         if prod in v2pd:
             return "missed", f"old name '{prod}' still present (rename not applied)"
