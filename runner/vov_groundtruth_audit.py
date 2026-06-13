@@ -60,89 +60,6 @@ def v1_structure(mj):
     return domains, products
 
 
-# ---------------- parse next_vibes.txt -----------------
-P_RE = re.compile(r"-\s*(P\d+):\s*([a-z_]+):\s*([a-z_0-9]+)\.([a-z_0-9]+)\*\*\s*[—-]+\s*(.*)")
-
-
-def parse_priorities(text):
-    out = []
-    for m in P_RE.finditer(text):
-        pid, action, dom, prod, detail = m.groups()
-        v = {"id": pid, "source": "SEC3C", "action": action,
-             "domain": norm(dom), "product": norm(prod), "raw": detail.strip()[:200]}
-        if action == "connect_table":
-            mm = re.search(r"add column ([a-z_0-9]+)\s*\(([A-Za-z]+)\)\s*with FK to ([a-z_0-9.]+)", detail)
-            if mm:
-                v["column"] = norm(mm.group(1)); v["fk_to"] = mm.group(3).strip(". ")
-        elif action == "rename_attribute":
-            mm = re.search(r"rename column ([a-z_0-9]+) to ([a-z_0-9]+)", detail)
-            if mm:
-                v["old_col"] = norm(mm.group(1)); v["new_col"] = norm(mm.group(2))
-        elif action == "move_product":
-            mm = re.search(r"move to ([a-z_0-9]+)", detail)
-            if mm:
-                v["new_domain"] = norm(mm.group(1))
-        elif action == "remove_fk":
-            mm = re.search(r"remove FK on column ([a-z_0-9]+)", detail)
-            if mm:
-                v["column"] = norm(mm.group(1))
-        elif action == "rename_product":
-            mm = re.search(r"rename to ([a-z_0-9]+)", detail)
-            if mm:
-                v["new_name"] = norm(mm.group(1))
-        out.append(v)
-    return out
-
-
-def section(text, start_pat, end_pats):
-    s = re.search(start_pat, text)
-    if not s:
-        return ""
-    rest = text[s.end():]
-    end = len(rest)
-    for ep in end_pats:
-        e = re.search(ep, rest)
-        if e:
-            end = min(end, e.start())
-    return rest[:end]
-
-
-def parse_stub_thin(text):
-    stubs, thin = [], []
-    sa = section(text, r"3a\.\s*STUBS", [r"3b\.", r"3c\.", r"SECTION"])
-    for m in re.finditer(r"-\s*([a-z_0-9]+)\.([a-z_0-9]+)", sa):
-        stubs.append((norm(m.group(1)), norm(m.group(2))))
-    sb = section(text, r"3b\.\s*THIN", [r"3c\.", r"3d\.", r"SECTION"])
-    for m in re.finditer(r"-\s*([a-z_0-9]+)\.([a-z_0-9]+)", sb):
-        thin.append((norm(m.group(1)), norm(m.group(2))))
-    return stubs, thin
-
-
-GAP_MARK = re.compile(r"missing|not (?:a )?first-class|no support|not modeled|not modeling|absent|"
-                      r"\bgap\b|required:|add(?:ing)?\b|promote to mvm|reconcile|not treated", re.I)
-
-
-def parse_sec2_entities(text, v1_products):
-    """Heuristic: snake_case multi-token identifiers in gap-marked sentences of Section 2,
-    that are NOT already v1 products (so they are NEW asks). Deterministic + transparent."""
-    sec2 = section(text, r"SECTION 2", [r"SECTION 3", r"END OF VIBE"])
-    cands = {}
-    for sent in re.split(r"(?<=[.\n])\s+", sec2):
-        if not GAP_MARK.search(sent):
-            continue
-        for tok in re.findall(r"\b([a-z][a-z0-9]+(?:_[a-z0-9]+)+)\b", sent):
-            t = norm(tok)
-            if t in v1_products:
-                continue
-            if t in ("first_class", "cold_chain", "data_model", "use_cases", "use_case",
-                     "real_time", "self_assessment", "back_office", "back_offices", "data_models",
-                     "lookup_tables", "metric_views", "self_ref", "self_referencing"):
-                continue
-            cands.setdefault(t, sent.strip()[:160])
-    return [{"id": f"SEC2-{i+1}", "source": "SEC2", "action": "add_entity", "entity": e, "raw": r}
-            for i, (e, r) in enumerate(sorted(cands.items()))]
-
-
 # ---------------- verification -----------------
 def fk_matches(fk_val, fk_to):
     if not fk_val:
@@ -396,18 +313,13 @@ def _llm_user_prompt(text, v1_domains, v1_products):
         "=== NEXT_VIBES DOCUMENT END ===")
 
 
-def llm_extract_vreqs(text, v1_domains, v1_products, profile, endpoint):
-    raw = _llm_invoke(profile, endpoint, _LLM_SYS,
-                      _llm_user_prompt(text, v1_domains, v1_products))
-    d = _extract_json(raw)
-    if not d or "vreqs" not in d:
-        return None
+def _normalize_vreqs(raw_vreqs, idprefix="LLM"):
     out = []
-    for i, v in enumerate(d.get("vreqs", [])):
+    for i, v in enumerate(raw_vreqs):
         a = (v.get("action") or "").strip()
         if a not in _ACTIONS:
             continue
-        vr = {"id": f"LLM-{i+1}", "source": "LLM", "action": a,
+        vr = {"id": f"{idprefix}-{i+1}", "source": "LLM", "action": a,
               "verbatim": (v.get("verbatim") or "")[:200],
               "interpretation": (v.get("interpretation") or "")[:200]}
         if a == "add_entity":
@@ -438,84 +350,208 @@ def llm_extract_vreqs(text, v1_domains, v1_products, profile, endpoint):
     return out
 
 
-def regex_improvement_vreqs(vibe, v1_products):
-    vreqs = []
-    vreqs += parse_priorities(vibe)
-    stubs, thin = parse_stub_thin(vibe)
-    for dom, prod in stubs:
-        vreqs.append({"id": f"STUB-{prod}", "source": "SEC3A", "action": "expand_stub",
-                      "product": prod, "domain": dom})
-    for dom, prod in thin:
-        vreqs.append({"id": f"THIN-{prod}", "source": "SEC3B", "action": "expand_thin",
-                      "product": prod, "domain": dom})
-    vreqs += parse_sec2_entities(vibe, v1_products)
-    return vreqs
+def _vreq_key(v):
+    a = v["action"]
+    if a == "add_entity":
+        return ("add_entity", v.get("entity"))
+    if a == "rename_attribute":
+        return (a, v.get("product"), v.get("old_col"), v.get("new_col"))
+    if a == "connect_table":
+        return (a, v.get("product"), v.get("column"))
+    if a == "move_product":
+        return (a, v.get("product"), v.get("new_domain"))
+    if a == "rename_product":
+        return (a, v.get("product"), v.get("new_name"))
+    if a == "remove_fk":
+        return (a, v.get("product"), v.get("column"))
+    return (a, v.get("product"))
 
 
-def audit_industry(ind, use_llm=False, profile=None, endpoint=None):
-    vibe = open(os.path.join(VIBES, ind, "next_vibes.txt"), errors="ignore").read()
-    v1 = load_model(os.path.join(VIBES, ind, "model.json"))
-    v2ecm = load_model(os.path.join(V2REPO, ind, "v2", "ecm", "model.json"))
-    if not v2ecm:
+_GAP_SYS = (
+    "You are a completeness auditor for data-model requirement extraction. You are "
+    "given a next_vibes document and a list of requirements already extracted from it. "
+    "Find EVERY additional atomic requirement in the document that is MISSING from the "
+    "list. Output STRICT JSON only.")
+
+
+def _gap_user_prompt(text, v1_domains, v1_products, have):
+    have_lines = "\n".join(f"- {v['action']}: {v.get('product') or v.get('entity')}"
+                           for v in have)
+    return (
+        f"v1 DOMAINS: {sorted(v1_domains)}\nv1 PRODUCTS: {sorted(v1_products)}\n\n"
+        "ALREADY-EXTRACTED requirements:\n" + have_lines + "\n\n"
+        "Same action vocabulary and JSON schema as before "
+        "(connect_table/rename_attribute/move_product/remove_fk/rename_product/"
+        "add_entity/expand_stub/expand_thin; each with required fields + verbatim + "
+        "interpretation). Return JSON {\"vreqs\":[...]} containing ONLY requirements "
+        "present in the document but ABSENT from the already-extracted list. If none are "
+        "missing, return {\"vreqs\":[]}.\n\n"
+        "=== NEXT_VIBES DOCUMENT START ===\n" + text[:120000] +
+        "\n=== NEXT_VIBES DOCUMENT END ===")
+
+
+def llm_extract_vreqs(text, v1_domains, v1_products, profile, endpoint,
+                      retries=3, gap_passes=1):
+    base = None
+    for _ in range(retries):
+        raw = _llm_invoke(profile, endpoint, _LLM_SYS,
+                          _llm_user_prompt(text, v1_domains, v1_products))
+        d = _extract_json(raw)
+        if d and "vreqs" in d:
+            base = _normalize_vreqs(d["vreqs"])
+            break
+    if base is None:
         return None
-    v1_domains, v1_products = v1_structure(v1)
-    v2pd, v2pa = index_model(v2ecm)
+    seen = {_vreq_key(v) for v in base}
+    nid = len(base)
+    for _ in range(gap_passes):
+        raw = _llm_invoke(profile, endpoint, _GAP_SYS,
+                          _gap_user_prompt(text, v1_domains, v1_products, base))
+        d = _extract_json(raw)
+        if not d or not d.get("vreqs"):
+            break
+        added = 0
+        for v in _normalize_vreqs(d["vreqs"], idprefix="GAP"):
+            k = _vreq_key(v)
+            if k in seen:
+                continue
+            seen.add(k)
+            nid += 1
+            v["id"] = f"LLM-{nid}"
+            base.append(v)
+            added += 1
+        if added == 0:
+            break
+    return base
 
-    vreqs = []
-    # SEC1 preservation (per product) — deterministic, always complete
-    for p in sorted(v1_products):
-        vreqs.append({"id": f"PRES-{p}", "source": "SEC1", "action": "preserve", "target": p})
 
-    # improvement VReqs: LLM-structured (exhaustive) with regex fallback
-    imp_mode = "regex"
-    imp = None
-    if use_llm:
-        imp = llm_extract_vreqs(vibe, v1_domains, v1_products,
-                                profile or LLM_PROFILE, endpoint or LLM_ENDPOINT)
-        if imp is not None:
-            imp_mode = "llm"
-    if imp is None:
-        imp = regex_improvement_vreqs(vibe, v1_products)
-    vreqs += imp
+def _score_one(v, v2pd, v2pa, v1_products):
+    a = v["action"]
+    if a in ("expand_stub", "expand_thin"):
+        rp = find_product(v["product"], v2pd)
+        if not rp:
+            return "missed", f"product '{v['product']}' absent in v2"
+        attrs = v2pa.get(rp, {})
+        nonkey = [an for an in attrs if not (an.endswith("_id") or an == "id")]
+        thr = 8 if a == "expand_stub" else 12
+        if len(nonkey) >= thr:
+            return "fulfilled", f"{len(nonkey)} non-key attributes"
+        return "partial", f"only {len(nonkey)} non-key attributes (< {thr})"
+    return verify(v, v2pd, v2pa, v1_products)
 
+
+def score_against_model(vreqs, model_json, v1_products):
+    v2pd, v2pa = index_model(model_json)
     results = []
     for v in vreqs:
-        a = v["action"]
-        if a in ("expand_stub", "expand_thin"):
-            rp = find_product(v["product"], v2pd)
-            if not rp:
-                status, reason = "missed", f"product '{v['product']}' absent in v2"
-            else:
-                attrs = v2pa.get(rp, {})
-                nonkey = [an for an in attrs if not (an.endswith("_id") or an == "id")]
-                thr = 8 if a == "expand_stub" else 12
-                if len(nonkey) >= thr:
-                    status, reason = "fulfilled", f"{len(nonkey)} non-key attributes"
-                else:
-                    status, reason = "partial", f"only {len(nonkey)} non-key attributes (< {thr})"
-        else:
-            status, reason = verify(v, v2pd, v2pa, v1_products)
+        status, reason = _score_one(v, v2pd, v2pa, v1_products)
         results.append({**v, "status": status, "reason": reason})
-
-    # scoreboard (ALL vreqs denominator)
     by = {}
     for r in results:
         by[r["status"]] = by.get(r["status"], 0) + 1
     total = len(results)
     ful = by.get("fulfilled", 0)
-    adher = round(100.0 * ful / total, 1) if total else 0.0
-
-    # improvement-only (exclude SEC1 preservation)
     imp = [r for r in results if r["source"] != "SEC1"]
     imp_ful = sum(1 for r in imp if r["status"] == "fulfilled")
-    imp_adher = round(100.0 * imp_ful / len(imp), 1) if imp else 0.0
+    summary = {
+        "total_vreqs": total, "by_status": by, "fulfilled": ful,
+        "adherence_all": round(100.0 * ful / total, 1) if total else 0.0,
+        "improvement_total": len(imp), "improvement_fulfilled": imp_ful,
+        "improvement_adherence": round(100.0 * imp_ful / len(imp), 1) if imp else 0.0,
+        "v2_products": len(v2pd)}
+    return results, summary
 
-    return {"industry": ind, "total_vreqs": total, "by_status": by,
-            "adherence_all": adher, "fulfilled": ful,
-            "improvement_total": len(imp), "improvement_fulfilled": imp_ful,
-            "improvement_adherence": imp_adher, "extraction_mode": imp_mode,
-            "v1_products": len(v1_products), "v2_products": len(v2pd),
-            "results": results}
+
+_AGENT_VREQ = re.compile(r"\[VREQ-(\d+)\]\s*(?:\(([^)]*)\))?\s*(.*)")
+_COMPLETENESS = re.compile(
+    r"vov-extract-completeness-audit[^\]]*\][^\n]*?missing=(\d+)[^\n]*?detected=(\d+)"
+    r"[^\n]*?recovered_total=(\d+)", re.I)
+_MUT_SUMMARY = re.compile(r"MUTATION-SUMMARY[^\n]*?applied[=:\s]+(\d+)[^\n]*?skipped[=:\s]+(\d+)", re.I)
+
+
+def parse_agent_selfscore(log_text):
+    """Agent's own extracted/applied counts from the vov log — the agent self-scoreboard
+    we audit against (lying-scoreboard check). [VREQ-NNN] are the agent's extracted VReqs;
+    VREQ-001 is the bundled preserve-all directive, the rest are generative/improvement."""
+    if not log_text:
+        return {}
+    out = {}
+    ids = {}
+    preserve = 0
+    for m in _AGENT_VREQ.finditer(log_text):
+        vid = m.group(1)
+        body = (m.group(3) or "")
+        ids[vid] = body
+        if "preserve the existing model" in body.lower():
+            preserve += 1
+    if ids:
+        out["agent_extracted_total"] = len(ids)
+        out["agent_preserve_vreqs"] = preserve
+        out["agent_improvement_extracted"] = len(ids) - preserve
+    cm = _COMPLETENESS.search(log_text)
+    if cm:
+        out["agent_completeness"] = {"missing": int(cm.group(1)),
+                                     "detected": int(cm.group(2)),
+                                     "recovered": int(cm.group(3))}
+    ms = _MUT_SUMMARY.findall(log_text)
+    if ms:
+        out["agent_applied"] = sum(int(a) for a, _ in ms)
+        out["agent_skipped"] = sum(int(s) for _, s in ms)
+    return out
+
+
+def extract_vreqs_for(ind, profile=None, endpoint=None):
+    """Pure-LLM VReq set for an industry: deterministic SEC1 preserve (from v1 model)
+    + exhaustive LLM improvement extraction (retry + gap pass, NO regex)."""
+    vibe = open(os.path.join(VIBES, ind, "next_vibes.txt"), errors="ignore").read()
+    v1 = load_model(os.path.join(VIBES, ind, "model.json"))
+    v1_domains, v1_products = v1_structure(v1)
+    vreqs = [{"id": f"PRES-{p}", "source": "SEC1", "action": "preserve", "target": p}
+             for p in sorted(v1_products)]
+    imp = llm_extract_vreqs(vibe, v1_domains, v1_products,
+                            profile or LLM_PROFILE, endpoint or LLM_ENDPOINT)
+    if imp is None:
+        raise RuntimeError(f"LLM VReq extraction failed for {ind} after retries (NO regex fallback)")
+    vreqs += imp
+    return vreqs, v1_products
+
+
+def audit_industry(ind, use_llm=True, profile=None, endpoint=None,
+                   v2_path=None, prior_model=None, log_text=None):
+    v2_path = v2_path or os.path.join(V2REPO, ind, "v2", "ecm", "model.json")
+    v2ecm = load_model(v2_path)
+    if not v2ecm:
+        return None
+    vreqs, v1_products = extract_vreqs_for(ind, profile, endpoint)
+    results, summary = score_against_model(vreqs, v2ecm, v1_products)
+
+    out = {"industry": ind, "extraction_mode": "llm", "v2_path": v2_path,
+           "v1_products": len(v1_products), "results": results, **summary}
+
+    coverage = parse_agent_selfscore(log_text) if log_text else {}
+    if coverage:
+        out["agent_selfscore"] = coverage
+        ae = coverage.get("agent_improvement_extracted")
+        if ae is not None and summary["improvement_total"]:
+            # coverage = of MY ground-truth improvement VReqs, how many the agent captured
+            out["agent_coverage_improvement_pct"] = round(
+                100.0 * min(ae, summary["improvement_total"]) / summary["improvement_total"], 1)
+        # lying-scoreboard delta: agent claims full capture (missing=0) but my verified
+        # adherence is the truth
+        comp = coverage.get("agent_completeness") or {}
+        if comp.get("missing") == 0:
+            out["agent_claimed_complete"] = True
+            out["truth_vs_claim_gap_pct"] = round(100.0 - summary["improvement_adherence"], 1)
+
+    if prior_model is not None:
+        _, prior_summary = score_against_model(vreqs, prior_model, v1_products)
+        out["prior"] = {k: prior_summary[k] for k in
+                        ("adherence_all", "fulfilled", "improvement_adherence",
+                         "improvement_fulfilled", "by_status")}
+        out["delta_adherence_all"] = round(summary["adherence_all"] - prior_summary["adherence_all"], 1)
+        out["delta_improvement_adherence"] = round(
+            summary["improvement_adherence"] - prior_summary["improvement_adherence"], 1)
+    return out
 
 
 _STATUS_MAP = {"fulfilled": "applied", "partial": "partial", "missed": "missed",
@@ -564,7 +600,11 @@ def main(industries, use_llm=False, profile=None, endpoint=None, out_dir=None):
     tot = ful = 0
     print(f"{'industry':<20}{'ALL':>8}{'ful':>6}{'adher%':>8}   {'impr':>5}{'impr%':>7}")
     for ind in industries:
-        a = audit_industry(ind, use_llm=use_llm, profile=profile, endpoint=endpoint)
+        try:
+            a = audit_industry(ind, use_llm=True, profile=profile, endpoint=endpoint)
+        except Exception as e:
+            print(f"{ind:<20}  LLM-EXTRACT FAILED: {str(e)[:80]}")
+            continue
         if not a:
             print(f"{ind:<20}  (no v2 ecm)")
             continue
@@ -579,7 +619,7 @@ def main(industries, use_llm=False, profile=None, endpoint=None, out_dir=None):
               f"   {a['improvement_total']:>5}{a['improvement_adherence']:>7}  [{a['extraction_mode']}]")
     agg["totals"] = {"total_vreqs": tot, "fulfilled": ful,
                      "adherence_all": round(100.0 * ful / tot, 1) if tot else 0.0,
-                     "extraction_mode": "llm" if use_llm else "regex"}
+                     "extraction_mode": "llm"}
     json.dump(agg, open(os.path.join(out, "_aggregate.json"), "w"), indent=2)
     print(f"\nAGGREGATE: {ful}/{tot} = {agg['totals']['adherence_all']}% (all-VReq, ground-truth denominator)")
 
