@@ -1,0 +1,2509 @@
+{
+  "agent_version": "synthetic-v357",
+  "business": "synthetic_defect_co",
+  "model": {
+    "domains": [
+      {
+        "name": "clinical_care",
+        "products": [
+          {
+            "name": "patient",
+            "primary_key": "patient_id",
+            "attributes": [
+              {
+                "name": "patient_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "patient_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "patient_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "patient_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "patient_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "patient_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "patient_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "patient_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "patient_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "patient_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "patient_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "patient_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "patient_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "patient_field_12",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "patient_field_13",
+                "data_type": "INT"
+              },
+              {
+                "name": "patient_field_14",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "patient_field_15",
+                "data_type": "STRING"
+              }
+            ]
+          },
+          {
+            "name": "encounter",
+            "primary_key": "encounter_id",
+            "attributes": [
+              {
+                "name": "encounter_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "patient_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "clinical_care.patient.patient_id"
+              },
+              {
+                "name": "provider_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "clinical_care.provider.provider_id"
+              },
+              {
+                "name": "encounter_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "encounter_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "encounter_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "encounter_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "encounter_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "encounter_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "encounter_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "encounter_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "encounter_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "encounter_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "encounter_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "encounter_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "encounter_field_12",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "encounter_field_13",
+                "data_type": "INT"
+              }
+            ]
+          },
+          {
+            "name": "diagnosis",
+            "primary_key": "diagnosis_id",
+            "attributes": [
+              {
+                "name": "diagnosis_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "encounter_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "clinical_care.encounter.encounter_id"
+              },
+              {
+                "name": "diagnosis_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "diagnosis_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "diagnosis_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "diagnosis_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "diagnosis_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "diagnosis_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "diagnosis_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "diagnosis_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "diagnosis_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "diagnosis_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "diagnosis_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "diagnosis_field_11",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          },
+          {
+            "name": "procedure",
+            "primary_key": "procedure_id",
+            "attributes": [
+              {
+                "name": "procedure_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "encounter_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "clinical_care.encounter.encounter_id"
+              },
+              {
+                "name": "procedure_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "procedure_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "procedure_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "procedure_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "procedure_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "procedure_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "procedure_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "procedure_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "procedure_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "procedure_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "procedure_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "procedure_field_11",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          },
+          {
+            "name": "medication",
+            "primary_key": "medication_id",
+            "attributes": [
+              {
+                "name": "medication_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "medication_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "medication_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "medication_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "medication_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "medication_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "medication_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "medication_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "medication_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "medication_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "medication_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "medication_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "medication_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "medication_field_12",
+                "data_type": "TIMESTAMP"
+              }
+            ]
+          },
+          {
+            "name": "lab_result",
+            "primary_key": "lab_result_id",
+            "attributes": [
+              {
+                "name": "lab_result_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "encounter_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "clinical_care.encounter.encounter_id"
+              }
+            ]
+          },
+          {
+            "name": "provider",
+            "primary_key": "provider_id",
+            "attributes": [
+              {
+                "name": "provider_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "provider_name",
+                "data_type": "STRING"
+              },
+              {
+                "name": "provider_status",
+                "data_type": "STRING"
+              }
+            ]
+          },
+          {
+            "name": "claim_clinical",
+            "primary_key": "claim_clinical_id",
+            "attributes": [
+              {
+                "name": "claim_clinical_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "patient_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "clinical_care.patient.patient_id"
+              },
+              {
+                "name": "claim_clinical_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "claim_clinical_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "claim_clinical_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "claim_clinical_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "claim_clinical_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "claim_clinical_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "claim_clinical_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "claim_clinical_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "claim_clinical_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "claim_clinical_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "claim_clinical_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "claim_clinical_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "claim_clinical_self_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "clinical_care.claim_clinical.claim_clinical_id"
+              }
+            ]
+          },
+          {
+            "name": "allergy",
+            "primary_key": "allergy_id",
+            "attributes": [
+              {
+                "name": "allergy_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "allergy_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "allergy_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "allergy_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "allergy_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "allergy_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "allergy_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "allergy_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "allergy_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "allergy_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "allergy_field_9",
+                "data_type": "BOOLEAN"
+              }
+            ]
+          },
+          {
+            "name": "immunization",
+            "primary_key": "immunization_id",
+            "attributes": [
+              {
+                "name": "immunization_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "immunization_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "immunization_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "immunization_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "immunization_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "immunization_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "immunization_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "immunization_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "immunization_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "immunization_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "immunization_field_9",
+                "data_type": "BOOLEAN"
+              }
+            ]
+          },
+          {
+            "name": "vital_sign",
+            "primary_key": "vital_sign_id",
+            "attributes": [
+              {
+                "name": "vital_sign_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "encounter_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "clinical_care.encounter.encounter_id"
+              },
+              {
+                "name": "vital_sign_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "vital_sign_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "vital_sign_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "vital_sign_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "vital_sign_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "vital_sign_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "vital_sign_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "vital_sign_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "vital_sign_field_8",
+                "data_type": "INT"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "aftersales",
+        "products": [
+          {
+            "name": "nameplate",
+            "primary_key": "nameplate_id",
+            "attributes": [
+              {
+                "name": "nameplate_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "nameplate_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "nameplate_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "nameplate_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "nameplate_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "nameplate_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "nameplate_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "nameplate_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "nameplate_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "nameplate_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "nameplate_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "nameplate_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "nameplate_field_11",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          },
+          {
+            "name": "body_style",
+            "primary_key": "body_style_id",
+            "attributes": [
+              {
+                "name": "body_style_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "body_style_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "body_style_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "body_style_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "body_style_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "body_style_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "body_style_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "body_style_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "body_style_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "body_style_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "body_style_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "body_style_field_10",
+                "data_type": "STRING"
+              }
+            ]
+          },
+          {
+            "name": "repair_order",
+            "primary_key": "repair_order_id",
+            "attributes": [
+              {
+                "name": "repair_order_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "dealer_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "aftersales.dealer.dealer_id"
+              },
+              {
+                "name": "repair_order_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "repair_order_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "repair_order_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "repair_order_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "repair_order_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "repair_order_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "repair_order_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "repair_order_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "repair_order_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "repair_order_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "repair_order_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "repair_order_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "repair_order_field_12",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "repair_order_field_13",
+                "data_type": "INT"
+              }
+            ]
+          },
+          {
+            "name": "warranty_claim",
+            "primary_key": "warranty_claim_id",
+            "attributes": [
+              {
+                "name": "warranty_claim_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "repair_order_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "aftersales.repair_order.repair_order_id"
+              },
+              {
+                "name": "warranty_claim_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "warranty_claim_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "warranty_claim_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "warranty_claim_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "warranty_claim_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "warranty_claim_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "warranty_claim_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "warranty_claim_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "warranty_claim_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "warranty_claim_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "warranty_claim_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "warranty_claim_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "warranty_claim_field_12",
+                "data_type": "TIMESTAMP"
+              }
+            ]
+          },
+          {
+            "name": "dealer",
+            "primary_key": "dealer_id",
+            "attributes": [
+              {
+                "name": "dealer_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "dealer_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "dealer_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "dealer_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "dealer_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "dealer_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "dealer_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "dealer_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "dealer_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "dealer_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "dealer_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "dealer_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "dealer_field_11",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          },
+          {
+            "name": "vehicle_service",
+            "primary_key": "vehicle_service_id",
+            "attributes": [
+              {
+                "name": "vehicle_service_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "vehicle_service_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "vehicle_service_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "vehicle_service_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "vehicle_service_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "vehicle_service_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "vehicle_service_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "vehicle_service_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "vehicle_service_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "vehicle_service_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "vehicle_service_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "vehicle_service_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "vehicle_service_field_11",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          },
+          {
+            "name": "service_part",
+            "primary_key": "service_part_id",
+            "attributes": [
+              {
+                "name": "service_part_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "service_part_name",
+                "data_type": "STRING"
+              },
+              {
+                "name": "service_part_status",
+                "data_type": "STRING"
+              }
+            ]
+          },
+          {
+            "name": "recall_notice",
+            "primary_key": "recall_notice_id",
+            "attributes": [
+              {
+                "name": "recall_notice_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              }
+            ]
+          },
+          {
+            "name": "svc_appt",
+            "primary_key": "svc_appt_id",
+            "attributes": [
+              {
+                "name": "svc_appt_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "svc_appt_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "svc_appt_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "svc_appt_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "svc_appt_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "svc_appt_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "svc_appt_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "svc_appt_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "svc_appt_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "svc_appt_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "svc_appt_field_9",
+                "data_type": "BOOLEAN"
+              }
+            ]
+          },
+          {
+            "name": "technician",
+            "primary_key": "technician_id",
+            "attributes": [
+              {
+                "name": "technician_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "technician_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "technician_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "technician_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "technician_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "technician_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "technician_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "technician_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "technician_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "technician_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "technician_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "technician_field_10",
+                "data_type": "STRING"
+              }
+            ]
+          },
+          {
+            "name": "loaner_vehicle",
+            "primary_key": "loaner_vehicle_id",
+            "attributes": [
+              {
+                "name": "loaner_vehicle_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "dealer_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "aftersales.dealer.dealer_id"
+              },
+              {
+                "name": "loaner_vehicle_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "loaner_vehicle_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "loaner_vehicle_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "loaner_vehicle_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "loaner_vehicle_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "loaner_vehicle_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "loaner_vehicle_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "loaner_vehicle_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "loaner_vehicle_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "loaner_vehicle_field_9",
+                "data_type": "BOOLEAN"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "merchandising",
+        "products": [
+          {
+            "name": "sku",
+            "primary_key": "sku_id",
+            "attributes": [
+              {
+                "name": "sku_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "sku_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "sku_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "sku_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "sku_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "sku_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "sku_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "sku_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "sku_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "sku_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "sku_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "sku_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "sku_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "sku_field_12",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "sku_field_13",
+                "data_type": "INT"
+              },
+              {
+                "name": "sku_field_14",
+                "data_type": "BOOLEAN"
+              }
+            ]
+          },
+          {
+            "name": "inventory_lot",
+            "primary_key": "inventory_lot_id",
+            "attributes": [
+              {
+                "name": "inventory_lot_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "sku_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "merchandising.sku.sku_id"
+              },
+              {
+                "name": "inventory_lot_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "inventory_lot_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "inventory_lot_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "inventory_lot_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "inventory_lot_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "inventory_lot_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "inventory_lot_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "inventory_lot_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "inventory_lot_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "inventory_lot_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "inventory_lot_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "inventory_lot_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "inventory_lot_field_12",
+                "data_type": "TIMESTAMP"
+              }
+            ]
+          },
+          {
+            "name": "store",
+            "primary_key": "store_id",
+            "attributes": [
+              {
+                "name": "store_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "store_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "store_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "store_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "store_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "store_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "store_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "store_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "store_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "store_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "store_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "store_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "store_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "store_field_12",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "store_field_13",
+                "data_type": "INT"
+              }
+            ]
+          },
+          {
+            "name": "promotion",
+            "primary_key": "promotion_id",
+            "attributes": [
+              {
+                "name": "promotion_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "promotion_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "promotion_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "promotion_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "promotion_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "promotion_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "promotion_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "promotion_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "promotion_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "promotion_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "promotion_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "promotion_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "promotion_field_11",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          },
+          {
+            "name": "basket",
+            "primary_key": "basket_id",
+            "attributes": [
+              {
+                "name": "basket_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "store_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "merchandising.store.store_id"
+              },
+              {
+                "name": "basket_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "basket_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "basket_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "basket_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "basket_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "basket_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "basket_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "basket_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "basket_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "basket_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "basket_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "basket_field_11",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          },
+          {
+            "name": "price_point",
+            "primary_key": "price_point_id",
+            "attributes": [
+              {
+                "name": "price_point_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "price_point_name",
+                "data_type": "STRING"
+              },
+              {
+                "name": "price_point_status",
+                "data_type": "STRING"
+              }
+            ]
+          },
+          {
+            "name": "planogram_slot",
+            "primary_key": "planogram_slot_id",
+            "attributes": [
+              {
+                "name": "planogram_slot_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "store_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "merchandising.store.store_id"
+              }
+            ]
+          },
+          {
+            "name": "supplier",
+            "primary_key": "supplier_id",
+            "attributes": [
+              {
+                "name": "supplier_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "supplier_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "supplier_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "supplier_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "supplier_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "supplier_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "supplier_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "supplier_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "supplier_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "supplier_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "supplier_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "supplier_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "supplier_field_11",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          },
+          {
+            "name": "category",
+            "primary_key": "category_id",
+            "attributes": [
+              {
+                "name": "category_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "category_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "category_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "category_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "category_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "category_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "category_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "category_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "category_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "category_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "category_field_9",
+                "data_type": "BOOLEAN"
+              }
+            ]
+          },
+          {
+            "name": "loyalty_member",
+            "primary_key": "loyalty_member_id",
+            "attributes": [
+              {
+                "name": "loyalty_member_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "loyalty_member_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "loyalty_member_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "loyalty_member_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "loyalty_member_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "loyalty_member_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "loyalty_member_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "loyalty_member_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "loyalty_member_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "loyalty_member_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "loyalty_member_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "loyalty_member_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "loyalty_member_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "loyalty_member_field_12",
+                "data_type": "TIMESTAMP"
+              }
+            ]
+          },
+          {
+            "name": "return_order",
+            "primary_key": "return_order_id",
+            "attributes": [
+              {
+                "name": "return_order_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "basket_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "merchandising.basket.basket_id"
+              },
+              {
+                "name": "return_order_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "return_order_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "return_order_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "return_order_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "return_order_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "return_order_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "return_order_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "return_order_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "return_order_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "return_order_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "return_order_field_10",
+                "data_type": "STRING"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "settlement",
+        "products": [
+          {
+            "name": "trade",
+            "primary_key": "trade_id",
+            "attributes": [
+              {
+                "name": "trade_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "trade_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "trade_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "trade_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "trade_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "trade_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "trade_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "trade_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "trade_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "trade_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "trade_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "trade_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "trade_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "trade_field_12",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "trade_field_13",
+                "data_type": "INT"
+              },
+              {
+                "name": "trade_field_14",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "trade_field_15",
+                "data_type": "STRING"
+              }
+            ]
+          },
+          {
+            "name": "position",
+            "primary_key": "position_id",
+            "attributes": [
+              {
+                "name": "position_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "trade_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "settlement.trade.trade_id"
+              },
+              {
+                "name": "position_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "position_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "position_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "position_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "position_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "position_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "position_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "position_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "position_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "position_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "position_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "position_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "position_field_12",
+                "data_type": "TIMESTAMP"
+              }
+            ]
+          },
+          {
+            "name": "custody_account",
+            "primary_key": "custody_account_id",
+            "attributes": [
+              {
+                "name": "custody_account_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "custody_account_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "custody_account_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "custody_account_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "custody_account_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "custody_account_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "custody_account_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "custody_account_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "custody_account_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "custody_account_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "custody_account_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "custody_account_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "custody_account_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "custody_account_field_12",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "custody_account_field_13",
+                "data_type": "INT"
+              }
+            ]
+          },
+          {
+            "name": "reconciliation",
+            "primary_key": "reconciliation_id",
+            "attributes": [
+              {
+                "name": "reconciliation_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "position_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "settlement.position.position_id"
+              },
+              {
+                "name": "reconciliation_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "reconciliation_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "reconciliation_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "reconciliation_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "reconciliation_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "reconciliation_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "reconciliation_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "reconciliation_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "reconciliation_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "reconciliation_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "reconciliation_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "reconciliation_field_11",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          },
+          {
+            "name": "ledger_entry",
+            "primary_key": "ledger_entry_id",
+            "attributes": [
+              {
+                "name": "ledger_entry_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "custody_account_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "settlement.custody_account.custody_account_id"
+              },
+              {
+                "name": "ledger_entry_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "ledger_entry_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "ledger_entry_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "ledger_entry_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "ledger_entry_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "ledger_entry_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "ledger_entry_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "ledger_entry_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "ledger_entry_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "ledger_entry_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "ledger_entry_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "ledger_entry_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "ledger_entry_field_12",
+                "data_type": "TIMESTAMP"
+              }
+            ]
+          },
+          {
+            "name": "counterparty",
+            "primary_key": "counterparty_id",
+            "attributes": [
+              {
+                "name": "counterparty_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "counterparty_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "counterparty_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "counterparty_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "counterparty_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "counterparty_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "counterparty_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "counterparty_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "counterparty_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "counterparty_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "counterparty_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "counterparty_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "counterparty_field_11",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          },
+          {
+            "name": "fee_schedule",
+            "primary_key": "fee_schedule_id",
+            "attributes": [
+              {
+                "name": "fee_schedule_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "fee_schedule_name",
+                "data_type": "STRING"
+              },
+              {
+                "name": "fee_schedule_status",
+                "data_type": "STRING"
+              }
+            ]
+          },
+          {
+            "name": "corporate_action",
+            "primary_key": "corporate_action_id",
+            "attributes": [
+              {
+                "name": "corporate_action_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              }
+            ]
+          },
+          {
+            "name": "instrument",
+            "primary_key": "instrument_id",
+            "attributes": [
+              {
+                "name": "instrument_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "instrument_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "instrument_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "instrument_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "instrument_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "instrument_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "instrument_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "instrument_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "instrument_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "instrument_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "instrument_field_9",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "instrument_field_10",
+                "data_type": "STRING"
+              },
+              {
+                "name": "instrument_field_11",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "instrument_field_12",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "instrument_field_13",
+                "data_type": "INT"
+              }
+            ]
+          },
+          {
+            "name": "margin_call",
+            "primary_key": "margin_call_id",
+            "attributes": [
+              {
+                "name": "margin_call_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "position_id",
+                "data_type": "BIGINT",
+                "foreign_key_to": "settlement.position.position_id"
+              },
+              {
+                "name": "margin_call_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "margin_call_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "margin_call_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "margin_call_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "margin_call_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "margin_call_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "margin_call_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "margin_call_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "margin_call_field_8",
+                "data_type": "INT"
+              },
+              {
+                "name": "margin_call_field_9",
+                "data_type": "BOOLEAN"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "partially",
+        "products": [
+          {
+            "name": "orphan_alpha",
+            "primary_key": "orphan_alpha_id",
+            "attributes": [
+              {
+                "name": "orphan_alpha_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "orphan_alpha_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "orphan_alpha_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "orphan_alpha_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "orphan_alpha_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "orphan_alpha_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "orphan_alpha_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "orphan_alpha_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "orphan_alpha_field_7",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "orphan_alpha_field_8",
+                "data_type": "INT"
+              }
+            ]
+          },
+          {
+            "name": "orphan_beta",
+            "primary_key": "orphan_beta_id",
+            "attributes": [
+              {
+                "name": "orphan_beta_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "orphan_beta_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "orphan_beta_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "orphan_beta_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "orphan_beta_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "orphan_beta_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "orphan_beta_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "orphan_beta_field_6",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "orphan_beta_field_7",
+                "data_type": "TIMESTAMP"
+              }
+            ]
+          },
+          {
+            "name": "orphan_gamma",
+            "primary_key": "orphan_gamma_id",
+            "attributes": [
+              {
+                "name": "orphan_gamma_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "orphan_gamma_name",
+                "data_type": "STRING"
+              },
+              {
+                "name": "orphan_gamma_status",
+                "data_type": "STRING"
+              }
+            ]
+          },
+          {
+            "name": "orphan_delta",
+            "primary_key": "orphan_delta_id",
+            "attributes": [
+              {
+                "name": "orphan_delta_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              }
+            ]
+          },
+          {
+            "name": "orphan_epsilon",
+            "primary_key": "orphan_epsilon_id",
+            "attributes": [
+              {
+                "name": "orphan_epsilon_id",
+                "data_type": "BIGINT",
+                "primary_key": true
+              },
+              {
+                "name": "orphan_epsilon_field_0",
+                "data_type": "STRING"
+              },
+              {
+                "name": "orphan_epsilon_field_1",
+                "data_type": "DECIMAL(18,2)"
+              },
+              {
+                "name": "orphan_epsilon_field_2",
+                "data_type": "TIMESTAMP"
+              },
+              {
+                "name": "orphan_epsilon_field_3",
+                "data_type": "INT"
+              },
+              {
+                "name": "orphan_epsilon_field_4",
+                "data_type": "BOOLEAN"
+              },
+              {
+                "name": "orphan_epsilon_field_5",
+                "data_type": "STRING"
+              },
+              {
+                "name": "orphan_epsilon_field_6",
+                "data_type": "DECIMAL(18,2)"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "metric_views": []
+  }
+}

@@ -204,13 +204,20 @@ def test_v065_new5_min_stem_length_4():
 
 
 def test_v065_new5_keeps_first_domain_owner():
-    """The pick-an-owner rule must keep the first (sorted) domain unchanged and
-    rename the rest — predictable, deterministic, industry-agnostic."""
+    """The pick-an-owner rule must be deterministic and industry-agnostic. As of
+    v3.6.0 (alias=p074-shared-canonical-keep) it prefers a shared/common SSOT
+    domain as the canonical owner when one is present (so the rename never
+    produces 'shared.shared_<x>', which the shared_domain_prefix rule flags as an
+    ERROR), and otherwise falls back to the first (sorted) domain unchanged —
+    preserving the original predictable behavior for the common case."""
     src = _agent_src()
     needle = "[P0.74-COLLISION-STEM FIRED]"
     idx = src.find(needle)
     pre = src[max(0, idx - 4000) : idx]
-    assert "_kept_dom = sorted(_by_dom.keys())[0]" in pre
+    # fallback owner is still the first sorted domain (original v0.6.5 intent)
+    assert "else sorted(_by_dom.keys())[0]" in pre
+    # but a shared/common SSOT domain is preferred as canonical owner when present
+    assert "_shared_doms_present[0] if _shared_doms_present" in pre
 
 
 def test_v065_new5_propagates_attribute_and_fk_updates():

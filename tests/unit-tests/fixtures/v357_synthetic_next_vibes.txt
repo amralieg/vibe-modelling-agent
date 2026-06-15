@@ -1,0 +1,14 @@
+SECTION 3 — PRIORITIZED ACTIONS
+3c. PRIORITIES
+- PRIORITY 1 — move_product: aftersales.nameplate — move to merchandising because nameplate is retail master data
+- PRIORITY 2 — move_product: aftersales.body_style — move to merchandising because body style is product catalog data
+- PRIORITY 3 — rename_product: aftersales.svc_appt — rename to service_appointment for clarity
+- PRIORITY 4 — rename_attribute: clinical_care.patient — rename column patient_field_0 to mrn
+- PRIORITY 5 — remove_fk: clinical_care.claim_clinical — remove FK on column claim_clinical_self_id (self reference)
+- PRIORITY 6 — connect_table: merchandising.planogram_slot — add column sku_id (BIGINT) with FK to merchandising.sku
+3a. STUBS
+- clinical_care.lab_result
+- aftersales.recall_notice
+3b. THIN
+- aftersales.service_part
+- settlement.fee_schedule

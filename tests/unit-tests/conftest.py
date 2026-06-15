@@ -4,6 +4,7 @@ Loads ALL code cells from agent/dbx_vibe_modelling_agent.ipynb (concatenated),
 not cell[1] only. Databricks runtime globals are stubbed; tests patch as needed.
 """
 import json
+import os
 import re
 import sys
 import types
@@ -19,10 +20,32 @@ if str(REPO_ROOT) not in sys.path:
 
 
 def _extract_source_from_notebook() -> str:
-    """Return concatenated source from every code cell in the agent notebook."""
-    tmp_src = Path("/tmp/agent_source.py")
-    if tmp_src.exists():
-        return tmp_src.read_text(encoding="utf-8")
+    """Return concatenated source from every code cell in the agent notebook.
+
+    The cache is honored ONLY when it is at least as new as the notebook on disk.
+    Root cause of a real audit hazard (2026-06-15): a stale /tmp/agent_source.py
+    (dumped days earlier at __AGENT_VERSION__ 3.5.8) silently shadowed the live
+    notebook, so every agent_helpers-based test ran against OLD source while the
+    working tree was 3.5.9 — a 'lying scoreboard' that lets tests pass against code
+    that no longer exists. The mtime guard makes the cache safe: if the notebook is
+    newer, the cache is ignored (and refreshed) so tests always reflect disk.
+
+    The cache path is WORKER-SCOPED (PYTEST_XDIST_WORKER). Root cause of a second
+    hazard (2026-06-15, v3.6.0): under `pytest -n 6`, all workers saw no cache,
+    parsed concurrently, then raced to write the SAME /tmp/agent_source.py with a
+    non-atomic write_text(); a worker reading mid-write got a truncated file →
+    exec failed → ~4 agent_helpers tests flaked (FAILED under -n, PASSED serial).
+    A per-worker cache file removes the shared-write race entirely while keeping
+    the within-worker reuse and the staleness guard. The write is also atomic
+    (temp + os.replace) so even a same-worker re-entry can never see a partial file.
+    """
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    tmp_src = Path("/tmp") / f"agent_source.{worker}.py"
+    if tmp_src.exists() and tmp_src.stat().st_mtime >= NOTEBOOK_PATH.stat().st_mtime:
+        try:
+            return tmp_src.read_text(encoding="utf-8")
+        except Exception:
+            pass  # corrupt/partial cache — fall through and re-extract
 
     nb = json.loads(NOTEBOOK_PATH.read_text(encoding="utf-8"))
     parts = []
@@ -36,7 +59,16 @@ def _extract_source_from_notebook() -> str:
             parts.append(src)
     if not parts:
         raise RuntimeError("No code cells found in agent notebook")
-    return "\n\n".join(parts)
+    concat = "\n\n".join(parts)
+    # Refresh the (worker-scoped) cache atomically so its mtime is newer than the
+    # notebook and a same-worker re-entry reuses it without ever seeing a partial.
+    try:
+        tmp_partial = tmp_src.with_suffix(f".py.{os.getpid()}.tmp")
+        tmp_partial.write_text(concat, encoding="utf-8")
+        os.replace(str(tmp_partial), str(tmp_src))
+    except Exception:
+        pass
+    return concat
 
 
 def _build_agent_helpers_module():
