@@ -81,6 +81,17 @@ class _FakeAIAgent:
             raise RuntimeError("no more scripted responses")
         return self.scripted_responses.pop(0)
 
+    # v3.6.5 routing: when SelfFixer.llm_endpoint is unresolved (None) — the case in this
+    # isolated test namespace (no live workspace) — _call_opus routes to the proven main
+    # Spark LLM path _call_ai_query instead of POSTing to /serving-endpoints/None. The mock
+    # must mirror production by exposing BOTH paths, both draining the same scripted queue,
+    # so tests are agnostic to which path the routing selects.
+    def _call_ai_query(self, *, prompt_name, prompt, response_schema, step_name, max_retries=1):
+        self.calls.append({"model": "ai_query", "prompt_preview": prompt[:200], "step_name": step_name})
+        if not self.scripted_responses:
+            raise RuntimeError("no more scripted responses")
+        return self.scripted_responses.pop(0)
+
 
 def _build_selffixer_namespace():
     """Execute the SelfFixer cell in an isolated namespace and return it."""
