@@ -88,11 +88,15 @@ def _bind_verify_deterministic():
     import collections
     ns = {"re": re, "json": json, "defaultdict": collections.defaultdict, "collections": collections}
     exec(method, ns)
+    # v3.6.8 g3: _verify_deterministic now calls self._verify_bulk_coverage(...) first, so the
+    # isolation harness must bind that real method too or it AttributeErrors.
+    exec(_extract_method(src, "_verify_bulk_coverage"), ns)
 
     class Dummy:
         logger = _Logger()
 
     Dummy._verify_deterministic = ns["_verify_deterministic"]
+    Dummy._verify_bulk_coverage = ns["_verify_bulk_coverage"]
     return Dummy()
 
 

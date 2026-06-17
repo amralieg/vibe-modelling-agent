@@ -222,9 +222,22 @@ def _exec_verifier():
     return ns["_verify_deterministic"]
 
 
+def _make_verifier_self():
+    """fake self with the REAL _verify_bulk_coverage bound. v3.6.8 g3 made
+    _verify_deterministic call self._verify_bulk_coverage(...) first, so any isolation
+    harness for _verify_deterministic must provide that method or it AttributeErrors."""
+    import json as _json
+    fn_src = _slice_method_source("_verify_bulk_coverage")
+    ns = {"re": re, "defaultdict": defaultdict, "json": _json}
+    exec(compile(fn_src, "<_verify_bulk_coverage>", "exec"), ns)
+    fs = SimpleNamespace(config={}, logger=_ListLogger())
+    fs._verify_bulk_coverage = ns["_verify_bulk_coverage"].__get__(fs)
+    return fs
+
+
 def test_verifier_rename_attribute_reports_fulfilled_when_new_name_present():
     verify = _exec_verifier()
-    fake_self = SimpleNamespace(config={}, logger=_ListLogger())
+    fake_self = _make_verifier_self()
     req = SimpleNamespace(
         id="VREQ-024",
         scope="attribute",
@@ -248,7 +261,7 @@ def test_verifier_rename_does_not_false_fulfill_when_new_name_absent():
     """Conservative: if the renamed-TO name is NOT present, the rename branch must
     NOT emit a fulfilled — it falls through to the existing (partial/failed) logic."""
     verify = _exec_verifier()
-    fake_self = SimpleNamespace(config={}, logger=_ListLogger())
+    fake_self = _make_verifier_self()
     req = SimpleNamespace(
         id="VREQ-024",
         scope="attribute",
