@@ -389,7 +389,18 @@ def _llm_user_prompt(text, v1_domains, v1_products):
         "Rules: resolve every `product` to an existing v1 product token when the document "
         "refers to one; if a requirement names a brand-new table not in v1, use add_entity. "
         "Do NOT emit a requirement that merely says 'preserve/keep existing tables' (those "
-        "are handled separately). Extract EVERYTHING else exhaustively.\n\n"
+        "are handled separately).\n"
+        "CRITICAL — observations are NOT requirements: the document includes DIAGNOSTIC "
+        "listings that merely REPORT what an analyzer detected (e.g. a 'Cross-domain SSOT "
+        "duplicates' section listing pairs like \"'a.x' vs 'b.x'\", counts like 'siloed "
+        "tables: 5', or inventory tables of findings). These are context, NOT directives. "
+        "Do NOT emit any VReq (no move_product, no remove_fk, nothing) from a bare "
+        "'X vs Y' duplicate-observation line or any detection-count line. Only emit a VReq "
+        "when the document gives an IMPERATIVE instruction to change the model — typically a "
+        "numbered PRIORITY (P1, P2, ...) or an explicit 'add/rename/connect/move/remove/"
+        "expand/make/tag' sentence. If a duplicate pair is genuinely actioned, it will have "
+        "its own PRIORITY line; extract THAT, not the observation.\n"
+        "Extract EVERYTHING that is an actual instruction, exhaustively.\n\n"
         "=== NEXT_VIBES DOCUMENT START ===\n"
         f"{text[:120000]}\n"
         "=== NEXT_VIBES DOCUMENT END ===")
@@ -426,6 +437,12 @@ def _normalize_vreqs(raw_vreqs, idprefix="LLM"):
             vr["new_col"] = norm(v.get("new_col"))
         elif a == "move_product":
             vr["new_domain"] = norm(v.get("new_domain"))
+            # Defensive: a move_product with no target domain is a malformed extraction —
+            # almost always a misread 'X vs Y' SSOT-duplicate OBSERVATION line (not a real
+            # move directive). Dropping it prevents the denominator from being inflated with
+            # non-requirements (which would understate true adherence).
+            if not vr["new_domain"]:
+                continue
         elif a == "remove_fk":
             vr["column"] = norm(v.get("column"))
         elif a == "rename_product":
@@ -487,13 +504,22 @@ def _gap_user_prompt(text, v1_domains, v1_products, have):
         "add_entity/expand_stub/expand_thin; each with required fields + verbatim + "
         "interpretation). Return JSON {\"vreqs\":[...]} containing ONLY requirements "
         "present in the document but ABSENT from the already-extracted list. If none are "
-        "missing, return {\"vreqs\":[]}.\n\n"
+        "missing, return {\"vreqs\":[]}.\n"
+        "Do NOT emit VReqs from diagnostic OBSERVATION lines (e.g. a 'Cross-domain SSOT "
+        "duplicates' list of \"'a.x' vs 'b.x'\" pairs, or detection counts) — those are "
+        "context, not directives. Only actual imperative instructions / numbered "
+        "PRIORITIES count.\n\n"
         "=== NEXT_VIBES DOCUMENT START ===\n" + text[:120000] +
         "\n=== NEXT_VIBES DOCUMENT END ===")
 
 
 def llm_extract_vreqs(text, v1_domains, v1_products, profile, endpoint,
-                      retries=3, gap_passes=1):
+                      retries=3, gap_passes=2, base_passes=2):
+    # Multiple independent base extractions unioned: the LLM is non-deterministic about
+    # WHICH atomic VReqs it surfaces in one pass, so a single pass under-counts. Unioning
+    # 2+ passes (then gap passes) converges on the true VReq set, making the ground-truth
+    # denominator stable + comparable across model versions (so 'improving vs previous' is
+    # a fair same-denominator comparison, not extraction noise).
     base = None
     for _ in range(retries):
         raw = _llm_invoke(profile, endpoint, _LLM_SYS,
@@ -506,6 +532,21 @@ def llm_extract_vreqs(text, v1_domains, v1_products, profile, endpoint,
         return None
     seen = {_vreq_key(v) for v in base}
     nid = len(base)
+    # additional union base passes
+    for _ in range(max(0, base_passes - 1)):
+        raw = _llm_invoke(profile, endpoint, _LLM_SYS,
+                          _llm_user_prompt(text, v1_domains, v1_products))
+        d = _extract_json(raw)
+        if not d or not d.get("vreqs"):
+            continue
+        for v in _normalize_vreqs(d["vreqs"], idprefix="U"):
+            k = _vreq_key(v)
+            if k in seen:
+                continue
+            seen.add(k)
+            nid += 1
+            v["id"] = f"LLM-{nid}"
+            base.append(v)
     for _ in range(gap_passes):
         raw = _llm_invoke(profile, endpoint, _GAP_SYS,
                           _gap_user_prompt(text, v1_domains, v1_products, base))
@@ -675,12 +716,15 @@ def parse_agent_selfscore(log_text):
     return out
 
 
-def extract_vreqs_for(ind, profile=None, endpoint=None):
+def extract_vreqs_for(ind, profile=None, endpoint=None, refresh=False):
     """Pure-LLM VReq set for an industry: deterministic SEC1 preserve (from v1 model)
-    + exhaustive LLM improvement extraction (retry + gap pass, NO regex)."""
-    vibe = open(os.path.join(VIBES, ind, "next_vibes.txt"), errors="ignore").read()
+    + exhaustive LLM improvement extraction (multi-pass union + gap passes, NO regex,
+    NO cache — extracted fresh every audit). The denominator is EVERY requirement the
+    user's vibe states; the score = fulfilled / ALL, i.e. did v2 adhere to 100% of the
+    user's vibes."""
     v1 = load_model(os.path.join(VIBES, ind, "model.json"))
     v1_domains, v1_products = v1_structure(v1)
+    vibe = open(os.path.join(VIBES, ind, "next_vibes.txt"), errors="ignore").read()
     vreqs = [{"id": f"PRES-{p}", "source": "SEC1", "action": "preserve", "target": p}
              for p in sorted(v1_products)]
     imp = llm_extract_vreqs(vibe, v1_domains, v1_products,
@@ -724,12 +768,13 @@ def _merge_xscope(ecm_results, mvm_results):
 
 
 def audit_industry(ind, use_llm=True, profile=None, endpoint=None,
-                   v2_path=None, prior_model=None, log_text=None, mvm_model=None):
+                   v2_path=None, prior_model=None, log_text=None, mvm_model=None,
+                   refresh=False):
     v2_path = v2_path or os.path.join(V2REPO, ind, "v2", "ecm", "model.json")
     v2ecm = load_model(v2_path)
     if not v2ecm:
         return None
-    vreqs, v1_products = extract_vreqs_for(ind, profile, endpoint)
+    vreqs, v1_products = extract_vreqs_for(ind, profile, endpoint, refresh=refresh)
     results, summary = score_against_model(vreqs, v2ecm, v1_products)
 
     out = {"industry": ind, "extraction_mode": "llm", "v2_path": v2_path,
@@ -815,15 +860,18 @@ def build_lineage(audit):
     return out
 
 
-def main(industries, use_llm=False, profile=None, endpoint=None, out_dir=None):
+def main(industries, use_llm=False, profile=None, endpoint=None, out_dir=None,
+         refresh=False):
     out = out_dir or OUT
     os.makedirs(out, exist_ok=True)
     agg = {"per_industry": [], "totals": {}}
     tot = ful = 0
-    print(f"{'industry':<20}{'ALL':>8}{'ful':>6}{'adher%':>8}   {'impr':>5}{'impr%':>7}")
+    print(f"{'industry':<20}{'ALL':>8}{'ful':>6}{'adher%':>8}   {'impr':>5}{'impr%':>7}  {'xscope%':>8}")
     for ind in industries:
         try:
-            a = audit_industry(ind, use_llm=True, profile=profile, endpoint=endpoint)
+            mvm = load_model(os.path.join(V2REPO, ind, "v2", "mvm", "model.json"))
+            a = audit_industry(ind, use_llm=True, profile=profile, endpoint=endpoint,
+                               mvm_model=mvm, refresh=refresh)
         except Exception as e:
             print(f"{ind:<20}  LLM-EXTRACT FAILED: {str(e)[:80]}")
             continue
@@ -837,8 +885,10 @@ def main(industries, use_llm=False, profile=None, endpoint=None, out_dir=None):
              "improvement_total", "improvement_fulfilled", "improvement_adherence",
              "extraction_mode")})
         tot += a["total_vreqs"]; ful += a["fulfilled"]
+        xs = a.get("xscope_adherence_all")
         print(f"{ind:<20}{a['total_vreqs']:>8}{a['fulfilled']:>6}{a['adherence_all']:>8}"
-              f"   {a['improvement_total']:>5}{a['improvement_adherence']:>7}  [{a['extraction_mode']}]")
+              f"   {a['improvement_total']:>5}{a['improvement_adherence']:>7}  "
+              f"{(xs if xs is not None else a['adherence_all']):>8}  [{a['extraction_mode']}]")
     agg["totals"] = {"total_vreqs": tot, "fulfilled": ful,
                      "adherence_all": round(100.0 * ful / tot, 1) if tot else 0.0,
                      "extraction_mode": "llm"}
@@ -849,12 +899,15 @@ def main(industries, use_llm=False, profile=None, endpoint=None, out_dir=None):
 if __name__ == "__main__":
     args = sys.argv[1:]
     use_llm = "--llm" in args
+    refresh = "--refresh" in args
     profile = endpoint = out_dir = None
     inds = []
     i = 0
     while i < len(args):
         a = args[i]
         if a == "--llm":
+            i += 1
+        elif a == "--refresh":
             i += 1
         elif a == "--profile":
             profile = args[i + 1]; i += 2
@@ -868,4 +921,5 @@ if __name__ == "__main__":
         inds = ["automotive", "construction", "consumer_goods", "health_insurance",
                 "healthcare", "manufacturing", "ngo", "restaurants", "retail",
                 "semiconductors", "travel_hospitality", "water_utilities"]
-    main(inds, use_llm=use_llm, profile=profile, endpoint=endpoint, out_dir=out_dir)
+    main(inds, use_llm=use_llm, profile=profile, endpoint=endpoint, out_dir=out_dir,
+         refresh=refresh)

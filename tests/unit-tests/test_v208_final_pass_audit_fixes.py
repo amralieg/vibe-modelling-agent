@@ -101,10 +101,18 @@ def test_linking_respects_applied_seeds_user_vibed_artifacts(src):
 
 
 def test_review_finalize_skip_autofix_gates_three_call_sites(src):
-    """Three call sites of _pre_static_analysis_autofix must be gated by _vov_*skip_autofix."""
-    assert "0 if _vov_review_skip_autofix else _pre_static_analysis_autofix" in src
-    assert "0 if _vov_qa_skip_autofix else _pre_static_analysis_autofix" in src
-    assert "0 if _vov_finalize_skip_autofix else _pre_static_analysis_autofix" in src
+    """v3.5.9 (alias=vov-run-autofix-default): the three VOV autofix sites now run the
+    pre-SA autofix BY DEFAULT (the v2.0.8 unconditional skip was the root cause of the
+    restaurants v2 'model got worse' — 500 SA warnings shipped because the autofix was
+    disabled on the VOV path). They run via _autofix_with_monotonic_guard (which reverts
+    if SA gets strictly worse) and are gated only by the explicit SKIP_POST_VOV_AUTOFIX
+    opt-out, not skipped by default."""
+    assert "0 if _vov_review_skip_autofix else _autofix_with_monotonic_guard" in src
+    assert "0 if _vov_qa_skip_autofix else _autofix_with_monotonic_guard" in src
+    assert "0 if _vov_finalize_skip_autofix else _autofix_with_monotonic_guard" in src
+    # the skip flags default to RUNNING; only an explicit opt-out disables the autofix
+    assert "SKIP_POST_VOV_AUTOFIX" in src
+    assert "vov-run-autofix-default" in src
 
 
 def test_synth_model_snapshot_injects_digest(src):
