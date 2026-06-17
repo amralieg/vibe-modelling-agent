@@ -1226,3 +1226,56 @@ After every pulse-monitored run terminates:
 2. For each pulse, ask: **"Was anything I said inconsistent with what I knew at the time?"**
 3. If YES, surface this in the post-run report under `[PULSE-DISCIPLINE FAILURE]` with the specific pulse number + the misleading claim + the truth I should have said.
 4. Honesty score (§6) MUST be deducted by 25 points for each pulse that violated §11.3 or §11.5, regardless of run outcome.
+
+---
+
+## 12. STRUCTURED QUALITY-GATE CATALOG (QGATE) — the honest scoreboard (added 2026-06-17)
+
+Added after the ncdot base-MVM "lying scoreboard" incident: the agent reported high adherence while the model degraded, because the VREQ verifier scored governance/tagging VREQs off a LOSSY snapshot (attribute tags/subdomain/division/descriptions omitted). It false-FAILED glossary/subdomain VREQs that were PHYSICALLY present (vibe_ncdot_basemvm: 3031 glossary + 7 subdomain tags). This section is the permanent contract for structured quality.
+
+### 12.1 The four-layer anti-lying architecture
+
+1. **Deterministic gates** (`run_metamodel_static_analysis`) read the REAL model dict, so a gate verdict cannot false-negative or false-positive. 66 categories today.
+2. **Agentic-loop wiring** (`_v366_sa_findings_requeue` `_fixable` whitelist) — every gate category is requeued to the SelfFixer closed loop so a discovered gap is REPAIRED, not merely reported. Curated completeness categories (descriptions/tags/types) requeue even at info severity.
+3. **Authoritative verifier override** (`VibeOrchestrator._verify_bulk_coverage`, alias `verifier-bulk-coverage-authoritative`) — for glossary/subdomain/division coverage VREQs, the deterministic dict verdict runs FIRST in `_verify_deterministic` and OVERRIDES the LLM verdict. Conservative thresholds: coverage >=0.9 fulfilled, ==0 failed, else partial. rename/drop and non-coverage VREQs are deferred (no hijack).
+4. **Physical ground-truth parity** (existing `gt-tag-enrich`/`gt-mv-enrich`/`gt-tag-verify`/`gt-mv-verify`) — post-build, query `information_schema.column_tags`, `information_schema.columns`, and the `_metrics` schema; verify tag/type/MV VREQs against the live catalog. This is the ultimate anti-lying check. DO NOT build a second physical-parity system — extend these.
+
+The deterministic quality score (`_compute_deterministic_confidence_and_status`) is computed from ALL severity issues and is AUTHORITATIVE over the LLM self-score. Every new gate feeds it automatically.
+
+### 12.2 The gate catalog (enforce ALL; add more whenever a new failure class appears)
+
+**Keys & relationships**
+- Every table has a PK (`missing_pk`, `pk_attribute_missing`).
+- Every FK resolves to an existing target PK (`broken_fk`, `pk_mismatch`, `fk_target_missing`, `unlinked_fk`, `invalid_fk_domain_refs`).
+- FK column type == target PK type (`fk_pk_type_mismatch`) — MEDIUM weight (join hazard).
+- No FK cycles (`fk_cycle`), no self-FK on a PK (`self_fk_on_pk`, `self_referencing_fk`), no direct bidirectional links.
+- No siloed tables (`siloed_table`, `silo_product`); FK density / over-hubby cap (`fk_density_over_hubby`).
+- Multi-FK label completeness; FK namespace/format/naming (`multi_fk_missing_label`, `fk_namespace_mismatch`, `fk_format_invalid`, `fk_column_naming`, `fk_name_target_mismatch`).
+
+**Governance / tagging**
+- Glossary-term tag on every business attribute when a glossary is in use (`missing_glossary_tag`).
+- PII/sensitivity tag on every person-pattern attribute (`pii_tagging_missing`).
+- Division tag on every domain (`missing_division_tag`).
+- Division within the canonical set + balance (`invalid_division`, `division_imbalance`).
+- Subdomain tag on every table (`missing_subdomain_tag`); subdomain SSOT collisions (`subdomain_ssot_collision`).
+- Generic tag presence (`missing_tags`).
+
+**Descriptions**
+- Domain/table/attribute descriptions present (`missing_domain_description`, `missing_product_description`, `missing_attribute_description`).
+- Non-placeholder, non-echo, >=10 chars (`low_quality_description`); no banned boilerplate (`banned_boilerplate_in_output`).
+
+**Types**
+- Type present & valid (`missing_data_type`, `invalid_data_type`); PK datatype consistency (`pk_datatype_inconsistency`, `datatype_mismatch`); well-known-column type sanity.
+
+**Structure / naming / dedup**
+- snake_case for domain/table/attribute; PK naming convention; no product-prefix on attribute.
+- Duplicate names/attributes/product-pairs; cross-domain SSOT duplicate (`cross_domain_duplicate`); denormalized natural keys (`denormalized_natural_key`).
+- Domain bloat caps; empty/orphaned domains; too-few-attributes; missing table/db names.
+
+### 12.3 Canonical division taxonomy — EXACTLY 3 (HARD)
+
+Every domain MUST be classified into EXACTLY ONE of three canonical divisions: **`operations`, `business`, `corporate`**. No other value is allowed. Legacy synonyms (`supporting`, `support`, `back_office`, `backoffice`) fold to `corporate`. Balance rule (DOM-RUL-001): Operations + Business >= 80% of domains; Corporate <= 20%. No early corporate (DOM-RUL-003): no corporate domains until Operations >= 2 and Business >= 2. The taxonomy lives in `get_division_taxonomy`; prompts, normalizer, and gates all read it (never hardcode the set elsewhere).
+
+### 12.4 Adding new gates (the standing instruction)
+
+Whenever a production run surfaces a new structural/governance defect class: (1) add a deterministic gate in `run_metamodel_static_analysis` reading the real dict; (2) add its category to the `_fixable` whitelist so it self-repairs; (3) if it is a coverage VREQ class, extend `_verify_bulk_coverage` so the scoreboard is authoritative; (4) add the rule to both `rules/vibe-data-modelling-rules*.csv` under the `Quality Gate` group; (5) add a fail-pre/pass-post behavioral test (§8.10). "Add AS MANY static structure checks AS POSSIBLE" is a standing directive, not a one-time task.

@@ -261,3 +261,24 @@ def test_g3_does_not_hijack_non_coverage_vreq():
     v = fn(_FakeSelf(), _Req("Add a column order_total to finance.invoice"),
            [], [], [])
     assert v is None
+
+
+# --------------------------------------------------------------------------- #
+# g6 — fk_pk_type_mismatch is weighted MEDIUM in the deterministic score
+# g5 — canonical 3-division fold shipped
+# (closure-internal constants; source-grep smoke per §8.10 alongside g1/g2/g3 behavior)
+# --------------------------------------------------------------------------- #
+def test_g6_fk_pk_type_mismatch_weighted_medium():
+    src = notebook_concat_source()
+    assert "qgate-score-weight" in src
+    # the MEDIUM weight set line must now contain fk_pk_type_mismatch
+    assert "_MEDIUM_WEIGHT_CATS = {" in src
+    medium_line = next(l for l in src.splitlines() if "_MEDIUM_WEIGHT_CATS = {" in l)
+    assert "fk_pk_type_mismatch" in medium_line
+
+
+def test_g5_division_canonical_fold_present():
+    src = notebook_concat_source()
+    assert "division-canonical-3" in src
+    # the gate folds legacy 'supporting' into 'corporate'
+    assert "supporting" in src and "corporate" in src
