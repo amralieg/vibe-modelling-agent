@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vov_v2_marathon as M
 
-AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v362"
+AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v368"
 BUDGET_S = 54000          # 15h user-directive agent budget -> runtime_budget_seconds
 JOB_TIMEOUT_S = 57600     # 16h job ceiling (15h agent + 1h teardown margin)
 LOCAL_STAGE = "/tmp/basemvm"
@@ -79,7 +79,7 @@ def build_spec(ind, profile, vibe_path, desc, domains):
     if domains:
         params["business_domains"] = domains
     return {
-        "name": f"dbx_vibe_basemvm_{ind}_v362",
+        "name": f"dbx_vibe_basemvm_{ind}_v368",
         "timeout_seconds": JOB_TIMEOUT_S,
         "max_concurrent_runs": 1,
         "tasks": [{
@@ -164,7 +164,7 @@ def run_case(case):
 
 def main():
     Path(os.path.dirname(M.PULSE_FILE)).mkdir(parents=True, exist_ok=True)
-    M.pulse(f"=== BASEMVM PROOF START v362 cases={[c['ind'] for c in CASES]} ===")
+    M.pulse(f"=== BASEMVM PROOF START v368 cases={[c['ind'] for c in CASES]} ===")
     threads = []
     for c in CASES:
         t = threading.Thread(target=run_case, args=(c,), name=c["ind"], daemon=False)
