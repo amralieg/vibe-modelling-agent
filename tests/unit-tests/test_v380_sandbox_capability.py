@@ -100,5 +100,80 @@ def test_forbidden_runtime_names_present(gate):
     for n in ("spark", "sc", "sqlContext", "dbutils", "SparkSession", "SparkContext"):
         assert n in frn
     fmn = gate["FORBIDDEN_MODULE_NAMES"]
-    for n in ("pyspark", "boto3", "requests", "pandas", "numpy", "delta"):
+    for n in ("pyspark", "boto3", "requests", "pandas", "numpy", "delta",
+              "tarfile", "zipfile", "glob", "mmap", "resource"):
         assert n in fmn
+
+
+# --------------------------------------------------------------------------
+# v3.8.0 /sandbox dump (4A) + real end-to-end sandbox execution
+# --------------------------------------------------------------------------
+
+def _load_full_sandbox_namespace():
+    import subprocess, tempfile, os, sys, resource, copy, ast as _ast, json as _json, re as _re, threading
+    from dataclasses import dataclass
+    from typing import Optional
+    nb = json.load(open(NB))
+    big = ""
+    for c in nb["cells"]:
+        if c.get("cell_type") != "code":
+            continue
+        src = "".join(c.get("source", []))
+        if "ALLOWED_AST_NODES = frozenset" in src and "def execute_in_sandbox" in src:
+            big = src
+            break
+    assert big
+    start = big.index("ALLOWED_AST_NODES = frozenset")
+    end = big.index("# ----- inlined from agent/vov_2_0/invariants.py -----")
+    snippet = big[start:end]
+    ns = {
+        "ast": _ast, "json": _json, "os": os, "sys": sys, "subprocess": subprocess,
+        "tempfile": tempfile, "resource": resource, "copy": copy, "re": _re,
+        "threading": threading, "dataclass": dataclass, "Optional": Optional, "logger": None,
+    }
+    exec(compile(snippet, "<sandbox>", "exec"), ns)
+    return ns
+
+
+@pytest.fixture(scope="module")
+def sb():
+    return _load_full_sandbox_namespace()
+
+
+def test_sandbox_wrapper_and_impl_split(sb):
+    assert "execute_in_sandbox" in sb
+    assert "_execute_in_sandbox_impl" in sb
+    assert "_emit_sandbox_dump" in sb
+    assert sb.get("_SANDBOX_DUMP_SINK") is None  # default no-op
+
+
+def test_sandbox_executes_and_dumps_with_status(sb):
+    captured = []
+    sb["_SANDBOX_DUMP_SINK"] = lambda label, m, v, info: captured.append((label, m, v, info))
+    mut = "def mutator(model):\n    model['x'] = 1\n    return model\n"
+    res = sb["execute_in_sandbox"](mut, "", {"x": 0}, label="unit-tag-all")
+    assert res.ok is True
+    assert res.new_model.get("x") == 1
+    assert len(captured) == 1
+    label, m, v, info = captured[0]
+    assert label == "unit-tag-all"
+    assert m == mut            # RAW LLM source preserved for audit
+    assert info["ok"] is True
+
+
+def test_sandbox_dump_fires_even_on_unsafe_reject(sb):
+    captured = []
+    sb["_SANDBOX_DUMP_SINK"] = lambda label, m, v, info: captured.append((label, m, v, info))
+    # references dbutils -> validate_ast rejects -> impl returns ok=False -> dump STILL fires
+    mut = "def mutator(model):\n    dbutils.fs.rm('/x')\n    return model\n"
+    res = sb["execute_in_sandbox"](mut, "", {"x": 0}, label="unit-bad")
+    assert res.ok is False
+    assert len(captured) == 1
+    assert captured[0][3]["ok"] is False
+
+
+def test_sandbox_no_sink_no_crash(sb):
+    sb["_SANDBOX_DUMP_SINK"] = None
+    mut = "def mutator(model):\n    model['y'] = 2\n    return model\n"
+    res = sb["execute_in_sandbox"](mut, "", {"y": 0}, label="nosink")
+    assert res.ok is True and res.new_model.get("y") == 2
