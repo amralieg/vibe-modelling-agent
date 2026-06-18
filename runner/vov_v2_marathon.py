@@ -150,7 +150,11 @@ def cat_name(ind):
 
 
 def vol_base(ind):
-    return f"/Volumes/{cat_name(ind)}/_staging/src"
+    # stage inputs INSIDE the agent's own _metamodel/vol_root volume (a folder),
+    # never a separate _staging database (user directive 2026-06-18). The agent
+    # creates _metamodel/vol_root with CREATE ... IF NOT EXISTS, so pre-creating
+    # them here and reusing is safe; the staged file survives the agent run.
+    return f"/Volumes/{cat_name(ind)}/_metamodel/vol_root/_input"
 
 
 def _try(args, profile, ok_substrings=(), timeout=180):
@@ -236,8 +240,10 @@ def prepare_catalog(profile, ind):
                 break
         if not created:
             raise RuntimeError(f"[{ind}] could not create catalog on {profile}: {last}")
-    sql_exec(profile, f"CREATE SCHEMA IF NOT EXISTS `{cat}`.`_staging`")
-    sql_exec(profile, f"CREATE VOLUME IF NOT EXISTS `{cat}`.`_staging`.`src`")
+    # reuse the agent's own meta schema/volume; do NOT create a separate _staging
+    # database (user directive 2026-06-18). The agent re-uses these via IF NOT EXISTS.
+    sql_exec(profile, f"CREATE SCHEMA IF NOT EXISTS `{cat}`.`_metamodel`")
+    sql_exec(profile, f"CREATE VOLUME IF NOT EXISTS `{cat}`.`_metamodel`.`vol_root`")
 
 
 def stage_files(profile, ind):

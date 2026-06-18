@@ -50,7 +50,7 @@ CASES = [
 
 
 def stage_vibe(profile, ind):
-    base = M.vol_base(ind)  # /Volumes/vibe_<ind>_basemvm/_staging/src
+    base = M.vol_base(ind)  # /Volumes/vibe_<ind>_basemvm/_metamodel/vol_root/_input
     M._try(["fs", "mkdir", f"dbfs:{base}"], profile, ("already exists",))
     src = f"{LOCAL_STAGE}/{ind}/model_vibes.txt"
     dst = f"dbfs:{base}/model_vibes.txt"
