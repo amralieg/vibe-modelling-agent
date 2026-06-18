@@ -22,9 +22,13 @@ cd /Users/amr.ali/Documents/projects/vibe-modelling-agent/runner
 python3 vov_v2_marathon.py --dry-run
 # 0e. Launch the marathon (backgrounded, survives your turn):
 nohup python3 vov_v2_marathon.py > ~/claude/vibe-agent/vov2_console.log 2>&1 &
-# 0f. Watch (§6) and pulse every 30 min (§9). On each industry terminal, audit (§7-8) and
-#     publish v2 to the fork (§10).
+# 0f. Watch (§6) and pulse every 30 min (§9). On each industry terminal: audit (§7-8), run the
+#     structural-quality + improvement gate (§8.3), and ONLY publish v2 if it passes (§10, §12).
 ```
+
+> Read **§1A PRIME DIRECTIVES** first. The five rules (VOV must improve the model; adherence is
+> against the WHOLE vibe so 45 applied of 100 = 45% not 90%; every fix is generic; any hang/critical
+> → generic fix → relaunch; run in background + 30-min pulse) outrank everything else here.
 
 ---
 
@@ -47,6 +51,58 @@ nohup python3 vov_v2_marathon.py > ~/claude/vibe-agent/vov2_console.log 2>&1 &
 
 ---
 
+## 1A. PRIME DIRECTIVES — read before every action (NON-NEGOTIABLE)
+
+These five rules outrank everything else in this prompt. If any other section seems to
+contradict them, these win.
+
+### PD-1 — VOV MUST IMPROVE THE MODEL. Always.
+v2 is a FAILURE if it is not strictly better than v1. Terminal SUCCESS is necessary but NOT
+sufficient. Before publishing any v2 you MUST prove improvement with the structural gate:
+```bash
+python3 runner/vov_structural_audit.py \
+  --v1 /tmp/vov_stage/<ind>/model/model.json \
+  --v2 /tmp/vov_out/<ind>/v2/ecm/model.json
+# exit 0 = PASS (no structural regression). exit 1 = v2 regressed -> DO NOT PUBLISH; RCA + fix + relaunch.
+```
+v2 must NOT add empty/thin/skeleton products or domains vs v1, must NOT lose attributes on net,
+and must NOT drop structural integrity (cycles/silos/FK density). A v2 that "ran clean" but is
+flatter, thinner, or more stubbed than v1 is a regression — treat it as a FAILED run (PD-4).
+
+### PD-2 — ADHERENCE IS MEASURED AGAINST THE *WHOLE* VIBE, NOT WHAT THE AGENT EXTRACTED.
+The denominator is EVERY VReq present in `next_vibes.txt` — including the ones the agent never
+extracted. Worked example the agent MUST internalize:
+> A vibe contains **100** VReqs. The agent extracts **50** and applies **45**.
+> Adherence = 45 / 100 = **45%**.  NOT 45/50 = 90%.
+
+Extraction completeness is HALF the score. A VReq the agent never noticed is a MISS, identical to
+one it noticed and dropped. The agent self-scoreboard (§8.1) divides by what it extracted and so
+LIES; always gate on the ground-truth audit (§8.2) whose denominator is the full parsed VReq set.
+**Target = 100% verified adherence; HARD FLOOR = 90%.** A "Max retries exhausted, proceeding"
+soft-accept is NOT applied and scores 0 for that VReq.
+
+### PD-3 — EVERY FIX IS GENERIC. NEVER INDUSTRY-SPECIFIC.
+No fix, patch, prompt tweak, threshold, blacklist, or workaround may reference or special-case any
+industry (automotive, healthcare, ncdot, banking, …). Every root cause is solved from the vibe /
+runtime / catalog / model structure so the SAME fix improves all 41 industries. If a fix only helps
+one industry it is wrong — find the generic root cause (CLAUDE.md §3, §8.5). Grep your diff for
+industry names before committing; a hit is a defect.
+
+### PD-4 — ANY HANG OR CRITICAL ISSUE -> GENERIC FIX -> RELAUNCH FROM SCRATCH.
+If an industry hangs (teardown hang past cap with no artifact), trips any §10.6 hard signature,
+fails the PD-1 improvement gate, or scores < 90% ground-truth: do NOT accept it. RCA the root cause,
+apply a GENERIC fix (PD-3), bump the single-digit semver, redeploy to all 5 workspaces, DROP that
+industry's catalog, and re-run it FROM SCRATCH (no chaining). Loop until green (§12). Never publish
+a hung / critical / regressed industry.
+
+### PD-5 — RUN IN BACKGROUND. PULSE EVERY 30 MINUTES. NEVER GO SILENT.
+The marathon runs as a backgrounded process (§5) plus a background reconcile tick (§6.3). Post a §9
+pulse every 30 minutes covering all industries until every one is green or genuinely unrecoverable.
+Use background shells, never Cursor `Monitor` (needs approvals, stalls the loop). Follow CLAUDE.md
+§11 pulse discipline — no "looking good" without evidence; soft-accepts are RED.
+
+---
+
 ## 2. Repos, branches, and key paths
 
 | Thing | Location |
@@ -58,6 +114,7 @@ nohup python3 vov_v2_marathon.py > ~/claude/vibe-agent/vov2_console.log 2>&1 &
 | Orchestrator | `runner/vov_v2_marathon.py` (THE driver — reuse it, do not reinvent) |
 | Self-scoreboard audit | `runner/vov_audit_extract.py` |
 | Ground-truth (honest) audit | `runner/vov_groundtruth_audit.py` |
+| Structural-quality auditor + improvement gate | `runner/vov_structural_audit.py` (empty/thin domains & products, wrong types, untagged PII, v1→v2 improvement gate — §8.3) |
 | Repo-sync helper | `runner/sync_to_repo.py` (retarget to the fork — see §10) |
 | Pulse log | `~/claude/vibe-agent/vov2_pulses.txt` |
 | State file | `~/claude/vibe-agent/vov2_state.json` |
@@ -259,8 +316,30 @@ extracts 50 and applies 45, this reports **45%**, not 90%. VReq classes parsed:
 - SEC3B thin — listed products should be expanded vs v1.
 - SEC2 entities — reviewer-flagged required entities must exist.
 
-> The mission metric (CLAUDE.md) is **VERIFIED vibe adherence**. Use §8.2. Target ≥ 90% verified;
-> hard floor as defined by the user. A soft-accept is NOT applied.
+> The mission metric (CLAUDE.md) is **VERIFIED vibe adherence**, measured against the WHOLE vibe
+> (PD-2): adherence = fulfilled / ALL VReqs in next_vibes.txt, NOT / extracted. Target 100%,
+> HARD FLOOR 90%. A soft-accept is NOT applied (scores 0).
+
+### 8.3 Structural-quality pass + VOV-improvement gate (empty / thin domains & products)
+Run on EVERY v2 ECM the moment it exports — this is the "empty or thin domains and products pass":
+```bash
+# single-model findings (empty/thin/skeleton domains+products, wrong types, untagged PII):
+python3 runner/vov_structural_audit.py --model /tmp/vov_out/<ind>/v2/ecm/model.json
+# improvement gate — v2 MUST NOT regress vs v1 (PD-1):
+python3 runner/vov_structural_audit.py \
+  --v1 /tmp/vov_stage/<ind>/model/model.json \
+  --v2 /tmp/vov_out/<ind>/v2/ecm/model.json   # exit 0 = PASS, exit 1 = REGRESSION -> relaunch
+```
+Definitions (industry-agnostic, read from model.json structure):
+- **empty domain** = 0 products · **thin/stub domain** = <5 products
+- **empty product** = 0 attributes · **thin/stub product** = <5 attributes
+- **skeleton product** = only PK/FK columns (0-1 data attributes) — the most critical stub class
+- **wrong type** = high-precision token rule (e.g. `*_flag` STRING→BOOLEAN, money/rate STRING→DECIMAL,
+  `*_date/_at` STRING→TIMESTAMP) · **untagged PII** = person/sensitive column with no sensitivity tag
+
+The gate is a publish blocker: if `--v1/--v2` exits 1, or the v2 still has empty/skeleton products,
+the run FAILED PD-1 → RCA → GENERIC fix (PD-3) → relaunch from scratch (PD-4). The same auditor
+runs on the whole fork (`--fork <data-models>`) for a portfolio snapshot.
 
 ---
 
@@ -270,8 +349,13 @@ Every 30 min, post a pulse covering ALL 13 industries. Follow CLAUDE.md §11 (no
 without evidence; soft-accepts are RED). Each pulse must include, per industry:
 
 1. **Run state** — `lc` + per-task (`install/vov/shrink`) state. Flag retries / `EXPECTED RECURRENCE`.
-2. **Ground-truth adherence %** (§8.2) once an ECM exists — this is the headline number.
-3. **§10.6 hard-signature scan** on the pulled logs (must be 0):
+2. **Ground-truth adherence %** (§8.2) once an ECM exists — headline number. State it as
+   `fulfilled / TOTAL_vibe_vreqs` (PD-2 denominator), e.g. `45/100 = 45%`, never `45/50`.
+   Floor 90%; below floor → on the relaunch list (PD-4).
+3. **Structural pass + improvement** (§8.3) — empty/thin/skeleton domain+product counts for v2,
+   and the v1→v2 improvement gate verdict (PASS/REGRESSION). A regression or any new empty/skeleton
+   product is RED and forces a relaunch.
+4. **§10.6 hard-signature scan** on the pulled logs (must be 0):
    ```python
    import re,glob
    t="".join(open(f,errors='ignore').read() for f in glob.glob('/tmp/<ind>_*.log'))
@@ -282,13 +366,13 @@ without evidence; soft-accepts are RED). Each pulse must include, per industry:
      ("Traceback",r"Traceback \(most recent")]:
        print(lbl,len(re.findall(pat,t)))
    ```
-4. **Soft-accept inventory** — list every `Max retries (3) exhausted` site (RED, not yellow).
-5. **Self-cancel proof** (v3.8.5) — grep the VOV info log for `self-cancel` ARMED + the watchdog
+5. **Soft-accept inventory** — list every `Max retries (3) exhausted` site (RED, not yellow).
+6. **Self-cancel proof** (v3.8.5) — grep the VOV info log for `self-cancel` ARMED + the watchdog
    diag (confirms the teardown-hang terminator fired with the correct run_id).
-6. **Tag counts** — physical vs model.json (§10.4) once installed.
-7. **Predictive verdict** — probability this industry terminates SUCCESS, with the math.
+7. **Tag counts** — physical vs model.json (§11.2) once installed.
+8. **Predictive verdict** — probability this industry terminates SUCCESS, with the math.
 
-Aggregate footer: `green=N/13, running=…, failed=…`.
+Aggregate footer: `green=N/13, running=…, failed=…, on-relaunch(PD-4)=…`.
 
 ---
 
@@ -362,10 +446,14 @@ An industry is **green** only when ALL hold:
 - `v2/ecm/model.json` AND `v2/mvm/model.json` exported (non-empty, parse-valid).
 - §10.6 hard signatures all **0** in the logs (ERROR / F1 / F2 soft-accept / F4 silo / R6 MV fail /
   R8 cycles / N2 fidelity / NameError / Traceback).
-- Ground-truth adherence (§8.2) ≥ 90% (or the user's stated floor).
-- v2 published to the fork with a commit citing the run_id + adherence.
+- **PD-2 ground-truth adherence (§8.2) ≥ 90%** (target 100%), denominator = ALL vibe VReqs.
+- **PD-1 improvement gate (§8.3) PASS** — `vov_structural_audit.py --v1 --v2` exits 0; v2 has
+  **zero empty/skeleton products**, no new thin/stub domains or products vs v1, and no net attribute loss.
+- v2 published to the fork with a commit citing the run_id + ground-truth adherence %.
 
-The whole marathon is done when all 13 are green. "Mostly clean" is not done.
+The whole marathon is done when all 13 are green. "Mostly clean" is not done. Any industry that
+hangs, trips a §10.6 signature, fails PD-1, or scores <90% goes on the relaunch list (PD-4): fix
+generically (PD-3), redeploy all 5, drop catalog, re-run from scratch — never publish it as-is.
 
 ---
 
@@ -414,6 +502,9 @@ Bottom line: model.json is self-contained for tags; a faithful installer (the ag
 | Stale agent | running an old `_v<NN>` | §3.3: `AGENT_VER` MUST equal `__AGENT_VERSION__`; re-verify the deployed archive grep (§3.2). |
 | Phantom QUEUED run | run stuck `QUEUED` > 3 min | `databricks jobs list-runs --job-id <id> --active-only`; cancel residual `run-now`-without-`--no-wait` leftovers. |
 | Lying scoreboard | agent reports high adherence, model is worse | ALWAYS gate on §8.2 ground-truth, never §8.1. v3.8.5 verifier-blindness fix narrows the gap but the independent audit is the source of truth. |
+| v2 regression (PD-1) | v2 has new empty/skeleton products, fewer attrs, or thinner than v1 | `vov_structural_audit.py --v1 --v2` exits 1. Do NOT publish. RCA the generic root cause (e.g. generator received only a count and free-invented stubs; preserve-pass dropped v1 products), fix generically (PD-3), bump semver, redeploy all 5, drop catalog, re-run from scratch (PD-4). |
+| Low adherence (<90%) | §8.2 ground-truth below floor | Usually an extraction miss (PD-2 denominator) or soft-accept drop. Trace the missed VReq classes generically, fix, relaunch. Never publish below floor. |
+| Industry-specific fix creep | a patch special-cases one industry | PD-3 violation. Grep the diff for industry names; rewrite the fix to read from vibe/runtime/catalog so it helps all 41. |
 
 ---
 
