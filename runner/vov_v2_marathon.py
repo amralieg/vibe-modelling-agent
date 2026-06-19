@@ -31,10 +31,21 @@ PULSE_S = 900
 #     (install functional <=40m on the slow my-uae workspace; shrink functional 66-106m), so real work
 #     never truncates while teardown waste stays bounded. Artifacts (model.json, next_vibes) are on the
 #     volume BEFORE teardown, so a cap-killed-but-functionally-complete task still exports + advances.
-JOB_TIMEOUT_S = 82800        # 23h job ceiling (>= 2h install + 15h vov + 5h shrink, with margin)
-INSTALL_TIMEOUT_S = 7200     # 2h: bounds the install teardown hang; ~3x the largest observed functional install
+JOB_TIMEOUT_S = 82800        # 23h job ceiling (>= 1h install + 15h vov + 2.5h shrink, with margin)
+# v385 marathon EVIDENCE (2026-06-19): all 13 installs finished functional work (physical schema +
+# tags + MVs + model.json deploy) in 14-17m, then hung in a GIL-held serverless teardown for ~90m
+# with NO new log lines and NO self-cancel marker (the in-driver self-cancel/faulthandler _exit kills
+# the DRIVER but does NOT flip the serverless RUN to TERMINATED -- only a control-plane cancel does).
+# The control-plane JOB TIMEOUT is that reliable external terminator. Install/shrink have short,
+# predictable functional times, so a tight cap bounds the teardown-hang waste WITHOUT truncating real
+# work. vov is quality-critical (variable multi-hour real work) so it keeps the full 15h ceiling and
+# relies on artifacts-before-teardown + the in-driver self-cancel (live-watched this run).
+INSTALL_TIMEOUT_S = 3600     # 60m: functional install <=40m even on slow my-uae; bounds the PROVEN
+                             #      teardown hang to ~20-45m (was 120m -> ~100m wasted) and unblocks
+                             #      vov (run_if=ALL_DONE) ~60m sooner. Never truncates <=40m functional.
 VOV_TIMEOUT_S = 54000        # 15h: user directive — the quality-critical agent run is never truncated
-SHRINK_TIMEOUT_S = 18000     # 5h: ~3x the slowest observed functional shrink; bounds the shrink teardown hang
+SHRINK_TIMEOUT_S = 9000      # 2.5h: functional shrink 66-106m; same serverless teardown-hang mechanism
+                             #       as install -> bound via control-plane timeout (was 5h)
 
 ASSIGN = {
     "fe-gcp": ["travel_hospitality", "consumer_goods", "automotive"],
