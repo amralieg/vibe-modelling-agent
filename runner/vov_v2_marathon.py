@@ -57,8 +57,12 @@ ASSIGN = {
     "fe-gcp": ["travel_hospitality", "consumer_goods", "automotive"],
     "fe-aws": ["ngo", "retail", "healthcare"],
     "my-gcp": ["restaurants", "semiconductors", "media_broadcasting"],
-    "my-adp": ["water_utilities", "manufacturing"],
+    "my-adp": ["water_utilities"],
     "my-uae": ["construction", "health_insurance"],
+    # my-aws (user directive 2026-06-19): fresh AWS test env added as a 6th concurrent profile.
+    # manufacturing moved here off the flaky Azure my-adp (which had external-location
+    # PERMISSION_DENIED on manufacturing) so the known blocker runs on a clean metastore.
+    "my-aws": ["manufacturing"],
 }
 
 WAREHOUSE = {
@@ -67,7 +71,21 @@ WAREHOUSE = {
     "my-gcp": "2023d0a3a188bd24",
     "my-adp": "2ad1b26db73a7c6f",
     "my-uae": "6b2c33b3b2aae3ac",
+    "my-aws": "7c313dcbcd3119c1",
 }
+
+# FIXED_CATALOG (user directive 2026-06-19): on environments where the principal lacks
+# CREATE CATALOG on the metastore, the marathon CANNOT mint a per-industry `vibe_<ind>_v1`
+# catalog. Instead every industry assigned to such a profile shares one pre-existing catalog
+# the user granted. cat_name() resolves an industry to this fixed catalog via the profile it is
+# assigned to, and prepare_catalog() skips the DROP/CREATE CATALOG dance for these profiles
+# (the agent's _ensure_catalog_exists SHOW-CATALOGS check then skips creation too).
+FIXED_CATALOG = {
+    "my-aws": "serverless_stable_8nstmo_catalog",
+}
+# reverse index ind -> profile, built from the static ASSIGN map, so cat_name(ind) (which only
+# receives the industry) can tell whether that industry lives on a fixed-catalog profile.
+_IND_PROFILE = {ind: prof for prof, inds in ASSIGN.items() for ind in inds}
 
 ECM_SCOPE = "Expanded Coverage Model - ECM"
 MVM_SCOPE = "Minimum Viable Model - MVM"
@@ -163,6 +181,11 @@ def set_ind(state, ind, **kv):
 
 
 def cat_name(ind):
+    # fixed-catalog profiles (no CREATE CATALOG on the metastore) share one pre-existing catalog;
+    # everyone else gets an isolated per-industry catalog the marathon creates/drops at will.
+    prof = _IND_PROFILE.get(ind)
+    if prof in FIXED_CATALOG:
+        return FIXED_CATALOG[prof]
     return f"vibe_{ind}_v1"
 
 
@@ -208,6 +231,41 @@ def _rows(res):
     return (res.get("result", {}) or {}).get("data_array", []) or []
 
 
+def v1_installed(profile, ind):
+    # install-once-reuse (user directive 2026-06-19): the install phase deterministically
+    # materializes the staged v1 model.json and is NOT under test — VOV (v1->v2) is. The vov task
+    # runs with context_file="" and reads the prior version straight from `<cat>._metamodel.business`,
+    # so a v1 row there is necessary AND sufficient for VOV to attach. When present we reuse it and
+    # skip both the DROP CATALOG and the install task instead of rebuilding v1 every relaunch.
+    # VOV_FORCE_REINSTALL=1 forces a clean rebuild (use when the install path / v1 model changes).
+    if os.environ.get("VOV_FORCE_REINSTALL") == "1":
+        return False
+    cat = cat_name(ind)
+    bn = ind.replace("'", "''")
+    try:
+        # require BOTH a v1 business row AND v1 domain rows: the agent writes the logical model
+        # (business -> domain -> product -> attribute) early in install, so a complete logical v1
+        # is what vov reads. A business row alone could be a partial/aborted install; demanding
+        # domains too guards reuse against feeding vov a truncated v1.
+        biz = sql_exec(
+            profile,
+            f"SELECT 1 FROM `{cat}`.`_metamodel`.`business` "
+            f"WHERE LOWER(business)=LOWER('{bn}') AND CAST(version AS INT)=1 LIMIT 1",
+            timeout=120,
+        )
+        if not _rows(biz):
+            return False
+        dom = sql_exec(
+            profile,
+            f"SELECT COUNT(*) FROM `{cat}`.`_metamodel`.`domain` WHERE CAST(version AS INT)=1",
+            timeout=120,
+        )
+        rows = _rows(dom)
+        return bool(rows) and int(rows[0][0]) > 0
+    except Exception:
+        return False
+
+
 def _external_location_bases(profile):
     # When the metastore has NO default storage, a plain CREATE CATALOG fails and we must
     # supply an explicit MANAGED LOCATION. The metastore's own WRITABLE external locations are
@@ -250,6 +308,21 @@ def _managed_bases(profile):
 
 def prepare_catalog(profile, ind):
     cat = cat_name(ind)
+    if v1_installed(profile, ind):
+        pulse(f"[{ind}] v1 already installed on {profile} — REUSING catalog, skip drop+install. alias=marathon-install-once-reuse")
+        sql_exec(profile, f"CREATE SCHEMA IF NOT EXISTS `{cat}`.`_metamodel`")
+        sql_exec(profile, f"CREATE VOLUME IF NOT EXISTS `{cat}`.`_metamodel`.`vol_root`")
+        return True
+    if profile in FIXED_CATALOG:
+        # fixed-catalog profile: the metastore denies CREATE CATALOG, and the shared catalog
+        # already exists, so we MUST NOT DROP/CREATE it. Just ensure the agent's meta schema +
+        # volume exist (CREATE SCHEMA/VOLUME IF NOT EXISTS are permitted on the granted catalog).
+        # v1 is not yet installed here -> return False so the install task runs; the agent's
+        # _ensure_catalog_exists then skips catalog creation because SHOW CATALOGS lists it.
+        pulse(f"[{ind}] fixed catalog `{cat}` on {profile} — no DROP/CREATE (metastore denies CREATE CATALOG); ensure schema+volume. alias=marathon-fixed-catalog-no-create")
+        sql_exec(profile, f"CREATE SCHEMA IF NOT EXISTS `{cat}`.`_metamodel`")
+        sql_exec(profile, f"CREATE VOLUME IF NOT EXISTS `{cat}`.`_metamodel`.`vol_root`")
+        return False
     sql_exec(profile, f"DROP CATALOG IF EXISTS `{cat}` CASCADE", timeout=600)
     try:
         sql_exec(profile, f"CREATE CATALOG `{cat}`")
@@ -285,13 +358,17 @@ def prepare_catalog(profile, ind):
     # database (user directive 2026-06-18). The agent re-uses these via IF NOT EXISTS.
     sql_exec(profile, f"CREATE SCHEMA IF NOT EXISTS `{cat}`.`_metamodel`")
     sql_exec(profile, f"CREATE VOLUME IF NOT EXISTS `{cat}`.`_metamodel`.`vol_root`")
+    return False
 
 
-def stage_files(profile, ind):
+def stage_files(profile, ind, reused=False):
     base = vol_base(ind)
     _try(["fs", "mkdir", f"dbfs:{base}/model"], profile, ("already exists",))
-    db(["fs", "cp", f"{STAGE_DIR}/{ind}/model/model.json",
-        f"dbfs:{base}/model/model.json", "--overwrite"], profile, timeout=600)
+    # model.json is only the install task's context_file; when reusing an installed v1 the install
+    # task is dropped, so staging it is pointless. next_vibes.txt is the VOV vibe input — always stage.
+    if not reused:
+        db(["fs", "cp", f"{STAGE_DIR}/{ind}/model/model.json",
+            f"dbfs:{base}/model/model.json", "--overwrite"], profile, timeout=600)
     db(["fs", "cp", f"{STAGE_DIR}/{ind}/next_vibes.txt",
         f"dbfs:{base}/next_vibes.txt", "--overwrite"], profile, timeout=300)
 
@@ -302,7 +379,7 @@ def industry_desc(ind):
     return d or f"{ind.replace('_', ' ')} industry enterprise data model."
 
 
-def build_job_spec(ind):
+def build_job_spec(ind, installed=False):
     cat = cat_name(ind)
     base = vol_base(ind)
     desc = industry_desc(ind)
@@ -329,31 +406,36 @@ def build_job_spec(ind):
             t["depends_on"] = [{"task_key": dep}]
             t["run_if"] = "ALL_DONE"
         return t
+    # install-once-reuse: when v1 is already installed, drop the install task and point vov at the
+    # existing catalog v1 directly (it reads _metamodel.business, not the staged context_file).
+    if installed:
+        tasks = [task("vov", vov, VOV_TIMEOUT_S),
+                 task("shrink", shrink, SHRINK_TIMEOUT_S, dep="vov")]
+    else:
+        tasks = [task("install", install, INSTALL_TIMEOUT_S),
+                 task("vov", vov, VOV_TIMEOUT_S, dep="install"),
+                 task("shrink", shrink, SHRINK_TIMEOUT_S, dep="vov")]
     return {
         "name": f"dbx_vibe_vov2_{ind}_v{AGENT_VER}",
         "timeout_seconds": JOB_TIMEOUT_S,
         "max_concurrent_runs": 1,
-        "tasks": [
-            task("install", install, INSTALL_TIMEOUT_S),
-            task("vov", vov, VOV_TIMEOUT_S, dep="install"),
-            task("shrink", shrink, SHRINK_TIMEOUT_S, dep="vov"),
-        ],
+        "tasks": tasks,
     }
 
 
-def find_or_create_job(profile, ind):
+def find_or_create_job(profile, ind, installed=False):
     name = f"dbx_vibe_vov2_{ind}_v{AGENT_VER}"
     jobs = dbj(["jobs", "list", "--limit", "100"], profile)
     items = jobs if isinstance(jobs, list) else jobs.get("jobs", [])
     for j in items:
         if (j.get("settings", {}) or {}).get("name") == name:
-            spec = build_job_spec(ind)
+            spec = build_job_spec(ind, installed=installed)
             patch = {"job_id": j["job_id"], "new_settings": spec}
             pp = f"/tmp/vov_jobpatch_{ind}.json"
             Path(pp).write_text(json.dumps(patch))
             db(["jobs", "reset", "--json", f"@{pp}"], profile)
             return j["job_id"]
-    spec = build_job_spec(ind)
+    spec = build_job_spec(ind, installed=installed)
     sp = f"/tmp/vov_jobspec_{ind}.json"
     Path(sp).write_text(json.dumps(spec))
     res = dbj(["jobs", "create", "--json", f"@{sp}"], profile)
@@ -456,15 +538,15 @@ def process_industry(profile, ind, state):
     pulse(f"=== START {ind} on {profile} ===")
     set_ind(state, ind, status="preparing", profile=profile)
     try:
-        prepare_catalog(profile, ind)
-        stage_files(profile, ind)
+        reused = prepare_catalog(profile, ind)
+        stage_files(profile, ind, reused=reused)
     except Exception as e:
         pulse(f"[{ind}] PREP FAILED: {str(e)[:300]}")
         set_ind(state, ind, status="prep_failed", error=str(e)[:300])
         return
     try:
-        job_id = find_or_create_job(profile, ind)
-        set_ind(state, ind, job_id=job_id, status="submitted")
+        job_id = find_or_create_job(profile, ind, installed=reused)
+        set_ind(state, ind, job_id=job_id, status="submitted", install_reused=reused)
         run_id = run_now(profile, job_id)
         set_ind(state, ind, run_id=run_id, status="running")
         pulse(f"[{ind}] submitted job={job_id} run={run_id}")
@@ -531,10 +613,10 @@ def tick_profile(profile, state):
         pulse(f"=== START {ind} on {profile} ===")
         set_ind(state, ind, status="preparing", profile=profile)
         try:
-            prepare_catalog(profile, ind)
-            stage_files(profile, ind)
-            job_id = find_or_create_job(profile, ind)
-            set_ind(state, ind, job_id=job_id)
+            reused = prepare_catalog(profile, ind)
+            stage_files(profile, ind, reused=reused)
+            job_id = find_or_create_job(profile, ind, installed=reused)
+            set_ind(state, ind, job_id=job_id, install_reused=reused)
             run_id = run_now(profile, job_id)
             set_ind(state, ind, run_id=run_id, status="running")
             pulse(f"[{ind}] submitted job={job_id} run={run_id}")
