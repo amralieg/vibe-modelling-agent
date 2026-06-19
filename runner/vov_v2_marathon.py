@@ -191,6 +191,25 @@ def _rows(res):
     return (res.get("result", {}) or {}).get("data_array", []) or []
 
 
+def _external_location_bases(profile):
+    # When the metastore has NO default storage, a plain CREATE CATALOG fails and we must
+    # supply an explicit MANAGED LOCATION. The metastore's own WRITABLE external locations are
+    # the most reliable candidates (the principal is, by definition, permitted to use them),
+    # unlike sibling-catalog storage_roots which are frequently owned by other principals.
+    # Generic/industry-agnostic: reads live UC config, never special-cases any workspace.
+    try:
+        d = dbj(["external-locations", "list"], profile, timeout=120)
+    except Exception:
+        return []
+    locs = d if isinstance(d, list) else d.get("external_locations", [])
+    bases = []
+    for l in locs:
+        url = (l.get("url") or "").rstrip("/")
+        if url and not l.get("read_only") and url.startswith(("abfss://", "s3://", "gs://")):
+            bases.append(url)
+    return bases
+
+
 def _managed_bases(profile):
     res = sql_exec(profile, "SHOW CATALOGS")
     cats = [str(r[0]) for r in _rows(res)
@@ -222,8 +241,13 @@ def prepare_catalog(profile, ind):
         if not ("storage root" in el or "default storage" in el or "managed location" in el):
             raise
         created, last = False, str(e)[:200]
-        for base in _managed_bases(profile):
-            for loc in (base, f"{base}/{cat}"):
+        cand_bases, seen_b = [], set()
+        for b in _external_location_bases(profile) + _managed_bases(profile):
+            if b not in seen_b:
+                seen_b.add(b)
+                cand_bases.append(b)
+        for base in cand_bases:
+            for loc in (f"{base}/{cat}", base):
                 try:
                     sql_exec(profile, f"CREATE CATALOG `{cat}` MANAGED LOCATION '{loc}'")
                     created = True
