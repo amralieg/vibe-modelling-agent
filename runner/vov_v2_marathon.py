@@ -8,13 +8,19 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-AGENT_VER = "385"  # matches __AGENT_VERSION__ 3.8.5 (semver minus dots, §3a); never run stale
+AGENT_VER = "391"  # matches __AGENT_VERSION__ 3.9.1 (semver minus dots, §3a); never run stale
 AGENT_PATH = f"/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v{AGENT_VER}"
 STAGE_DIR = "/tmp/vov_stage"
 OUT_DIR = "/tmp/vov_out"
 PULSE_FILE = os.path.expanduser("~/claude/vibe-agent/vov2_pulses.txt")
 STATE_FILE = os.path.expanduser("~/claude/vibe-agent/vov2_state.json")
 KILL_FILE = os.path.expanduser("~/claude/vibe-agent/vov2_KILL")
+# DRAIN_FILE (v390 baseline-preserve): when present, workers RE-ATTACH + monitor + audit any
+# already-in-flight run to terminal, but DO NOT START new (queued/prep_failed) industries. This
+# honors the "let the 5 in-flight v385 VOVs finish as the honest baseline, pause the queued"
+# directive without the KILL_FILE bluntness (KILL abandons in-flight monitoring). Remove the file
+# and restart to resume normal fan-out. alias=marathon-drain-baseline-preserve
+DRAIN_FILE = os.path.expanduser("~/claude/vibe-agent/vov2_drain.flag")
 
 POLL_S = 120
 PULSE_S = 900
@@ -442,6 +448,11 @@ def process_industry(profile, ind, state):
                 return
         except Exception as e:
             pulse(f"[{ind}] re-attach failed ({str(e)[:120]}) — restarting")
+    if os.path.exists(DRAIN_FILE):
+        pulse(f"[{ind}] DRAIN active — not starting new run (baseline-preserve). alias=marathon-drain-baseline-preserve")
+        if not cur.get("status", "").startswith(("green", "partial", "red")):
+            set_ind(state, ind, status="queued_paused")
+        return
     pulse(f"=== START {ind} on {profile} ===")
     set_ind(state, ind, status="preparing", profile=profile)
     try:
@@ -512,6 +523,11 @@ def tick_profile(profile, state):
             ts = ", ".join(f"{t['k']}={t['lc'] or '?'}/{t['r'] or '-'}" for t in info["tasks"])
             pulse(f"[{ind}] {profile} lc={info['lc']} [{ts}]")
             return
+        if os.path.exists(DRAIN_FILE):
+            pulse(f"[{ind}] DRAIN active — not starting new run (baseline-preserve). alias=marathon-drain-baseline-preserve")
+            if not st.startswith(("green", "partial", "red")):
+                set_ind(state, ind, status="queued_paused")
+            continue
         pulse(f"=== START {ind} on {profile} ===")
         set_ind(state, ind, status="preparing", profile=profile)
         try:
