@@ -70,12 +70,15 @@ def test_v062_reg1_uses_base_version_path():
 
 
 def test_v062_reg1_path_uses_model_scope_and_sanitized_business():
-    """Path is {root_loc}/business/{sanitized_name}/{model_scope}_v{base}/vibes/next_vibes.txt"""
+    """Path is {root_loc}/business/{sanitized_name}/v{base}/{model_scope}/vibes/next_vibes.txt
+    (v3.5.2 alias=nested-version-layout switched the fused '{model_scope}_v{n}' segment to the
+    nested 'v{n}/{model_scope}' pair; the assertion tracks the current on-disk layout)."""
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
     window = src[max(0, idx - 5000):idx + 6000]
     assert 'os.path.join(root_loc, "business", sanitized_name' in window
-    assert 'f"{model_scope}_v{_base_ver_auto}"' in window
+    assert 'f"v{_base_ver_auto}"' in window
+    assert 'model_scope' in window
 
 
 def test_v062_reg1_has_dbutils_fs_head_fallback():

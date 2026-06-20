@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-AGENT_VER = "393"  # matches __AGENT_VERSION__ 3.9.3 (semver minus dots, §3a); never run stale
+AGENT_VER = "394"  # matches __AGENT_VERSION__ 3.9.4 (semver minus dots, §3a); never run stale
 AGENT_PATH = f"/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v{AGENT_VER}"
 STAGE_DIR = "/tmp/vov_stage"
 OUT_DIR = "/tmp/vov_out"
@@ -559,14 +559,22 @@ def _vov_teardown_hang_cancel(profile, ind, run_id, info, hang_state):
             if _pkw or _final:
                 mins = int((now_t - hs["since"]) / 60)
                 _why = "pkw pipeline-finally" if _pkw else f"finalization marker '{_final}'"
-                pulse(f"[{ind}] VOV TEARDOWN-HANG: model.json written + ecm-log flatline ~{mins}m + "
-                      f"{_why} -> control-plane cancel run={run_id} (artifacts "
-                      f"safe, ALL_DONE lets shrink proceed) alias=marathon-vov-teardown-hang-cancel")
-                try:
-                    db(["jobs", "cancel-run", str(run_id)], profile, timeout=120)
-                    return True
-                except Exception as e:
-                    pulse(f"[{ind}] cancel-run err: {str(e)[:120]}")
+                # v3.9.3 alias=marathon-vov-teardown-observe-only -- OBSERVABILITY ONLY, never cancel.
+                # ROOT CAUSE of the user's "I did not cancel any run" concern: a run-level
+                # `jobs cancel-run` cancels the WHOLE run, so the downstream shrink task goes
+                # UPSTREAM_CANCELED and the MVM stage is LOST. The job is built (build_job_spec) with
+                # the vov task on a 15h VOV_TIMEOUT_S and shrink depends_on=vov run_if=ALL_DONE: when a
+                # hung vov hits its TASK timeout the platform marks only that task TIMEDOUT and shrink
+                # STILL runs via ALL_DONE -> the run ends on its own with full ECM+MVM. Early
+                # run-cancel DEFEATS that design. So we only LOG the teardown-hang (so the operator
+                # knows ECM functional work is done and the run is waiting out its task timeout); the
+                # 15h task-timeout -> ALL_DONE -> shrink path is what terminates it. The real fix for
+                # the wasted teardown wall-time is a clean in-driver vov exit (agent-side), tracked
+                # separately; the marathon must NOT cancel.
+                pulse(f"[{ind}] VOV TEARDOWN-HANG DETECTED (observe-only): model.json written + "
+                      f"ecm-log flatline ~{mins}m + {_why}. NOT cancelling -- vov rides its 15h task "
+                      f"timeout, then shrink/MVM runs via ALL_DONE (run ends on its own with full "
+                      f"ECM+MVM). alias=marathon-vov-teardown-observe-only")
     else:
         hs["mtime"] = mt
         hs["since"] = None
