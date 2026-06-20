@@ -462,9 +462,121 @@ def get_run(profile, run_id):
     }
 
 
+HANG_CHECK_S = 300    # re-evaluate the teardown-hang signal at most every 5 min
+HANG_STALL_S = 1200   # 20 min of ecm-log flatline AFTER the teardown marker => in-driver kill failed
+
+# Finalization-class markers (gate d). ANY one, together with model.json-on-volume (gate b) +
+# HANG_STALL_S info-log flatline (gate c), proves the vov body finished and only teardown remains,
+# so a control-plane cancel is loss-free. All are emitted ONLY at/after finalization -> no mid-run
+# false positive. FINAL-FLUSH + JobTags were added 2026-06-19 after the restaurants hang
+# (run 83272126670362) ended at exactly these two lines and NEVER reached the pkw watchdog ARM-LOG.
+_TEARDOWN_DONE_MARKERS = (
+    "[VolumeLogFlush][FINAL-FLUSH]",   # volume log flusher's final flush -- only at pipeline shutdown
+    "[JobTags] Updated job tags",      # terminal ECM tagging step -- last functional action
+)
+
+
+def _ls_json(profile, dir_path, timeout=120):
+    out = dbj(["fs", "ls", dir_path], profile, timeout=timeout)
+    return out if isinstance(out, list) else out.get("files", []) or []
+
+
+def _vov_teardown_hang_cancel(profile, ind, run_id, info, hang_state):
+    """v3.9.3 alias=marathon-vov-teardown-hang-cancel.
+
+    PROVEN (probe run 798401088196186, my-gcp serverless, 2026-06-19): the agent's in-driver
+    self-cancel CANNOT resolve its own run_id in serverless -- env DATABRICKS_RUN_ID/TASK_RUN_ID
+    are null, spark.conf.get('spark.databricks.job.runId') raises AnalysisException, and
+    dbutils...getContext().toJson() raises Py4JSecurityException. So a vov task that FINISHED its
+    functional work (wrote v2/ecm/model.json + JobTags) but then hung in a GIL-held teardown stays
+    RUNNING until the 15h vov cap -- wasting hours of compute (live: restaurants run 83272126670362
+    hung from 21:16, model.json already on the volume). The marathon DOES hold the run_id, so it is
+    the ONLY actor that can flip the run to TERMINATED.
+
+    Fires ONLY when ALL hold (low false-positive quad gate): (a) the vov task is RUNNING, (b)
+    v2/ecm/model.json is on the volume (functional work done -- it is written only at finalization,
+    never mid-vov), (c) the ecm info.log mtime has not advanced for HANG_STALL_S (in-driver kill
+    failed), and (d) the log tail carries ANY genuine finalization marker in _TEARDOWN_DONE_MARKERS.
+
+    On gate (d): the original build required ONLY the 'process-kill-watchdog ARM-LOG FIRED ...
+    source=pipeline-finally' pair, but the LIVE restaurants hang (run 83272126670362, 2026-06-19)
+    does NOT emit it -- its 8665-line info.log ends cleanly at the final '[JobTags] Updated job tags'
+    + '[VolumeLogFlush][FINAL-FLUSH]' and then the driver freezes BEFORE the pkw watchdog arms (or
+    its ARM-LOG is never flushed). A gate that only accepts the pkw pair is therefore a false-negative
+    no-op against the exact hang it was built to catch. The fix accepts ANY finalization-class marker:
+    the pkw pair, OR the volume-log FINAL-FLUSH (emitted only at pipeline shutdown), OR the terminal
+    JobTags update (the last functional ECM step). All three are emitted only at/after finalization,
+    so combined with gates (b)+(c) the cancel stays loss-free and cannot false-fire mid-run. Artifacts
+    are on the volume before teardown and the downstream shrink is run_if=ALL_DONE, so the cancel is
+    loss-free and unblocks shrink immediately. Scoped to the vov task only -- install/shrink already
+    have tight control-plane caps."""
+    vt = next((t for t in info.get("tasks", [])
+               if t.get("k") == "vov" and t.get("lc") == "RUNNING"), None)
+    if not vt:
+        return False
+    now_t = time.time()
+    hs = hang_state.setdefault(ind, {"last_check": 0.0, "mtime": None, "since": None})
+    if now_t - hs["last_check"] < HANG_CHECK_S:
+        return False
+    hs["last_check"] = now_t
+    cat = cat_name(ind)
+    biz_dir = f"dbfs:/Volumes/{cat}/_metamodel/vol_root/business/{ind}/v2/ecm"
+    log_dir = f"dbfs:/Volumes/{cat}/_metamodel/vol_root/logs/{ind}/v2/ecm"
+    log_name = f"{ind}_info_v2_ecm.log"
+    try:
+        names = {e.get("name") for e in _ls_json(profile, biz_dir)}
+        if "model.json" not in names:
+            hs["mtime"] = None
+            hs["since"] = None
+            return False
+        mt = None
+        for e in _ls_json(profile, log_dir):
+            if e.get("name") == log_name:
+                # `databricks fs ls -o json` reports the mtime as `last_modified` (ISO-8601 string,
+                # verified live 2026-06-19); older CLIs used `modification_time`/`mtime` (epoch ms).
+                # Either way string/int EQUALITY is all the flatline check needs: an unchanged value
+                # across HANG_STALL_S means the log file was not written, i.e. the driver is hung.
+                mt = e.get("last_modified") or e.get("modification_time") or e.get("mtime")
+                break
+        if mt is None:
+            return False
+    except Exception as e:
+        pulse(f"[{ind}] hang-check err: {str(e)[:120]}")
+        return False
+    if hs["mtime"] == mt:
+        if hs["since"] is None:
+            hs["since"] = now_t
+        elif now_t - hs["since"] >= HANG_STALL_S:
+            try:
+                tmpf = f"/tmp/vov_hangchk_{ind}.log"
+                db(["fs", "cp", f"{log_dir}/{log_name}", tmpf, "--overwrite"], profile, timeout=300)
+                tail = open(tmpf, errors="ignore").read()[-20000:]
+            except Exception:
+                tail = ""
+            _pkw = ("process-kill-watchdog ARM-LOG FIRED" in tail
+                    and "source=pipeline-finally" in tail)
+            _final = next((m for m in _TEARDOWN_DONE_MARKERS if m in tail), None)
+            if _pkw or _final:
+                mins = int((now_t - hs["since"]) / 60)
+                _why = "pkw pipeline-finally" if _pkw else f"finalization marker '{_final}'"
+                pulse(f"[{ind}] VOV TEARDOWN-HANG: model.json written + ecm-log flatline ~{mins}m + "
+                      f"{_why} -> control-plane cancel run={run_id} (artifacts "
+                      f"safe, ALL_DONE lets shrink proceed) alias=marathon-vov-teardown-hang-cancel")
+                try:
+                    db(["jobs", "cancel-run", str(run_id)], profile, timeout=120)
+                    return True
+                except Exception as e:
+                    pulse(f"[{ind}] cancel-run err: {str(e)[:120]}")
+    else:
+        hs["mtime"] = mt
+        hs["since"] = None
+    return False
+
+
 def wait_terminal(profile, ind, run_id):
     started = time.time()
     last = 0
+    hang_state = {}
     while True:
         if os.path.exists(KILL_FILE):
             pulse(f"[{ind}] KILL file present — leaving run {run_id} as-is and exiting watcher")
@@ -477,6 +589,10 @@ def wait_terminal(profile, ind, run_id):
             continue
         if info["lc"] in ("TERMINATED", "INTERNAL_ERROR", "SKIPPED"):
             return info
+        try:
+            _vov_teardown_hang_cancel(profile, ind, run_id, info, hang_state)
+        except Exception as e:
+            pulse(f"[{ind}] hang-detector err: {str(e)[:120]}")
         if time.time() - last >= PULSE_S:
             ts = ", ".join(f"{t['k']}={t['lc'] or '?'}/{t['r'] or '-'}" for t in info["tasks"])
             pulse(f"[{ind}] {profile} elapsed={int((time.time()-started)/60)}m lc={info['lc']} [{ts}]")
