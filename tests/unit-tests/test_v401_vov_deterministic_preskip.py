@@ -137,7 +137,7 @@ def test_killswitch_disables_preskip(monkeypatch):
 # ---------------- version + fail-pre ----------------
 
 def test_version_bumped_to_401():
-    assert '__AGENT_VERSION__ = "4.0.2"' in _concat(NB)
+    assert '__AGENT_VERSION__ = "4.0.3"' in _concat(NB)
 
 
 def test_failpre_preskip_absent_in_v400_backup():

@@ -124,4 +124,4 @@ def test_fail_pre_heartbeat_absent_in_pre_patch():
 
 
 def test_version_bumped_to_398(src):
-    assert '__AGENT_VERSION__ = "4.0.2"' in src
+    assert '__AGENT_VERSION__ = "4.0.3"' in src
