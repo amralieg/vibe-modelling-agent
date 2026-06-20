@@ -530,6 +530,8 @@ Keep this watchlist in the monitor prompt on every run. If a signature is detect
 | N1 | install test failure at ~50-60s with `Workload failed, see run output for details` + no info log on volume | Install early-exit, no diagnostics |
 | N2 | `Fidelity gates FAILED: precision < 0.85 — rollback recommended` | Memory/JSON attribute-name drift |
 | N3 | `⚠️ DBML FK SCRUB: Skipping dangling ref` (cosmetic) | DBML exporter naming drift |
+| N4 | `mutator raised: AttributeError: '<scalar>' object has no attribute '<append/get/extend>'` recurring across all 3 retries → `rejected_unsafe` (VREQ lost) | Mis-directed retry hint: the generic `_v204_ast_class_hints` needle assumed the bad value was a DICT and gave dict-only advice, so the LLM kept crashing on a STRING scalar field. FIXED v4.0.2 `vov-scalar-attr-typed-hint` (type-accurate advice + suppress contradictory dict hint). PRESENT if a `'str'/'int'/'float' object has no attribute` crash survives all retries with NO `STRING-NOT-LIST`/`TYPE-MISMATCH` hint in the trace. |
+| N5 | `[UC-DDL] ■ Finished SET TAGS in NN:NN` where NN > ~20min at 8 workers (e.g. mfg 14585 stmts = 28min, 0 failures) | Tag-DDL wall-clock is the post-VOV bottleneck (~6% of tier-1 runtime). NOT a defect — the 8-worker cap (`TAG_DDL_MAX_WORKERS`, `settags-sparkconnect-concurrency-cap`) is CORRECT (prevents the 97.7% Spark-Connect-saturation failure cascade). The ONLY proven safe speedup is routing tag DDL through a SQL-Warehouse REST endpoint (v3.6.6 repro: 1800 tags @ 60 workers = 0% fail, 12/s). Do NOT naively raise the worker cap — that reintroduces the cascade. |
 
 ### 9.5 Positive signals to look for (don't regress what works)
 
@@ -540,6 +542,8 @@ Equally important — affirmatively detect and record these, because absence ove
 - `✅ Step N: <name> - PASSED validation` → each step self-verified
 - `Architect Self-Review iter N landed=K regressed=0 blocked=0` → corrective actions landing cleanly
 - `🛡️ BLOCKED product move: '<name>' is protected` → defense-in-depth guard working even when LLM pushes against it
+- `[vov-scalar-attr-typed-hint FIRED v4.0.2]` → type-accurate scalar-attribute retry hint firing (str/int/float `.append`/`.get` crash steered with the RIGHT advice instead of the contradictory dict hint; prevents adherence loss from un-recoverable retries)
+- `[vov-deterministic-preskip FIRED v4.0.1]` → a VREQ already satisfied per the deterministic dict probe was credited `applied` WITHOUT spending an LLM synth+verify+sandbox cycle (speed + anti-false-negative; reduces the `noop_failed` empty-diff class)
 - `[NORM-FIX] BLOCKED semantic mismatch` → normalizer correctly rejecting a bad join
 - LLM health: all models `0 timeouts, 0 errors, ✅ healthy` in the runtime-profile summary
 
