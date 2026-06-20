@@ -266,4 +266,4 @@ def test_fail_pre_parallel_absent_in_v399():
 
 def test_version_bumped_to_400():
     nb = REPO / "agent" / "dbx_vibe_modelling_agent.ipynb"
-    assert '__AGENT_VERSION__ = "4.0.0"' in _concat(nb)
+    assert '__AGENT_VERSION__ = "4.0.2"' in _concat(nb)
