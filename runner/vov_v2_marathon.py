@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-AGENT_VER = "394"  # matches __AGENT_VERSION__ 3.9.4 (semver minus dots, §3a); never run stale
+AGENT_VER = "395"  # matches __AGENT_VERSION__ 3.9.5 (semver minus dots, §3a); never run stale
 AGENT_PATH = f"/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v{AGENT_VER}"
 STAGE_DIR = "/tmp/vov_stage"
 OUT_DIR = "/tmp/vov_out"
@@ -383,8 +383,12 @@ def build_job_spec(ind, installed=False):
     cat = cat_name(ind)
     base = vol_base(ind)
     desc = industry_desc(ind)
+    # self_run_id: Databricks-native {{job.run_id}} substituted at runtime so the agent's
+    # control-plane self-cancel can arm even when the serverless context exposes no run_id tags
+    # (my-aws: tag_keys=[]). alias=self-cancel-runid-jobparam (paired with agent v3.9.5 fallback).
     common = {"business_name": ind, "business_description": desc,
-              "deployment_catalog": cat, "generate_samples": "0"}
+              "deployment_catalog": cat, "generate_samples": "0",
+              "self_run_id": "{{job.run_id}}"}
     install = dict(common, operation="install model", model_version="1",
                    data_model_scopes=ECM_SCOPE,
                    context_file=f"{base}/model/model.json", model_vibes="")
