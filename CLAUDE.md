@@ -527,6 +527,7 @@ Keep this watchlist in the monitor prompt on every run. If a signature is detect
 | R6 | `[Metrics] Failed metric view '<name>'.*UNRESOLVED_COLUMN` | Metric-view ↔ normalizer contract mismatch |
 | R7 | `[MODEL-PARAMS] <field> missing from LLM output — using midpoint N` | LLM JSON-schema non-compliance |
 | R8 | `[CYCLE DETECTION] Found N cycle(s)` where N > 0 after finalization | FK cycle recurrence |
+| R8b | finalization `[CYCLE DETECTION] ✅ No cycles` BUT the output `model.json` still has FK cycles (SCC on the nested dict > 0) | Lying-scoreboard: the flat-list finalization breaker (`_v394` on `products_data/attributes_data`) ran clean, but cycles persisted in the NESTED `data_model` serialized to model.json (VOV sandbox-authoritative FK adds / SSOT resolver / flat↔nested desync). Live: mfg vov_v3 my-aws run 696361916556037 = 11 SCC cycles, finalization said 0. FIXED v4.0.3 `v403-serialize-cycle-guard` (deterministic detect+break on the nested dict at the model.json serialization boundary). PRESENT if `[v403-serialize-cycle-guard FIRED]` reports `remaining>0`, or model.json SCC > 0 on any run. |
 | N1 | install test failure at ~50-60s with `Workload failed, see run output for details` + no info log on volume | Install early-exit, no diagnostics |
 | N2 | `Fidelity gates FAILED: precision < 0.85 — rollback recommended` | Memory/JSON attribute-name drift |
 | N3 | `⚠️ DBML FK SCRUB: Skipping dangling ref` (cosmetic) | DBML exporter naming drift |
@@ -544,6 +545,7 @@ Equally important — affirmatively detect and record these, because absence ove
 - `🛡️ BLOCKED product move: '<name>' is protected` → defense-in-depth guard working even when LLM pushes against it
 - `[vov-scalar-attr-typed-hint FIRED v4.0.2]` → type-accurate scalar-attribute retry hint firing (str/int/float `.append`/`.get` crash steered with the RIGHT advice instead of the contradictory dict hint; prevents adherence loss from un-recoverable retries)
 - `[vov-deterministic-preskip FIRED v4.0.1]` → a VREQ already satisfied per the deterministic dict probe was credited `applied` WITHOUT spending an LLM synth+verify+sandbox cycle (speed + anti-false-negative; reduces the `noop_failed` empty-diff class)
+- `[v403-serialize-cycle-guard FIRED]` with `remaining=0` → the model.json serialization boundary verified the NESTED `data_model` has 0 FK cycles before writing; `cleared=0` on a clean model is the expected idempotent no-op, `cleared>0` means residual cycles that escaped the flat finalization breaker were deterministically broken in place (R8b backstop; user-vibed edges protected per §3c)
 - `[NORM-FIX] BLOCKED semantic mismatch` → normalizer correctly rejecting a bad join
 - LLM health: all models `0 timeouts, 0 errors, ✅ healthy` in the runtime-profile summary
 
@@ -1252,7 +1254,7 @@ The deterministic quality score (`_compute_deterministic_confidence_and_status`)
 - Every table has a PK (`missing_pk`, `pk_attribute_missing`).
 - Every FK resolves to an existing target PK (`broken_fk`, `pk_mismatch`, `fk_target_missing`, `unlinked_fk`, `invalid_fk_domain_refs`).
 - FK column type == target PK type (`fk_pk_type_mismatch`) — MEDIUM weight (join hazard).
-- No FK cycles (`fk_cycle`), no self-FK on a PK (`self_fk_on_pk`, `self_referencing_fk`), no direct bidirectional links.
+- No FK cycles (`fk_cycle`), no self-FK on a PK (`self_fk_on_pk`, `self_referencing_fk`), no direct bidirectional links. Enforced at THREE layers: base-model Step 7D cycle-break, VOV-finalize flat backstop (`_v394_break_post_vov_cycles`), and the v4.0.3 serialization-boundary guard (`_v403_break_cycles_in_serialized_model`) that re-checks the NESTED `data_model` immediately before `model.json` is written — the last line of defense against R8b (flat finalization clean while the serialized nested dict still cycles).
 - No siloed tables (`siloed_table`, `silo_product`); FK density / over-hubby cap (`fk_density_over_hubby`).
 - Multi-FK label completeness; FK namespace/format/naming (`multi_fk_missing_label`, `fk_namespace_mismatch`, `fk_format_invalid`, `fk_column_naming`, `fk_name_target_mismatch`).
 
