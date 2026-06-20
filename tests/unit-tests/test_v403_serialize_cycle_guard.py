@@ -49,7 +49,7 @@ def _model_2cycle():
 
 # ----- version -----
 def test_version_bumped_to_403():
-    assert ah.__AGENT_VERSION__ == "4.0.5", ah.__AGENT_VERSION__
+    assert ah.__AGENT_VERSION__ == "4.0.6", ah.__AGENT_VERSION__
 
 
 # ----- pass-post: 2-cycle in the NESTED dict is broken in place -----
