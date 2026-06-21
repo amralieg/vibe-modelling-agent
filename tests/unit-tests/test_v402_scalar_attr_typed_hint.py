@@ -39,7 +39,7 @@ def _load_fn_from_nb(path, fnname):
 
 # ----- version -----
 def test_version_bumped_to_402():
-    assert ah.__AGENT_VERSION__ == "4.0.6", ah.__AGENT_VERSION__
+    assert ah.__AGENT_VERSION__ == "4.0.8", ah.__AGENT_VERSION__
 
 
 # ----- pass-post: 'str'.append now gets STRING advice, not DICT advice -----

@@ -43,6 +43,9 @@ def marathon():
     return mod
 
 
+# v4.0.8: self_run_id retired -> vibe_session_id carries {{job.run_id}} (ONE identifier drives both
+# the progress-tracking session AND the control-plane self-cancel). The marathon now injects
+# vibe_session_id={{job.run_id}} on every task; the {{...}} template semantics + guard are unchanged.
 def test_marathon_injects_self_run_id_into_every_task(marathon):
     for installed in (False, True):
         spec = marathon.build_job_spec("manufacturing", installed=installed)
@@ -50,9 +53,13 @@ def test_marathon_injects_self_run_id_into_every_task(marathon):
         assert tasks, "job spec must have tasks"
         for t in tasks:
             params = t["notebook_task"]["base_parameters"]
-            assert params.get("self_run_id") == "{{job.run_id}}", (
+            assert params.get("vibe_session_id") == "{{job.run_id}}", (
                 f"task {t['task_key']} (installed={installed}) missing "
-                f"self_run_id={{job.run_id}} -> control-plane self-cancel cannot arm"
+                f"vibe_session_id={{job.run_id}} -> control-plane self-cancel cannot arm"
+            )
+            # self_run_id base-param is retired; it must NOT reappear.
+            assert "self_run_id" not in params, (
+                f"task {t['task_key']} still injects retired self_run_id base-param"
             )
 
 
@@ -60,7 +67,7 @@ def test_marathon_self_run_id_value_is_databricks_template(marathon):
     # Must be the literal template token so Databricks substitutes the real run id at runtime;
     # a hardcoded id or empty string would defeat the fix.
     spec = marathon.build_job_spec("ngo", installed=True)
-    vals = {t["notebook_task"]["base_parameters"].get("self_run_id") for t in spec["tasks"]}
+    vals = {t["notebook_task"]["base_parameters"].get("vibe_session_id") for t in spec["tasks"]}
     assert vals == {"{{job.run_id}}"}
 
 
@@ -73,7 +80,9 @@ def _agent_self_cancel_src():
         if c.get("cell_type") != "code":
             continue
         s = "".join(c.get("source", []))
-        if "self-cancel-runid-jobparam" in s and 'dbutils.widgets.get("self_run_id")' in s:
+        # v4.0.8: the self-cancel run_id source is now vibe_session_id (self_run_id retired); the
+        # original self-cancel-runid-jobparam comment block is preserved alongside the new alias.
+        if "self-cancel-runid-jobparam" in s and 'dbutils.widgets.get("vibe_session_id")' in s:
             return s
     return None
 

@@ -16,7 +16,7 @@ def _tmp_info():
 
 
 def test_version_bumped_to_404():
-    assert ah.__AGENT_VERSION__ == "4.0.6", ah.__AGENT_VERSION__
+    assert ah.__AGENT_VERSION__ == "4.0.8", ah.__AGENT_VERSION__
 
 
 def test_noop_when_not_stalled():

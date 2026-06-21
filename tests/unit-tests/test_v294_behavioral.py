@@ -34,7 +34,11 @@ def test_agent_version_is_294():
 def test_fix_present():
     src = _src()
     assert "alias=runtime-budget-honor-real-timeout" in src
-    assert 'dbutils.widgets.text("runtime_budget_seconds"' in src
+    # v4.0.8: runtime_budget_seconds is no longer an operator widget (text()); it is injected as a
+    # launcher/marathon base-parameter and READ via widgets.get() (base-params are readable without a
+    # text() definition). The honor-real-timeout resolve logic (_v294_w) is unchanged, so the v2.9.4
+    # intent — a 15h job is not clamped to the 4h default — is preserved by the read path below.
+    assert 'dbutils.widgets.get("runtime_budget_seconds")' in src
 
 
 def test_widget_overrides_4h_default():

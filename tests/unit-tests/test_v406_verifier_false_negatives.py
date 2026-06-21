@@ -147,7 +147,7 @@ PRESERVE_TEXT = ("Preserve the existing model structure of 20 domains and 413 pr
 # ============================== version =====================================
 def test_version_bumped_to_406():
     # v4.0.6 fixes still live in the current (>=4.0.6) notebook; pin to running version.
-    assert ah.__AGENT_VERSION__ == "4.0.7", ah.__AGENT_VERSION__
+    assert ah.__AGENT_VERSION__ == "4.0.8", ah.__AGENT_VERSION__
 
 
 # ===================== FIX 1: preserve-structure ============================

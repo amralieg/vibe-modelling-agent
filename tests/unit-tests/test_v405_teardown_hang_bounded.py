@@ -9,7 +9,7 @@ PRE = Path("/tmp/agent_v404_backup.ipynb")  # pre-v4.0.5 (v4.0.4): unbounded wai
 
 
 def test_version_bumped_to_405():
-    assert ah.__AGENT_VERSION__ == "4.0.6", ah.__AGENT_VERSION__
+    assert ah.__AGENT_VERSION__ == "4.0.8", ah.__AGENT_VERSION__
 
 
 class _BlockingPool:

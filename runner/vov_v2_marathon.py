@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-AGENT_VER = "407"  # matches __AGENT_VERSION__ 4.0.7 (semver minus dots, §3a); never run stale
+AGENT_VER = "408"  # matches __AGENT_VERSION__ 4.0.8 (semver minus dots, §3a); never run stale
 AGENT_PATH = f"/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v{AGENT_VER}"
 STAGE_DIR = "/tmp/vov_stage"
 OUT_DIR = "/tmp/vov_out"
@@ -429,12 +429,13 @@ def build_job_spec(ind, installed=False):
     cat = cat_name(ind)
     base = vol_base(ind)
     desc = industry_desc(ind)
-    # self_run_id: Databricks-native {{job.run_id}} substituted at runtime so the agent's
-    # control-plane self-cancel can arm even when the serverless context exposes no run_id tags
-    # (my-aws: tag_keys=[]). alias=self-cancel-runid-jobparam (paired with agent v3.9.5 fallback).
+    # v4.0.8 alias=self-cancel-reuse-vibe-session-id: vibe_session_id carries the Databricks-native
+    # {{job.run_id}} (substituted at runtime). ONE identifier now drives both the progress-tracking
+    # session AND the control-plane self-cancel (which arms even when the serverless context exposes
+    # no run_id tags, e.g. my-aws tag_keys=[]). Replaces the retired separate self_run_id base-param.
     common = {"business_name": ind, "business_description": desc,
               "deployment_catalog": cat, "generate_samples": "0",
-              "self_run_id": "{{job.run_id}}"}
+              "vibe_session_id": "{{job.run_id}}"}
     install = dict(common, operation="install model", model_version="1",
                    data_model_scopes=ECM_SCOPE,
                    context_file=f"{base}/model/model.json", model_vibes="")
@@ -444,6 +445,13 @@ def build_job_spec(ind, installed=False):
     shrink = dict(common, operation="shrink ecm", model_version="2",
                   data_model_scopes=MVM_SCOPE, model_vibes="", context_file="")
     def task(key, params, tmo, dep=None):
+        # v4.0.8 alias=runtime-budget-config-base-param: inject runtime_budget_seconds = this task's
+        # REAL timeout so the agent's per-VREQ verifier RuntimeBudget honours the full allocation
+        # (vov=15h) instead of the 14400s/4h default. Databricks does not expose the timeout as an
+        # env var, so this base-param is the only correct source for marathon runs. DRY: tmo is the
+        # single source of truth for both the platform timeout AND the agent budget.
+        params = dict(params)
+        params["runtime_budget_seconds"] = str(int(tmo))
         t = {"task_key": key,
              "notebook_task": {"notebook_path": AGENT_PATH, "source": "WORKSPACE",
                                "base_parameters": params},
