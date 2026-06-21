@@ -189,6 +189,27 @@ def cat_name(ind):
     return f"vibe_{ind}_v1"
 
 
+def _parse_mtime_ms(v):
+    # v4.0.7 marathon-harvest-latest-version: normalize a `databricks fs ls -o json` mtime to epoch ms.
+    # The CLI reports `last_modified` as ISO-8601 (e.g. '2026-06-21T10:48:03Z') OR epoch ms int on older
+    # builds; return epoch ms (int) or None so the freshness gate can compare against run start_ms.
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return int(v)
+    s = str(v).strip()
+    if s.isdigit():
+        return int(s)
+    try:
+        from datetime import datetime, timezone
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp() * 1000)
+    except Exception:
+        return None
+
+
 def latest_version(profile, ind):
     # v4.0.7 alias=marathon-harvest-latest-version -- ROOT CAUSE (lying-scoreboard #1 lever): both
     # export_industry and the audit hardcoded the 'v2' artifact path, but install-once-reuse vov's a
@@ -484,6 +505,9 @@ def get_run(profile, run_id):
         "result": st.get("result_state"),
         "msg": (st.get("state_message", "") or "")[:200],
         "url": info.get("run_page_url"),
+        # v4.0.7 marathon-harvest-latest-version: start_ms gates the teardown-hang freshness check so a
+        # stale prior-generation model.json/log (older than this run) cannot trigger a false hang.
+        "start_ms": info.get("start_time") or info.get("start_time_ms"),
         "tasks": [{"k": t.get("task_key"),
                    "lc": (t.get("state", {}) or {}).get("life_cycle_state"),
                    "r": (t.get("state", {}) or {}).get("result_state")}
@@ -549,15 +573,38 @@ def _vov_teardown_hang_cancel(profile, ind, run_id, info, hang_state):
         return False
     hs["last_check"] = now_t
     cat = cat_name(ind)
-    biz_dir = f"dbfs:/Volumes/{cat}/_metamodel/vol_root/business/{ind}/v2/ecm"
-    log_dir = f"dbfs:/Volumes/{cat}/_metamodel/vol_root/logs/{ind}/v2/ecm"
-    log_name = f"{ind}_info_v2_ecm.log"
+    # v4.0.7 alias=marathon-harvest-latest-version -- watch the CURRENT run's log, not a hardcoded
+    # stale v2. ROOT CAUSE (live retail false-positive): on an install-once-reuse catalog the new vov
+    # writes v4 while the old v2 log already carries a FINAL-FLUSH + a 24m-flatline mtime, so the
+    # detector false-flagged a teardown hang on a run only 33m in (still in early vov, no v4 log yet)
+    # AND could never see a REAL v4 teardown hang (wrong log). Resolve the latest version per-run.
+    ver = latest_version(profile, ind)
+    biz_dir = f"dbfs:/Volumes/{cat}/_metamodel/vol_root/business/{ind}/{ver}/ecm"
+    log_dir = f"dbfs:/Volumes/{cat}/_metamodel/vol_root/logs/{ind}/{ver}/ecm"
+    log_name = f"{ind}_info_{ver}_ecm.log"
     try:
-        names = {e.get("name") for e in _ls_json(profile, biz_dir)}
+        _entries = _ls_json(profile, biz_dir)
+        names = {e.get("name") for e in _entries}
         if "model.json" not in names:
             hs["mtime"] = None
             hs["since"] = None
             return False
+        # v4.0.7 marathon-harvest-latest-version FRESHNESS GATE -- ROOT CAUSE of the live retail
+        # false-positive: on a reused catalog the latest EXISTING version (e.g. v3) is a COMPLETED
+        # prior generation whose model.json + log already carry FINAL-FLUSH and a long-flatlined
+        # mtime, so the detector flagged a teardown hang on a run still in early vov. Only treat the
+        # model.json as THIS run's output when it was written AFTER the run started. If it predates
+        # the run (stale gen) OR the run start is unknown but the model.json is clearly old, bail.
+        _start_ms = info.get("start_ms")
+        if _start_ms:
+            _mj = next((e for e in _entries if e.get("name") == "model.json"), {})
+            _mjmt = _parse_mtime_ms(_mj.get("last_modified") or _mj.get("modification_time")
+                                    or _mj.get("mtime"))
+            if _mjmt is not None and _mjmt < (_start_ms - 60000):
+                # model.json belongs to a prior generation -> not this run's teardown.
+                hs["mtime"] = None
+                hs["since"] = None
+                return False
         mt = None
         for e in _ls_json(profile, log_dir):
             if e.get("name") == log_name:
