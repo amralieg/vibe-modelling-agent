@@ -19,9 +19,12 @@ import vov_v2_marathon as M  # cat_name / db / OUT_DIR / profiles
 AUDIT_DIR = os.path.expanduser("~/claude/vibe-agent/v2_audit")
 
 
-def fetch_log(profile, ind, scope):
+def fetch_log(profile, ind, scope, ver="v2"):
+    # v4.0.7 alias=marathon-harvest-latest-version -- audit the LATEST vov generation, not stale v2
+    # (install-once-reuse lands the newest model at v3/v4/...). Version supplied by the caller via
+    # M.latest_version so the scored log matches the harvested model.json (no cross-version mismatch).
     cat = M.cat_name(ind)
-    src = f"dbfs:/Volumes/{cat}/_metamodel/vol_root/logs/{ind}/v2/{scope}/{ind}_info_v2_{scope}.log"
+    src = f"dbfs:/Volumes/{cat}/_metamodel/vol_root/logs/{ind}/{ver}/{scope}/{ind}_info_{ver}_{scope}.log"
     lf = f"/tmp/audit_{ind}_{scope}.log"
     M.db(["fs", "cp", src, lf, "--overwrite"], profile, timeout=300)
     return lf
@@ -75,7 +78,8 @@ def counts(model_json):
 
 def extract(ind, profile):
     os.makedirs(AUDIT_DIR, exist_ok=True)
-    log = fetch_log(profile, ind, "ecm")
+    ver = M.latest_version(profile, ind)  # v4.0.7 marathon-harvest-latest-version (DRY: same resolver)
+    log = fetch_log(profile, ind, "ecm", ver=ver)
     scored = last_scored(log) or {}
     fixes = selffixer_events(log)
     details = scored.get("unfulfilled_details", [])
@@ -89,8 +93,8 @@ def extract(ind, profile):
     likely_false_neg = [d["id"] for d in details
                         if d.get("status") == "failed"
                         and any(k in d.get("evidence", "").lower() for k in fn_markers)]
-    ecm_counts = counts(f"{M.OUT_DIR}/{ind}/v2/ecm/model.json")
-    mvm_counts = counts(f"{M.OUT_DIR}/{ind}/v2/mvm/model.json")
+    ecm_counts = counts(f"{M.OUT_DIR}/{ind}/{ver}/ecm/model.json")
+    mvm_counts = counts(f"{M.OUT_DIR}/{ind}/{ver}/mvm/model.json")
     audit = {
         "industry": ind,
         "profile": profile,

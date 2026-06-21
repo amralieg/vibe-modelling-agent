@@ -189,6 +189,31 @@ def cat_name(ind):
     return f"vibe_{ind}_v1"
 
 
+def latest_version(profile, ind):
+    # v4.0.7 alias=marathon-harvest-latest-version -- ROOT CAUSE (lying-scoreboard #1 lever): both
+    # export_industry and the audit hardcoded the 'v2' artifact path, but install-once-reuse vov's a
+    # reused catalog repeatedly so the LATEST model lands at v3/v4/... (live: construction v3=agent
+    # 4.0.6 / 20 domains while the harvested v2=agent 3.9.2). The marathon then HARVESTED + AUDITED the
+    # STALE v2, under-reporting every multi-generation industry and making the scoreboard lie. Discover
+    # the highest v<N> business dir; default 'v2' on empty/auth-fail (honest, never crashes the run).
+    import re as _re
+    cat = cat_name(ind)
+    base = f"dbfs:/Volumes/{cat}/_metamodel/vol_root/business/{ind}"
+    try:
+        out = db(["fs", "ls", base], profile, timeout=90)
+        vers = []
+        for line in (out or "").splitlines():
+            nm = line.strip().rstrip("/").split("/")[-1].split()[0] if line.strip() else ""
+            m = _re.fullmatch(r"v(\d+)", nm)
+            if m:
+                vers.append(int(m.group(1)))
+        if vers:
+            return f"v{max(vers)}"
+    except Exception:
+        pass
+    return "v2"
+
+
 def vol_base(ind):
     # stage inputs INSIDE the agent's own _metamodel/vol_root volume (a folder),
     # never a separate _staging database (user directive 2026-06-18). The agent
@@ -615,12 +640,13 @@ def wait_terminal(profile, ind, run_id):
 def export_industry(profile, ind):
     cat = cat_name(ind)
     root = f"/Volumes/{cat}/_metamodel/vol_root/business/{ind}"
+    ver = latest_version(profile, ind)  # v4.0.7 marathon-harvest-latest-version (never stale v2)
     dest = f"{OUT_DIR}/{ind}"
     Path(dest).mkdir(parents=True, exist_ok=True)
-    got = {}
+    got = {"_version": ver}
     for scope in ("ecm", "mvm"):
-        src = f"dbfs:{root}/v2/{scope}"
-        d = f"{dest}/v2/{scope}"
+        src = f"dbfs:{root}/{ver}/{scope}"
+        d = f"{dest}/{ver}/{scope}"
         Path(os.path.dirname(d)).mkdir(parents=True, exist_ok=True)
         try:
             db(["fs", "cp", "-r", src, d, "--overwrite"], profile, timeout=1200)
@@ -630,10 +656,12 @@ def export_industry(profile, ind):
             got[scope] = False
     for fn in ("readme.md",):
         try:
-            db(["fs", "cp", f"dbfs:{root}/v2/{fn}", f"{dest}/v2/{fn}", "--overwrite"],
+            db(["fs", "cp", f"dbfs:{root}/{ver}/{fn}", f"{dest}/{ver}/{fn}", "--overwrite"],
                profile, timeout=120)
         except Exception:
             pass
+    pulse(f"[{ind}] export harvested {ver} ecm={got.get('ecm')} mvm={got.get('mvm')} "
+          f"alias=marathon-harvest-latest-version")
     return got
 
 
