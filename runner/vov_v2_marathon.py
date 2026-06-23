@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-AGENT_VER = "408"  # matches __AGENT_VERSION__ 4.0.8 (semver minus dots, §3a); never run stale
+AGENT_VER = "410"  # matches __AGENT_VERSION__ 4.1.0 (semver minus dots, §3a); never run stale
 AGENT_PATH = f"/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v{AGENT_VER}"
 STAGE_DIR = "/tmp/vov_stage"
 OUT_DIR = "/tmp/vov_out"
@@ -217,9 +217,28 @@ def latest_version(profile, ind):
     # 4.0.6 / 20 domains while the harvested v2=agent 3.9.2). The marathon then HARVESTED + AUDITED the
     # STALE v2, under-reporting every multi-generation industry and making the scoreboard lie. Discover
     # the highest v<N> business dir; default 'v2' on empty/auth-fail (honest, never crashes the run).
+    #
+    # v4.1.1 alias=marathon-harvest-complete-pair -- ROOT CAUSE (live manufacturing partial, 2026-06-23):
+    # install-once-reuse vov'd the same catalog repeatedly to v8, but the v8 shrink no-op'd MVM creation
+    # (only the older v2/v3 ever wrote mvm/model.json). max(vers)=v8 has ecm/model.json but NO
+    # mvm/model.json, so export_industry copied a complete ecm + an EMPTY mvm and harvested 'partial'.
+    # This marathon always runs MVM scope (data_model_scopes=MVM_SCOPE), so a COMPLETE version must
+    # carry BOTH ecm/model.json AND mvm/model.json. Pick the highest version that has the complete pair;
+    # only if none is complete do we fall back to max(vers) (then ecm-only, then 'v2') so the run still
+    # harvests something and never crashes -- but a half-baked latest version no longer shadows the last
+    # good complete pair. Fail SAFE: any ls/auth error on a candidate just skips it.
     import re as _re
     cat = cat_name(ind)
     base = f"dbfs:/Volumes/{cat}/_metamodel/vol_root/business/{ind}"
+
+    def _has_model_json(ver_dir, scope):
+        try:
+            o = db(["fs", "ls", f"{base}/{ver_dir}/{scope}"], profile, timeout=90)
+            return any(ln.strip().rstrip("/").split("/")[-1].split()[0] == "model.json"
+                       for ln in (o or "").splitlines() if ln.strip())
+        except Exception:
+            return False
+
     try:
         out = db(["fs", "ls", base], profile, timeout=90)
         vers = []
@@ -229,6 +248,18 @@ def latest_version(profile, ind):
             if m:
                 vers.append(int(m.group(1)))
         if vers:
+            vers_desc = sorted(set(vers), reverse=True)
+            for n in vers_desc:
+                vd = f"v{n}"
+                if _has_model_json(vd, "ecm") and _has_model_json(vd, "mvm"):
+                    return vd
+            # no complete ecm+mvm pair anywhere: prefer the highest version with at least an ecm,
+            # else the bare highest version. Pulse so a partial harvest is never silent.
+            for n in vers_desc:
+                if _has_model_json(f"v{n}", "ecm"):
+                    pulse(f"[{ind}] no complete ecm+mvm version found; harvesting ecm-only v{n} "
+                          f"(latest complete pair absent). alias=marathon-harvest-complete-pair")
+                    return f"v{n}"
             return f"v{max(vers)}"
     except Exception:
         pass
@@ -293,13 +324,26 @@ def v1_installed(profile, ind):
         # (business -> domain -> product -> attribute) early in install, so a complete logical v1
         # is what vov reads. A business row alone could be a partial/aborted install; demanding
         # domains too guards reuse against feeding vov a truncated v1.
+        # ROOT CAUSE (live consumer_goods/semiconductors/retail INTERNAL_ERROR, 2026-06-23):
+        # a bare existence check reused a v1 whose 'new base model' run never finished (the agent
+        # records completed_percent<100 for a truncated install). VOV then fail-closes with
+        # "Version '1' ... INCOMPLETE (progress: 99.0%)". The agent's OWN completeness contract is
+        # completed_percent==100.0 (see _version_is_incomplete / _get_latest_completed_version), so
+        # mirror it here: only reuse a v1 the agent would accept as a base; otherwise force a fresh
+        # install. MAX(COALESCE(...)) returns NULL when no v1 row exists (-> fresh install) and a
+        # missing completed_percent column raises (-> except -> fresh install): both fail SAFE.
         biz = sql_exec(
             profile,
-            f"SELECT 1 FROM `{cat}`.`_metamodel`.`business` "
-            f"WHERE LOWER(business)=LOWER('{bn}') AND CAST(version AS INT)=1 LIMIT 1",
+            f"SELECT MAX(COALESCE(completed_percent, 0.0)) FROM `{cat}`.`_metamodel`.`business` "
+            f"WHERE LOWER(business)=LOWER('{bn}') AND CAST(version AS INT)=1",
             timeout=120,
         )
-        if not _rows(biz):
+        brows = _rows(biz)
+        if not brows or brows[0][0] is None:
+            return False
+        _pct = float(brows[0][0] or 0.0)
+        if _pct < 100.0:
+            pulse(f"[{ind}] v1 present on {profile} but INCOMPLETE (completed_percent={_pct}) — forcing fresh install, not reuse. alias=marathon-reuse-incomplete-v1")
             return False
         dom = sql_exec(
             profile,
