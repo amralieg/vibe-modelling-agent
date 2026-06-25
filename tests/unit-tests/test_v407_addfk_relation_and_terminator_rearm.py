@@ -75,7 +75,7 @@ def _orch(klass):
 
 # ============================== version =====================================
 def test_version_bumped_to_407():
-    assert ah.__AGENT_VERSION__ == "4.1.1", ah.__AGENT_VERSION__
+    assert ah.__AGENT_VERSION__ == "4.1.2", ah.__AGENT_VERSION__
 
 
 # ============ FIX 1: relation-branch domain-prefix-resolve (add FK) =========
@@ -199,6 +199,9 @@ def test_terminator_rearm_wired_two_sites_POST():
 
 
 def test_terminator_was_dead_code_FAILPRE_v406():
+    if not PRE.exists():
+        import pytest
+        pytest.skip(f"pre-patch backup {PRE} absent (ephemeral /tmp dev artifact); fail-pre half historical, pass-post protects live behavior")
     pre_src = json.loads(PRE.read_bytes().decode("utf-8"))
     src = "".join("".join(c["source"]) for c in pre_src["cells"] if c["cell_type"] == "code")
     # fail-pre: v4.0.6 defines the watchdog but NEVER calls it with the re-arm grace (dead code).

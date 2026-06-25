@@ -22,7 +22,7 @@ def _live_executor_workers():
 
 
 def test_version_bumped_to_409():
-    assert ah.__AGENT_VERSION__ == "4.1.1", ah.__AGENT_VERSION__
+    assert ah.__AGENT_VERSION__ == "4.1.2", ah.__AGENT_VERSION__
 
 
 def test_teardown_drain_removes_leaked_nondaemon_executor(capsys):
