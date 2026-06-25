@@ -121,7 +121,19 @@ def test_no_detect_no_cancel_when_log_still_advancing(monkeypatch):
         return [{"name": f"{_ind(dir_path)}_info_v2_ecm.log", "last_modified": str(mt[0])}]
 
     monkeypatch.setattr(mod, "_ls_json", fake_ls)
-    monkeypatch.setattr(mod, "db", lambda *a, **k: state["cancelled"].append(a) or "")
+    # v4.0.7 marathon-harvest-latest-version added latest_version(profile, ind) INSIDE the detector,
+    # which issues benign `db ["fs","ls",...]` version-discovery calls. Stub it to the version the
+    # fake log uses ("v2") so (a) log_name == fake_ls's name and the advancing-log path is genuinely
+    # exercised, and (b) only a real `jobs cancel-run` counts as a cancel (mirrors _patch_volume's
+    # fake_db) -- the pre-v4.0.7 naive "append every db call" stub wrongly counted fs-ls as a cancel.
+    monkeypatch.setattr(mod, "latest_version", lambda profile, ind: "v2")
+
+    def _fake_db(args, profile, timeout=300):
+        if args[:2] == ["jobs", "cancel-run"]:
+            state["cancelled"].append(args[2])
+        return ""
+
+    monkeypatch.setattr(mod, "db", _fake_db)
     monkeypatch.setattr(mod, "pulse", lambda *a, **k: state["pulses"].append(a[0] if a else ""))
     monkeypatch.setattr(mod, "cat_name", lambda ind: f"vibe_{ind}_v1")
     hs = {}

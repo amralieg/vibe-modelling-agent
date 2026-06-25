@@ -137,7 +137,13 @@ def test_killswitch_disables_preskip(monkeypatch):
 # ---------------- version + fail-pre ----------------
 
 def test_version_bumped_to_401():
-    assert '__AGENT_VERSION__ = "4.0.3"' in _concat(NB)
+    # Originally pinned the exact literal "4.0.3"; that one-shot snapshot goes stale on every bump.
+    # Durable invariant: canonical single-digit-semver version line present (CLAUDE.md 3a) and never
+    # regressing below the version this test gated (4.0.3).
+    import re
+    m = re.search(r'__AGENT_VERSION__\s*=\s*"(\d)\.(\d)\.(\d)"', _concat(NB))
+    assert m, "canonical single-digit-semver __AGENT_VERSION__ line missing (CLAUDE.md 3a)"
+    assert tuple(int(g) for g in m.groups()) >= (4, 0, 3), f"version {m.group(0)} regressed below 4.0.3"
 
 
 def test_failpre_preskip_absent_in_v400_backup():

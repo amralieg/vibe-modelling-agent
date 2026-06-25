@@ -57,11 +57,22 @@ def test_force_reinstall_env_short_circuits_probe(monkeypatch):
     assert calls["n"] == 0
 
 
-def test_probe_true_when_v1_row_present(monkeypatch):
+def test_probe_true_when_v1_complete(monkeypatch):
+    # v1_installed now mirrors the agent's completeness contract: reuse a v1 ONLY when
+    # MAX(completed_percent) >= 100 AND domain rows exist. "100" satisfies both the
+    # completeness query (float("100") == 100.0) and the domain-count query (int("100") > 0).
     monkeypatch.delenv("VOV_FORCE_REINSTALL", raising=False)
     monkeypatch.setattr(m, "sql_exec",
-                        lambda *a, **k: {"result": {"data_array": [["1"]]}})
+                        lambda *a, **k: {"result": {"data_array": [["100"]]}})
     assert m.v1_installed("fe-gcp", "travel_hospitality") is True
+
+
+def test_probe_false_when_v1_incomplete(monkeypatch):
+    # a v1 row that never finished (completed_percent < 100) must NOT be reused — fresh install.
+    monkeypatch.delenv("VOV_FORCE_REINSTALL", raising=False)
+    monkeypatch.setattr(m, "sql_exec",
+                        lambda *a, **k: {"result": {"data_array": [["99.0"]]}})
+    assert m.v1_installed("fe-gcp", "travel_hospitality") is False
 
 
 def test_probe_false_when_no_row(monkeypatch):
@@ -81,42 +92,61 @@ def test_probe_false_when_catalog_missing(monkeypatch):
     assert m.v1_installed("fe-gcp", "travel_hospitality") is False
 
 
-# --- fixed-catalog (my-aws, no CREATE CATALOG on metastore) ---
+# --- fixed-catalog mechanism (a profile where the metastore denies CREATE CATALOG) ---
+# my-aws is the FIXED_CATALOG profile but is now EMPTY of industries (manufacturing was relocated
+# to the droppable fe-aws on 2026-06-24 to escape the un-droppable shared catalog that pinned it
+# 'partial'). The fixed-catalog mechanism must still be covered, so these tests drive it through a
+# SYNTHETIC industry mapped onto my-aws rather than a live assignment.
+FIXED_PROFILE = "my-aws"
+FIXED_CAT = "serverless_stable_8nstmo_catalog"
 
-def test_cat_name_fixed_for_my_aws_industry():
-    # manufacturing is assigned to the fixed-catalog profile my-aws -> shared catalog
-    assert m.cat_name("manufacturing") == "serverless_stable_8nstmo_catalog"
-    # an industry on a normal profile keeps its isolated per-industry catalog
+
+def test_fixed_catalog_mechanism_via_synthetic_industry(monkeypatch):
+    monkeypatch.setitem(m._IND_PROFILE, "_fixedtest", FIXED_PROFILE)
+    assert m.FIXED_CATALOG.get(FIXED_PROFILE) == FIXED_CAT
+    # an industry on the fixed-catalog profile resolves to the shared pre-existing catalog
+    assert m.cat_name("_fixedtest") == FIXED_CAT
+    # an industry on a normal profile keeps its isolated, droppable per-industry catalog
     assert m.cat_name("travel_hospitality") == "vibe_travel_hospitality_v1"
 
 
-def test_manufacturing_moved_off_my_adp_to_my_aws():
-    assert "manufacturing" not in m.ASSIGN["my-adp"]
-    assert m.ASSIGN["my-aws"] == ["manufacturing"]
-    assert "my-aws" in m.WAREHOUSE
-    # default --profiles fan-out must now include my-aws
-    assert "my-aws" in ",".join(m.ASSIGN.keys())
+def test_manufacturing_on_droppable_fe_aws():
+    # manufacturing now lives on fe-aws (CREATE/DROP CATALOG allowed) so the marathon can do a
+    # clean DROP+install v1->v2; it must NOT be on the fixed/un-droppable or flaky-Azure profiles.
+    assert "manufacturing" in m.ASSIGN["fe-aws"]
+    assert "manufacturing" not in m.ASSIGN["my-aws"]
+    assert "manufacturing" not in m.ASSIGN.get("my-adp", [])
+    # and it therefore gets a droppable, isolated per-industry catalog
+    assert m.cat_name("manufacturing") == "vibe_manufacturing_v1"
 
 
-def test_build_job_spec_uses_fixed_catalog_for_my_aws_industry():
+def test_build_job_spec_uses_fixed_catalog_for_fixed_profile_industry(monkeypatch):
+    monkeypatch.setitem(m._IND_PROFILE, "_fixedtest", FIXED_PROFILE)
+    spec = m.build_job_spec("_fixedtest", installed=False)
+    for t in spec["tasks"]:
+        assert t["notebook_task"]["base_parameters"]["deployment_catalog"] == FIXED_CAT
+
+
+def test_build_job_spec_uses_droppable_catalog_for_manufacturing():
     spec = m.build_job_spec("manufacturing", installed=False)
     for t in spec["tasks"]:
-        assert t["notebook_task"]["base_parameters"]["deployment_catalog"] == "serverless_stable_8nstmo_catalog"
+        assert t["notebook_task"]["base_parameters"]["deployment_catalog"] == "vibe_manufacturing_v1"
 
 
 def test_prepare_catalog_fixed_skips_drop_and_create(monkeypatch):
+    monkeypatch.setitem(m._IND_PROFILE, "_fixedtest", FIXED_PROFILE)
     stmts = []
     monkeypatch.setattr(m, "v1_installed", lambda *a, **k: False)
     monkeypatch.setattr(m, "sql_exec",
                         lambda profile, stmt, timeout=180: stmts.append(stmt) or {"result": {"data_array": []}})
     monkeypatch.setattr(m, "pulse", lambda *a, **k: None)
-    reused = m.prepare_catalog("my-aws", "manufacturing")
+    reused = m.prepare_catalog(FIXED_PROFILE, "_fixedtest")
     joined = " | ".join(stmts).upper()
     # the metastore denies CREATE CATALOG, so neither DROP nor CREATE CATALOG may be issued
     assert "DROP CATALOG" not in joined
     assert "CREATE CATALOG" not in joined
     # but the agent meta schema + volume must be ensured inside the shared catalog
-    assert any("CREATE SCHEMA IF NOT EXISTS" in s and "serverless_stable_8nstmo_catalog" in s for s in stmts)
+    assert any("CREATE SCHEMA IF NOT EXISTS" in s and FIXED_CAT in s for s in stmts)
     assert any("CREATE VOLUME IF NOT EXISTS" in s for s in stmts)
     # v1 not yet installed -> install task must run (reused False)
     assert reused is False

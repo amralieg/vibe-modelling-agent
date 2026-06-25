@@ -46,8 +46,11 @@ def _slice(src, start_marker, end_marker, include_end=True):
 def _exec_tag_prefix(tag_keys, prefix):
     """Exec the verbatim _UNIVERSAL_TAGS / _is_universal_tag / _viol slice."""
     src = _cell_src(9)
+    # v3.4.4/v3.4.5 refactored the prefix check into _is_universal_token + _key_violates_prefix
+    # (compound-tag aware), so the final _viol line now reads through _key_violates_prefix. Slice to
+    # the CURRENT terminator so the white-box test exercises the live, improved implementation.
     block = _slice(src, "_UNIVERSAL_TAGS = {",
-                   "_viol = [k for k in _industry_keys if not k.startswith(_p)]")
+                   "_viol = [k for k in set(_tag_keys) if _key_violates_prefix(k)]")
     block = textwrap.dedent(block)
     ns = {"_rt": re, "_tag_keys": tag_keys, "_p": prefix}
     exec(block, ns)

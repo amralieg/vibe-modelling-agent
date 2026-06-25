@@ -265,5 +265,12 @@ def test_fail_pre_parallel_absent_in_v399():
 
 
 def test_version_bumped_to_400():
+    # Originally pinned the exact literal "4.0.6"; that one-shot snapshot goes stale on every bump
+    # (false-red the moment the version advances). The durable, non-tautological invariant is: the
+    # canonical version line EXISTS, is a valid single-digit semver (CLAUDE.md 3a), and never
+    # regresses below the version this test gated (4.0.6).
+    import re
     nb = REPO / "agent" / "dbx_vibe_modelling_agent.ipynb"
-    assert '__AGENT_VERSION__ = "4.0.6"' in _concat(nb)
+    m = re.search(r'__AGENT_VERSION__\s*=\s*"(\d)\.(\d)\.(\d)"', _concat(nb))
+    assert m, "canonical single-digit-semver __AGENT_VERSION__ line missing (CLAUDE.md 3a)"
+    assert tuple(int(g) for g in m.groups()) >= (4, 0, 6), f"version {m.group(0)} regressed below 4.0.6"

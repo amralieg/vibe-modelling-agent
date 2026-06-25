@@ -293,14 +293,19 @@ def test_all_four_v230_fixes_each_appear_exactly_in_one_definition_site(src):
 
 def test_no_existing_v220_or_v219_aliases_were_lost(src):
     """Regression guard: v2.3.0 must NOT remove any prior FIRED aliases."""
+    # NOTE: the v218 marker "vibe-parse-prose-only-prompt" was DELIBERATELY removed in v2.7.8
+    # ("generalize exact-count recovery + remove run-specific overfitting") and superseded by
+    # "sizing-directive-focused-recovery" + the structured VIBE_PARSE sizing_directives mechanism.
+    # The prose-parsing FEATURE (VIBE_PARSE_PROMPT) is intact; only the over-specific v218 alias was
+    # generalized, well after v2.3.0. Guarding it here is stale, so it is replaced by its successor.
     for prior in [
-        "vov-apply-handler-none-model-guard",  # v220
-        "mv-statements-dict-coercion-fix",      # v219
-        "vibe-parse-prose-only-prompt",         # v218
-        "vov-coverage-honest",                  # v2.0.8
-        "vov-noop-applied-guard",               # v2.0.8
+        "vov-apply-handler-none-model-guard",   # v220
+        "mv-statements-dict-coercion-fix",       # v219
+        "sizing-directive-focused-recovery",     # v2.7.8 successor of the v218 prose-only-prompt marker
+        "vov-coverage-honest",                   # v2.0.8
+        "vov-noop-applied-guard",                # v2.0.8
     ]:
-        assert prior in src, f"prior alias {prior!r} was lost in v2.3.0 - regression"
+        assert prior in src, f"prior alias {prior!r} was lost - regression"
 
 
 def test_synthesis_prompt_still_has_user_vibe_authority(src):

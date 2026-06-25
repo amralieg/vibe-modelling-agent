@@ -55,14 +55,18 @@ SHRINK_TIMEOUT_S = 9000      # 2.5h: functional shrink 66-106m; same serverless 
 
 ASSIGN = {
     "fe-gcp": ["travel_hospitality", "consumer_goods", "automotive"],
-    "fe-aws": ["ngo", "retail", "healthcare"],
+    # manufacturing moved here off the fixed-catalog my-aws (2026-06-24): my-aws is a FIXED_CATALOG
+    # profile (serverless_stable_8nstmo_catalog) the marathon CANNOT drop, so repeated vov runs
+    # polluted it v1->v8 and the v8 shrink no-op'd the MVM -> permanent 'partial'. fe-aws mints a
+    # droppable per-industry catalog (vibe_manufacturing_v1), so a clean DROP+install v1->v2 with a
+    # complete ecm+mvm pair is possible. fe-aws's other industries are already green and skip.
+    "fe-aws": ["ngo", "retail", "healthcare", "manufacturing"],
     "my-gcp": ["restaurants", "semiconductors", "media_broadcasting"],
     "my-adp": ["water_utilities"],
     "my-uae": ["construction", "health_insurance"],
     # my-aws (user directive 2026-06-19): fresh AWS test env added as a 6th concurrent profile.
-    # manufacturing moved here off the flaky Azure my-adp (which had external-location
-    # PERMISSION_DENIED on manufacturing) so the known blocker runs on a clean metastore.
-    "my-aws": ["manufacturing"],
+    # (manufacturing relocated to fe-aws 2026-06-24 to escape the un-droppable fixed catalog.)
+    "my-aws": [],
 }
 
 WAREHOUSE = {
