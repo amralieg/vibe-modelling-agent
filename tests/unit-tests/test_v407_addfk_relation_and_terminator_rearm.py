@@ -75,7 +75,7 @@ def _orch(klass):
 
 # ============================== version =====================================
 def test_version_bumped_to_407():
-    assert ah.__AGENT_VERSION__ == "4.1.2", ah.__AGENT_VERSION__
+    assert tuple(int(x) for x in ah.__AGENT_VERSION__.split(".")) >= (4, 1, 3), ah.__AGENT_VERSION__
 
 
 # ============ FIX 1: relation-branch domain-prefix-resolve (add FK) =========

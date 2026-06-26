@@ -237,4 +237,7 @@ def test_hook_present_in_v337_absent_in_pre():
 
 
 def test_version_bumped():
-    assert '__AGENT_VERSION__ = "3.3.7"' in _full_src(NB)
+    import re as _re
+    m = _re.search(r'__AGENT_VERSION__\s*=\s*"(\d+)\.(\d+)\.(\d+)"', _full_src(NB))
+    assert m, "no single-digit-semver __AGENT_VERSION__ literal found"
+    assert tuple(int(g) for g in m.groups()) >= (3, 3, 7)

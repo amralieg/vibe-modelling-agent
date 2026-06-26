@@ -62,12 +62,12 @@ def _cell1(nb_path=None):
 
 # ============================== version =====================================
 def test_version_bumped_to_408():
-    assert ah.__AGENT_VERSION__ == "4.1.2", ah.__AGENT_VERSION__
+    assert tuple(int(x) for x in ah.__AGENT_VERSION__.split(".")) >= (4, 1, 3), ah.__AGENT_VERSION__
 
 
 def test_version_is_first_line_then_banner_POST():
     lines = _cell1().split("\n")
-    assert lines[0].startswith('__AGENT_VERSION__ = "4.1.2"'), lines[0]
+    assert lines[0].startswith('__AGENT_VERSION__ = "' + ah.__AGENT_VERSION__ + '"'), lines[0]
     assert ("AGENT BANNER" in lines[1]) or ("CELL 1" in lines[1]), lines[1]
 
 

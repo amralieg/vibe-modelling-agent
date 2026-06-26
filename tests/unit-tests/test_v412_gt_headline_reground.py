@@ -61,7 +61,7 @@ def _load_backup_module(path: Path):
 
 # ============================== version =====================================
 def test_version_bumped_to_412():
-    assert ah.__AGENT_VERSION__ == "4.1.2", ah.__AGENT_VERSION__
+    assert tuple(int(x) for x in ah.__AGENT_VERSION__.split(".")) >= (4, 1, 3), ah.__AGENT_VERSION__
 
 
 # ===================== _v412_combine_verdict (FAILPRE) ======================

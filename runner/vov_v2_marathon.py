@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-AGENT_VER = "412"  # matches __AGENT_VERSION__ 4.1.2 (semver minus dots, §3a); never run stale
+AGENT_VER = "414"  # matches __AGENT_VERSION__ 4.1.4 (semver minus dots, §3a); never run stale
 AGENT_PATH = f"/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v{AGENT_VER}"
 STAGE_DIR = "/tmp/vov_stage"
 OUT_DIR = "/tmp/vov_out"
