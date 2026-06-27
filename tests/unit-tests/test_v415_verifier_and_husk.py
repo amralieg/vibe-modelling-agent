@@ -71,6 +71,23 @@ class _Req:
         self.id = rid
 
 
+def _extract_modfn(src, name):
+    # module-level (column-0) def extractor: from '\ndef name(' to the next column-0 'def ' / EOF
+    m = re.search(rf"\ndef {name}\(.*?(?=\ndef |\Z)", src, re.S)
+    assert m, f"module-level {name} not found"
+    return m.group(0)
+
+
+def _bind_classify_op(path):
+    # exec _v337_classify_op + its module-level deps from `path` into one namespace (re available)
+    src = _full_src(path)
+    ns = {"re": re}
+    for fn in ("_v301_extract_rename_target", "_v337_extract_col_rename",
+               "_v337_extract_move_target", "_v337_classify_op"):
+        exec(_extract_modfn(src, fn), ns)
+    return ns["_v337_classify_op"]
+
+
 def _bind(path, name):
     src = _full_src(path)
     ns = {"re": re}
@@ -209,9 +226,56 @@ def test_add_attr_verifier_wired_before_coarse_fallback_POST(agent_source_text):
     assert loop_after != -1 and loop_after > call_at
 
 
+# ===================== RC#3 B7 bare-action column rename ====================
+# ngo VREQ-034 (supply_category_code -> commodity_category_code): a column rename
+# arriving WITHOUT an explicit action label (action='') fell through _v337_classify_op
+# to None (the empty-action branch only handled product/table rename). v415 adds the
+# empty-action column-rename branch. SAFE: requires explicit column/attribute/field
+# rename phrasing; _v337_apply_rename_attribute validates the source col so a mis-parse
+# defers (returns None) and never mutates.
+RA_FQN = "procurement.purchase_order"
+RA_TXT = "rename column supply_category_code to commodity_category_code"
+
+
+def test_bare_action_column_rename_classified_POST():
+    op = ah._v337_classify_op("", RA_FQN, RA_TXT, RA_TXT)
+    assert op == ("rename_attribute", "procurement", "purchase_order",
+                  "supply_category_code", "commodity_category_code"), op
+
+
+def test_explicit_action_column_rename_still_classified_POST():
+    op = ah._v337_classify_op("rename_attribute", RA_FQN, RA_TXT, RA_TXT)
+    assert op == ("rename_attribute", "procurement", "purchase_order",
+                  "supply_category_code", "commodity_category_code"), op
+
+
+def test_bare_action_product_rename_unaffected_POST():
+    # the product-rename empty-action branch must still win for product/table phrasing
+    op = ah._v337_classify_op("", "sales.order", "rename product order to sales_order",
+                              "rename product order to sales_order")
+    assert op is not None and op[0] == "rename_product", op
+
+
+def test_bare_action_non_rename_returns_none_POST():
+    # non-rename free text must NOT be misclassified as a column rename (no false op)
+    op = ah._v337_classify_op("", "sales.order", "add column total_amount DECIMAL",
+                              "add column total_amount DECIMAL")
+    assert op is None, op
+
+
+@pytest.mark.skipif(not os.path.exists(NB_PRE), reason="pre-v415 backup absent")
+def test_bare_action_column_rename_None_pre_patch_FAILPRE():
+    # behavioral fail-pre: v4.1.4 _v337_classify_op returns None for the bare-action rename
+    classify_pre = _bind_classify_op(NB_PRE)
+    assert classify_pre("", RA_FQN, RA_TXT, RA_TXT) is None
+    # and post must return the op (proves the patch changed observable behavior)
+    assert ah._v337_classify_op("", RA_FQN, RA_TXT, RA_TXT) is not None
+
+
 # ============================== FAILPRE =====================================
 @pytest.mark.skipif(not os.path.exists(NB_PRE), reason="pre-v415 backup absent")
 def test_add_attr_verifier_absent_pre_patch_FAILPRE():
     pre = _full_src(NB_PRE)
     assert "_v415_verify_add_attr" not in pre, "v4.1.4 must NOT have the add-attr verifier"
     assert "v415-empty-domain-final-export-sweep" not in pre, "v4.1.4 must NOT have the export sweep"
+    assert "v415-rename-attr-bare-action" not in pre, "v4.1.4 must NOT have the bare-action col-rename branch"
