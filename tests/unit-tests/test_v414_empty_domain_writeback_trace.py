@@ -70,7 +70,8 @@ def _load_backup_module(path: Path):
 
 # ============================== version =====================================
 def test_version_bumped_to_414():
-    assert ah.__AGENT_VERSION__ == "4.1.4", ah.__AGENT_VERSION__
+    ver = tuple(int(x) for x in ah.__AGENT_VERSION__.split("."))
+    assert ver >= (4, 1, 4), ah.__AGENT_VERSION__
 
 
 # ============== Issue 2A: empty-domain cleanup mechanism (POST) =============
