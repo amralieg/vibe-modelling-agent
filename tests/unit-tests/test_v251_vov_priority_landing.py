@@ -87,6 +87,11 @@ def _exec_v251_namespace():
         "logger": _ListLogger(),
         # v2.9.6 alias=vov-severity-first — the sort const used by the extracted helpers.
         "_V296_SEV_RANK": {"critical": 0, "high": 1, "medium": 2, "low": 3},
+        # v4.1.5 test-harness debt fix: _v320_vov_calls/_reset_calls read these module-level
+        # globals (the VOV LLM-bridge call counter + its lock). The isolated namespace must
+        # provide them or run_vov_pipeline NameErrors mid-pipeline. Stub with real values.
+        "_VOV_BRIDGE_CALL_LOCK": __import__("threading").Lock(),
+        "_VOV_BRIDGE_CALL_COUNT": 0,
     }
     ordered_defs = [
         "_V251_PRIORITY_LINE_RE",
@@ -103,6 +108,8 @@ def _exec_v251_namespace():
         "_v251_find_attribute_row",
         "_v251_iter_attribute_rows",
         "_v251_parse_priority_details",
+        "_v410_resolve_pk",
+        "_v415_complete_connect_details",
         "_v251_prevalidate_priority",
         "_v327_infer_coltype",
         "_v251_apply_priority_deterministic",
@@ -110,6 +117,22 @@ def _exec_v251_namespace():
         "_v251_apply_pass1_priorities",
         "_apply_handler_with_retry",
         "_v328_pack_budget",
+        # v4.1.5 test-harness debt fix: run_vov_pipeline transitively calls these module-level
+        # helpers; the hand-curated namespace list had drifted (pre-existing failures at v4.1.4
+        # baseline aafc1c8 too). Add the real defs so the run_vov_pipeline tests can execute.
+        "_v207_get_runtime_budget",
+        "_v260_diagnose_slip",
+        "_v260_priority_to_vreq_with_feedback",
+        "_v261_vreq_with_feedback",
+        "_v292_audit_extraction_completeness",
+        "_v292_residual_signature",
+        "_v299_collapse_preservation_vreqs",
+        "_v299_is_preservation_only",
+        "_v320_vov_calls",
+        "_v320_vov_reset_calls",
+        "_v330_recover_dropped_priorities",
+        "_v413_vreq_to_det_op",
+        "_v413_apply_det_op_inplace",
         "run_vov_pipeline",
     ]
     for name in ordered_defs:
