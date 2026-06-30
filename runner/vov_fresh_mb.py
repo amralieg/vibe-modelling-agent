@@ -19,7 +19,7 @@ import vov_v2_marathon as M
 import vov_canary_finish as C
 import vov_audit_extract as A
 
-M.AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v358"
+M.AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v418"
 M.INSTALL_TIMEOUT_S = 2700      # 45m: bounds install teardown hang; vov is run_if=ALL_DONE
 C.SHRINK_TIMEOUT_S = 14400      # 4h cap for mb (~421p) shrink on my-gcp
 
