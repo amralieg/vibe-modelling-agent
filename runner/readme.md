@@ -472,3 +472,25 @@ The runner implements multiple layers of error handling:
 ---
 
 [← Back to project root](../readme.md)
+
+---
+
+## Endpoint Pre-flight (`endpoint_preflight.py`)
+
+Externalizes LLM endpoint selection so a new workspace needs **no code edits**, and
+fails fast on a misconfigured run instead of ~10 min into generation.
+
+```bash
+# discover + validate, and (optionally) probe temperature support
+python runner/endpoint_preflight.py --warehouse <sql_warehouse_id> --probe-temperature
+```
+
+It (1) discovers the chat serving endpoints actually present on the target workspace,
+(2) resolves an ensemble in priority order — explicit `llm_endpoints` override →
+auto-discovery → packaged default, and (3) verifies each chosen endpoint exists and
+(optionally) accepts the `temperature` param. Importable: `from endpoint_preflight
+import resolve_ensemble, preflight`.
+
+> Note: Anthropic hybrid-reasoning endpoints (Opus 4.7/4.8) reject `temperature`;
+> the resolver flags these `supports_temperature=False`. See issue #3 for wiring this
+> per-endpoint into the agent's `ai_query` calls.
