@@ -59,6 +59,7 @@ const DOMAIN_COLORS = [
   '#77DD77','#AEC6CF','#FDFD96','#836953','#C23B22','#779ECB','#966FD6',
 ];
 const DEFAULT_W = 500, DEFAULT_H = 400;
+const TREE_ATTR_CAP = 250;
 
 // ── Graph data extraction ──────────────────────────────────
 function extractGraph(dataModel) {
@@ -515,7 +516,8 @@ const TreeNode=memo(({domainName,domainData,expandedDomains,expandedTables,
         },tname),
         h('span',{style:{fontSize:9,color:'#555',marginLeft:5}},'('+sortedAttrs.length+')')
       ),
-      isTblExp&&h('div',{key:'attrs'},sortedAttrs.map(attr=>{
+      isTblExp&&h('div',{key:'attrs'},[
+        ...sortedAttrs.slice(0,TREE_ATTR_CAP).map(attr=>{
         const isPk=attr.pk;
         const isFk=!!attr.fk;
         const icon=isPk?'🔑':isFk?'🔗':'•';
@@ -528,7 +530,11 @@ const TreeNode=memo(({domainName,domainData,expandedDomains,expandedTables,
           h('span',{style:{fontSize:10,color:'#ccc',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},attr.name),
           h('span',{style:{fontSize:9,color:'#666',marginLeft:5}},attr.type)
         );
-      }))
+      }),
+        sortedAttrs.length>TREE_ATTR_CAP&&h('div',{key:'__more',
+          style:{fontSize:9,color:'#888',fontStyle:'italic',marginLeft:indent+24,padding:'3px 0'}},
+          `… ${sortedAttrs.length-TREE_ATTR_CAP} more attributes (click the product to view all)`)
+      ])
     );
   }
 
@@ -843,10 +849,10 @@ function NodeInfoPanel({selectedNode,selectedEdge,treeClick,graphData,domainSize
 // ── GitHub repo browser ───────────────────────────────────
 const REPO_LS_KEY='model_viewer:last_repo';
 const CACHE_PREFIX='model_viewer:cache:';
-const MODEL_DIR_RE=/^(ecm|mvm)_v?\d+$/i;
+const MODEL_DIR_RE=/^(ecm|mvm)(_v?\d+)?$/i;
 // Default repo shown in the From Repo dialog when no saved repo exists.
 // Change this single constant if you fork this viewer for a different project.
-const DEFAULT_REPO='amralieg/vibe-modelling-agent';
+const DEFAULT_REPO='databricks-industry-solutions/lakehouse-business-data-models';
 const DEFAULT_BRANCH='main';
 
 function parseRepoSpec(raw){
@@ -928,30 +934,48 @@ function writeCachedModel(owner,repo,branch,dirPath,content){
 function readLastRepo(){try{const raw=localStorage.getItem(REPO_LS_KEY);return raw?JSON.parse(raw):null;}catch(_){return null;}}
 function writeLastRepo(spec){try{localStorage.setItem(REPO_LS_KEY,JSON.stringify(spec));}catch(_){}}
 
-// Scan flat git/trees output for every <industry>/(ecm|mvm)_v?N/model.json blob
-// and group by industry name. Industry = the directory immediately above the
-// model-version dir. Returns sorted rows: [{industry, parentPath,
-//   ecm:[{ver,name,path}], mvm:[...]}], versions sorted newest-first per scope.
+// Scan flat git/trees output for every industry model.json blob and group by
+// industry. Supports two on-disk layouts:
+//   NEW: <industry>/v<N>/(ecm|mvm)/model.json  (version dir is parent, scope dir is child)
+//   OLD: <industry>/(ecm|mvm)_v?<N>/model.json (scope+version combined in one dir)
+// Grouping key is the industry directory path, so all versions of one industry
+// share a row and same-named industries under different prefixes stay distinct.
+// Returns sorted rows: [{industry, parentPath, ecm:[{ver,name,path}], mvm:[...]}],
+// versions sorted newest-first per scope.
 function buildIndustryRows(treeEntries){
-  const byParent={}; // key = parentPath so two industries with the same name in different prefixes stay distinct
+  const byKey={};
   (treeEntries||[]).forEach(e=>{
     if(!e||e.type!=='blob')return;
     const p=e.path||'';
     if(!p.endsWith('/model.json'))return;
     const parts=p.split('/');
-    if(parts.length<3)return; // need <industry>/<scope_dir>/model.json at minimum
-    const dirName=parts[parts.length-2];
-    const m=dirName.match(/^(ecm|mvm)_v?(\d+)$/i);
-    if(!m)return;
-    const scope=m[1].toLowerCase();
-    const ver=parseInt(m[2],10);
+    if(parts.length<3)return; // need at least <industry>/<scope_dir>/model.json
+    const scopeDir=parts[parts.length-2];
+    let scope,ver,industry,industryPath,name;
+    const sm=scopeDir.match(/^(ecm|mvm)$/i);
+    const vm=parts.length>=4?parts[parts.length-3].match(/^v(\d+)$/i):null;
+    if(sm&&vm){
+      // NEW layout: bare ecm|mvm scope dir under a v<N> version dir.
+      scope=sm[1].toLowerCase();
+      ver=parseInt(vm[1],10);
+      industry=parts[parts.length-4];
+      industryPath=parts.slice(0,-3).join('/');
+      name='v'+ver;
+    }else{
+      // OLD layout: scope and version combined in a single dir.
+      const om=scopeDir.match(/^(ecm|mvm)_v?(\d+)$/i);
+      if(!om)return;
+      scope=om[1].toLowerCase();
+      ver=parseInt(om[2],10);
+      industry=parts[parts.length-3];
+      industryPath=parts.slice(0,-2).join('/');
+      name=scopeDir;
+    }
     const dirPath=parts.slice(0,-1).join('/');
-    const parentPath=parts.slice(0,-2).join('/');
-    const industry=parts[parts.length-3];
-    if(!byParent[parentPath]){byParent[parentPath]={industry,parentPath,ecm:[],mvm:[]};}
-    byParent[parentPath][scope].push({ver,name:dirName,path:dirPath});
+    if(!byKey[industryPath]){byKey[industryPath]={industry,parentPath:industryPath,ecm:[],mvm:[]};}
+    byKey[industryPath][scope].push({ver,name,path:dirPath});
   });
-  return Object.values(byParent).map(r=>({
+  return Object.values(byKey).map(r=>({
     ...r,
     ecm:r.ecm.sort((a,b)=>b.ver-a.ver),
     mvm:r.mvm.sort((a,b)=>b.ver-a.ver),
@@ -963,8 +987,9 @@ function IndustryTable({rows,onSelect,loadingPath,resolved,cacheTick}){
     return h('div',{style:{textAlign:'center',padding:40,color:'#888',fontSize:12}},
       h('div',{style:{fontSize:32,marginBottom:10}},'🤷'),
       'No industry models found. Looking for ',
-      h('code',{style:{color:'#4ECDC4'}},'<industry>/ecm_v*/model.json'),' or ',
-      h('code',{style:{color:'#4ECDC4'}},'<industry>/mvm_v*/model.json'),' anywhere in the repo.');
+      h('code',{style:{color:'#4ECDC4'}},'<industry>/v*/ecm/model.json'),' or ',
+      h('code',{style:{color:'#4ECDC4'}},'<industry>/v*/mvm/model.json'),' (or legacy ',
+      h('code',{style:{color:'#4ECDC4'}},'<industry>/(ecm|mvm)_v*/model.json'),') anywhere in the repo.');
   }
   const versionBtn=(scope,item)=>{
     const cached=resolved?!!readCachedModel(resolved.owner,resolved.repo,resolved.branch,item.path):false;
@@ -1025,7 +1050,10 @@ function RepoBrowser({onLoadModel,onClose}){
     try{
       const spec=parseRepoSpec(repoInput);
       if(!spec)throw new Error('Could not parse repo. Use https://github.com/owner/repo, owner/repo, or git@github.com:owner/repo');
-      let branch=(branchInput||'').trim()||spec.branch||'';
+      // A branch embedded in a pasted /tree/<branch> URL is the most explicit signal,
+      // so honour it over a stale value left in the Branch box, and reflect it back.
+      let branch=(spec.branch||'').trim()||(branchInput||'').trim();
+      if(spec.branch&&spec.branch!==branchInput){setBranchInput(spec.branch);}
       if(!branch){branch=await fetchDefaultBranch(spec.owner,spec.repo,tokenInput||null);}
       const treeData=await fetchRepoTree(spec.owner,spec.repo,branch,tokenInput||null);
       const built=buildIndustryRows(treeData.tree||[]);
@@ -1096,7 +1124,7 @@ function RepoBrowser({onLoadModel,onClose}){
         h('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:10,marginBottom:8}},
           h('div',{},
             h('label',{style:labelStyle},'Repository'),
-            h('input',{type:'text',value:repoInput,onChange:e=>setRepoInput(e.target.value),
+            h('input',{type:'text',value:repoInput,onChange:e=>{const v=e.target.value;setRepoInput(v);const sp=parseRepoSpec(v);if(sp&&sp.branch)setBranchInput(sp.branch);},
               placeholder:'https://github.com/owner/repo  or  owner/repo',
               style:inputStyle,
               onKeyDown:e=>{if(e.key==='Enter')browseRepo();}})
@@ -1153,7 +1181,7 @@ function RepoBrowser({onLoadModel,onClose}){
       // Footer hint
       h('div',{style:{padding:'10px 18px',borderTop:'1px solid #333',fontSize:10,color:'#666',flexShrink:0}},
         'Each row is one industry. ECM / MVM buttons load the corresponding ',
-        h('code',{style:{color:'#4ECDC4'}},'<industry>/(ecm|mvm)_v<N>/model.json'),
+        h('code',{style:{color:'#4ECDC4'}},'<industry>/v<N>/(ecm|mvm)/model.json'),
         '. Newest version first. Loaded files are cached in your browser.')
     )
   );
@@ -1258,6 +1286,29 @@ function App(){
     };
     reader.readAsText(file);
     e.target.value='';
+  },[processModel]);
+
+  // Auto-load a server-bundled model on first mount (if the app ships one at
+  // /model.json). Silently no-ops when absent or when the route returns HTML
+  // (old servers with only a SPA catch-all), so the empty state still shows.
+  const autoLoadedRef=useRef(false);
+  useEffect(()=>{
+    if(autoLoadedRef.current)return;
+    autoLoadedRef.current=true;
+    (async()=>{
+      try{
+        const r=await fetch('./model.json',{headers:{'Accept':'application/json'}});
+        if(!r.ok)return;
+        const ct=r.headers.get('content-type')||'';
+        if(ct.indexOf('json')<0)return;
+        setIsLoading(true);setLoadError(null);setUploadStatus('Loading bundled model…');
+        const data=await r.json();
+        setTimeout(()=>{
+          try{processModel(data,'bundled/model.json');setUploadStatus('✓ bundled model');}
+          catch(err){setLoadError('Processing error: '+err.message);setIsLoading(false);setUploadStatus('✗ Error');}
+        },50);
+      }catch(_){/* no bundled model; keep empty state */}
+    })();
   },[processModel]);
 
   // ── Cytoscape mount/destroy ─────────────────────────────
