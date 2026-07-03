@@ -74,6 +74,7 @@ function extractGraph(dataModel) {
     domainColors[dname] = color;
 
     let dAttr=0, dFk=0, dTag=0, dTbl=0;
+    const dCatCount={};
     domainHierarchy[dname] = {
       color, description: domain.description||'', division: domain.division||'',
       tables:{}, subdomains:{}
@@ -83,6 +84,15 @@ function extractGraph(dataModel) {
       const tname = product.name||'';
       const fullId = `${dname}.${tname}`;
       const subdomain = product.subdomain||'';
+      // original physical table name (for the "semantic" toggle): prefer the source
+      // reference (catalog.schema.table) leaf, then table_name, then the product name.
+      const origName = ((product.reference||'').split('.').pop())||product.table_name||tname;
+      // physical catalog/schema from the source reference (catalog.schema.table),
+      // used by the Semantic toggle to relabel domain->catalog, subdomain->database.
+      const refParts=(product.reference||'').split('.');
+      const pCatalog=refParts.length>=3?refParts[0]:'';
+      const pSchema=refParts.length>=3?refParts[refParts.length-2]:'';
+      if(pCatalog) dCatCount[pCatalog]=(dCatCount[pCatalog]||0)+1;
       dTbl++;
 
       const attrs = product.attributes||[];
@@ -112,13 +122,16 @@ function extractGraph(dataModel) {
 
       if(subdomain){
         if(!domainHierarchy[dname].subdomains[subdomain])
-          domainHierarchy[dname].subdomains[subdomain]={tables:[],attr_count:0,fk_count:0};
+          domainHierarchy[dname].subdomains[subdomain]={tables:[],attr_count:0,fk_count:0,schemaCount:{}};
         const sd=domainHierarchy[dname].subdomains[subdomain];
         sd.tables.push(tname); sd.attr_count+=attrList.length; sd.fk_count+=fkCount;
+        if(pSchema) sd.schemaCount[pSchema]=(sd.schemaCount[pSchema]||0)+1;
       }
 
       nodes.push({
-        data:{id:fullId,label:tname,parent:`domain_${dname}`,type:'table',
+        data:{id:fullId,label:tname,sem_label:tname,orig_label:origName,
+              orig_catalog:pCatalog,orig_schema:pSchema,
+              parent:`domain_${dname}`,type:'table',
               domain:dname,subdomain,attribute_count:attrList.length,
               fk_count:fkCount,tag_count:tagArr.length,color},
         classes:'table-node'
@@ -130,22 +143,29 @@ function extractGraph(dataModel) {
         if(parts.length<2) return;
         const targetId=`${parts[0]}.${parts[1]}`;
         const targetCol=parts[2]||`${parts[1]}_id`;
+        // agent-synthesised FKs carry a `_dbx_fk_*` tag (declared UC FKs do not).
+        const isDbxFk=(attr.tags||[]).some(t=>/(^|_)dbx_fk/i.test(String(t)));
         edges.push({
           data:{
             id:`edge_${fullId}_${targetId}_${attr.name}`,
             source:fullId,target:targetId,label:attr.name,
             source_domain:dname,target_domain:parts[0],
             source_column:attr.name,target_column:targetCol,
-            source_table:tname,target_table:parts[1],fk_full:attr.fk
+            source_table:tname,target_table:parts[1],fk_full:attr.fk,
+            dbx_fk:isDbxFk
           },
-          classes:'fk-edge'
+          classes:isDbxFk?'fk-edge dbx-fk-edge':'fk-edge'
         });
       });
     });
 
     domainStats[dname]={table_count:dTbl,attr_count:dAttr,fk_count:dFk,tag_count:dTag};
+    const domCatalog=Object.keys(dCatCount).sort((a,b)=>dCatCount[b]-dCatCount[a])[0]||'';
+    domainHierarchy[dname].catalog=domCatalog;
     nodes.push({
-      data:{id:`domain_${dname}`,label:dname.toUpperCase(),type:'domain',color,
+      data:{id:`domain_${dname}`,label:dname.toUpperCase(),
+            sem_label:dname.toUpperCase(),orig_label:domCatalog||dname.toUpperCase(),
+            orig_catalog:domCatalog,type:'domain',color,
             division:domain.division||'',table_count:dTbl,attr_count:dAttr,
             fk_count:dFk,tag_count:dTag,width:DEFAULT_W,height:DEFAULT_H},
       classes:'domain-node'
@@ -493,6 +513,7 @@ const TreeNode=memo(({domainName,domainData,expandedDomains,expandedTables,
   const visibleTables=st?matchingTables:tableEntries;
   const visibleCount=visibleTables.length;
   const divColors={'operations':'#E74C3C','business':'#3498DB','corporate':'#F39C12'};
+  const divAbbr={'operations':'OPS','business':'BIZ','corporate':'COR'};
   const divLower=(division||'').toLowerCase();
   const hasSubs=Object.keys(subdomains).length>0;
 
@@ -556,7 +577,7 @@ const TreeNode=memo(({domainName,domainData,expandedDomains,expandedTables,
         divColors[divLower]&&h('span',{style:{
           display:'inline-block',padding:'1px 4px',background:divColors[divLower],color:'#fff',
           borderRadius:3,fontSize:8,fontWeight:'bold',marginLeft:5,flexShrink:0,lineHeight:'12px'
-        }},divLower.slice(0,3).toUpperCase())
+        }},divAbbr[divLower]||divLower.slice(0,3).toUpperCase())
       )
     ),
     showTables&&h('div',{},
@@ -1201,6 +1222,8 @@ function App(){
   // UI state
   const [layout,setLayout]=useState('circle');
   const [showDomains,setShowDomains]=useState(true);
+  const [semanticNames,setSemanticNames]=useState(true);
+  const [showDbxFk,setShowDbxFk]=useState(true);
   const [sizeScale,setSizeScale]=useState(1.0);
   const [filterState,setFilterState]=useState({type:null,value:null});
   const [navHistory,setNavHistory]=useState([]);
@@ -1469,13 +1492,19 @@ function App(){
           const sdId=`subdomain_${dname}_${sdname}`;
           subNodeIds.add(sdId);
           const sdColor=SUBDOMAIN_PALETTE[sdi%SUBDOMAIN_PALETTE.length];
-          result.push({data:{id:sdId,label:sdname.replace(/_/g,' ').replace(/-/g,' '),type:'subdomain',color:sdColor,domain:dname,domain_color:domColor},classes:'subdomain-node'});
+          const scMap=(subs[sdname]||{}).schemaCount||{};
+          const sdSchema=Object.keys(scMap).sort((a,b)=>scMap[b]-scMap[a])[0]||'';
+          const semLbl=sdname.replace(/_/g,' ').replace(/-/g,' ');
+          result.push({data:{id:sdId,label:semanticNames?semLbl:(sdSchema||semLbl),
+            sem_label:semLbl,orig_label:sdSchema||semLbl,orig_schema:sdSchema,
+            type:'subdomain',color:sdColor,domain:dname,domain_color:domColor},classes:'subdomain-node'});
         });
       } else {
         const dn=domainByName[dname];
         if(dn)result.push(dn);
       }
       const domTables=tablesByDomain[dname]||[];
+      const visibleIds=new Set();
       domTables.forEach(n=>{
         const sd=n.data.subdomain||'';
         const sdId=hasSubs&&sd?`subdomain_${dname}_${sd}`:'';
@@ -1483,8 +1512,14 @@ function App(){
         if(hasSubs&&sd&&subNodeIds.has(sdId)) cloned.data.parent=sdId;
         else if(hasSubs) delete cloned.data.parent;
         result.push(cloned);
+        visibleIds.add(n.data.id);
       });
-      (edgesWithinDomain[dname]||[]).forEach(e=>result.push(e));
+      // Render every edge whose BOTH endpoints are visible in this domain view
+      // (co-visible), so two tables the user can see always show their link.
+      // Robust vs. table names containing dots (unlike the prefix-split index).
+      edges.forEach(e=>{
+        if(visibleIds.has(e.data.source)&&visibleIds.has(e.data.target)) result.push(e);
+      });
       const pos=calcDomainViewPositions(result);
       result.forEach(n=>{if(n.data&&pos[n.data.id])n.position=pos[n.data.id];});
       return applyDomainSizes(result);
@@ -1647,6 +1682,32 @@ function App(){
     setTimeout(()=>cy.fit(50),50);
   },[showDomains,sizeScale]);
 
+  // ── Semantic toggle: swap product node labels between the business (semantic)
+  //    name and the original physical table name. Data carries both, so this is
+  //    a pure re-label (no graph rebuild). ───────────────────────────────────
+  useEffect(()=>{
+    const cy=cyRef.current;
+    if(!cy)return;
+    cy.batch(()=>{
+      cy.nodes('.table-node, .domain-node, .subdomain-node').forEach(n=>{
+        const sem=n.data('sem_label'), orig=n.data('orig_label');
+        if(sem||orig) n.data('label', semanticNames ? (sem||orig) : (orig||sem));
+      });
+    });
+  },[semanticNames,graphElements]);
+
+  // ── dbx_fk toggle: hide/show agent-synthesised FK edges (those carrying a
+  //    `_dbx_fk_*` tag). Declared UC FKs are unaffected. Pure display toggle. ──
+  useEffect(()=>{
+    const cy=cyRef.current;
+    if(!cy)return;
+    cy.batch(()=>{
+      cy.edges('.dbx-fk-edge').forEach(e=>{
+        e.style('display', showDbxFk ? 'element' : 'none');
+      });
+    });
+  },[showDbxFk,graphElements]);
+
   // ── Stats ──────────────────────────────────────────────
   const statsText=useMemo(()=>{
     if(!graphData)return '';
@@ -1759,6 +1820,14 @@ function App(){
         h('div',{style:{display:'flex',alignItems:'center',marginLeft:4}},
           h('label',{style:{color:'#aaa',fontSize:10,marginRight:4}},'Domains'),
           h('input',{type:'checkbox',checked:showDomains,onChange:e=>setShowDomains(e.target.checked),style:{cursor:'pointer'}})
+        ),
+        h('div',{style:{display:'flex',alignItems:'center',marginLeft:4}},
+          h('label',{style:{color:'#aaa',fontSize:10,marginRight:4},title:'On: business (semantic) product names. Off: original physical table names.'},'Semantic'),
+          h('input',{type:'checkbox',checked:semanticNames,onChange:e=>setSemanticNames(e.target.checked),style:{cursor:'pointer'}})
+        ),
+        h('div',{style:{display:'flex',alignItems:'center',marginLeft:4}},
+          h('label',{style:{color:'#aaa',fontSize:10,marginRight:4},title:'Show agent-synthesised (_dbx_fk) foreign-key links. Off: only declared UC FKs.'},'dbx FK'),
+          h('input',{type:'checkbox',checked:showDbxFk,onChange:e=>setShowDbxFk(e.target.checked),style:{cursor:'pointer'}})
         ),
         h('select',{value:layout,onChange:e=>setLayout(e.target.value),style:{fontSize:11}},
           h('option',{value:'circle'},'Circular'),
