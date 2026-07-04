@@ -57,14 +57,42 @@ def test_force_reinstall_env_short_circuits_probe(monkeypatch):
     assert calls["n"] == 0
 
 
+def _v1_probe_sql(sql_return_by_kind):
+    """Build a query-aware sql_exec stub for v1_installed's THREE probes:
+    completeness (MAX(completed_percent)), accumulation guard (MAX(CAST(version AS INT)),
+    alias=marathon-reset-accumulated-v2plus), and domain count (COUNT(*) on domain).
+    A single flat return can't distinguish them, so route by the SQL text."""
+    def _stub(profile, stmt, timeout=180):
+        s = stmt.upper()
+        if "MAX(CAST(VERSION AS INT))" in s:
+            kind = "accum"
+        elif "COMPLETED_PERCENT" in s:
+            kind = "pct"
+        else:
+            kind = "domain"
+        return {"result": {"data_array": [[sql_return_by_kind[kind]]]}}
+    return _stub
+
+
 def test_probe_true_when_v1_complete(monkeypatch):
-    # v1_installed now mirrors the agent's completeness contract: reuse a v1 ONLY when
-    # MAX(completed_percent) >= 100 AND domain rows exist. "100" satisfies both the
-    # completeness query (float("100") == 100.0) and the domain-count query (int("100") > 0).
+    # v1_installed mirrors the agent's completeness contract AND (v4.2.4
+    # marathon-reset-accumulated-v2plus) refuses reuse when the catalog carries
+    # completed v2+ generations. A CLEAN v1-only catalog reuses: completeness=100,
+    # MAX(version)=1 (no accumulation), domain rows present.
     monkeypatch.delenv("VOV_FORCE_REINSTALL", raising=False)
     monkeypatch.setattr(m, "sql_exec",
-                        lambda *a, **k: {"result": {"data_array": [["100"]]}})
+                        _v1_probe_sql({"pct": "100", "accum": "1", "domain": "3"}))
     assert m.v1_installed("fe-gcp", "travel_hospitality") is True
+
+
+def test_probe_false_when_catalog_accumulated_v2plus(monkeypatch):
+    # a catalog that already carries a completed v2+ (e.g. a prior VOV wrote v5) must NOT
+    # be reused — reuse would make VOV read v5 and write v6 (accumulation), never a clean
+    # v1->v2. alias=marathon-reset-accumulated-v2plus
+    monkeypatch.delenv("VOV_FORCE_REINSTALL", raising=False)
+    monkeypatch.setattr(m, "sql_exec",
+                        _v1_probe_sql({"pct": "100", "accum": "5", "domain": "3"}))
+    assert m.v1_installed("fe-gcp", "travel_hospitality") is False
 
 
 def test_probe_false_when_v1_incomplete(monkeypatch):
@@ -110,13 +138,23 @@ def test_fixed_catalog_mechanism_via_synthetic_industry(monkeypatch):
     assert m.cat_name("travel_hospitality") == "vibe_travel_hospitality_v1"
 
 
-def test_manufacturing_on_droppable_fe_aws():
-    # manufacturing now lives on fe-aws (CREATE/DROP CATALOG allowed) so the marathon can do a
-    # clean DROP+install v1->v2; it must NOT be on the fixed/un-droppable or flaky-Azure profiles.
-    assert "manufacturing" in m.ASSIGN["fe-aws"]
-    assert "manufacturing" not in m.ASSIGN["my-aws"]
-    assert "manufacturing" not in m.ASSIGN.get("my-adp", [])
-    # and it therefore gets a droppable, isolated per-industry catalog
+def test_active_industries_never_on_fixed_or_undroppable_profile():
+    # DURABLE profile-policy invariant (survives ASSIGN narrowing across relaunches):
+    # the active-run list must never place an industry on a FIXED_CATALOG profile (my-aws)
+    # — those catalogs can't be dropped, so a clean v1->v2 rebuild is impossible there.
+    for fixed_profile in m.FIXED_CATALOG:
+        assert not m.ASSIGN.get(fixed_profile), (
+            f"active ASSIGN must not host industries on fixed-catalog profile {fixed_profile}"
+        )
+    # every ACTIVE industry resolves to an isolated, droppable per-industry catalog
+    # (vibe_<ind>_v1), never the shared fixed catalog — so prepare_catalog can DROP+recreate.
+    for prof, inds in m.ASSIGN.items():
+        for ind in inds:
+            assert m.cat_name(ind) == f"vibe_{ind}_v1", (
+                f"active industry {ind} must get a droppable per-industry catalog"
+            )
+    # manufacturing (published, not currently active) still resolves to a droppable catalog
+    # and is never pinned to the fixed catalog if it were re-added.
     assert m.cat_name("manufacturing") == "vibe_manufacturing_v1"
 
 

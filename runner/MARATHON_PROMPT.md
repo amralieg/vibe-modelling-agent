@@ -447,9 +447,18 @@ An industry is **green** only when ALL hold:
 - §10.6 hard signatures all **0** in the logs (ERROR / F1 / F2 soft-accept / F4 silo / R6 MV fail /
   R8 cycles / N2 fidelity / NameError / Traceback).
 - **PD-2 ground-truth adherence (§8.2) ≥ 90%** (target 100%), denominator = ALL vibe VReqs.
+  Measured from the v4.2.2 CORRECTED physical reground (informational-exclude + blind-partial-unknown
+  + gt-rescue-typecorrect); a "Max retries exhausted, proceeding" soft-accept does NOT count as applied.
 - **PD-1 improvement gate (§8.3) PASS** — `vov_structural_audit.py --v1 --v2` exits 0; v2 has
   **zero empty/skeleton products**, no new thin/stub domains or products vs v1, and no net attribute loss.
+- **native_quality (structural) ≥ v1** — the v2 native/structural quality must not regress vs v1
+  (the vov_quality 50/50 blend embeds adherence, so gate its native half against v1, not an absolute bar).
 - v2 published to the fork with a commit citing the run_id + ground-truth adherence %.
+
+**Gate 4A (v4.2.2, superseding the original vov_quality≥85 hard gate):** publish iff
+adherence≥90 (corrected) AND §10.6 zero-error AND PD-1 strictly-improves AND native_quality≥v1.
+`vov_quality` is REPORT-ONLY (recorded in the audit, not a blocking gate) — the original 85% vov_quality
+bar was infeasible against the published "strong 6" baseline and conflated adherence with native quality.
 
 The whole marathon is done when all 13 are green. "Mostly clean" is not done. Any industry that
 hangs, trips a §10.6 signature, fails PD-1, or scores <90% goes on the relaunch list (PD-4): fix

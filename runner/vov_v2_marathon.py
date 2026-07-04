@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-AGENT_VER = "418"  # matches __AGENT_VERSION__ 4.1.8 (semver minus dots, §3a); never run stale
+AGENT_VER = "424"  # matches __AGENT_VERSION__ 4.2.4 (semver minus dots, §3a); never run stale
 AGENT_PATH = f"/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v{AGENT_VER}"
 STAGE_DIR = "/tmp/vov_stage"
 OUT_DIR = "/tmp/vov_out"
@@ -53,20 +53,31 @@ VOV_TIMEOUT_S = 54000        # 15h: user directive — the quality-critical agen
 SHRINK_TIMEOUT_S = 9000      # 2.5h: functional shrink 66-106m; same serverless teardown-hang mechanism
                              #       as install -> bound via control-plane timeout (was 5h)
 
+# v4.2.1 marathon (2026-07-01 user directive): regenerate v2 for the 7 REMAINING weak industries
+# ONLY. The strong 6 (travel_hospitality, consumer_goods, health_insurance, construction,
+# media_broadcasting, semiconductors) are already published and must NOT be touched, so they are
+# removed from ASSIGN entirely (the marathon only processes ASSIGN industries). The 7 keep their
+# original droppable per-industry catalogs (none is a FIXED_CATALOG profile), so a clean fresh
+# DROP+install v1 -> VOV -> shrink is possible with VOV_FORCE_REINSTALL=1 (set at launch). Special
+# cases (restaurants dropped catalog / water_utilities non-standard layout / manufacturing no
+# baseline) all self-heal via the standard prepare_catalog fresh-install path.
+# 2026-07-03 clean-v1->v2 relaunch: healthcare + restaurants already PUBLISHED (removed). automotive
+# DEFERRED to a separate v4.2.4 track (needs junk-domain + name-prefix fixes, not just a relaunch).
+# manufacturing (was accumulated v6) + ngo (was accumulating to v5) + water_utilities (rebuild) are
+# relaunched CLEAN v1->v2, one-per-profile for true parallelism (user "no queue, run in parallel").
+# retail is a clean v1->v2 already RUNNING on my-gcp -> re-attach and let it finish.
+# 2026-07-03 v4.2.4 relaunch: healthcare, restaurants, ngo, manufacturing already PUBLISHED
+# (clean v1->v2, gate-passed) and are NOT in the active list. The v4.2.4 track relaunches the
+# three that missed the gate on v4.2.3, one-per-droppable-profile for true parallelism:
+#   automotive (fe-gcp)     — RC-A junk/empty-domain guard + RC-C move-FQN verifier
+#   retail     (fe-aws)     — VOV holistic/refactor VREQ grounding (live-iterative)
+#   water_utilities (my-adp)— verifier-pipeline-meta-informational (VREQ-029) + create-entity grounding
+# All three sit on CREATE/DROP-CATALOG-capable profiles so prepare_catalog can do a clean
+# DROP+install v1 -> VOV -> shrink. None is a FIXED_CATALOG (my-aws) or flaky-Azure profile.
 ASSIGN = {
-    "fe-gcp": ["travel_hospitality", "consumer_goods", "automotive"],
-    # manufacturing moved here off the fixed-catalog my-aws (2026-06-24): my-aws is a FIXED_CATALOG
-    # profile (serverless_stable_8nstmo_catalog) the marathon CANNOT drop, so repeated vov runs
-    # polluted it v1->v8 and the v8 shrink no-op'd the MVM -> permanent 'partial'. fe-aws mints a
-    # droppable per-industry catalog (vibe_manufacturing_v1), so a clean DROP+install v1->v2 with a
-    # complete ecm+mvm pair is possible. fe-aws's other industries are already green and skip.
-    "fe-aws": ["ngo", "retail", "healthcare", "manufacturing"],
-    "my-gcp": ["restaurants", "semiconductors", "media_broadcasting"],
+    "fe-gcp": ["automotive"],
+    "fe-aws": ["retail"],
     "my-adp": ["water_utilities"],
-    "my-uae": ["construction", "health_insurance"],
-    # my-aws (user directive 2026-06-19): fresh AWS test env added as a 6th concurrent profile.
-    # (manufacturing relocated to fe-aws 2026-06-24 to escape the un-droppable fixed catalog.)
-    "my-aws": [],
 }
 
 WAREHOUSE = {
@@ -348,6 +359,27 @@ def v1_installed(profile, ind):
         _pct = float(brows[0][0] or 0.0)
         if _pct < 100.0:
             pulse(f"[{ind}] v1 present on {profile} but INCOMPLETE (completed_percent={_pct}) — forcing fresh install, not reuse. alias=marathon-reuse-incomplete-v1")
+            return False
+        # v4.2.4 marathon-reset-accumulated-v2plus (2026-07-03 user directive "launch v2 on v1->v2 vov"):
+        # install-once-reuse on a catalog that ALREADY carries v2+ completed generations makes the VOV
+        # read the LATEST completed version (e.g. v5) and write v6 -- an ACCUMULATION, never a clean
+        # v1->v2 (empirically: manufacturing v2=4.1.0 .. v6=4.2.2; ngo v2=4.1.4 .. v4=4.2.2). A published
+        # "v2" MUST be a single VOV step from v1. If any completed version > 1 exists, the catalog has
+        # drifted through prior generations; force a fresh install (drop+reinstall v1) so the VOV attaches
+        # to v1 and writes a CLEAN v2. Generic/industry-agnostic: reads the live business version table.
+        try:
+            accr = sql_exec(
+                profile,
+                f"SELECT MAX(CAST(version AS INT)) FROM `{cat}`.`_metamodel`.`business` "
+                f"WHERE LOWER(business)=LOWER('{bn}') AND COALESCE(completed_percent, 0.0) >= 100.0",
+                timeout=120,
+            )
+            arows = _rows(accr)
+            maxv = int(arows[0][0]) if (arows and arows[0][0] is not None) else 1
+        except Exception:
+            maxv = 1
+        if maxv > 1:
+            pulse(f"[{ind}] catalog carries accumulated completed v{maxv} (>v1) — forcing FRESH install so VOV yields a CLEAN v1->v2, not an accumulation. alias=marathon-reset-accumulated-v2plus")
             return False
         dom = sql_exec(
             profile,

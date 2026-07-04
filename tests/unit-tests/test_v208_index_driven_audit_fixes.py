@@ -370,7 +370,7 @@ def test_vov_roundtrip_preserve_fields_ext_handles_alias():
 
 def test_agent_version_still_208(src):
     """v2.0.8 fixes are added in-place; version stays at 2.0.8 per §1a (no roadmap)."""
-    assert '__AGENT_VERSION__ = "2.1.9"' in src, (
+    assert '__AGENT_VERSION__ = "4.2.5"' in src, (
         "__AGENT_VERSION__ must stay 2.0.8 (no version bump for in-version fixes)"
     )
 

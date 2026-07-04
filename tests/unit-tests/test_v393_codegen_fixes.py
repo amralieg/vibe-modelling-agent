@@ -310,7 +310,7 @@ def test_gap_fired_anchors_present():
 # version
 # ============================================================
 def test_version_is_393():
-    assert '__AGENT_VERSION__ = "3.9.3"' in _cell(1)
+    assert '__AGENT_VERSION__ = "4.2.5"' in _cell(1)
 
 
 if __name__ == "__main__":

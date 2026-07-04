@@ -80,6 +80,17 @@ def test_v205_f3_purge_runs_and_emits_alias(caplog):
     def_end = src_concat.find("\ndef ", def_start + 10)
     purge_src = src_concat[def_start:def_end]
 
+    # The purge routine factors its cycle-edge derivation through the module-level
+    # helper _cycle_to_edges (agent nb ~L54108). Extract + exec it into the same
+    # isolated namespace so this test exercises the REAL function chain rather than
+    # NameError-ing on a legitimate helper dependency (test-isolation fragility, not
+    # a production bug — _cycle_to_edges is defined at module scope in the notebook).
+    def _extract_def(name: str) -> str:
+        s = src_concat.find(f"def {name}(")
+        assert s != -1, f"helper def {name} not found in notebook source"
+        e = src_concat.find("\ndef ", s + 10)
+        return src_concat[s:e]
+
     # Build a mock _detect_cycles_dfs that returns the cycle on first call and []
     # thereafter (simulating successful purge).
     # Cycle is a list of NODE strings (matching _detect_cycles_dfs return shape).
@@ -96,6 +107,7 @@ def test_v205_f3_purge_runs_and_emits_alias(caplog):
 
     ns = {"__name__": "_v205_test"}
     ns["_detect_cycles_dfs"] = mock_detect_cycles_dfs
+    exec(_extract_def("_cycle_to_edges"), ns)
     exec(purge_src, ns)
 
     products = [

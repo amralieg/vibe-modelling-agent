@@ -42,6 +42,16 @@ def check_all_cells():
     n = 0
     for idx, src in _iter_code_cells():
         n += 1
+        # A clean cell parses RAW (no normalisation). Only fall back to magic-
+        # normalisation when the raw parse fails (genuine Jupyter %/! magics). This
+        # avoids the false-positive where _normalise() would replace a %/!-leading
+        # line INSIDE a multiline string literal with `pass`, corrupting the string
+        # and reporting a spurious SyntaxError on a syntactically-valid cell.
+        try:
+            ast.parse(src)
+            continue
+        except SyntaxError:
+            pass
         try:
             ast.parse(_normalise(src))
         except SyntaxError as e:
