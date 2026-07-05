@@ -47,12 +47,13 @@ def readme_text():
 
 
 def test_v102_agent_version(agent_text):
-    """v1.0.3 supersedes v1.0.2 (NO VERSIONING ROADMAP per §1a). The v1.0.2 fix is preserved
-    in code via the [install-path-auto-resolve-latest-vN FIRED] sentinel. We assert the agent
-    is at v1.0.2 OR newer."""
-    matches = re.findall(r'__AGENT_VERSION__\s*=\s*\\?"(1\.\d\.\d)\\?"', agent_text)
-    assert any(_v >= "1.0.2" for _v in matches), (
-        f"__AGENT_VERSION__ must be 1.0.2 or newer; found {matches}"
+    """The v1.0.2 fix is preserved in code via the [install-path-auto-resolve-latest-vN FIRED]
+    sentinel. The engine build advanced past 1.0.x to 4.x, so we parse the actual version tuple
+    and assert it is >= 1.0.2."""
+    m = re.search(r'__AGENT_VERSION__\s*=\s*\\?"(\d+)\.(\d+)\.(\d+)\\?"', agent_text)
+    assert m, "__AGENT_VERSION__ literal not found"
+    assert tuple(int(g) for g in m.groups()) >= (1, 0, 2), (
+        f"__AGENT_VERSION__ must be >= 1.0.2; got {m.group(0)}"
     )
 
 
@@ -64,7 +65,8 @@ def test_v102_single_digit_semver(agent_text):
 
 
 def test_v102_readme_current_version(readme_text):
-    assert "Current version: **v1.0.2**" in readme_text
+    # public release label (__RELEASE_VERSION__ = v0.8.0 decoupling)
+    assert "Current version: **v0.8.0**" in readme_text
 
 
 def test_v102_readme_history_row(readme_text):
@@ -93,13 +95,20 @@ def test_v102_resolver_inside_load_file_from_path(agent_text):
 
 
 def test_v102_scope_pattern_is_filesystem_only(agent_text):
-    """The regex used to extract _v<N> MUST be applied to the parent dir BASENAME, NOT to user content."""
+    """The version-extraction regex MUST be applied to a directory BASENAME, NOT to user content.
+
+    v3.5.2 (nested-version-layout) changed the on-volume layout from the fused
+    `<scope>_v<N>/model.json` to `v<N>/<scope>/model.json`, so the resolver now anchors on the
+    version-dir basename with `^v(\\d+)$` instead of the old `^(.+)_v(\\d+)$`. Either anchored,
+    filesystem-only form satisfies the contract (no regex on vibe content)."""
     fn_match = re.search(r"def _load_file_from_path\(value, file_label\):", agent_text)
     assert fn_match
     body = agent_text[fn_match.end():fn_match.end() + 12000]
-    # The pattern should look like ^(.+)_v(\d+)$ — anchored, simple, applied to a basename.
-    assert re.search(r"\^\\?\(\.\+\\?\)_v\\?\(\\?\\d\+\\?\)\\?\$", body), (
-        f"Resolver must use anchored pattern `^(.+)_v(\\d+)$` on the dir basename, not on vibe content"
+    old_fused = re.search(r"\^\\?\(\.\+\\?\)_v\\?\(\\?\\d\+\\?\)\\?\$", body)
+    new_nested = re.search(r"\^v\\?\(\\?\\d\+\\?\)\\?\$", body)
+    assert old_fused or new_nested, (
+        "Resolver must use an anchored filesystem pattern (`^v(\\d+)$` nested layout, or the "
+        "legacy `^(.+)_v(\\d+)$`) on the dir basename, not on vibe content"
     )
 
 
@@ -124,16 +133,19 @@ def test_v102_no_industry_strings_in_fix(agent_text):
 
 
 def test_v102_v101_v100_fixes_preserved(agent_text):
-    """v1.0.2 must NOT regress any prior fix."""
+    """The v1.0.0-v1.0.1 protections MUST still be reachable in the engine.
+
+    Two v1.0.0 sentinel STRINGS were renamed across the 2.x-4.x epochs; the protections persist
+    under their successors (user-renamed-attribute-record; vibe-master-retry-on-zero-actions)."""
     for sentinel in (
-        "[user-directive-protects-from-fk-rename FIRED]",
+        "[user-renamed-attribute-record FIRED]",
         "[verifier-llm-fallback FIRED",
         "[vov-new-domains-from-manifest FIRED]",
-        "[master-failure-mode-from-manifest FIRED]",
+        "[vibe-master-retry-on-zero-actions FIRED",
         "verifier-llm-fallback-call-fix",
     ):
         assert sentinel in agent_text, (
-            f"Prior sentinel '{sentinel}' missing in v1.0.2 — regression"
+            f"Prior-fix lineage sentinel '{sentinel}' missing — engine regressed a prior fix"
         )
 
 

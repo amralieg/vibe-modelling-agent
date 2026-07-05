@@ -300,8 +300,8 @@ def test_v074_runner_failure_manifest_only_writes_when_not_all_ok():
 
 def test_v074_readme_current_version_matches():
     rd = (REPO_ROOT / "readme.md").read_text()
-    assert "Current version: **v3.5.2**" in rd, (
-        "readme `Current version:` line must match __AGENT_VERSION__ (CLAUDE.md \u00a73a-bis)"
+    assert "Current version: **v0.8.0**" in rd, (
+        "readme `Current version:` line must match __RELEASE_VERSION__ (public release; v0.8.0 decoupling)"
     )
 
 

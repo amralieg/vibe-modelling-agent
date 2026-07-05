@@ -207,6 +207,10 @@ def _build_shim_namespace_with_stubs():
         # v2.0.8 [vov-agent-version-stamp-callsite] run_vov_2_against_widgets now reads
         # __AGENT_VERSION__ instead of __VOV_VERSION__. Inject both so the shim runs.
         "__AGENT_VERSION__": "2.0.8",
+        # v0.8.0 [release-version-public] widgets_flat_to_model now also stamps
+        # __RELEASE_VERSION__ (public label decoupled from the engine build). Cell 1
+        # defines it in production; the extracted-function shim must inject it too.
+        "__RELEASE_VERSION__": "0.8.0",
     }
     # Order matters: helpers first
     exec(compile(model_to_flat, "<model_to_widgets_flat>", "exec"), ns)

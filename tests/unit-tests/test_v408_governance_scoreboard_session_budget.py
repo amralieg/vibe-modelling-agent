@@ -68,7 +68,14 @@ def test_version_bumped_to_408():
 def test_version_is_first_line_then_banner_POST():
     lines = _cell1().split("\n")
     assert lines[0].startswith('__AGENT_VERSION__ = "' + ah.__AGENT_VERSION__ + '"'), lines[0]
-    assert ("AGENT BANNER" in lines[1]) or ("CELL 1" in lines[1]), lines[1]
+    # v0.8.0 [release-version-public]: the public release label is paired immediately
+    # after the engine version (still the first code statement per §3a-bis), so the
+    # banner moves one line down. Accept the release line at index 1, banner within the
+    # first few lines.
+    if lines[1].startswith("__RELEASE_VERSION__ = "):
+        assert ("AGENT BANNER" in lines[2]) or ("CELL 1" in lines[2]), lines[2]
+    else:
+        assert ("AGENT BANNER" in lines[1]) or ("CELL 1" in lines[1]), lines[1]
 
 
 def test_version_was_second_line_in_v407_FAILPRE():

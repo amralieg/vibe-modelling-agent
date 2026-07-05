@@ -102,8 +102,12 @@ def test_v069_fired_marker_present():
 
 def test_v069_model_json_root_has_agent_version_first_key():
     txt = _agent_text()
+    # agent_version stays the FIRST key; release_version (public label, v0.8.0
+    # decoupling) rides directly after it, before model_requirements.
     pat = re.compile(
-        r'model_json_root\s*=\s*\{\s*"agent_version"\s*:\s*__AGENT_VERSION__\s*,\s*'
+        r'model_json_root\s*=\s*\{\s*"agent_version"\s*:\s*__AGENT_VERSION__\s*,'
+        r'(?:\s*#[^\n]*)?\s*'
+        r'(?:"release_version"\s*:\s*__RELEASE_VERSION__\s*,(?:\s*#[^\n]*)?\s*)?'
         r'"model_requirements"',
         re.MULTILINE,
     )
@@ -153,18 +157,19 @@ def test_v069_no_two_digit_semver_in_constant():
 
 
 def test_v069_readme_current_version_matches():
-    """The readme 'Current version' line must reference the same version as
-    the agent's __AGENT_VERSION__ constant (whatever the current value is).
-    The introducing version was v0.6.9; subsequent releases bump both in
-    lock-step per the v0.6.9 contract."""
+    """The readme 'Current version' line is the PUBLIC release label and must
+    match __RELEASE_VERSION__ (v0.8.0 decoupling): the public line stays
+    continuous (main 0.7.7 -> 0.8.0) while the engine build __AGENT_VERSION__
+    iterates independently. model.json carries agent_version (engine build) for
+    provenance and release_version (public) for the consumer-facing label."""
     text = README.read_text(encoding="utf-8")
     txt = _agent_text()
-    m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', txt)
-    assert m is not None, "__AGENT_VERSION__ constant not found in agent notebook"
-    cur_version = m.group(1)
-    assert f"Current version: **v{cur_version}**" in text, (
-        f"readme.md 'Current version' line must match agent __AGENT_VERSION__ "
-        f"(expected v{cur_version})"
+    m = re.search(r'__RELEASE_VERSION__\s*=\s*"([^"]+)"', txt)
+    assert m is not None, "__RELEASE_VERSION__ constant not found in agent notebook"
+    rel_version = m.group(1)
+    assert f"Current version: **v{rel_version}**" in text, (
+        f"readme.md 'Current version' line must match agent __RELEASE_VERSION__ "
+        f"(expected v{rel_version})"
     )
 
 
@@ -179,11 +184,11 @@ def test_v069_readme_history_row_present():
         "(version that introduced the __AGENT_VERSION__ contract)"
     )
     txt = _agent_text()
-    m = re.search(r'__AGENT_VERSION__\s*=\s*"([^"]+)"', txt)
+    m = re.search(r'__RELEASE_VERSION__\s*=\s*"([^"]+)"', txt)
     cur_version = m.group(1) if m else None
-    assert cur_version, "__AGENT_VERSION__ not found"
+    assert cur_version, "__RELEASE_VERSION__ not found"
     assert f"| **v{cur_version}** |" in text, (
-        f"readme.md must have a Version-history row for current v{cur_version}"
+        f"readme.md must have a Version-history row for current public release v{cur_version}"
     )
 
 
