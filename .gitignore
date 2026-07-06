@@ -24,4 +24,11 @@ __pycache__/
 # Pre-edit notebook backups (local working-tree snapshots, never committed)
 *.ipynb.*.bak
 *.bak
+*_BACKUP.ipynb
 .scratch_audit/
+
+# Extracted-source scratch dumps and local IDE/Databricks state (never committed)
+.agent_src_scratch.py
+*_src_scratch.py
+.databricks/
+**/.databricks/
