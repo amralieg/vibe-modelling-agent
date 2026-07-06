@@ -1,6 +1,6 @@
 """Behavioral tests for v1.1.0 (vov-closure-respect-user-widget).
 
-Pre-fix evidence: NCDOT iter=10 mvm_v3 had 9 domains because regex parser
+Pre-fix evidence: gov_transport iter=10 mvm_v3 had 9 domains because regex parser
 extracted 8 domain-level tuples from prose (organization.organization_id,
 job_family.job_family_id, ...) and downstream consumers (P70 auto-seed,
 SURGICAL FAST PATH, hydrate, sizing gate) all created phantom stubs.
@@ -70,10 +70,10 @@ def test_v110_uses_user_specified_domains_widget_key():
     )
 
 
-# ---------- Behavioral simulation: NCDOT-style phantom rejection ----------
+# ---------- Behavioral simulation: gov_transport-style phantom rejection ----------
 
 def test_filter_drops_phantom_domain_tuples_when_widget_populated():
-    """NCDOT scenario: regex emits 8 domain-level tuples; widget says hr+project."""
+    """gov_transport scenario: regex emits 8 domain-level tuples; widget says hr+project."""
     # Reproduce the filter logic in isolation to demonstrate it works.
     user_widget_doms = {"hr", "project"}
     parser_new_entities = {

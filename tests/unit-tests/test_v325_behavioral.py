@@ -1,6 +1,6 @@
 """Behavioral + contract tests for v3.2.5 GENERIC physical-adherence fixes.
 
-Two root causes, both industry-agnostic, both proven against the NCDOT
+Two root causes, both industry-agnostic, both proven against the gov_transport
 ground-truth audit (model.json adherence 91.7% vs PHYSICAL catalog 66%):
 
 RC1 (verifier-fk-required) — `_verify_structural_target` parsed FK targets

@@ -1,5 +1,5 @@
 """v4.1.4 behavioral tests -- two root-cause fixes from the automotive v4.1.3
-vov audit (fe-gcp run 442659892452317, vov+shrink SUCCESS, physical adherence 80%
+vov audit (<profile> run <run_id>, vov+shrink SUCCESS, physical adherence 80%
 but 4 empty husk domains shipped + 3 SelfFixer mutators crashed):
 
 1. v414-empty-domain-vov-writeback -- v4.1.3 placed _cleanup_empty_domains in

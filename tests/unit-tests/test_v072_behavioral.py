@@ -1,6 +1,6 @@
 """Behavioral tests for v0.7.2 — three root-cause fixes from v0.7.1 airlines tiny live audit
-(run 1097831250061095, all 5 tasks SUCCESS) PLUS the Phase 6 Retailer SHRINK-NEW-SILO
-external report (Databricks parent run 939656662583490).
+(run <run_id>, all 5 tasks SUCCESS) PLUS the Phase 6 Retailer SHRINK-NEW-SILO
+external report (Databricks parent run <run_id>).
 
 Fixes shipped:
   1. self-ref-mem-json-sync   — Memory <-> JSON drift fix. The SELF-REF-FIX autofix

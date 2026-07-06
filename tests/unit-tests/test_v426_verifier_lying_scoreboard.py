@@ -1,6 +1,6 @@
 """v4.2.6 anti-lying-scoreboard verifier fixes (fail-pre / pass-post, §8.10).
 
-Root causes (coffee_roastery base-MVM run 907028114518006 reported 33.3% adherence on a ~100% model):
+Root causes (coffee_roastery base-MVM run <run_id> reported 33.3% adherence on a ~100% model):
   (a) verifier-domain-create-name-normalize -- vibe display domain names carry spaces
       ("green coffee sourcing and roasting") while the physical domain is space/punct-collapsed
       ("greencoffeesourcingandroasting"), so == / endswith / substring never matched and the domain

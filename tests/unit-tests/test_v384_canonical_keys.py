@@ -1,10 +1,10 @@
 """
 v3.8.4 behavioral test for the canonical-key root-cause fix (alias=canonical-key-apply).
 
-ROOT CAUSE (NCDOT VREQ PK-convention): the vibe declared canonical keys
+ROOT CAUSE (gov_transport VREQ PK-convention): the vibe declared canonical keys
 ('`position_number` is the canonical position key') but the agent's surrogate-key heuristic
 set product primary_key='position_id', overriding the explicit user directive (CLAUDE.md 3c
-violation: heuristic beat vibe). 3/4 NCDOT canonical keys were already correct; position was not.
+violation: heuristic beat vibe). 3/4 gov_transport canonical keys were already correct; position was not.
 
 FIX: _v384_apply_canonical_keys parses vibe-declared canonical keys and honors them as the
 product primary_key, AND re-points any FK that referenced the old PK column so FK integrity is
@@ -49,7 +49,7 @@ class _Logger:
         self.msgs.append(m)
 
 
-def test_parse_canonical_keys_from_ncdot_phrasing():
+def test_parse_canonical_keys_from_gov_transport_phrasing():
     parse, _ = _load_funcs()
     vibe = (
         "- `employee_id` is the canonical employee key\n"

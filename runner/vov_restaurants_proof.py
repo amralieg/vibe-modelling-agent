@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restaurants-only v3.6.0 live VOV proof run (my-gcp).
+"""Restaurants-only v3.6.0 live VOV proof run (<profile>).
 
 Reuses the marathon's process_industry end-to-end (prepare_catalog -> stage v1
 artifacts -> create/patch job at the _v360 agent path -> run install/vov/shrink
@@ -13,7 +13,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vov_v2_marathon as M
 
-PROFILE = "my-gcp"
+PROFILE = "<profile>"
 IND = "restaurants"
 
 

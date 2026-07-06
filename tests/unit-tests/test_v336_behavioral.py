@@ -58,7 +58,7 @@ def _prods(pairs):
 
 # ---------- RC2: remove-FK VREQ whose rationale mentions tag/classification must NOT route to tag branch ----------
 
-# Faithful reproduction of NCDOT VREQ-008: a remove-FK directive whose RATIONALE mentions
+# Faithful reproduction of gov_transport VREQ-008: a remove-FK directive whose RATIONALE mentions
 # 'classification', where the FK removal did NOT land (column still present, no tags).
 REMOVE_FK_TEXT = ("On table hr.eligibility_rule, remove the foreign key on column employee_id, "
                   "because eligibility_rule is a classification reference, not an employee relation.")

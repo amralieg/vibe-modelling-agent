@@ -64,7 +64,7 @@ def cast(ns, expr):
 
 
 def test_sum_of_addition_casts_both_operands(ns):
-    # PASS-POST: the exact ncdot failure shape
+    # PASS-POST: the exact gov_transport failure shape
     out = cast(ns, "SUM(full_time_count + part_time_count)")
     assert out == "SUM(CAST(full_time_count AS DOUBLE) + CAST(part_time_count AS DOUBLE))", out
 

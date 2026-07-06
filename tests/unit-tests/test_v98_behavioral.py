@@ -138,7 +138,7 @@ def test_v98_mode_reconciliation_aggregate_wins_present():
     """v0.9.8: master_analyze must reconcile LLM top-level classification vs
     aggregate overall_mode; when they disagree, empirical aggregate wins.
 
-    ROOT-CAUSE FIX for v0.9.6 RT (run 675947004165824):
+    ROOT-CAUSE FIX for v0.9.6 RT (run <run_id>):
     All 85 parsed VREQs had mode=surgical, but LLM returned classification='GENERATIVE'.
     compile_vibe_contract read 'classification' verbatim, so VibeContract.mode='GENERATIVE',
     surgical mutation pipeline was bypassed, 0 rename_product/connect_table mutations landed.

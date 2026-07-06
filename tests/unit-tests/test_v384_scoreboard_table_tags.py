@@ -5,7 +5,7 @@ ROOT CAUSE: the ground-truth audit enriched COLUMN tags into phys_attrs but neve
 information_schema.table_tags, so table-scoped coverage VREQs (subdomain, division) were
 invisible -> products_data carried only {domain,product} (no subdomain) and domains_data
 only {domain} (no division). The verifier subdomain/division branches therefore scored
-0/N FALSE-NEGATIVES (ncdot v383 reported 66.7% while physical subdomain was 77/85).
+0/N FALSE-NEGATIVES (gov_transport v383 reported 66.7% while physical subdomain was 77/85).
 
 FIX: gt-table-tag-enrich queries information_schema.table_tags and grounds products_data +
 domains_data with the REAL physical table tags before the verifier runs.
@@ -125,8 +125,8 @@ def test_enrich_populates_subdomain_and_division():
     products_data = [{"domain": "hr", "product": "applicant"}]  # NO subdomain (pre-state)
     domains_data = [{"domain": "hr"}]  # NO division (pre-state)
     rows = [
-        _row("hr_schema", "applicant", "ncdot_subdomain", "Recruitment"),
-        _row("hr_schema", "applicant", "ncdot_division", "Corporate"),
+        _row("hr_schema", "applicant", "gov_transport_subdomain", "Recruitment"),
+        _row("hr_schema", "applicant", "gov_transport_division", "Corporate"),
     ]
     # pre-condition: subdomain/division absent
     assert not products_data[0].get("subdomain")
@@ -137,7 +137,7 @@ def test_enrich_populates_subdomain_and_division():
     # observable state change
     assert ns["products_data"][0]["subdomain"] == "Recruitment"
     assert ns["domains_data"][0]["division"] == "Corporate"
-    assert "ncdot_subdomain" in ns["widgets_values"]["_gt_observed_tag_keys"]
+    assert "gov_transport_subdomain" in ns["widgets_values"]["_gt_observed_tag_keys"]
     assert any("gt-table-tag-enrich FIRED v3.8.4" in m for m in ns["logger"].msgs)
 
 
@@ -182,8 +182,8 @@ def test_verdict_flips_failed_to_fulfilled():
 
     # POST-ENRICH: run the actual enrich block to populate, then re-verify
     rows = [
-        _row("hr_schema", "applicant", "ncdot_subdomain", "Recruitment"),
-        _row("hr_schema", "applicant", "ncdot_division", "Corporate"),
+        _row("hr_schema", "applicant", "gov_transport_subdomain", "Recruitment"),
+        _row("hr_schema", "applicant", "gov_transport_division", "Corporate"),
     ]
     en = _run_enrich([{"domain": "hr", "product": "applicant"}], [{"domain": "hr"}], rows)
     pd_post, dd_post = en["products_data"], en["domains_data"]

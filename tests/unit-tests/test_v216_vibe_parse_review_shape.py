@@ -1,11 +1,11 @@
 """Behavioural tests for v2.1.6 VIBE-PARSE-REVIEW-SHAPE release.
 
 Live evidence motivating these tests:
-- v215 HC run 525720810838503 + RT run 103482775460490 (2026-05-27 14:01)
+- v215 HC run <run_id> + RT run <run_id> (2026-05-27 14:01)
   reported `[VIBE_EVENT] vibe_orchestrator_parsed payload.requirement_count: 1`
   against 16,755-char HC reviewer-feedback and 14,353-char RT reviewer-feedback,
-  while NCDOT (21,780 chars of structured directives) produced 21 VREQs.
-- Audit classified Stage A adherence at 4% for HC/RT vs 100% for NCDOT.
+  while gov_transport (21,780 chars of structured directives) produced 21 VREQs.
+- Audit classified Stage A adherence at 4% for HC/RT vs 100% for gov_transport.
 
 Aliases under test:
 - vibe-parse-review-shape-prompt-fix     — prompt now teaches Shape B (review prose)
@@ -63,7 +63,7 @@ def test_v216_prompt_explains_shape_a_structured(cell1_src):
     """The prompt must explicitly name Shape A (structured directives)."""
     assert "Shape A" in cell1_src
     assert "Structured directive" in cell1_src
-    # The NCDOT-style language must still be recognised
+    # The gov_transport-style language must still be recognised
     assert "EXACTLY" in cell1_src
 
 
@@ -182,7 +182,7 @@ def test_v216_safety_net_dedupes_by_intent(cell9_src):
 
 # ---------------------------------------------------------------------------
 # A4. Behaviour: the detector logic (extracted as regex) classifies the
-#     HC vibe as Shape-B silent-drop and NCDOT as Shape-A no-drop.
+#     HC vibe as Shape-B silent-drop and gov_transport as Shape-A no-drop.
 #
 # This re-implements the detection inline (same regex set as the safety net)
 # and asserts the boolean classification against the LIVE v215 vibe fixtures.
@@ -236,10 +236,10 @@ def test_v216_detector_fires_on_rt_feedback():
     )
 
 
-def test_v216_detector_does_not_fire_on_ncdot_style_directive():
-    """NCDOT-style structured directive must NOT trigger the safety net (no false positive)."""
-    ncdot_like = """
-## NCDOT — base model
+def test_v216_detector_does_not_fire_on_gov_transport_style_directive():
+    """gov_transport-style structured directive must NOT trigger the safety net (no false positive)."""
+    gov_transport_like = """
+## gov_transport — base model
 
 ### Domains (build exactly these)
 
@@ -256,9 +256,9 @@ def test_v216_detector_does_not_fire_on_ncdot_style_directive():
 - snake_case naming
 - BIGINT primary keys
 """
-    # NCDOT-style produced 21 reqs in v215 — simulate even an n_req=21 outcome
-    assert not _classify(ncdot_like, n_req=21), (
-        "false positive: NCDOT-style directive incorrectly classified as Shape B silent-drop"
+    # gov_transport-style produced 21 reqs in v215 — simulate even an n_req=21 outcome
+    assert not _classify(gov_transport_like, n_req=21), (
+        "false positive: gov_transport-style directive incorrectly classified as Shape B silent-drop"
     )
 
 

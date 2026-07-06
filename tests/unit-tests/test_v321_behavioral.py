@@ -1,6 +1,6 @@
 """v3.2.1 behavioral tests.
 
-Root-cause fixes for the NCDOT mvm_v2 stall (38.9% / 28-of-72 VREQs after 337min).
+Root-cause fixes for the gov_transport mvm_v2 stall (38.9% / 28-of-72 VREQs after 337min).
 Every test proves the NEW behavior AND that the pre-patch behavior would have failed
 (CLAUDE.md §8.3 anti-tautology, §8.10 behavioral-not-noop).
 
@@ -62,7 +62,7 @@ def _load_validate_ast():
 
 def test_nonlocal_accepted_global_still_rejected():
     validate_ast, UnsafeCodeError = _load_validate_ast()
-    # nonlocal: enclosing-scope rebind used by LLM helper closures (NCDOT VREQ-084 rejection)
+    # nonlocal: enclosing-scope rebind used by LLM helper closures (gov_transport VREQ-084 rejection)
     nonlocal_src = (
         "def f(model):\n"
         "    acc = 0\n"
@@ -167,7 +167,7 @@ def test_model_level_metadata_change_is_not_noop():
     diff = _load_diff_summary()
     before = {"model": {"domains": [], "metric_views": []}}
     after = {"model": {"domains": [], "metric_views": [],
-                       "model_governance": {"systems_of_record": ["SAP"], "governing_bodies": ["NCDOT"]}}}
+                       "model_governance": {"systems_of_record": ["SAP"], "governing_bodies": ["gov_transport"]}}}
     d = diff(before, after)
     assert d["model_meta_changed"] is True
     assert "model_governance" in d["model_meta_keys_changed"]
@@ -194,9 +194,9 @@ def test_agent_version_bump_alone_is_not_model_meta_change():
 # (3) vov-lowprog-converge-window
 # --------------------------------------------------------------------------- #
 def test_lowprog_window_fires_on_oscillating_sequence():
-    """Replicate the EXACT NCDOT mvm_v2 coverage sequence and prove the new
+    """Replicate the EXACT gov_transport mvm_v2 coverage sequence and prove the new
     window predicate fires while the old consecutive-streak predicate never did."""
-    seq = [36.1, 37.5, 37.5, 38.9, 38.9]  # observed NCDOT mvm_v2 cumulative_cov per iter
+    seq = [36.1, 37.5, 37.5, 38.9, 38.9]  # observed gov_transport mvm_v2 cumulative_cov per iter
 
     # OLD predicate: streak of 2 consecutive <1% iters (never reached on oscillation)
     prev = -1.0
@@ -210,7 +210,7 @@ def test_lowprog_window_fires_on_oscillating_sequence():
         prev = cov
         if streak >= 2:
             old_fired = True
-    assert old_fired is False, "anti-tautology: old streak guard must NOT fire on the oscillating NCDOT seq"
+    assert old_fired is False, "anti-tautology: old streak guard must NOT fire on the oscillating gov_transport seq"
 
     # NEW predicate: trailing 3-iter window gain < 1.5 (fires)
     hist = []
@@ -219,7 +219,7 @@ def test_lowprog_window_fires_on_oscillating_sequence():
         hist.append(cov)
         if idx >= 4 and len(hist) >= 4 and (hist[-1] - hist[-4]) < 1.5:
             new_fired = True
-    assert new_fired is True, "new window guard must converge-stop on the oscillating NCDOT seq"
+    assert new_fired is True, "new window guard must converge-stop on the oscillating gov_transport seq"
 
 
 def test_lowprog_window_does_not_fire_on_healthy_climb():

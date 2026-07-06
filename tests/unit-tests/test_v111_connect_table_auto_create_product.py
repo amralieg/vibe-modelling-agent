@@ -2,7 +2,7 @@ from notebook_source_util import notebook_concat_source
 
 """Behavioral test for v1.1.1 — connect-table-auto-create-product.
 
-Live-run failure (RT mvm_v2 run 798213885123781 v1.1.0 audit on 2026-05-25):
+Live-run failure (RT mvm_v2 run <run_id> v1.1.0 audit on 2026-05-25):
 
     [VIBE_EVENT] vibe_orchestrator_scored
         total_requirements: 104

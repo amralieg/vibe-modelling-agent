@@ -1,6 +1,6 @@
 """Behavioral tests for v3.7.1 alias=bc-domain-floor-user-king.
 
-ROOT CAUSE this fixes (live, ncdot base-MVM run 980958435536744 @ fe-gcp, v3.7.0):
+ROOT CAUSE this fixes (live, gov_transport base-MVM run <run_id> @ <profile>, v3.7.0):
 SmartWorkerValidator.validate_business_context hardcoded a `len(domains) < 3`
 floor ("need at least 3 domains for a meaningful model"). A user who PINS exactly
 2 domains via the business_domains widget (_user_specified_domains = ["hr","project"])

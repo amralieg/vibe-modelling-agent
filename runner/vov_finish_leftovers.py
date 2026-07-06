@@ -29,9 +29,9 @@ C.SHRINK_TIMEOUT_S = 18000  # 5h (hang-guard bounds teardown; never truncates a 
 # industry -> (profile, vov_run_id)
 #   vov_run_id is the run whose ECM Phase-1 waits on; if already terminal + ecm present it proceeds.
 LEFTOVERS = {
-    "consumer_goods":   ("fe-gcp", 526234627113671),  # partial: old marathon run (terminal) + ecm present
-    "semiconductors":   ("my-gcp", 72769833656327),   # partial: old marathon run (terminal) + ecm present
-    "retail":           ("fe-aws", 276358972114126),  # red: uncapped single-task vov still finishing ECM
+    "consumer_goods":   ("<profile>", 526234627113671),  # partial: old marathon run (terminal) + ecm present
+    "semiconductors":   ("<profile>", 72769833656327),   # partial: old marathon run (terminal) + ecm present
+    "retail":           ("<profile>", 276358972114126),  # red: uncapped single-task vov still finishing ECM
     "health_insurance": ("my-uae", 710485709140431),  # red: uncapped single-task vov still finishing ECM
 }
 

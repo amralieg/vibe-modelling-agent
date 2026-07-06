@@ -112,10 +112,10 @@ def test_v346_tag_alias_and_callsite_present():
 def test_v346_tagset_from_string_parses_kv_and_labels():
     ns = _exec_tag_helpers()
     fn = ns["_tagset_from_string"]
-    ts = fn("ncdot_source_table=emp_history, primary_key, pii_identifier")
+    ts = fn("gov_transport_source_table=emp_history, primary_key, pii_identifier")
     keys = {t["key"]: t for t in ts}
-    assert keys["ncdot_source_table"]["value"] == "emp_history"
-    assert keys["ncdot_source_table"]["kind"] == "key_value"
+    assert keys["gov_transport_source_table"]["value"] == "emp_history"
+    assert keys["gov_transport_source_table"]["kind"] == "key_value"
     assert keys["primary_key"]["kind"] == "label"
     assert keys["pii_identifier"]["kind"] == "label"
 
@@ -128,7 +128,7 @@ def test_v346_enrich_adds_tagset_all_levels_and_subdomains():
             "domain": "hr", "division": "corporate",
             "products": [{
                 "name": "employee", "subdomain": "workforce",
-                "tags": "ncdot_source_table=emp_history", "data_type": "master_data",
+                "tags": "gov_transport_source_table=emp_history", "data_type": "master_data",
                 "attributes": [
                     {"name": "employee_id", "data_type": "BIGINT",
                      "tags": "primary_key, pii_identifier",
@@ -137,43 +137,43 @@ def test_v346_enrich_adds_tagset_all_levels_and_subdomains():
             }],
         }]
     }
-    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "gov_transport_", "tag_suffix": ""}}
     enrich(dm, cfg, None)
     d0 = dm["domains"][0]
     # DOMAIN level
     dkeys = {t["key"] for t in d0["tag_set"]}
-    assert "ncdot_domain" in dkeys and "ncdot_division" in dkeys
+    assert "gov_transport_domain" in dkeys and "gov_transport_division" in dkeys
     # SUBDOMAIN promoted to first-class object with its own tag_set
     assert d0.get("subdomains"), "subdomains not promoted"
     sd = d0["subdomains"][0]
     assert sd["name"] == "workforce"
-    assert any(t["key"] == "ncdot_subdomain" for t in sd["tag_set"])
+    assert any(t["key"] == "gov_transport_subdomain" for t in sd["tag_set"])
     assert "steward" in sd
     # TABLE level
     p0 = d0["products"][0]
     pkeys = {t["key"] for t in p0["tag_set"]}
-    assert "ncdot_source_table" in pkeys and "ncdot_data_type" in pkeys
-    assert "ncdot_subdomain" in pkeys
+    assert "gov_transport_source_table" in pkeys and "gov_transport_data_type" in pkeys
+    assert "gov_transport_subdomain" in pkeys
     # COLUMN level
     a0 = p0["attributes"][0]
     akeys = {t["key"] for t in a0["tag_set"]}
     assert "primary_key" in akeys and "pii_identifier" in akeys
-    assert "ncdot_business_glossary_term" in akeys
+    assert "gov_transport_business_glossary_term" in akeys
 
 
 def test_v346_trace_tag_harvest_from_description():
-    # VREQ-011: ncdot_source_attribute buried in description prose must be promoted to a tag.
+    # VREQ-011: gov_transport_source_attribute buried in description prose must be promoted to a tag.
     ns = _exec_tag_helpers()
     enrich = ns["_enrich_model_authoritative_tags"]
     dm = {"domains": [{"domain": "hr", "products": [{
         "name": "employee", "attributes": [
             {"name": "employee_id", "type": "BIGINT",
-             "description": "Canonical employee key. ncdot_source_attribute=PERNR maps to SAP."},
+             "description": "Canonical employee key. gov_transport_source_attribute=PERNR maps to SAP."},
         ]}]}]}
-    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "gov_transport_", "tag_suffix": ""}}
     enrich(dm, cfg, None)
     ts = dm["domains"][0]["products"][0]["attributes"][0]["tag_set"]
-    hit = [t for t in ts if t["key"] == "ncdot_source_attribute"]
+    hit = [t for t in ts if t["key"] == "gov_transport_source_attribute"]
     assert hit, "trace tag not harvested from description"
     assert hit[0]["value"] == "PERNR"
     assert hit[0]["source"] == "harvested"
@@ -186,17 +186,17 @@ def test_v346_physical_mirror_promotes_description_trace_into_tags_string():
     mirror = ns["_mirror_trace_tags_into_tags_string"]
     attrs = [
         {"name": "employee_id", "tags": "primary_key",
-         "description": "Key. ncdot_source_attribute=PERNR maps to SAP."},
+         "description": "Key. gov_transport_source_attribute=PERNR maps to SAP."},
         {"name": "x", "tags": "", "description": "no trace token here"},
     ]
-    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "gov_transport_", "tag_suffix": ""}}
     mirror([], attrs, cfg, None)
-    assert "ncdot_source_attribute=PERNR" in attrs[0]["tags"]
+    assert "gov_transport_source_attribute=PERNR" in attrs[0]["tags"]
     assert "primary_key" in attrs[0]["tags"]  # existing tag preserved
     assert attrs[1]["tags"] == ""  # no false promotion
     # idempotent
     mirror([], attrs, cfg, None)
-    assert attrs[0]["tags"].count("ncdot_source_attribute") == 1
+    assert attrs[0]["tags"].count("gov_transport_source_attribute") == 1
 
 
 def test_v346_harvest_ignores_non_trace_kv():
@@ -207,7 +207,7 @@ def test_v346_harvest_ignores_non_trace_kv():
         "name": "employee", "attributes": [
             {"name": "x", "description": "threshold=0.85 and ratio=12 are tuning knobs."},
         ]}]}]}
-    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "gov_transport_", "tag_suffix": ""}}
     enrich(dm, cfg, None)
     ts = dm["domains"][0]["products"][0]["attributes"][0]["tag_set"]
     assert not any(t["key"] in ("threshold", "ratio") for t in ts)
@@ -252,12 +252,12 @@ def test_v346_enrich_is_idempotent_and_preserves_legacy_tags():
     ns = _exec_tag_helpers()
     enrich = ns["_enrich_model_authoritative_tags"]
     dm = {"domains": [{"domain": "hr", "products": [
-        {"name": "employee", "tags": "ncdot_source_table=emp_history", "attributes": []}]}]}
-    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+        {"name": "employee", "tags": "gov_transport_source_table=emp_history", "attributes": []}]}]}
+    cfg = {"MODEL_CONVENTIONS": {"tag_prefix": "gov_transport_", "tag_suffix": ""}}
     enrich(dm, cfg, None)
     n1 = len(dm["domains"][0]["products"][0]["tag_set"])
     # legacy flat string preserved for backward compat
-    assert dm["domains"][0]["products"][0]["tags"] == "ncdot_source_table=emp_history"
+    assert dm["domains"][0]["products"][0]["tags"] == "gov_transport_source_table=emp_history"
     # second pass must not duplicate tags (derived view, re-computed cleanly)
     enrich(dm, cfg, None)
     n2 = len(dm["domains"][0]["products"][0]["tag_set"])

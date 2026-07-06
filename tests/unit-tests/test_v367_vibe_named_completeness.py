@@ -125,5 +125,5 @@ def test_v367_industry_agnostic():
     m1 = re.search(r"\ndef _v367_harvest_vibe_named_entities\(.*?\n(?=\ndef )", src, re.DOTALL)
     m2 = re.search(r"\ndef _v367_completeness_reinject\(.*?\n(?=\ndef )", src, re.DOTALL)
     body = (m1.group(0) + m2.group(0)).lower()
-    for term in ["healthcare", "airline", "ncdot", "automotive", "banking", "retail"]:
+    for term in ["healthcare", "airline", "gov_transport", "automotive", "banking", "retail"]:
         assert f'"{term}"' not in body and f"'{term}'" not in body, f"industry literal {term} in logic"

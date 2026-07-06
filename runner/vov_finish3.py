@@ -14,9 +14,9 @@ M.AGENT_PATH=_v355) and waits the MVM hang-aware, Phase 3 exports. We add the pe
 audit the user requires after each goes green.
 
 vov run_ids captured from the v3.5.5 rerun submit (vov_rerun_v355.out):
-  automotive@my-adp           run=85666859313119
-  healthcare@fe-aws           run=72712100735100
-  media_broadcasting@my-gcp   run=245895494291044
+  automotive@<profile>           run=<run_id>
+  healthcare@<profile>           run=<run_id>
+  media_broadcasting@<profile>   run=<run_id>
 """
 import os
 import sys
@@ -28,9 +28,9 @@ import vov_canary_finish as C
 import vov_audit_extract as A
 
 TARGETS = {
-    "automotive": ("my-adp", "85666859313119"),
-    "healthcare": ("fe-aws", "72712100735100"),
-    "media_broadcasting": ("my-gcp", "245895494291044"),
+    "automotive": ("<profile>", "85666859313119"),
+    "healthcare": ("<profile>", "72712100735100"),
+    "media_broadcasting": ("<profile>", "245895494291044"),
 }
 
 

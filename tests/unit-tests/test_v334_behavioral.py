@@ -56,7 +56,7 @@ def _prods(pairs):
     return [{"domain": d, "product": p} for d, p in pairs]
 
 
-# ---------- Fix 1: multi-FK disambiguation rename (NCDOT 036/039/041/042) ----------
+# ---------- Fix 1: multi-FK disambiguation rename (gov_transport 036/039/041/042) ----------
 
 def test_multifk_disambig_generic_gone_with_variants_is_fulfilled():
     obj = _bind(NB)
@@ -113,7 +113,7 @@ def test_multifk_disambig_requires_cue_no_cue_no_false_fulfill():
     assert v is None or v["status"] != "fulfilled", v
 
 
-# ---------- Fix 2: fully-qualified attribute name (NCDOT VREQ-062) ----------
+# ---------- Fix 2: fully-qualified attribute name (gov_transport VREQ-062) ----------
 
 def test_fqn_attr_tag_absent_is_failed_not_none():
     obj = _bind(NB)
@@ -129,7 +129,7 @@ def test_fqn_attr_tag_absent_is_failed_not_none():
 def test_fqn_attr_tag_present_is_fulfilled():
     obj = _bind(NB)
     attrs = _attrs([("hr", "compensation", "compensation_subject_employee_id", "",
-                     {"ncdot_pii": "true", "classification": "restricted"})])
+                     {"gov_transport_pii": "true", "classification": "restricted"})])
     req = _Req("Classify the PII-candidate attribute hr.compensation.compensation_subject_employee_id "
                "with restricted/confidential classification and a PII tag.")
     v = obj._verify_structural_target(req, _prods([("hr", "compensation")]), attrs)

@@ -11,8 +11,8 @@ All three terminated CANCELED/rolled-back, so their partial ECMs are crash artif
 unrepresentative adherence (healthcare 80% but no MVM; media_broadcasting 30%; automotive ~40%).
 The metamodel records were ROLLED BACK on failure, so a shrink-only salvage cannot rebuild
 reliably. This runs the FULL install->vov->shrink pipeline on the v3.5.5 agent
-(/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v355), one industry per idle workspace,
-in parallel. Exports overwrite /tmp/vov_out/<ind> only on success; prior fe-gcp automotive ECM
+(/Users/user@databricks.com/dbx_vibe_modelling_agent_v355), one industry per idle workspace,
+in parallel. Exports overwrite /tmp/vov_out/<ind> only on success; prior <profile> automotive ECM
 remains a recoverable fallback. Reuses the marathon's prepare/stage/job/wait/export/audit
 functions; does NOT touch the shared marathon state file (avoids the cross-process write race).
 """
@@ -29,9 +29,9 @@ import vov_audit_extract as A
 M.INSTALL_TIMEOUT_S = 2700  # 45m
 
 ASSIGN = [
-    ("automotive", "my-adp"),
-    ("healthcare", "fe-aws"),
-    ("media_broadcasting", "my-gcp"),
+    ("automotive", "<profile>"),
+    ("healthcare", "<profile>"),
+    ("media_broadcasting", "<profile>"),
 ]
 
 

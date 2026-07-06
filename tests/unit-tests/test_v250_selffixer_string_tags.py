@@ -7,12 +7,12 @@ aliases:
   v250-coerce-tags-to-string
   v250-count-schema-string-violations
 
-Regression target: NCDOT install_base run 723387204811151 (2026-05-28 09:36 → 10:04 UTC) crashed
+Regression target: gov_transport install_base run <run_id> (2026-05-28 09:36 → 10:04 UTC) crashed
 with AttributeError: 'dict' object has no attribute 'lower' at step_generate_data_model_json,
 then again with 'dict' object has no attribute 'strip' at step_generate_metric_view_artifacts.
 
 Producer: [selffixer-applied FIRED v2.0.8] req=VREQ-018 applied an LLM-generated sandbox mutator
-that wrote attr['tags'] = {'ncdot_source_attribute': '<orig>'} (a Python dict) to 1372 attributes,
+that wrote attr['tags'] = {'gov_transport_source_attribute': '<orig>'} (a Python dict) to 1372 attributes,
 violating the TABLE_ATTRIBUTE_SCHEMA tags:string contract.
 
 v240 only protected enforce_configured_pk_consistency (ONE consumer). 4 downstream consumers
@@ -192,7 +192,7 @@ def test_v250_coerce_tags_behavior():
     assert fn("pii,contact") == "pii,contact"
     assert fn("") == ""
     assert fn(None) == ""
-    assert fn({"ncdot_source_attribute": "employee_id"}) == "ncdot_source_attribute=employee_id"
+    assert fn({"gov_transport_source_attribute": "employee_id"}) == "gov_transport_source_attribute=employee_id"
     coerced = fn({"a": 1, "b": 2})
     parts = sorted(coerced.split(","))
     assert parts == ["a=1", "b=2"]
@@ -248,7 +248,7 @@ def test_v250_count_schema_violations_behavior():
                                 {
                                     "name": "employee_id",
                                     "type": "BIGINT",
-                                    "tags": {"ncdot_source_attribute": "employee_id"},
+                                    "tags": {"gov_transport_source_attribute": "employee_id"},
                                     "description": "PK",
                                 },
                                 {
@@ -280,7 +280,7 @@ def test_v250_enforce_invariant_behavior():
         exec(fn_src, ns)
 
     attrs = [
-        {"domain": "hr", "product": "employee", "attribute": "employee_id", "tags": {"ncdot_source_attribute": "employee_id"}},
+        {"domain": "hr", "product": "employee", "attribute": "employee_id", "tags": {"gov_transport_source_attribute": "employee_id"}},
         {"domain": "hr", "product": "employee", "attribute": "first_name", "tags": "pii"},
         {"domain": "hr", "product": "employee", "attribute": "last_name", "tags": ["pii", "audit"]},
         {"domain": "hr", "product": "employee", "attribute": "manager_id", "tags": None},
@@ -290,7 +290,7 @@ def test_v250_enforce_invariant_behavior():
     assert n_coerced == 2, f"expected 2 coerced (dict + list), got {n_coerced}"
     for a in attrs:
         assert isinstance(a["tags"], str) or a["tags"] is None
-    assert attrs[0]["tags"] == "ncdot_source_attribute=employee_id"
+    assert attrs[0]["tags"] == "gov_transport_source_attribute=employee_id"
     assert attrs[1]["tags"] == "pii"
     assert attrs[2]["tags"] == "pii,audit"
 
@@ -305,7 +305,7 @@ def test_v250_v240_compatibility_preserved():
 
 def test_v250_pre_patch_would_crash_proof():
     """Prove the pre-patch behavior: `.lower()` on a dict crashes."""
-    bad_dict_tag = {"ncdot_source_attribute": "employee_id"}
+    bad_dict_tag = {"gov_transport_source_attribute": "employee_id"}
     with pytest.raises(AttributeError, match="lower"):
         _ = bad_dict_tag.lower()
 

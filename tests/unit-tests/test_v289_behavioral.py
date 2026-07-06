@@ -1,6 +1,6 @@
 """Behavioral tests for v2.8.9 — eight VOV/§3c root-cause fixes.
 
-Audit source: killed-swarm line-by-line audit of NCDOT (mvm_v1 agent 2.8.2 / mvm_v2 agent 2.8.5)
+Audit source: killed-swarm line-by-line audit of gov_transport (mvm_v1 agent 2.8.2 / mvm_v2 agent 2.8.5)
 and restaurants (ecm_v2 agent 2.8.7), plus the live construction v2.8.8 SelfFixer run.
 
 FIX 1  vov-strip-import-pre-ast    : strip `import`/`from-import` lines before AST validation +
@@ -12,7 +12,7 @@ FIX 3  selffixer schema keys       : _SELFFIXER_PROMPT MODEL SHAPE used "product
                                      product not found'. Fix keys + add CREATE-THEN-MUTATE.
 FIX 6  vov-bridge-retry-empty      : empty/None LLM response (429/throttle) crashed complete_json on
                                      the FIRST occurrence; retry with adaptive backoff before raising.
-FIX 7  vov-respect/restore-user-product-name : NCDOT next_vibes PRIORITY-1/2 proved the pipeline
+FIX 7  vov-respect/restore-user-product-name : gov_transport next_vibes PRIORITY-1/2 proved the pipeline
                                      stripped user literal 'project_material'->'material' and the
                                      SelfFixer rename-back failed. §3c: never strip/typo a user name;
                                      restore mangled near-matches deterministically.
@@ -75,7 +75,7 @@ def test_levenshtein_distances():
 
 
 def test_match_user_token_restores_and_is_conservative():
-    """NON-TAUTOLOGY: prove restore fires for the two real NCDOT mangles AND does NOT fire for an
+    """NON-TAUTOLOGY: prove restore fires for the two real gov_transport mangles AND does NOT fire for an
     unrelated product (control) nor for an already-correct name (no-op)."""
     ns = exec_function_namespace(
         "_vov_match_user_token",

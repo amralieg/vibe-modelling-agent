@@ -53,7 +53,7 @@ def test_force_reinstall_env_short_circuits_probe(monkeypatch):
 
     monkeypatch.setattr(m, "sql_exec", _boom)
     monkeypatch.setenv("VOV_FORCE_REINSTALL", "1")
-    assert m.v1_installed("fe-gcp", "travel_hospitality") is False
+    assert m.v1_installed("<profile>", "travel_hospitality") is False
     assert calls["n"] == 0
 
 
@@ -82,7 +82,7 @@ def test_probe_true_when_v1_complete(monkeypatch):
     monkeypatch.delenv("VOV_FORCE_REINSTALL", raising=False)
     monkeypatch.setattr(m, "sql_exec",
                         _v1_probe_sql({"pct": "100", "accum": "1", "domain": "3"}))
-    assert m.v1_installed("fe-gcp", "travel_hospitality") is True
+    assert m.v1_installed("<profile>", "travel_hospitality") is True
 
 
 def test_probe_false_when_catalog_accumulated_v2plus(monkeypatch):
@@ -92,7 +92,7 @@ def test_probe_false_when_catalog_accumulated_v2plus(monkeypatch):
     monkeypatch.delenv("VOV_FORCE_REINSTALL", raising=False)
     monkeypatch.setattr(m, "sql_exec",
                         _v1_probe_sql({"pct": "100", "accum": "5", "domain": "3"}))
-    assert m.v1_installed("fe-gcp", "travel_hospitality") is False
+    assert m.v1_installed("<profile>", "travel_hospitality") is False
 
 
 def test_probe_false_when_v1_incomplete(monkeypatch):
@@ -100,14 +100,14 @@ def test_probe_false_when_v1_incomplete(monkeypatch):
     monkeypatch.delenv("VOV_FORCE_REINSTALL", raising=False)
     monkeypatch.setattr(m, "sql_exec",
                         lambda *a, **k: {"result": {"data_array": [["99.0"]]}})
-    assert m.v1_installed("fe-gcp", "travel_hospitality") is False
+    assert m.v1_installed("<profile>", "travel_hospitality") is False
 
 
 def test_probe_false_when_no_row(monkeypatch):
     monkeypatch.delenv("VOV_FORCE_REINSTALL", raising=False)
     monkeypatch.setattr(m, "sql_exec",
                         lambda *a, **k: {"result": {"data_array": []}})
-    assert m.v1_installed("fe-gcp", "travel_hospitality") is False
+    assert m.v1_installed("<profile>", "travel_hospitality") is False
 
 
 def test_probe_false_when_catalog_missing(monkeypatch):
@@ -117,15 +117,15 @@ def test_probe_false_when_catalog_missing(monkeypatch):
         raise RuntimeError("TABLE_OR_VIEW_NOT_FOUND: _metamodel.business")
 
     monkeypatch.setattr(m, "sql_exec", _raise)
-    assert m.v1_installed("fe-gcp", "travel_hospitality") is False
+    assert m.v1_installed("<profile>", "travel_hospitality") is False
 
 
 # --- fixed-catalog mechanism (a profile where the metastore denies CREATE CATALOG) ---
-# my-aws is the FIXED_CATALOG profile but is now EMPTY of industries (manufacturing was relocated
-# to the droppable fe-aws on 2026-06-24 to escape the un-droppable shared catalog that pinned it
+# <profile> is the FIXED_CATALOG profile but is now EMPTY of industries (manufacturing was relocated
+# to the droppable <profile> on 2026-06-24 to escape the un-droppable shared catalog that pinned it
 # 'partial'). The fixed-catalog mechanism must still be covered, so these tests drive it through a
-# SYNTHETIC industry mapped onto my-aws rather than a live assignment.
-FIXED_PROFILE = "my-aws"
+# SYNTHETIC industry mapped onto <profile> rather than a live assignment.
+FIXED_PROFILE = "<profile>"
 FIXED_CAT = "serverless_stable_8nstmo_catalog"
 
 
@@ -140,7 +140,7 @@ def test_fixed_catalog_mechanism_via_synthetic_industry(monkeypatch):
 
 def test_active_industries_never_on_fixed_or_undroppable_profile():
     # DURABLE profile-policy invariant (survives ASSIGN narrowing across relaunches):
-    # the active-run list must never place an industry on a FIXED_CATALOG profile (my-aws)
+    # the active-run list must never place an industry on a FIXED_CATALOG profile (<profile>)
     # — those catalogs can't be dropped, so a clean v1->v2 rebuild is impossible there.
     for fixed_profile in m.FIXED_CATALOG:
         assert not m.ASSIGN.get(fixed_profile), (
@@ -196,7 +196,7 @@ def test_prepare_catalog_normal_profile_still_drops_and_creates(monkeypatch):
     monkeypatch.setattr(m, "sql_exec",
                         lambda profile, stmt, timeout=180: stmts.append(stmt) or {"result": {"data_array": []}})
     monkeypatch.setattr(m, "pulse", lambda *a, **k: None)
-    m.prepare_catalog("fe-gcp", "travel_hospitality")
+    m.prepare_catalog("<profile>", "travel_hospitality")
     joined = " | ".join(stmts).upper()
     # a normal profile (CREATE CATALOG allowed) must still drop+recreate its isolated catalog
     assert "DROP CATALOG IF EXISTS" in joined

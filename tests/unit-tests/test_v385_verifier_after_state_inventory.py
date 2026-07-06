@@ -1,7 +1,7 @@
 """
 v3.8.5 behavioral test for the verifier-blindness fix (alias=verifier-after-state-inventory).
 
-ROOT CAUSE (ncdot v3.8.4 audit, VREQ-011/012/013/014/015/016 false-fails): VibeOrchestrator.audit_all
+ROOT CAUSE (gov_transport v3.8.4 audit, VREQ-011/012/013/014/015/016 false-fails): VibeOrchestrator.audit_all
 built the unified-audit after_state from ONLY domain+product names (both truncated). The LLM verifier
 therefore could not SEE the applied attributes/tags/subdomains/stewards/PKs/metric-views and false-FAILED
 every metadata VREQ on a model that physically carried them (the same "lying scoreboard" class as the
@@ -44,7 +44,7 @@ def _load_inventory_fn():
     return ns.get("_v385_after_state_inventory_lines")
 
 
-def _fake_self(metric_views=None, statements=None, catalog="vibe_ncdot_basemvm"):
+def _fake_self(metric_views=None, statements=None, catalog="vibe_gov_transport_basemvm"):
     wv = {}
     if metric_views is not None:
         wv["metric_views"] = metric_views
@@ -65,11 +65,11 @@ def _model():
     ]
     attributes = [
         {"domain": "hr", "product": "employee", "attribute": "employee_id",
-         "is_primary_key": True, "tags": "primary_key,ncdot_business_glossary_term=Employee Identifier"},
+         "is_primary_key": True, "tags": "primary_key,gov_transport_business_glossary_term=Employee Identifier"},
         {"domain": "hr", "product": "employee", "attribute": "hire_date",
-         "is_primary_key": False, "tags": "ncdot_business_glossary_term=Hire Date,ncdot_source_attribute=hire_dt"},
+         "is_primary_key": False, "tags": "gov_transport_business_glossary_term=Hire Date,gov_transport_source_attribute=hire_dt"},
         {"domain": "hr", "product": "applicant", "attribute": "applicant_id",
-         "is_primary_key": True, "tags": "primary_key,ncdot_source_attribute=appl_id"},
+         "is_primary_key": True, "tags": "primary_key,gov_transport_source_attribute=appl_id"},
     ]
     return domains, products, attributes
 
@@ -86,7 +86,7 @@ def test_method_emits_all_inventories():
     assert "TAG INVENTORY" in blob
     assert "PRIMARY-KEY FLAGS" in blob and "hr.employee.employee_id" in blob
     assert "METRIC-VIEW INVENTORY" in blob and "hr_vacancy_rate" in blob and "hr_turnover_rate" in blob and "hr_headcount" in blob
-    assert "CATALOG (authoritative): vibe_ncdot_basemvm" in blob
+    assert "CATALOG (authoritative): vibe_gov_transport_basemvm" in blob
 
 
 def test_tag_inventory_counts():
@@ -96,15 +96,15 @@ def test_tag_inventory_counts():
     lines = fn(_fake_self(), domains, products, attributes)
     blob = "\n".join(lines)
     # glossary appears on 2 attrs, source_attribute on 2 attrs
-    assert "ncdot_business_glossary_term(2)" in blob
-    assert "ncdot_source_attribute(2)" in blob
+    assert "gov_transport_business_glossary_term(2)" in blob
+    assert "gov_transport_source_attribute(2)" in blob
 
 
 def test_metric_views_parsed_from_statements():
     fn = _load_inventory_fn()
     assert fn is not None
     domains, products, attributes = _model()
-    stmts = ["CREATE OR REPLACE VIEW vibe_ncdot_basemvm._metrics.hr_vacancy_rate AS SELECT 1"]
+    stmts = ["CREATE OR REPLACE VIEW vibe_gov_transport_basemvm._metrics.hr_vacancy_rate AS SELECT 1"]
     lines = fn(_fake_self(statements=stmts), domains, products, attributes)
     blob = "\n".join(lines)
     assert "METRIC-VIEW INVENTORY" in blob and "hr_vacancy_rate" in blob

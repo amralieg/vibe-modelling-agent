@@ -1,10 +1,10 @@
 """v3.2.9 — verifier-rename false-fulfillment root-cause fix.
 
-Ground truth (NCDOT mvm_v6 physical audit 2026-06-05): source priorities
+Ground truth (gov_transport mvm_v6 physical audit 2026-06-05): source priorities
 P18-P22 (rename_attribute, e.g. project_id -> primary_project_id on
 project.asset_impact / project.location / project.plan_inclusion) were marked
 ALREADY FULFILLED by the deterministic verifier yet were absent from BOTH
-model.json and the ncdot_v1 catalog. Two false-pass paths:
+model.json and the gov_transport_v1 catalog. Two false-pass paths:
 
   (1) verifier-rename-state: the new-name capture regex `\\bto\\s+X` matched
       "...two FKs point to project.project" (the WRONG "to"), found leaf

@@ -9,7 +9,7 @@ Fixes shipped:
                               `dict` shape. Previously crashed with
                               `AttributeError: 'str' object has no attribute 'get'`
                               when LLM returned a list of strings instead of
-                              dicts (root cause of run_id 210677821854565
+                              dicts (root cause of run_id <run_id>
                               first shrink attempt failure).
 
   2. shrink-phantom-drop    — `_run_resize_model` shrink branch filters
@@ -17,7 +17,7 @@ Fixes shipped:
                               `products_data` BEFORE running the silo
                               validator. Phantom product names introduced by
                               the LLM (e.g. `legal_entity`, `roster_period`
-                              from run_id 450474006514631 second shrink
+                              from run_id <run_id> second shrink
                               attempt) are now logged + dropped instead of
                               wrongly tripping the SHRINK-NEW-SILO validator
                               (which used to trigger because the phantom
@@ -32,7 +32,7 @@ Fixes shipped:
                               feedback path could be soft-accepted after
                               `Max retries (3) exhausted` (R7/F2 hatch
                               observed at line 14:40:23 of killed
-                              run 453386975947787 for
+                              run <run_id> for
                               `find_missing_fk_links_workforce`,
                               `timesheet.schedule_id` →
                               `workforce.work_schedule.work_schedule_id`).
@@ -125,7 +125,7 @@ def test_v071_fix1_handles_string_in_domains_to_remove():
     txt = _agent_text()
     assert "domains_to_remove item not a dict" in txt, (
         "domains_to_remove items must be guarded against non-dict (root cause of "
-        "AttributeError 'str' has no 'get' in run 210677821854565)"
+        "AttributeError 'str' has no 'get' in run <run_id>)"
     )
 
 
@@ -164,7 +164,7 @@ def test_v071_fix1_no_unguarded_dict_get_on_removed_domain():
     window = txt[max(0, pos - 800):pos]
     assert "isinstance(removed_domain, dict)" in window, (
         "removed_domain.get(...) call site is not guarded by isinstance() within 800 chars; "
-        "this is the exact failure mode of run 210677821854565"
+        "this is the exact failure mode of run <run_id>"
     )
 
 
@@ -193,7 +193,7 @@ def test_v071_fix2_phantom_filter_runs_before_silo_validator():
     assert phantom_pos < silo_pos, (
         "Phantom-drop must occur BEFORE the SHRINK-NEW-SILO validator raises; "
         "otherwise phantoms still trigger false positives (root cause of "
-        "run 450474006514631 SHRINK-NEW-SILO failure with phantom names "
+        "run <run_id> SHRINK-NEW-SILO failure with phantom names "
         "['legal_entity', 'roster_period'])"
     )
 

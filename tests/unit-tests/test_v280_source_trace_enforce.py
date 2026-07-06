@@ -6,7 +6,7 @@ end-to-end and asserts the OBSERVABLE state change (not a static grep).
 Failure mode pre-patch (no enforcement pass existed for new-base models):
   - table-level source-trace tags (e.g. original_table_name) left EMPTY by the
     MODEL_ARCHITECT_REVIEW path (it only knows the model name).
-  - attribute-level source-trace tags (e.g. ncdot_source_attribute) stamped
+  - attribute-level source-trace tags (e.g. gov_transport_source_attribute) stamped
     SELF-REFERENTIALLY (col=col) by generic ATTRIBUTE_GENERATE.
 
 These tests drive the real notebook function (sliced from the agent .ipynb) with a
@@ -137,10 +137,10 @@ def test_attribute_self_referential_corrected_to_source_column():
          "columns": [{"name": "annual_salary", "original_column_name": "base_salary_amt"}]},
     ])
     attrs = [{"attribute": "annual_salary", "product": "employees",
-              "tags": "ncdot_source_attribute=annual_salary"}]  # self-referential
-    assert _tag_val(attrs[0], "ncdot_source_attribute") == "annual_salary"
+              "tags": "gov_transport_source_attribute=annual_salary"}]  # self-referential
+    assert _tag_val(attrs[0], "gov_transport_source_attribute") == "annual_salary"
     fn([], [], attrs, _widgets(ai), _LOGGER)
-    assert _tag_val(attrs[0], "ncdot_source_attribute") == "base_salary_amt"
+    assert _tag_val(attrs[0], "gov_transport_source_attribute") == "base_salary_amt"
 
 
 def test_residual_llm_maps_semantic_rename():
@@ -151,9 +151,9 @@ def test_residual_llm_maps_semantic_rename():
         residual={0: "employee_name"},
     )
     attrs = [{"attribute": "emp_full_name", "product": "employees",
-              "tags": "ncdot_source_attribute=emp_full_name"}]
+              "tags": "gov_transport_source_attribute=emp_full_name"}]
     fn([], [], attrs, _widgets(ai), _LOGGER)
-    assert _tag_val(attrs[0], "ncdot_source_attribute") == "employee_name"
+    assert _tag_val(attrs[0], "gov_transport_source_attribute") == "employee_name"
 
 
 def test_fabricated_self_ref_blanked_when_no_source_origin():
@@ -164,10 +164,10 @@ def test_fabricated_self_ref_blanked_when_no_source_origin():
         residual={0: ""},  # LLM says no source origin
     )
     attrs = [{"attribute": "synthetic_score", "product": "employees",
-              "tags": "ncdot_source_attribute=synthetic_score"}]
-    assert _tag_val(attrs[0], "ncdot_source_attribute") == "synthetic_score"
+              "tags": "gov_transport_source_attribute=synthetic_score"}]
+    assert _tag_val(attrs[0], "gov_transport_source_attribute") == "synthetic_score"
     fn([], [], attrs, _widgets(ai), _LOGGER)
-    assert _tag_val(attrs[0], "ncdot_source_attribute") == ""
+    assert _tag_val(attrs[0], "gov_transport_source_attribute") == ""
 
 
 def test_noop_when_no_source_trace_keys_present():
@@ -190,16 +190,16 @@ def test_v281_reads_ddl_from_model_vibes_not_business_description():
     ])
     widgets = {
         "ai_agent": ai,
-        # summary that merely *references* model_vibes — no DDL (mirrors the live NCDOT run)
+        # summary that merely *references* model_vibes — no DDL (mirrors the live gov_transport run)
         "business_description": "Reverse-engineer tables listed in model_vibes; add source tags.",
         "model_vibes": "CREATE MATERIALIZED VIEW hr_emp_master (base_salary_amt STRING);",
     }
     attrs = [{"attribute": "annual_salary", "product": "employees",
-              "tags": "ncdot_source_attribute=annual_salary"}]
+              "tags": "gov_transport_source_attribute=annual_salary"}]
     fn([], [], attrs, widgets, _LOGGER)
     # the StubAI keys off prompt_name not text, but the function only reaches extraction
     # because vibe_text was non-empty from model_vibes -> tag faithfully corrected
-    assert _tag_val(attrs[0], "ncdot_source_attribute") == "base_salary_amt"
+    assert _tag_val(attrs[0], "gov_transport_source_attribute") == "base_salary_amt"
 
 
 def test_v281_table_residual_llm_maps_unmatched_table():
@@ -225,6 +225,6 @@ def test_faithful_value_already_present_is_preserved():
     ])
     # attribute already carries the correct source value -> must not be blanked/changed
     attrs = [{"attribute": "annual_salary", "product": "employees",
-              "tags": "ncdot_source_attribute=base_salary_amt"}]
+              "tags": "gov_transport_source_attribute=base_salary_amt"}]
     fn([], [], attrs, _widgets(ai), _LOGGER)
-    assert _tag_val(attrs[0], "ncdot_source_attribute") == "base_salary_amt"
+    assert _tag_val(attrs[0], "gov_transport_source_attribute") == "base_salary_amt"

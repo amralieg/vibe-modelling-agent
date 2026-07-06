@@ -1,6 +1,6 @@
 """Behavioral tests for v2.8.7 — PINNED-DOMAIN RECONCILE (alias=vov-pinned-domain-reconcile).
 
-Live my-gcp/restaurants VOV run (2026-05-30) printed the swarm's first per-iteration outcome:
+Live <profile>/restaurants VOV run (2026-05-30) printed the swarm's first per-iteration outcome:
     [VOV-OUTCOME-SUMMARY] iter=1 batches=54 applied=0 by_status={'invariant_violation': 36,
                           'time_budget_exceeded': 18}
 0% applied coverage. Ground-truth: business_domains widget was EMPTY yet the VOV pinned 13
@@ -138,7 +138,7 @@ def test_reconcile_is_order_preserving_and_deduped():
 
 def test_reconcile_fired_line_routes_to_vov2_pipeline_logger():
     # §8.10 regression guard: the FIRED line MUST emit on the vov2-pipeline logger (which the VOV
-    # pipeline attaches to the volume info.log), NOT the module-global logger. Live my-gcp/restaurants
+    # pipeline attaches to the volume info.log), NOT the module-global logger. Live <profile>/restaurants
     # v287 proved the fix but its FIRED line was invisible to a volume-log grep because capture_invariants
     # used the unrouted global logger. This locks the routing so the gap can't regress.
     import logging

@@ -1,7 +1,7 @@
 """v3.8.3 behavioral tests for the SIX generic VREQ-lifecycle fixes (microscopic vibe audit 2026-06-18).
 
 Each fix is industry-agnostic; tests assert the OBSERVABLE state change (not a log line) and use the
-EXACT structural shapes from the ncdot vibe (backtick directives, the 72-row CDE glossary table, the
+EXACT structural shapes from the gov_transport vibe (backtick directives, the 72-row CDE glossary table, the
 9-row subdomain roster, the 3 mandated metric views, the PSE merge-first directive) so they would have
 caught every real miss. Loads the live helpers from the production notebook; on pre-v3.8.3 HEAD the
 helpers do not exist, so _load_ns() raises and every test fails (fail-pre proof).
@@ -22,11 +22,11 @@ VIBE = """
 | Compensation & Benefits | y | B |
 | Talent Acquisition | z | C |
 
-For EACH new table created in the `hr` domain based on the DDL below, add an ATTRIBUTE-LEVEL tag `ncdot_source_attribute=<original_column>`.
+For EACH new table created in the `hr` domain based on the DDL below, add an ATTRIBUTE-LEVEL tag `gov_transport_source_attribute=<original_column>`.
 
 ### Business glossary attribute enrichment
 
-For every attribute in the HR base model, attach the tag `ncdot_business_glossary_term=<Business Data Element>` whenever a match exists in the table below.
+For every attribute in the HR base model, attach the tag `gov_transport_business_glossary_term=<Business Data Element>` whenever a match exists in the table below.
 
 | CDE# | Sub-Domain | Business Data Element | Description |
 |---|---|---|---|
@@ -45,12 +45,12 @@ For every attribute in the HR base model, attach the tag `ncdot_business_glossar
 Evaluate every column from these source tables and merge into existing `project` domain products where
 the concept already exists; only create a new product when none of the existing project products covers the column.
 
-- Tag prefix: `ncdot_` for every NCDOT-specific tag.
-- Source-trace MANDATORY for every HR table: `ncdot_source_table=<orig>`, `ncdot_source_attribute=<orig>`.
+- Tag prefix: `gov_transport_` for every gov_transport-specific tag.
+- Source-trace MANDATORY for every HR table: `gov_transport_source_table=<orig>`, `gov_transport_source_attribute=<orig>`.
 - For PSE-derived project tables: `original_table_name=<orig>`.
 """
 
-CFG = {"MODEL_CONVENTIONS": {"tag_prefix": "ncdot_", "tag_suffix": ""}}
+CFG = {"MODEL_CONVENTIONS": {"tag_prefix": "gov_transport_", "tag_suffix": ""}}
 
 
 def _grab(src, name):
@@ -113,20 +113,20 @@ def test_A_fk_target_metric_view_is_kept_safe(ns):
 
 # ---------------------------------------------------------------- CLASS B ----
 def test_B_per_attribute_provenance_resolved(ns):
-    prods = [{"domain": "hr", "name": "employee", "tags": "ncdot_source_table=emp_actions"},
+    prods = [{"domain": "hr", "name": "employee", "tags": "gov_transport_source_table=emp_actions"},
              {"domain": "project", "name": "route", "tags": ""}]  # NOT source-derived
     attrs = [{"domain": "hr", "product": "employee", "attribute": "hire_date", "column_name": "hire_date", "tags": ""},
              {"domain": "project", "product": "route", "attribute": "route_id", "column_name": "route_id", "tags": ""}]
     n = ns["_v383_apply_per_attribute_value_tags"](attrs, prods, VIBE, CFG, None)
     assert n == 1, n
-    assert "ncdot_source_attribute=hire_date" in attrs[0]["tags"], attrs[0]["tags"]
+    assert "gov_transport_source_attribute=hire_date" in attrs[0]["tags"], attrs[0]["tags"]
     # the non-source-derived product's attribute is untouched (no blanket stamping)
     assert "source_attribute" not in (attrs[1]["tags"] or ""), attrs[1]["tags"]
 
 
 def test_B_directive_parses_through_backticks(ns):
     keys = ns["_v383_parse_attr_placeholder_directives"](VIBE)
-    assert "ncdot_source_attribute" in keys, keys  # backtick + 'EACH table' phrasing must parse
+    assert "gov_transport_source_attribute" in keys, keys  # backtick + 'EACH table' phrasing must parse
 
 
 # ---------------------------------------------------------------- CLASS C ----
@@ -138,7 +138,7 @@ def test_C_glossary_lexicon_harvested_full(ns):
 def test_C_fabricated_glossary_purged_real_kept(ns):
     attrs = [{"domain": "hr", "product": "e", "attribute": "a", "business_glossary_term": "Position"},
              {"domain": "hr", "product": "e", "attribute": "b", "business_glossary_term": "Made Up Zzqq Nonsense"},
-             {"domain": "hr", "product": "e", "attribute": "c", "tags": "ncdot_business_glossary_term=Garbage Xyzzy"}]
+             {"domain": "hr", "product": "e", "attribute": "c", "tags": "gov_transport_business_glossary_term=Garbage Xyzzy"}]
     purged = ns["_v383_purge_fabricated_lookup_tags"](attrs, VIBE, CFG, None)
     assert purged == 2, purged
     assert attrs[0]["business_glossary_term"] == "Position"   # real lexicon match survives
@@ -186,16 +186,16 @@ def test_E_noop_without_merge_directive(ns):
 
 # ---------------------------------------------------------------- CLASS F ----
 def test_F_literal_tag_name_outranks_prefix(ns):
-    prods = [{"domain": "project", "name": "route", "tags": "ncdot_original_table_name=pse_route,foo=bar"}]
+    prods = [{"domain": "project", "name": "route", "tags": "gov_transport_original_table_name=pse_route,foo=bar"}]
     n = ns["_v383_enforce_tag_name_precedence"](prods, [], VIBE, CFG, None)
     assert n == 1, n
     assert "original_table_name=pse_route" in prods[0]["tags"]
-    assert "ncdot_original_table_name" not in prods[0]["tags"]  # prefixed variant rewritten to literal
+    assert "gov_transport_original_table_name" not in prods[0]["tags"]  # prefixed variant rewritten to literal
     assert "foo=bar" in prods[0]["tags"]                        # unrelated tag preserved
 
 
 def test_F_prefixed_only_keys_untouched(ns):
-    # ncdot_source_table is given WITH prefix in the vibe -> not a literal-unprefixed target
-    prods = [{"domain": "hr", "name": "employee", "tags": "ncdot_source_table=emp_actions"}]
+    # gov_transport_source_table is given WITH prefix in the vibe -> not a literal-unprefixed target
+    prods = [{"domain": "hr", "name": "employee", "tags": "gov_transport_source_table=emp_actions"}]
     ns["_v383_enforce_tag_name_precedence"](prods, [], VIBE, CFG, None)
-    assert prods[0]["tags"] == "ncdot_source_table=emp_actions"
+    assert prods[0]["tags"] == "gov_transport_source_table=emp_actions"

@@ -6,7 +6,7 @@ ONE fix that covers everything, not one-fix-per-deploy.
 
 Bug classes covered:
 1. v2.1.8 silent-drop in VIBE_PARSE_PROMPT (HC/RT 1-VREQ collapse on review prose).
-2. v2.1.9 dict-vs-str in metric_view_statements (NCDOT vov_v1_to_v2 attempt-1 crash).
+2. v2.1.9 dict-vs-str in metric_view_statements (gov_transport vov_v1_to_v2 attempt-1 crash).
 3. v2.2.0 None-model in _apply_handler_with_retry (HC + RT vov_v1_to_v2 crash).
 
 The suite runs:

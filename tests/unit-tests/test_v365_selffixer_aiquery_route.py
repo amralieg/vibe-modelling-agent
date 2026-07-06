@@ -1,13 +1,13 @@
 """Behavioral tests for v3.6.5 alias=selffixer-route-aiquery-on-unresolved-endpoint.
 
-ROOT CAUSE this fixes (live, ncdot base-MVM run 748921978115629 @ fe-gcp):
+ROOT CAUSE this fixes (live, gov_transport base-MVM run <run_id> @ <profile>):
 the SelfFixer (closed-loop residual VREQ repair, the LARGEST adherence lever per
 CLAUDE.md MISSION) was INERT. SelfFixer.__init__ logged
 `[selffixer-endpoint-resolve MISS]` -> self.llm_endpoint stayed None, BUT
 `_call_opus` still PREFERRED the spark-free HTTP path purely on
 `hasattr(self.ai_agent, "_v207_call_llm_spark_free")` (always True on the real
 AIAgent). It therefore POSTed to `/serving-endpoints/None/invocations` and got
-`NotFound` on every failed VREQ -> ncdot shipped 60.87% verified adherence
+`NotFound` on every failed VREQ -> gov_transport shipped 60.87% verified adherence
 ("DEAD AGENTIC REPAIR"). The proven main path `_call_ai_query` (which built the
 ENTIRE model on the same workspace, self-resolving the model via
 `_get_model_config_for_prompt` -> default databricks-claude-sonnet-4-5) was only
@@ -118,7 +118,7 @@ def test_unresolved_endpoint_routes_to_aiquery():
     SelfFixer = _load_selffixer()
     agent = _RecAgent(resolve=False)
     fx = SelfFixer(agent, _CapLogger())
-    assert fx.llm_endpoint is None, "precondition: endpoint resolve MISSES (mirrors fe-gcp)"
+    assert fx.llm_endpoint is None, "precondition: endpoint resolve MISSES (mirrors <profile>)"
 
     parsed = fx._call_opus("REQ1", "req text", "evidence", "digest")
 

@@ -90,7 +90,7 @@ def _scenario(ledger):
          "foreign_key_to": ""},
     ]
     config = {
-        "PROMPT_VARIABLES": {"business_config": {"business": "ncdot", "version": "1"},
+        "PROMPT_VARIABLES": {"business_config": {"business": "gov_transport", "version": "1"},
                              "model_conventions_config": {"table_id_type": "BIGINT"}},
         "MODEL_SCOPE": "ecm",
         "_widgets_values": {"_vov_removed_fk_fqns": list(ledger)},

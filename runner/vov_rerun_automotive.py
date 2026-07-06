@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """Clean re-run of automotive on an idle workspace for QUALITY.
 
-The first automotive run (fe-gcp, 3-task install->vov->shrink) was externally CANCELLED at ~10.7h
+The first automotive run (<profile>, 3-task install->vov->shrink) was externally CANCELLED at ~10.7h
 ("Run cancelled by user") during vov finalization, BEFORE the selffixer applied residual VReq fixes
 (selffixer_applied=[]). Its ECM is structurally complete (581 products) but VReq adherence is only
 ~40% (27/69) — below the mission's 90% floor. healthcare + media_broadcasting (same age, different
 workspaces) are still running, so the cancel was workspace-specific / one-off, not systematic.
 
-This re-runs the FULL pipeline on my-adp (idle, no observed cancel) reusing the marathon's own
+This re-runs the FULL pipeline on <profile> (idle, no observed cancel) reusing the marathon's own
 prepare/stage/submit/wait/export/audit functions, so the model is rebuilt identically with the full
 vov + selffixer pass. Install cap trimmed to 40m (install functionally completes in <10m and only
 loads _metamodel; the 2h cap just burned teardown-hang time and delayed vov). Exports overwrite
-/tmp/vov_out/automotive only on success; the fe-gcp ECM remains on its volume as a recoverable
+/tmp/vov_out/automotive only on success; the <profile> ECM remains on its volume as a recoverable
 fallback. Does NOT touch the shared marathon state file (avoids the cross-process write race).
 """
 import os
@@ -21,13 +21,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vov_v2_marathon as M
 import vov_audit_extract as A
 
-PROFILE = "my-adp"
+PROFILE = "<profile>"
 IND = "automotive"
 M.INSTALL_TIMEOUT_S = 2400  # 40m: install loads _metamodel in <10m; trim the teardown-hang tail
 
 
 def main():
-    M.pulse(f"=== RERUN {IND} on {PROFILE} (clean full pipeline; prior fe-gcp run CANCELLED @~40% adherence) ===")
+    M.pulse(f"=== RERUN {IND} on {PROFILE} (clean full pipeline; prior <profile> run CANCELLED @~40% adherence) ===")
     try:
         M.prepare_catalog(PROFILE, IND)
         M.stage_files(PROFILE, IND)

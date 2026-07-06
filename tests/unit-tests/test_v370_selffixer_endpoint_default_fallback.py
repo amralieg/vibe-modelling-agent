@@ -1,6 +1,6 @@
 """Behavioral tests for v3.7.0 alias=selffixer-endpoint-default-fallback.
 
-ROOT CAUSE this fixes (live, ncdot base-MVM run 1100641407727378 @ fe-gcp, v3.6.9):
+ROOT CAUSE this fixes (live, gov_transport base-MVM run <run_id> @ <profile>, v3.6.9):
 the SelfFixer endpoint cascade in __init__ resolved NOTHING --
 `_select_model_for_requirement(thinker/worker, large)` AND the `_models_lookup`
 scan both returned empty because the v3.0.4 model-discovery step marked the live
@@ -59,7 +59,7 @@ _GOOD_JSON = '{"mutator_src": "model", "verifier_src": "True", "rationale": "ok"
 
 class _Agent:
     """Configurable fake. `cascade_ep` controls the _select_model_for_requirement /
-    _models_lookup cascade (None => MISS, mirrors fe-gcp). `default_cfg` / `llm_cfg`
+    _models_lookup cascade (None => MISS, mirrors <profile>). `default_cfg` / `llm_cfg`
     set the authoritative widget endpoint the main synthesis path uses."""
 
     def __init__(self, cascade_ep=None, default_cfg=None, llm_cfg=None):

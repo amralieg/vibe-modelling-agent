@@ -2,7 +2,7 @@
 v3.8.5 behavioral test for the self-cancel hang-observability root-cause fix
 (alias=self-cancel-vol-log / self-cancel-subproc-sentinel).
 
-ROOT CAUSE (ncdot v3.8.4 run + healthcare v3.8.3 run both hung ~4h past FINAL-FLUSH):
+ROOT CAUSE (gov_transport v3.8.4 run + healthcare v3.8.3 run both hung ~4h past FINAL-FLUSH):
 the v3.8.4 control-plane self-cancel was INERT and UNDIAGNOSABLE. The watchdog armed the
 REST runs/cancel branch ONLY when _SELF_CANCEL_CTX had run_id+host+token; when capture
 failed silently (it ran before logger init, print()ed to driver stdout that is never

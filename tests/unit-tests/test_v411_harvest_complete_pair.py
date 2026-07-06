@@ -44,7 +44,7 @@ def test_picks_latest_complete_pair_not_half_baked_max():
         "versions": [1, 2, 3, 8],
         "complete": {1: {"ecm"}, 2: {"ecm", "mvm"}, 3: {"ecm", "mvm"}, 8: {"ecm"}},
     })
-    assert mod.latest_version("fe-aws", "manufacturing") == "v3"
+    assert mod.latest_version("<profile>", "manufacturing") == "v3"
 
 
 def test_picks_max_when_all_complete():
@@ -54,7 +54,7 @@ def test_picks_max_when_all_complete():
         "versions": [1, 2, 3],
         "complete": {1: {"ecm", "mvm"}, 2: {"ecm", "mvm"}, 3: {"ecm", "mvm"}},
     })
-    assert mod.latest_version("fe-aws", "retail") == "v3"
+    assert mod.latest_version("<profile>", "retail") == "v3"
 
 
 def test_falls_back_to_ecm_only_when_no_complete_pair():
@@ -64,4 +64,4 @@ def test_falls_back_to_ecm_only_when_no_complete_pair():
         "versions": [1, 2, 5],
         "complete": {1: {"ecm"}, 2: {"ecm"}, 5: {"ecm"}},
     })
-    assert mod.latest_version("fe-aws", "semiconductors") == "v5"
+    assert mod.latest_version("<profile>", "semiconductors") == "v5"

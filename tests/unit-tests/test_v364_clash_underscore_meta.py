@@ -97,7 +97,7 @@ def test_staging_underscore_schema_is_noop_not_clash():
     log = _CapLogger()
     # Pre-v3.6.4 HEAD: `_staging` survives the filter, exists in the catalog,
     # and the empty-widgets path raises the hostile clash ValueError.
-    fn(spark, [("vibe_ncdot_basemvm", "_staging")], {}, log)  # must NOT raise
+    fn(spark, [("vibe_gov_transport_basemvm", "_staging")], {}, log)  # must NOT raise
     joined = " ".join(m for _, m in log.lines)
     assert "all internal schemas" in joined, (
         "underscore-meta-only targets must short-circuit as an all-internal no-op; "

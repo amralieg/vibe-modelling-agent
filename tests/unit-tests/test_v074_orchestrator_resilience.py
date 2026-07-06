@@ -58,7 +58,7 @@ def test_v074_sync_watchdog_alias_present():
 
 def test_v074_sync_watchdog_polls_all_three_clouds():
     src = WATCHDOG_FILE.read_text()
-    for prof in ("emirates-gcp", "fe-aws", "fe-vm-feip"):
+    for prof in ("<profile>", "<profile>", "fe-vm-feip"):
         assert prof in src, f"watchdog CLOUDS must include profile '{prof}'"
 
 
@@ -308,7 +308,7 @@ def test_v074_db_retries_after_oauth_token_expired_stderr():
         return success
 
     with mock.patch.object(orch.subprocess, "run", side_effect=fake_run):
-        out = orch.db(["jobs", "list"], "emirates-gcp")
+        out = orch.db(["jobs", "list"], "<profile>")
     assert out == '{"ok":true}', "db() must return success after one auth-error retry"
     auth_token_calls = [c for c in call_log if "auth" in c and "token" in c]
     assert len(auth_token_calls) == 1, "Exactly one `databricks auth token` refresh call expected"
@@ -332,7 +332,7 @@ def test_v074_db_does_not_retry_on_non_auth_error():
 
     with mock.patch.object(orch.subprocess, "run", side_effect=fake_run):
         try:
-            orch.db(["jobs", "get", "999"], "emirates-gcp")
+            orch.db(["jobs", "get", "999"], "<profile>")
             raise AssertionError("expected RuntimeError")
         except RuntimeError as e:
             assert "resource not found" in str(e)
@@ -493,7 +493,7 @@ def test_v074_watchdog_quality_gate_rejects_when_tasks_failed():
     }
     captured = []
     with mock.patch.object(m.subprocess, "run", side_effect=_make_fake_manifest_runner(partial_failure)):
-        result = m.passes_quality_gate("emirates-gcp", "test_industry", "GCP", log_fn=captured.append)
+        result = m.passes_quality_gate("<profile>", "test_industry", "GCP", log_fn=captured.append)
     assert result is False, "all_tasks_succeeded=False must REJECT regardless of file count"
     assert any("all_tasks_succeeded=False" in c for c in captured), "must cite the failure reason"
 
@@ -514,7 +514,7 @@ def test_v074_watchdog_quality_gate_passes_real_manifest():
     }
     captured = []
     with mock.patch.object(m.subprocess, "run", side_effect=_make_fake_manifest_runner(real_manifest)):
-        result = m.passes_quality_gate("emirates-gcp", "healthcare", "GCP", log_fn=captured.append)
+        result = m.passes_quality_gate("<profile>", "healthcare", "GCP", log_fn=captured.append)
     assert result is True, "Healthcare-class manifest must PASS"
     assert any("PASS" in c for c in captured), "must log PASS"
 
@@ -534,7 +534,7 @@ def test_v074_watchdog_quality_gate_rejects_missing_manifest():
 
     captured = []
     with mock.patch.object(m.subprocess, "run", side_effect=fake_run):
-        result = m.passes_quality_gate("emirates-gcp", "no_such_industry", "GCP", log_fn=captured.append)
+        result = m.passes_quality_gate("<profile>", "no_such_industry", "GCP", log_fn=captured.append)
     assert result is False, "Missing manifest must REJECT"
     assert any("no _manifest.json" in c for c in captured), "must cite missing manifest"
 

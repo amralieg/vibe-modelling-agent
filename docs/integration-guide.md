@@ -82,7 +82,7 @@ When the UI creates the job, it **MUST** set these exact tag keys. All values mu
 | Tag Key | Value | Example |
 |---|---|---|
 | `dbx_vibe_modelling_launcher_source` | Source that launched the job: `Vibe_Modelling_Notebook` when launched from a notebook, `Vibe_Modelling_App` when launched from an external app/UI | `Vibe_Modelling_Notebook`, `Vibe_Modelling_App` |
-| `dbx_vibe_modelling_business` | Sanitized business name (spaces → `_`, special chars removed) | `NCDot`, `Acme_Corp` |
+| `dbx_vibe_modelling_business` | Sanitized business name (spaces → `_`, special chars removed) | `gov_transport`, `Acme_Corp` |
 | `dbx_vibe_modelling_model` | `{scope}_v{version}` where scope is `mvm` or `ecm` | `mvm_v1`, `ecm_v2` |
 | `dbx_vibe_modelling_operation` | Sanitized operation name (spaces → `_`) | `new_base_model`, `vibe_modeling_of_version`, `shrink_ecm`, `enlarge_mvm`, `install_model`, `uninstall_model_version`, `generate_sample_data` |
 | `dbx_vibe_modelling_domains` | `0` (updated by agent at end of run) | `0` → `8` |
@@ -94,7 +94,7 @@ When the UI creates the job, it **MUST** set these exact tag keys. All values mu
 
 **Tag sanitization rule:** Replace any character not in `[A-Za-z0-9._-]` with `_`, collapse consecutive `_`, strip leading/trailing `_`, `.`, `-`.
 
-**Job naming convention:** `dbx_vibe_modelling_<sanitized_business_name>` (e.g., `dbx_vibe_modelling_ncdot`).
+**Job naming convention:** `dbx_vibe_modelling_<sanitized_business_name>` (e.g., `dbx_vibe_modelling_gov_transport`).
 
 **Compute:** Mirror the compute type the user selected. If the user is on serverless, create a serverless job task (no cluster config). If the user is on a classic all-purpose cluster, pass `existing_cluster_id` on the task.
 

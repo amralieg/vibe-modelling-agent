@@ -32,12 +32,12 @@ def test_v347_physical_mirror_wired_into_finalize():
 
 def test_v347_gt_rescue_tagkey_eq_regex():
     # ROOT CAUSE behavioral: tag key embedded as `key=value` must be extractable so physical tags
-    # can rescue the VREQ (NCDOT VREQ-013 false-negative). Old regex returned []; new returns the key.
-    raw = "attach the tag `ncdot_business_glossary_term=<Business Data Element>` whenever a match exists"
+    # can rescue the VREQ (gov_transport VREQ-013 false-negative). Old regex returned []; new returns the key.
+    raw = "attach the tag `gov_transport_business_glossary_term=<Business Data Element>` whenever a match exists"
     old = re.findall(r"`([a-z0-9_]+)`", raw)
     new = [k for k in re.findall(r"`([a-z0-9_]+)(?:=[^`]*)?`", raw) if "_" in k]
     assert old == []  # proves the bug existed
-    assert new == ["ncdot_business_glossary_term"]  # proves the fix works
+    assert new == ["gov_transport_business_glossary_term"]  # proves the fix works
     # and the fixed pattern is present in the deployed source
     assert "gt-rescue-tagkey-eq" in _full()
     assert r"`([a-z0-9_]+)(?:=[^`]*)?`" in _full()

@@ -88,7 +88,7 @@ def test_sync_completed_industries_calls_rebuild_when_pushed(monkeypatch, captur
     out = _sr.sync_completed_industries(
         repo_path="/tmp/fake-repo",
         workspace_root="/Users/x/vibe_runner_models",
-        profile="emirates-gcp",
+        profile="<profile>",
         log=log,
     )
 
@@ -111,7 +111,7 @@ def test_sync_completed_industries_skips_rebuild_when_nothing_pushed(monkeypatch
     out = _sr.sync_completed_industries(
         repo_path="/tmp/fake-repo",
         workspace_root="/Users/x/vibe_runner_models",
-        profile="emirates-gcp",
+        profile="<profile>",
         log=log,
     )
 

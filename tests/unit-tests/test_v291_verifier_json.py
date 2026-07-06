@@ -5,7 +5,7 @@ json.loads + a single {..} re-extraction that ALSO re-raised on single-quoted /
 trailing-comma / prose-wrapped JSON. The exception propagated to the outer except
 and returned {"status": "partial", "evidence": "[verifier-llm-fallback ERROR ...
 JSONDecodeError ...]"} -- a FALSE partial that corrupted precision/recall whenever
-the model genuinely satisfied the requirement (observed live on ncdot VREQ-022/023).
+the model genuinely satisfied the requirement (observed live on gov_transport VREQ-022/023).
 
 FIX: a shared _v291_lenient_verifier_json(raw) helper handles code-fences, prose,
 single-quoted dicts (ast.literal_eval), trailing commas, and finally regex-extracts

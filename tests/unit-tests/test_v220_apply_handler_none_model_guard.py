@@ -1,8 +1,8 @@
 """Behavioral tests for v2.2.0 vov-apply-handler-none-model-guard.
 
 Live failures reproduced:
-- HC v218 vov_v1_to_v2 (run 845786704782753, 2026-05-27 18:19)
-- RT v218 vov_v1_to_v2 attempt 0 (run 808929300923898) and attempt 1 (run 669678946926508)
+- HC v218 vov_v1_to_v2 (run <run_id>, 2026-05-27 18:19)
+- RT v218 vov_v1_to_v2 attempt 0 (run <run_id>) and attempt 1 (run <run_id>)
 
 Both crashed identically:
 

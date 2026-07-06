@@ -3,7 +3,7 @@
 Context: v3.0.7 tried to fix the "73K-95K char mutator embedded as a JSON string breaks
 json.loads on unescaped quotes/backslashes" failure by dropping response_schema and asking
 the synthesizer to emit a ```python fence. Empirically that turned a v306 ~26-min retail VOV
-iteration into a 2h+ non-convergence hang (run 1063899640798190 cancelled 2026-06-03 after 2h
+iteration into a 2h+ non-convergence hang (run <run_id> cancelled 2026-06-03 after 2h
 with zero version flush). The dropped schema regressed the generation path.
 
 v3.0.8 reverts the contract to the known-good fast JSON path:

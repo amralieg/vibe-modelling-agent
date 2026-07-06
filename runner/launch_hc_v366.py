@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Non-blocking healthcare base-MVM launch on v3.6.6 (fe-aws).
+"""Non-blocking healthcare base-MVM launch on v3.6.6 (<profile>).
 
 Driver-side wait was unreliable (background process reaped between shell calls), so
 this ONLY drops the catalog + submits, then exits. The job runs independently on
@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import base_mvm_proof as B  # noqa: E402
 
 M = B.M
-IND, PROF, DOMAINS = "healthcare", "fe-aws", ""
+IND, PROF, DOMAINS = "healthcare", "<profile>", ""
 
 
 def main():

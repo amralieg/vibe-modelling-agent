@@ -95,8 +95,8 @@ def test_rename_both_present_is_partial():
 
 def test_tag_present_is_fulfilled():
     obj = _bind(NB)
-    attrs = _attrs([("hr", "compensation", "compensation_employee_id", "", {"ncdot_pii": "true", "classification": "restricted"})])
-    req = _Req("Add classification tags restricted/confidential and ncdot_pii to column compensation_employee_id in hr.compensation.",
+    attrs = _attrs([("hr", "compensation", "compensation_employee_id", "", {"gov_transport_pii": "true", "classification": "restricted"})])
+    req = _Req("Add classification tags restricted/confidential and gov_transport_pii to column compensation_employee_id in hr.compensation.",
                scope_targets=["hr.compensation"])
     v = obj._verify_structural_target(req, _prods([("hr", "compensation")]), attrs)
     assert v and v["status"] == "fulfilled", v
@@ -105,7 +105,7 @@ def test_tag_present_is_fulfilled():
 def test_tag_absent_is_failed():
     obj = _bind(NB)
     attrs = _attrs([("hr", "compensation", "compensation_employee_id", "", None)])
-    req = _Req("Add classification tags restricted/confidential and ncdot_pii to column compensation_employee_id in hr.compensation.",
+    req = _Req("Add classification tags restricted/confidential and gov_transport_pii to column compensation_employee_id in hr.compensation.",
                scope_targets=["hr.compensation"])
     v = obj._verify_structural_target(req, _prods([("hr", "compensation")]), attrs)
     assert v and v["status"] == "failed", v

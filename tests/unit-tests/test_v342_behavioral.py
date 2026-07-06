@@ -2,12 +2,12 @@
 
 These prove the two false-negative classes that produced the "lying scoreboard"
 (agent ground-truth-audit reported 45.5% while the model was ~89% physically
-correct on NCDOT mvm_v1) are eliminated, WITHOUT re-running the multi-hour
+correct on gov_transport mvm_v1) are eliminated, WITHOUT re-running the multi-hour
 pipeline. Each test execs the VERBATIM source slice from the deployed notebook
 (not a re-implementation) so it exercises the real code path.
 
   RC tag-prefix scope (gt-tag-prefix-scope, cell 9 _verify_deterministic):
-      The industry tag-prefix rule (`ncdot_`) was applied to EVERY observed tag
+      The industry tag-prefix rule (`gov_transport_`) was applied to EVERY observed tag
       key, so universal/structural tag families (classification/pii/system/
       lineage) were force-failed as "missing prefix". The fix exempts universal
       tags; only industry-specific keys must carry the prefix.
@@ -65,25 +65,25 @@ def test_v342_universal_tags_exempt_from_prefix():
     """confidential/pii/system/self_ref_fk must NOT be flagged as prefix violations."""
     universal = ["confidential", "pii", "classification", "self_ref_fk",
                  "cg_business_unit", "system_load_ts", "primary_key"]
-    viol, industry = _exec_tag_prefix(universal, "ncdot_")
+    viol, industry = _exec_tag_prefix(universal, "gov_transport_")
     assert viol == [], f"universal tags wrongly flagged: {viol}"
     assert industry == [], f"universal tags wrongly treated as industry: {industry}"
 
 
 def test_v342_industry_tag_without_prefix_still_flagged():
     """A genuine industry tag missing the prefix MUST still be a violation (no over-rescue)."""
-    keys = ["ncdot_division", "route_classification", "confidential"]
-    viol, industry = _exec_tag_prefix(keys, "ncdot_")
+    keys = ["gov_transport_division", "route_classification", "confidential"]
+    viol, industry = _exec_tag_prefix(keys, "gov_transport_")
     assert "route_classification" in viol, f"genuine violation missed: viol={viol}"
-    assert "ncdot_division" not in viol
+    assert "gov_transport_division" not in viol
     assert "confidential" not in viol  # universal exempt
     assert "confidential" not in industry
 
 
 def test_v342_tag_prefix_differs_from_prepatch_behavior():
     """Prove the patch CHANGES behavior: pre-patch logic flags universal tags, post-patch does not."""
-    keys = ["confidential", "pii", "ncdot_division"]
-    prefix = "ncdot_"
+    keys = ["confidential", "pii", "gov_transport_division"]
+    prefix = "gov_transport_"
     # pre-patch: _viol = [k for k in set(_tag_keys) if not k.startswith(_p)]
     prepatch_viol = sorted(k for k in set(keys) if not k.startswith(prefix))
     postpatch_viol, _ = _exec_tag_prefix(keys, prefix)

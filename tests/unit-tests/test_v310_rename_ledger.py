@@ -1,6 +1,6 @@
 """v3.1.0 behavioral test: rename-ledger redirect (alias=vov-rename-ledger-redirect).
 
-ROOT CAUSE (NCDOT mvm_v2 ground-truth catalog audit 2026-06-03):
+ROOT CAUSE (gov_transport mvm_v2 ground-truth catalog audit 2026-06-03):
 next_vibes carried a rename_product directive (VREQ-061: rename project.data_value
 -> project_data_value) ALONGSIDE sibling directives that still referenced the old
 name (VREQ-060/062/063: "On project.data_value, add column ..."). The rename applied
@@ -33,7 +33,7 @@ def ledger_fn():
 
 
 def _priorities():
-    # mirrors NCDOT VREQ-061 (rename) + VREQ-060/062/063 (stale old-name adds)
+    # mirrors gov_transport VREQ-061 (rename) + VREQ-060/062/063 (stale old-name adds)
     return [
         {
             "action": "rename_product",

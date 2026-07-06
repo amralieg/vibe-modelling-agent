@@ -218,7 +218,7 @@ def test_t17_format_normalize_present(src):
     """PRE-LAUNCH BUG FIX: T17 must normalize (d,p) tuples to 'd.p' strings to match target_set.
 
     Before this fix, _diff_touched contained "('d', 'p')" stringified tuples while _target_set
-    contained "d.p" strings — they could never match and every NCDOT-style mutation got
+    contained "d.p" strings — they could never match and every gov_transport-style mutation got
     falsely rejected as target_miss. The fix introduces _norm_to_dp() and applies it to
     every diff source.
     """

@@ -158,9 +158,9 @@ def test_orchestrator_script_imports_and_help_runs():
 
 def test_orchestrator_constants_match_user_directives():
     src = ORCHESTRATOR.read_text()
-    assert 'DEFAULT_PROFILE = "emirates-gcp"' in src
+    assert 'DEFAULT_PROFILE = "<profile>"' in src
     assert 'DEFAULT_GLOBAL_VOLUME = "/Volumes/_root/default/root_vol"' in src
-    assert 'DEFAULT_RUNNER_PATH = "/Users/amr.ali@databricks.com/vibe_runner_v71"' in src
+    assert 'DEFAULT_RUNNER_PATH = "/Users/user@databricks.com/vibe_runner_v71"' in src
     expected_block = "\n".join([f'    "{f}",' for f in SECTOR_FILE_ORDER])
     assert expected_block in src, (
         "orchestrator SECTOR_FILES_ORDER must list files smallest-to-largest exactly as test expects"
@@ -484,7 +484,7 @@ def test_orchestrator_has_resolve_sector_filter_helper():
     src = ORCHESTRATOR.read_text()
     assert "def _resolve_sector_filter(" in src, (
         "orchestrator MUST expose _resolve_sector_filter(...) — required for Option B "
-        "multi-cloud parallelisation (split SECTOR_FILES_ORDER across emirates-gcp + fe-vm-feip)"
+        "multi-cloud parallelisation (split SECTOR_FILES_ORDER across <profile> + fe-vm-feip)"
     )
     fn_body = src.split("def _resolve_sector_filter(", 1)[1].split("\ndef ", 1)[0]
     assert "alias=sectors-filter" in fn_body, (

@@ -1,6 +1,6 @@
 """v4.2.4 behavioral tests -- v424-serialize-junk-domain-guard.
 
-ROOT CAUSE (automotive v2 VOV run 329174793249727):
+ROOT CAUSE (automotive v2 VOV run <run_id>):
     the final model.json shipped a garbage domain 'partially' with 0 products.
     The v3.5.7 flat junk guard (_v357_reject_junk_domains) + v4.1.3 _cleanup_empty_domains
     run on the FLAT lists at VOV finalize, but the SelfFixer 'missing_domain_description'

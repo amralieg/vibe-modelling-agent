@@ -1,7 +1,7 @@
 """
 v4.2.3 behavioral tests — foreign_key_to:string boundary invariant.
 
-ROOT CAUSE (restaurants v2 ECM VOV, run 680029593930392 attempt-0):
+ROOT CAUSE (restaurants v2 ECM VOV, run <run_id> attempt-0):
     AttributeError: 'list' object has no attribute 'split'
     File _build_fk_adjacency.<locals>._compute, line ...: fk_parts = fk.split('.')
 An unnormalized multi-FK LLM mutation stored `foreign_key_to` as a LIST on an

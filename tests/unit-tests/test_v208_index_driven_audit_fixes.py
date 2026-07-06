@@ -39,7 +39,7 @@ def src() -> str:
 # ---------------------------------------------------------------------------
 # FIX A — bare-name-fix-json-sync
 # Root cause: _fix_bare_attribute_names mutated Memory but never rewrote JSON mirror,
-# producing 31 only-in-Memory / 31 only-in-JSON drift warnings (v207 NCDOT).
+# producing 31 only-in-Memory / 31 only-in-JSON drift warnings (v207 gov_transport).
 # ---------------------------------------------------------------------------
 
 def test_bare_name_fix_json_sync_alias_present(src):
@@ -289,7 +289,7 @@ def test_ai_query_permanent_error_no_fallback_alias_present(src):
 
 
 def test_ai_query_permanent_error_markers_complete(src):
-    """All v207 NCDOT permission error markers must be in the detector."""
+    """All v207 gov_transport permission error markers must be in the detector."""
     required_markers = [
         'ai_function_session_permission_denied',
         'not supported for batch inference',
@@ -301,7 +301,7 @@ def test_ai_query_permanent_error_markers_complete(src):
 
 
 def test_ai_query_permanent_error_detection_logic():
-    """Demonstrate the detector recognizes v207 NCDOT error strings."""
+    """Demonstrate the detector recognizes v207 gov_transport error strings."""
     permanent_markers = [
         'ai_function_session_permission_denied',
         'not supported for batch inference',
@@ -311,7 +311,7 @@ def test_ai_query_permanent_error_detection_logic():
         'endpoint is not supported',
         'sqlstate: 42501',
     ]
-    # Verbatim v207 NCDOT error
+    # Verbatim v207 gov_transport error
     v207_err = (
         "[AI_FUNCTION_SESSION_PERMISSION_DENIED] AI function `ai_query` session creation "
         "failed. Permission denied: HTTP request failed with status: "
@@ -319,7 +319,7 @@ def test_ai_query_permanent_error_detection_logic():
         'is not supported for batch inference."'
     ).lower()
     assert any(m in v207_err for m in permanent_markers), (
-        "v207 NCDOT permission error should be detected as permanent"
+        "v207 gov_transport permission error should be detected as permanent"
     )
 
     # Transient errors should NOT match

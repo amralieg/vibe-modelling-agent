@@ -60,8 +60,8 @@ QUALITY_GATE_MIN_FILES_MVM = 15
 JOB_NAME_PREFIX = "dbx_vibe_"
 JOB_NAME_SUFFIX = "_pipeline_ecm_mvm_v1"
 CLOUDS = [
-    {"name": "GCP", "profile": "emirates-gcp"},
-    {"name": "AWS", "profile": "fe-aws"},
+    {"name": "GCP", "profile": "<profile>"},
+    {"name": "AWS", "profile": "<profile>"},
     {"name": "AZURE", "profile": "fe-vm-feip"},
 ]
 

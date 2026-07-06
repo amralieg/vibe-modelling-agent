@@ -1,6 +1,6 @@
 """Behavioral tests for v3.6.7 Fix#7 (alias=vibe-named-trim-preserve / vibe-named-judge-count-effective).
 
-ROOT CAUSE under test (healthcare base-MVM live run 562080035570249, error log):
+ROOT CAUSE under test (healthcare base-MVM live run <run_id>, error log):
 the judge free-synthesised 24 domains (mostly free-invented: revenue/telehealth/population/
 device/finance/access...), missing the user's vibe-named required domains. Two downstream bugs
 then INVERTED the user's intent:
@@ -152,5 +152,5 @@ def test_fix7_industry_agnostic():
     for fn in ["_v367_required_domain_norm_set", "_v367_effective_domain_count", "_v367_cap_trim_preserve_required"]:
         m = re.search(rf"\ndef {fn}\(.*?\n(?=\ndef |\n[^ \n])", src, re.DOTALL)
         body = m.group(0).lower()
-        for term in ["healthcare", "airline", "ncdot", "automotive", "banking", "retail"]:
+        for term in ["healthcare", "airline", "gov_transport", "automotive", "banking", "retail"]:
             assert f'"{term}"' not in body and f"'{term}'" not in body, f"industry literal {term} in {fn}"

@@ -1,6 +1,6 @@
 """v4.0.6 behavioral tests — three ground-truth verifier false-negative fixes.
 
-Diagnosed from the live mfg v4 ECM ground-truth audit (my-aws 2026-06-20), which
+Diagnosed from the live mfg v4 ECM ground-truth audit (<profile> 2026-06-20), which
 reported PHYSICAL adherence 42/50 = 84% with 8 partials that were ALL
 false-negatives (the model did the work; the verifier looked in the wrong place):
 

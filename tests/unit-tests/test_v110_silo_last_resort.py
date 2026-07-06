@@ -2,7 +2,7 @@ from notebook_source_util import notebook_concat_source
 
 """Behavioral test for v1.1.0 — silo-last-resort-inbound-fk-injection.
 
-Live-run failure: pulse 14 HC v1.0.9 install_base run 562090433003727 emitted
+Live-run failure: pulse 14 HC v1.0.9 install_base run <run_id> emitted
 
     [POST-LINKING-SILO-RECHECK] 1 product(s) remain siloed after all remediation
     passes (in-domain, cross-domain mesh, pairwise, silo remediation). These

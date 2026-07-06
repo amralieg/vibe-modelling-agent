@@ -2092,7 +2092,7 @@ Any deviation breaks backward compatibility. PR reviewers MUST diff-check each b
 ### 14.2 Parallel-run validation
 
 Before replacing v0.8.1:
-1. Deploy v1.0.0 to `/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v100` (per CLAUDE.md §3a).
+1. Deploy v1.0.0 to `/Users/user@databricks.com/dbx_vibe_modelling_agent_v100` (per CLAUDE.md §3a).
 2. Run the tiny tester (existing `tests/vibe_tester.ipynb`) against BOTH v0.8.1 and v1.0.0 with identical widgets.
 3. Diff outputs:
    - `model.json` — structural equivalence (same domain count, same products, same FK topology; names may differ due to LLM nondeterminism).
@@ -2601,7 +2601,7 @@ Combined with the bloat-function reduction, the **total ≤ 18,000 LOC target is
 
 **Measured baseline (v0.8.1)**:
 - Tier-1 ECM (airlines: 10 domains, 160–180 products, 4,000–5,000 attributes): ~10 hours observed (the user's opening claim)
-- Tier-1 MVM (telecom: 10 domains, 168 products, 4,783 attrs): v0.6.3 measured at 193.5 min total / 186.4 min generate (run 922023973905434, 2026-04-27, from readme v0.6.4 entry)
+- Tier-1 MVM (telecom: 10 domains, 168 products, 4,783 attrs): v0.6.3 measured at 193.5 min total / 186.4 min generate (run <run_id>, 2026-04-27, from readme v0.6.4 entry)
 - The v0.6.4 perf bundle measured the raw cap: `_compute_max_concurrent_batches_for_32gb` capped `MAX_CONCURRENT_BATCHES` at `min(raw, 8)`, throttling every parallel pool to 8 workers when serverless 32GB executors had headroom for 16 (alias=perf-cap-16).
 
 **Observed bottlenecks from v0.6.x audits** (all present in v0.8.1 unless explicitly fixed):

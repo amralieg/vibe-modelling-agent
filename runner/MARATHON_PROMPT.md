@@ -83,7 +83,7 @@ soft-accept is NOT applied and scores 0 for that VReq.
 
 ### PD-3 — EVERY FIX IS GENERIC. NEVER INDUSTRY-SPECIFIC.
 No fix, patch, prompt tweak, threshold, blacklist, or workaround may reference or special-case any
-industry (automotive, healthcare, ncdot, banking, …). Every root cause is solved from the vibe /
+industry (automotive, healthcare, gov_transport, banking, …). Every root cause is solved from the vibe /
 runtime / catalog / model structure so the SAME fix improves all 41 industries. If a fix only helps
 one industry it is wrong — find the generic root cause (CLAUDE.md §3, §8.5). Grep your diff for
 industry names before committing; a hit is a defect.
@@ -140,10 +140,10 @@ must point at that exact version.
 
 | Profile | Cloud | Warehouse ID | Industries (from `ASSIGN`) |
 |---|---|---|---|
-| `fe-gcp` | GCP field-eng | `d6d89fb9fd47b835` | travel_hospitality, consumer_goods, automotive |
-| `fe-aws` | AWS field-eng | `862f1d757f0424f7` | ngo, retail, healthcare |
-| `my-gcp` | GCP personal | `2023d0a3a188bd24` | restaurants, semiconductors, media_broadcasting |
-| `my-adp` | Azure personal | `2ad1b26db73a7c6f` | water_utilities, manufacturing |
+| `<profile>` | GCP field-eng | `d6d89fb9fd47b835` | travel_hospitality, consumer_goods, automotive |
+| `<profile>` | AWS field-eng | `862f1d757f0424f7` | ngo, retail, healthcare |
+| `<profile>` | GCP personal | `2023d0a3a188bd24` | restaurants, semiconductors, media_broadcasting |
+| `<profile>` | Azure personal | `2ad1b26db73a7c6f` | water_utilities, manufacturing |
 | `my-uae` | Azure personal | `6b2c33b3b2aae3ac` | construction, health_insurance |
 
 (`logfood` is internal Databricks telemetry — do NOT run the agent there.)
@@ -153,14 +153,14 @@ must point at that exact version.
 Let `NN` = `__AGENT_VERSION__` minus dots (e.g. `3.8.5` → `385`). For each profile:
 
 ```bash
-WS="/Users/amr.ali@databricks.com"
-for P in fe-gcp fe-aws my-gcp my-adp my-uae; do
+WS="/Users/user@databricks.com"
+for P in <profile> <profile> <profile> <profile> my-uae; do
   databricks workspace import "$WS/dbx_vibe_modelling_agent_v${NN}" \
     --file agent/dbx_vibe_modelling_agent.ipynb \
     --format JUPYTER --language PYTHON --overwrite --profile $P
 done
 # Verify each deployed archive carries this version's aliases (Step 6):
-for P in fe-gcp fe-aws my-gcp my-adp my-uae; do
+for P in <profile> <profile> <profile> <profile> my-uae; do
   databricks workspace export "$WS/dbx_vibe_modelling_agent_v${NN}" --format JUPYTER \
     --profile $P --file /tmp/v${NN}_check_$P.ipynb
   grep -c "verifier-after-state-inventory\|self-cancel-vol-log\|canonical-key-attr-flag" /tmp/v${NN}_check_$P.ipynb
@@ -226,7 +226,7 @@ exporting, and auto-running the self-scoreboard audit. State is checkpointed to
 `vov2_state.json` after every transition, so the marathon is **resumable**: re-running
 `vov_v2_marathon.py` re-attaches to in-flight runs and skips industries already `green`.
 
-Run a single profile or industry subset with `--profiles fe-aws,my-gcp`. Use `--once` for a single
+Run a single profile or industry subset with `--profiles <profile>,<profile>`. Use `--once` for a single
 reconcile tick (useful from a cron/background watcher).
 
 ---
@@ -471,7 +471,7 @@ generically (PD-3), redeploy all 5, drop catalog, re-run from scratch — never 
 **Yes, `model.json` contains the tags — at all three scopes.** Verified against a real exported
 model.json:
 - **Domain:** `division` + `tags` (flat string) + `tag_set` (structured `[{key,value,kind,source}]`).
-- **Product/table:** `subdomain`, `steward`, `tags` (e.g. `ncdot_subdomain=...`), `tag_set`.
+- **Product/table:** `subdomain`, `steward`, `tags` (e.g. `gov_transport_subdomain=...`), `tag_set`.
 - **Attribute/column:** `tags` (e.g. `primary_key,glossary_term=Applicant Id`), `tag_set`.
 - **Metric views:** carried under `model.metric_views`.
 

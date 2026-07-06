@@ -58,7 +58,7 @@ def _apply_subdomain_roster(products, mappings):
 
 
 def test_v350_relabels_invented_to_vibe_roster():
-    # Mirrors NCDOT S1: generator invented labels; vibe declared the canonical 9.
+    # Mirrors gov_transport S1: generator invented labels; vibe declared the canonical 9.
     products = [
         {"product": "employee", "subdomain": "workforce_administration"},
         {"product": "position", "subdomain": "workforce_administration"},

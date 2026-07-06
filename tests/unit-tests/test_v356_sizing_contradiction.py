@@ -219,9 +219,9 @@ def test_v356_parse_tags_pre_patch_crash_then_post_patch_clean():
     parse = ns["_parse_tags"]
 
     # list input no longer crashes and parses each element as a bare key
-    out = parse(["confidential", "ncdot_source_table=foo"])
+    out = parse(["confidential", "gov_transport_source_table=foo"])
     assert out["confidential"] == ""
-    assert out["ncdot_source_table"] == "foo"
+    assert out["gov_transport_source_table"] == "foo"
     # dict input also handled
     out2 = parse({"a": "1", "b": "2"})
     assert out2["a"] == "1" and out2["b"] == "2"

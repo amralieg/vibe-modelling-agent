@@ -78,7 +78,7 @@ def test_is_system_identifier_column_pii_debias_no_emirates_id(monkeypatch):
     # They should NOT be classified as system identifiers (would skip linking)
     # Without an SOR prefix, these match no SOR prefix, no SUFFIX, no PATTERN — return False
     assert ah._is_system_identifier_column(
-        "emirates", attr_name="emirates_id", config=config
+        "example_air", attr_name="emirates_id", config=config
     ) is False, "emirates_id should NOT be a system identifier (it's PII)"
 
 

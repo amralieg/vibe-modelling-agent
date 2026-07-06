@@ -4,7 +4,7 @@ Root cause: step_interpret_model_instructions did `action.get('target_state','')
 (and the same for action/scope/name). When the LLM emits any of those as a dict (legitimate
 per the VIBE_MASTER_PROMPT schema, especially target_state for renames/connect_table),
 Python raises `KeyError: slice(None, 25, None)` because dicts use slices as keys, not as
-slice operations. LG iter-5 run 830504162641240 hit this and the whole VOV died before any
+slice operations. LG iter-5 run <run_id> hit this and the whole VOV died before any
 mutation ran.
 
 Fix: wrap each slice with `_v104_safe_str(x, n)` that coerces non-strings via json.dumps.
