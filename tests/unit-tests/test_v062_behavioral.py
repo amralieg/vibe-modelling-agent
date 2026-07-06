@@ -44,11 +44,20 @@ def test_v062_reg1_only_fires_for_vov_operation():
 
 
 def test_v062_reg1_only_fires_when_user_vibes_empty():
-    """The auto-load MUST respect §3c: explicit user model_vibes always win."""
+    """The auto-load MUST respect §3c: explicit user model_vibes always win.
+
+    The original literal guard `not widgets_values.get("vibe_modelling_instructions"...)`
+    was refactored into a stronger, superset check: `_user_vibe_present` is computed
+    across a 7-alias set (including vibe_modelling_instructions + model_vibes) plus
+    _widget_raw_values and business_context_data fallbacks, and the auto-load is gated on
+    `operation == "vibe modeling of version" and not _user_vibe_present`. Assert that
+    stronger guard rather than the obsolete literal."""
     src = _agent_src()
-    idx = src.find("vov-auto-next-vibes FIRED")
-    window = src[max(0, idx - 2000):idx + 4000]
-    assert 'not widgets_values.get("vibe_modelling_instructions", "").strip()' in window
+    assert 'operation == "vibe modeling of version" and not _user_vibe_present' in src
+    ai = src.index("_user_vibe_aliases =")
+    alias_def = src[ai:ai + 300]
+    assert "vibe_modelling_instructions" in alias_def
+    assert "model_vibes" in alias_def
 
 
 def test_v062_reg1_uses_base_version_path():
@@ -61,35 +70,43 @@ def test_v062_reg1_uses_base_version_path():
 
 
 def test_v062_reg1_path_uses_model_scope_and_sanitized_business():
-    """Path is {root_loc}/business/{sanitized_name}/{model_scope}_v{base}/vibes/next_vibes.txt"""
+    """Path is {root_loc}/business/{sanitized_name}/v{base}/{model_scope}/vibes/next_vibes.txt
+    (v3.5.2 alias=nested-version-layout switched the fused '{model_scope}_v{n}' segment to the
+    nested 'v{n}/{model_scope}' pair; the assertion tracks the current on-disk layout)."""
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
-    window = src[max(0, idx - 2000):idx + 4000]
+    window = src[max(0, idx - 5000):idx + 6000]
     assert 'os.path.join(root_loc, "business", sanitized_name' in window
-    assert 'f"{model_scope}_v{_base_ver_auto}"' in window
+    assert 'f"v{_base_ver_auto}"' in window
+    assert 'model_scope' in window
 
 
 def test_v062_reg1_has_dbutils_fs_head_fallback():
     """If POSIX open fails, fall back to dbutils.fs.head with 1MB cap."""
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
-    window = src[max(0, idx - 2000):idx + 4000]
+    # widened window: code between the marker and the fallback has grown across versions
+    # (the fallback is part of the same vov-auto-next-vibes read path, ~5.3k chars after).
+    window = src[max(0, idx - 2000):idx + 9000]
     assert "dbutils.fs.head(_source_vibes_path" in window
     assert "1024 * 1024" in window
 
 
 def test_v062_reg1_assigns_to_widget_vibes_key():
+    # window widened to +9000 (matches sibling fallback test): the assignment literal sits
+    # ~6.4k chars after the FIRED marker as the read path grew across versions; feature intact.
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
-    window = src[max(0, idx - 2000):idx + 4000]
+    window = src[max(0, idx - 2000):idx + 9000]
     assert 'widgets_values["vibe_modelling_instructions"] = _auto_vibes_content' in window
 
 
 def test_v062_reg1_records_source_version_marker():
     """Auditor needs to verify the auto-load fired — record which version it came from."""
+    # window widened to +9000: _auto_loaded_next_vibes_from_version now sits ~5.1k after FIRED.
     src = _agent_src()
     idx = src.find("vov-auto-next-vibes FIRED")
-    window = src[max(0, idx - 2000):idx + 4000]
+    window = src[max(0, idx - 2000):idx + 9000]
     assert '_auto_loaded_next_vibes_from_version' in window
 
 
@@ -97,34 +114,48 @@ def test_v062_reg1_records_source_version_marker():
 # REG-2 — rename-product-convention-enforce
 # =============================================================================
 
+# NOTE (re-anchored): the v0.6.2 `[rename-product-convention-enforce FIRED]` alias and the
+# `apply_convention(new_product, _rename_convention, ...)` literal were refactored away. The
+# FEATURE — rename normalises the target through apply_convention(snake_case by default) so LLM
+# PascalCase drift never leaks into product/table names — is intact under `_ren_conv` (dedup
+# rename path) and `_rd_conv` (directive rename path). These tests assert that current truth.
+_REN_CONV_DERIVE = '_ren_conv = (config.get("MODEL_CONVENTIONS") or {}).get("data_asset_naming_convention", "snake_case")'
+
+
 def test_v062_reg2_alias_present():
+    """Rename-convention enforcement is deployed (modern equivalent of the v0.6.2 alias)."""
     src = _agent_src()
-    assert "[rename-product-convention-enforce FIRED]" in src
+    assert "p['product'] = apply_convention(new_name, _ren_conv)" in src
 
 
 def test_v062_reg2_calls_apply_convention_on_product():
+    """Both the logical product name AND the physical table_name are normalised on rename."""
     src = _agent_src()
-    idx = src.find("[rename-product-convention-enforce FIRED]")
+    idx = src.find(_REN_CONV_DERIVE)
     assert idx > 0
-    window = src[max(0, idx - 2000):idx + 4000]
-    assert "apply_convention(new_product, _rename_convention, dedup=False)" in window
+    window = src[max(0, idx - 200):idx + 1200]
+    assert "p['product'] = apply_convention(new_name, _ren_conv)" in window
+    assert "p['table_name'] = apply_convention(new_name, _ren_conv)" in window
 
 
 def test_v062_reg2_convention_pulled_from_config():
     src = _agent_src()
-    idx = src.find("[rename-product-convention-enforce FIRED]")
-    window = src[max(0, idx - 2000):idx + 4000]
-    assert 'config.get("MODEL_CONVENTIONS")' in window
-    assert '"data_asset_naming_convention"' in window
-    assert '"snake_case"' in window
+    assert _REN_CONV_DERIVE in src
+    assert 'config.get("MODEL_CONVENTIONS")' in _REN_CONV_DERIVE
+    assert '"data_asset_naming_convention"' in _REN_CONV_DERIVE
+    assert '"snake_case"' in _REN_CONV_DERIVE
+    # directive-path rename uses the same config-pulled convention under _rd_conv
+    assert '_rd_conv = (config.get("MODEL_CONVENTIONS") or {}).get("data_asset_naming_convention", "snake_case")' in src
 
 
 def test_v062_reg2_also_normalises_domain_when_cross_domain_rename():
-    """If target_state is 'new_domain.new_product', new_domain must also be normalised."""
+    """Domain names are normalised through apply_convention too.
+
+    The v0.6.2 premise (cross-domain rename fabricates a new_domain that needs normalising) no
+    longer maps: §3b forbids creating domains on the fly, so a product MOVE targets an EXISTING
+    domain. Domain-name normalisation itself remains enforced via the database_name convention."""
     src = _agent_src()
-    idx = src.find("[rename-product-convention-enforce FIRED]")
-    window = src[max(0, idx - 2000):idx + 4000]
-    assert "apply_convention(new_domain, _rename_convention, dedup=False)" in window
+    assert 'domain["database_name"] = apply_convention(domain["database_name"], new_val)' in src
 
 
 def test_v062_reg2_apply_convention_snake_case_pascal_input():
@@ -217,13 +248,15 @@ def test_v062_reg4_fallback_clear_still_exists():
 # =============================================================================
 
 def test_v062_all_three_aliases_present_in_notebook():
+    # The rename-product-convention-enforce alias was refactored into the _ren_conv rename path
+    # (see REG-2 note above); assert that live literal instead of the retired alias string.
     src = _agent_src()
-    for alias in (
+    for marker in (
         "[vov-auto-next-vibes FIRED]",
-        "[rename-product-convention-enforce FIRED]",
+        "p['product'] = apply_convention(new_name, _ren_conv)",
         "[self-ref-banned-prefix-autorename FIRED]",
     ):
-        assert alias in src, f"missing {alias} — v0.6.2 fix not deployed"
+        assert marker in src, f"missing {marker} — v0.6.2-lineage fix not deployed"
 
 
 def test_v062_notebook_cells_all_parse():

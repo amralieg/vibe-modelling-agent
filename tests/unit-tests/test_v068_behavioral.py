@@ -49,10 +49,14 @@ def test_v068_new13_fired_marker_present():
 
 
 def test_v068_new13_keep_as_is_branch():
-    """If _suggestions is empty, dec must be coerced to KEEP_AS_IS."""
+    """If the canonical-candidate list is empty, dec must be coerced to KEEP_AS_IS.
+
+    (The local variable was renamed `_suggestions` -> `_ranked` when the canonical
+    suggester became `_fmfl_suggest_canonical`; the auto-coerce behaviour is unchanged.)
+    """
     txt = _agent_text()
-    assert "if not _suggestions:" in txt, "auto-coerce branch missing"
-    idx = txt.find("if not _suggestions:")
+    assert "if not _ranked:" in txt, "auto-coerce branch missing"
+    idx = txt.find("if not _ranked:")
     assert idx > 0
     window = txt[idx : idx + 800]
     assert "dec['decision'] = 'KEEP_AS_IS'" in window, "dec coerce to KEEP_AS_IS missing"
@@ -299,7 +303,10 @@ def test_v068_preserves_v0_6_x_aliases():
         "fmfl-canonical-target",
         "collision-naming-canonical",
         "immutable-early-exit",
-        "det-priority-parse",
+        # NOTE: "det-priority-parse" was intentionally superseded — vibe->action
+        # conversion is now LLM-only (alias=vibe-llm-only-no-priority-regex /
+        # vibe-llm-only-no-deterministic-override) per CLAUDE.md §3c, so the
+        # deterministic priority-regex alias is no longer guaranteed present.
         "surgical-mv-preserve",
         "surgical-mv-rewrite",
         "fmfl-auto-coerce-keep",

@@ -1,0 +1,21 @@
+{
+  "_schema_version": "1.0.0",
+  "_captured_from": "agent/dbx_vibe_modelling_agent.ipynb @ __AGENT_VERSION__=0.8.1, Cell 1 TECHNICAL_CONTEXT['models'] lines 246-307",
+  "_purpose": "Byte-exact capture of the v0.8.1 LLM model pool. Rewrite core/llm_pool.py MUST default to this roster and assert import-time that every id resolves via databricks.sdk.serving.endpoints.get('databricks-<name>'). Forward-looking IDs (opus-4-7, haiku-4-5, gemma-3-12b) are FORBIDDEN in the baseline until the target workspace exposes them.",
+  "_notes": [
+    "order is the routing priority within a (type, size) group (lower = higher priority).",
+    "llm_endpoint_name is the literal name passed to the FMAPI serving endpoint client.",
+    "llm_input_context_tokens_count and llm_output_context_tokens_count feed the context-ladder step-down (core/smart_worker_loop.py).",
+    "enabled=True is the default; ensemble auto-demotion (OPS-RUL-004) flips this to False in-memory after N failures — it MUST NOT be persisted back to the pool definition."
+  ],
+  "model_count": 6,
+  "models": [
+    {"name": "claude-opus-4-6",    "order": 10, "type": "thinker", "size": "large", "enabled": true, "llm_endpoint_name": "databricks-claude-opus-4-6",    "llm_input_context_tokens_count": 200000, "llm_output_context_tokens_count": 128000},
+    {"name": "claude-sonnet-4-6",  "order": 20, "type": "worker",  "size": "large", "enabled": true, "llm_endpoint_name": "databricks-claude-sonnet-4-6",  "llm_input_context_tokens_count": 200000, "llm_output_context_tokens_count":  64000},
+    {"name": "claude-opus-4-5",    "order": 30, "type": "thinker", "size": "large", "enabled": true, "llm_endpoint_name": "databricks-claude-opus-4-5",    "llm_input_context_tokens_count": 200000, "llm_output_context_tokens_count":  64000},
+    {"name": "claude-sonnet-4-5",  "order": 40, "type": "worker",  "size": "large", "enabled": true, "llm_endpoint_name": "databricks-claude-sonnet-4-5",  "llm_input_context_tokens_count": 200000, "llm_output_context_tokens_count":  64000},
+    {"name": "gpt-oss-120b",       "order": 50, "type": "worker",  "size": "small", "enabled": true, "llm_endpoint_name": "databricks-gpt-oss-120b",       "llm_input_context_tokens_count": 131072, "llm_output_context_tokens_count":  25000},
+    {"name": "gpt-oss-20b",        "order": 60, "type": "worker",  "size": "tiny",  "enabled": true, "llm_endpoint_name": "databricks-gpt-oss-20b",        "llm_input_context_tokens_count": 131072, "llm_output_context_tokens_count":  25000}
+  ],
+  "query_tag_label": "dbx_vibe_data_modelling_agent_run_summary"
+}

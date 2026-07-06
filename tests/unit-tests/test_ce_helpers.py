@@ -1,6 +1,10 @@
 """Tests for candidate_evaluation helpers — v0.8.0."""
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason="_is_link_excluded_by_candidate_eval removed; FK postprocess uses structured link.decision field"
+)
+
 
 def _load_classify():
     # _ce_classify_line_decision is NESTED in _is_link_excluded_by_candidate_eval.

@@ -1,0 +1,25 @@
+{
+  "agent_helpers": {
+    "module_functions": 705,
+    "class_methods": 354,
+    "classes": 55,
+    "module_globals": 305,
+    "callable_total": 1059,
+    "symbols_total": 1419,
+    "load_errors": 0
+  },
+  "notebook_ast": {
+    "module_functions": 683,
+    "methods": 274,
+    "total": 957
+  },
+  "coverage_pct": {
+    "module_functions_smoke": 100.0,
+    "class_methods_smoke": 100.0,
+    "module_globals_exist": 100.0,
+    "classes_exist": 100.0,
+    "notebook_methods_in_helpers": 97.81,
+    "notebook_module_funcs_in_helpers": 100.0
+  },
+  "tests_run": 18
+}

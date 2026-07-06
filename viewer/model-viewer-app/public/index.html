@@ -59,6 +59,7 @@ const DOMAIN_COLORS = [
   '#77DD77','#AEC6CF','#FDFD96','#836953','#C23B22','#779ECB','#966FD6',
 ];
 const DEFAULT_W = 500, DEFAULT_H = 400;
+const TREE_ATTR_CAP = 250;
 
 // ── Graph data extraction ──────────────────────────────────
 function extractGraph(dataModel) {
@@ -73,6 +74,7 @@ function extractGraph(dataModel) {
     domainColors[dname] = color;
 
     let dAttr=0, dFk=0, dTag=0, dTbl=0;
+    const dCatCount={};
     domainHierarchy[dname] = {
       color, description: domain.description||'', division: domain.division||'',
       tables:{}, subdomains:{}
@@ -82,6 +84,15 @@ function extractGraph(dataModel) {
       const tname = product.name||'';
       const fullId = `${dname}.${tname}`;
       const subdomain = product.subdomain||'';
+      // original physical table name (for the "semantic" toggle): prefer the source
+      // reference (catalog.schema.table) leaf, then table_name, then the product name.
+      const origName = ((product.reference||'').split('.').pop())||product.table_name||tname;
+      // physical catalog/schema from the source reference (catalog.schema.table),
+      // used by the Semantic toggle to relabel domain->catalog, subdomain->database.
+      const refParts=(product.reference||'').split('.');
+      const pCatalog=refParts.length>=3?refParts[0]:'';
+      const pSchema=refParts.length>=3?refParts[refParts.length-2]:'';
+      if(pCatalog) dCatCount[pCatalog]=(dCatCount[pCatalog]||0)+1;
       dTbl++;
 
       const attrs = product.attributes||[];
@@ -111,13 +122,16 @@ function extractGraph(dataModel) {
 
       if(subdomain){
         if(!domainHierarchy[dname].subdomains[subdomain])
-          domainHierarchy[dname].subdomains[subdomain]={tables:[],attr_count:0,fk_count:0};
+          domainHierarchy[dname].subdomains[subdomain]={tables:[],attr_count:0,fk_count:0,schemaCount:{}};
         const sd=domainHierarchy[dname].subdomains[subdomain];
         sd.tables.push(tname); sd.attr_count+=attrList.length; sd.fk_count+=fkCount;
+        if(pSchema) sd.schemaCount[pSchema]=(sd.schemaCount[pSchema]||0)+1;
       }
 
       nodes.push({
-        data:{id:fullId,label:tname,parent:`domain_${dname}`,type:'table',
+        data:{id:fullId,label:tname,sem_label:tname,orig_label:origName,
+              orig_catalog:pCatalog,orig_schema:pSchema,
+              parent:`domain_${dname}`,type:'table',
               domain:dname,subdomain,attribute_count:attrList.length,
               fk_count:fkCount,tag_count:tagArr.length,color},
         classes:'table-node'
@@ -129,22 +143,29 @@ function extractGraph(dataModel) {
         if(parts.length<2) return;
         const targetId=`${parts[0]}.${parts[1]}`;
         const targetCol=parts[2]||`${parts[1]}_id`;
+        // agent-synthesised FKs carry a `_dbx_fk_*` tag (declared UC FKs do not).
+        const isDbxFk=(attr.tags||[]).some(t=>/(^|_)dbx_fk/i.test(String(t)));
         edges.push({
           data:{
             id:`edge_${fullId}_${targetId}_${attr.name}`,
             source:fullId,target:targetId,label:attr.name,
             source_domain:dname,target_domain:parts[0],
             source_column:attr.name,target_column:targetCol,
-            source_table:tname,target_table:parts[1],fk_full:attr.fk
+            source_table:tname,target_table:parts[1],fk_full:attr.fk,
+            dbx_fk:isDbxFk
           },
-          classes:'fk-edge'
+          classes:isDbxFk?'fk-edge dbx-fk-edge':'fk-edge'
         });
       });
     });
 
     domainStats[dname]={table_count:dTbl,attr_count:dAttr,fk_count:dFk,tag_count:dTag};
+    const domCatalog=Object.keys(dCatCount).sort((a,b)=>dCatCount[b]-dCatCount[a])[0]||'';
+    domainHierarchy[dname].catalog=domCatalog;
     nodes.push({
-      data:{id:`domain_${dname}`,label:dname.toUpperCase(),type:'domain',color,
+      data:{id:`domain_${dname}`,label:dname.toUpperCase(),
+            sem_label:dname.toUpperCase(),orig_label:domCatalog||dname.toUpperCase(),
+            orig_catalog:domCatalog,type:'domain',color,
             division:domain.division||'',table_count:dTbl,attr_count:dAttr,
             fk_count:dFk,tag_count:dTag,width:DEFAULT_W,height:DEFAULT_H},
       classes:'domain-node'
@@ -492,6 +513,7 @@ const TreeNode=memo(({domainName,domainData,expandedDomains,expandedTables,
   const visibleTables=st?matchingTables:tableEntries;
   const visibleCount=visibleTables.length;
   const divColors={'operations':'#E74C3C','business':'#3498DB','corporate':'#F39C12'};
+  const divAbbr={'operations':'OPS','business':'BIZ','corporate':'COR'};
   const divLower=(division||'').toLowerCase();
   const hasSubs=Object.keys(subdomains).length>0;
 
@@ -515,7 +537,8 @@ const TreeNode=memo(({domainName,domainData,expandedDomains,expandedTables,
         },tname),
         h('span',{style:{fontSize:9,color:'#555',marginLeft:5}},'('+sortedAttrs.length+')')
       ),
-      isTblExp&&h('div',{key:'attrs'},sortedAttrs.map(attr=>{
+      isTblExp&&h('div',{key:'attrs'},[
+        ...sortedAttrs.slice(0,TREE_ATTR_CAP).map(attr=>{
         const isPk=attr.pk;
         const isFk=!!attr.fk;
         const icon=isPk?'🔑':isFk?'🔗':'•';
@@ -528,7 +551,11 @@ const TreeNode=memo(({domainName,domainData,expandedDomains,expandedTables,
           h('span',{style:{fontSize:10,color:'#ccc',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},attr.name),
           h('span',{style:{fontSize:9,color:'#666',marginLeft:5}},attr.type)
         );
-      }))
+      }),
+        sortedAttrs.length>TREE_ATTR_CAP&&h('div',{key:'__more',
+          style:{fontSize:9,color:'#888',fontStyle:'italic',marginLeft:indent+24,padding:'3px 0'}},
+          `… ${sortedAttrs.length-TREE_ATTR_CAP} more attributes (click the product to view all)`)
+      ])
     );
   }
 
@@ -550,7 +577,7 @@ const TreeNode=memo(({domainName,domainData,expandedDomains,expandedTables,
         divColors[divLower]&&h('span',{style:{
           display:'inline-block',padding:'1px 4px',background:divColors[divLower],color:'#fff',
           borderRadius:3,fontSize:8,fontWeight:'bold',marginLeft:5,flexShrink:0,lineHeight:'12px'
-        }},divLower.slice(0,3).toUpperCase())
+        }},divAbbr[divLower]||divLower.slice(0,3).toUpperCase())
       )
     ),
     showTables&&h('div',{},
@@ -843,10 +870,10 @@ function NodeInfoPanel({selectedNode,selectedEdge,treeClick,graphData,domainSize
 // ── GitHub repo browser ───────────────────────────────────
 const REPO_LS_KEY='model_viewer:last_repo';
 const CACHE_PREFIX='model_viewer:cache:';
-const MODEL_DIR_RE=/^(ecm|mvm)_v?\d+$/i;
+const MODEL_DIR_RE=/^(ecm|mvm)(_v?\d+)?$/i;
 // Default repo shown in the From Repo dialog when no saved repo exists.
 // Change this single constant if you fork this viewer for a different project.
-const DEFAULT_REPO='amralieg/vibe-modelling-agent';
+const DEFAULT_REPO='databricks-industry-solutions/lakehouse-business-data-models';
 const DEFAULT_BRANCH='main';
 
 function parseRepoSpec(raw){
@@ -928,30 +955,48 @@ function writeCachedModel(owner,repo,branch,dirPath,content){
 function readLastRepo(){try{const raw=localStorage.getItem(REPO_LS_KEY);return raw?JSON.parse(raw):null;}catch(_){return null;}}
 function writeLastRepo(spec){try{localStorage.setItem(REPO_LS_KEY,JSON.stringify(spec));}catch(_){}}
 
-// Scan flat git/trees output for every <industry>/(ecm|mvm)_v?N/model.json blob
-// and group by industry name. Industry = the directory immediately above the
-// model-version dir. Returns sorted rows: [{industry, parentPath,
-//   ecm:[{ver,name,path}], mvm:[...]}], versions sorted newest-first per scope.
+// Scan flat git/trees output for every industry model.json blob and group by
+// industry. Supports two on-disk layouts:
+//   NEW: <industry>/v<N>/(ecm|mvm)/model.json  (version dir is parent, scope dir is child)
+//   OLD: <industry>/(ecm|mvm)_v?<N>/model.json (scope+version combined in one dir)
+// Grouping key is the industry directory path, so all versions of one industry
+// share a row and same-named industries under different prefixes stay distinct.
+// Returns sorted rows: [{industry, parentPath, ecm:[{ver,name,path}], mvm:[...]}],
+// versions sorted newest-first per scope.
 function buildIndustryRows(treeEntries){
-  const byParent={}; // key = parentPath so two industries with the same name in different prefixes stay distinct
+  const byKey={};
   (treeEntries||[]).forEach(e=>{
     if(!e||e.type!=='blob')return;
     const p=e.path||'';
     if(!p.endsWith('/model.json'))return;
     const parts=p.split('/');
-    if(parts.length<3)return; // need <industry>/<scope_dir>/model.json at minimum
-    const dirName=parts[parts.length-2];
-    const m=dirName.match(/^(ecm|mvm)_v?(\d+)$/i);
-    if(!m)return;
-    const scope=m[1].toLowerCase();
-    const ver=parseInt(m[2],10);
+    if(parts.length<3)return; // need at least <industry>/<scope_dir>/model.json
+    const scopeDir=parts[parts.length-2];
+    let scope,ver,industry,industryPath,name;
+    const sm=scopeDir.match(/^(ecm|mvm)$/i);
+    const vm=parts.length>=4?parts[parts.length-3].match(/^v(\d+)$/i):null;
+    if(sm&&vm){
+      // NEW layout: bare ecm|mvm scope dir under a v<N> version dir.
+      scope=sm[1].toLowerCase();
+      ver=parseInt(vm[1],10);
+      industry=parts[parts.length-4];
+      industryPath=parts.slice(0,-3).join('/');
+      name='v'+ver;
+    }else{
+      // OLD layout: scope and version combined in a single dir.
+      const om=scopeDir.match(/^(ecm|mvm)_v?(\d+)$/i);
+      if(!om)return;
+      scope=om[1].toLowerCase();
+      ver=parseInt(om[2],10);
+      industry=parts[parts.length-3];
+      industryPath=parts.slice(0,-2).join('/');
+      name=scopeDir;
+    }
     const dirPath=parts.slice(0,-1).join('/');
-    const parentPath=parts.slice(0,-2).join('/');
-    const industry=parts[parts.length-3];
-    if(!byParent[parentPath]){byParent[parentPath]={industry,parentPath,ecm:[],mvm:[]};}
-    byParent[parentPath][scope].push({ver,name:dirName,path:dirPath});
+    if(!byKey[industryPath]){byKey[industryPath]={industry,parentPath:industryPath,ecm:[],mvm:[]};}
+    byKey[industryPath][scope].push({ver,name,path:dirPath});
   });
-  return Object.values(byParent).map(r=>({
+  return Object.values(byKey).map(r=>({
     ...r,
     ecm:r.ecm.sort((a,b)=>b.ver-a.ver),
     mvm:r.mvm.sort((a,b)=>b.ver-a.ver),
@@ -963,8 +1008,9 @@ function IndustryTable({rows,onSelect,loadingPath,resolved,cacheTick}){
     return h('div',{style:{textAlign:'center',padding:40,color:'#888',fontSize:12}},
       h('div',{style:{fontSize:32,marginBottom:10}},'🤷'),
       'No industry models found. Looking for ',
-      h('code',{style:{color:'#4ECDC4'}},'<industry>/ecm_v*/model.json'),' or ',
-      h('code',{style:{color:'#4ECDC4'}},'<industry>/mvm_v*/model.json'),' anywhere in the repo.');
+      h('code',{style:{color:'#4ECDC4'}},'<industry>/v*/ecm/model.json'),' or ',
+      h('code',{style:{color:'#4ECDC4'}},'<industry>/v*/mvm/model.json'),' (or legacy ',
+      h('code',{style:{color:'#4ECDC4'}},'<industry>/(ecm|mvm)_v*/model.json'),') anywhere in the repo.');
   }
   const versionBtn=(scope,item)=>{
     const cached=resolved?!!readCachedModel(resolved.owner,resolved.repo,resolved.branch,item.path):false;
@@ -1025,7 +1071,10 @@ function RepoBrowser({onLoadModel,onClose}){
     try{
       const spec=parseRepoSpec(repoInput);
       if(!spec)throw new Error('Could not parse repo. Use https://github.com/owner/repo, owner/repo, or git@github.com:owner/repo');
-      let branch=(branchInput||'').trim()||spec.branch||'';
+      // A branch embedded in a pasted /tree/<branch> URL is the most explicit signal,
+      // so honour it over a stale value left in the Branch box, and reflect it back.
+      let branch=(spec.branch||'').trim()||(branchInput||'').trim();
+      if(spec.branch&&spec.branch!==branchInput){setBranchInput(spec.branch);}
       if(!branch){branch=await fetchDefaultBranch(spec.owner,spec.repo,tokenInput||null);}
       const treeData=await fetchRepoTree(spec.owner,spec.repo,branch,tokenInput||null);
       const built=buildIndustryRows(treeData.tree||[]);
@@ -1096,7 +1145,7 @@ function RepoBrowser({onLoadModel,onClose}){
         h('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:10,marginBottom:8}},
           h('div',{},
             h('label',{style:labelStyle},'Repository'),
-            h('input',{type:'text',value:repoInput,onChange:e=>setRepoInput(e.target.value),
+            h('input',{type:'text',value:repoInput,onChange:e=>{const v=e.target.value;setRepoInput(v);const sp=parseRepoSpec(v);if(sp&&sp.branch)setBranchInput(sp.branch);},
               placeholder:'https://github.com/owner/repo  or  owner/repo',
               style:inputStyle,
               onKeyDown:e=>{if(e.key==='Enter')browseRepo();}})
@@ -1153,7 +1202,7 @@ function RepoBrowser({onLoadModel,onClose}){
       // Footer hint
       h('div',{style:{padding:'10px 18px',borderTop:'1px solid #333',fontSize:10,color:'#666',flexShrink:0}},
         'Each row is one industry. ECM / MVM buttons load the corresponding ',
-        h('code',{style:{color:'#4ECDC4'}},'<industry>/(ecm|mvm)_v<N>/model.json'),
+        h('code',{style:{color:'#4ECDC4'}},'<industry>/v<N>/(ecm|mvm)/model.json'),
         '. Newest version first. Loaded files are cached in your browser.')
     )
   );
@@ -1173,6 +1222,8 @@ function App(){
   // UI state
   const [layout,setLayout]=useState('circle');
   const [showDomains,setShowDomains]=useState(true);
+  const [semanticNames,setSemanticNames]=useState(true);
+  const [showDbxFk,setShowDbxFk]=useState(true);
   const [sizeScale,setSizeScale]=useState(1.0);
   const [filterState,setFilterState]=useState({type:null,value:null});
   const [navHistory,setNavHistory]=useState([]);
@@ -1258,6 +1309,29 @@ function App(){
     };
     reader.readAsText(file);
     e.target.value='';
+  },[processModel]);
+
+  // Auto-load a server-bundled model on first mount (if the app ships one at
+  // /model.json). Silently no-ops when absent or when the route returns HTML
+  // (old servers with only a SPA catch-all), so the empty state still shows.
+  const autoLoadedRef=useRef(false);
+  useEffect(()=>{
+    if(autoLoadedRef.current)return;
+    autoLoadedRef.current=true;
+    (async()=>{
+      try{
+        const r=await fetch('./model.json',{headers:{'Accept':'application/json'}});
+        if(!r.ok)return;
+        const ct=r.headers.get('content-type')||'';
+        if(ct.indexOf('json')<0)return;
+        setIsLoading(true);setLoadError(null);setUploadStatus('Loading bundled model…');
+        const data=await r.json();
+        setTimeout(()=>{
+          try{processModel(data,'bundled/model.json');setUploadStatus('✓ bundled model');}
+          catch(err){setLoadError('Processing error: '+err.message);setIsLoading(false);setUploadStatus('✗ Error');}
+        },50);
+      }catch(_){/* no bundled model; keep empty state */}
+    })();
   },[processModel]);
 
   // ── Cytoscape mount/destroy ─────────────────────────────
@@ -1418,13 +1492,19 @@ function App(){
           const sdId=`subdomain_${dname}_${sdname}`;
           subNodeIds.add(sdId);
           const sdColor=SUBDOMAIN_PALETTE[sdi%SUBDOMAIN_PALETTE.length];
-          result.push({data:{id:sdId,label:sdname.replace(/_/g,' ').replace(/-/g,' '),type:'subdomain',color:sdColor,domain:dname,domain_color:domColor},classes:'subdomain-node'});
+          const scMap=(subs[sdname]||{}).schemaCount||{};
+          const sdSchema=Object.keys(scMap).sort((a,b)=>scMap[b]-scMap[a])[0]||'';
+          const semLbl=sdname.replace(/_/g,' ').replace(/-/g,' ');
+          result.push({data:{id:sdId,label:semanticNames?semLbl:(sdSchema||semLbl),
+            sem_label:semLbl,orig_label:sdSchema||semLbl,orig_schema:sdSchema,
+            type:'subdomain',color:sdColor,domain:dname,domain_color:domColor},classes:'subdomain-node'});
         });
       } else {
         const dn=domainByName[dname];
         if(dn)result.push(dn);
       }
       const domTables=tablesByDomain[dname]||[];
+      const visibleIds=new Set();
       domTables.forEach(n=>{
         const sd=n.data.subdomain||'';
         const sdId=hasSubs&&sd?`subdomain_${dname}_${sd}`:'';
@@ -1432,8 +1512,14 @@ function App(){
         if(hasSubs&&sd&&subNodeIds.has(sdId)) cloned.data.parent=sdId;
         else if(hasSubs) delete cloned.data.parent;
         result.push(cloned);
+        visibleIds.add(n.data.id);
       });
-      (edgesWithinDomain[dname]||[]).forEach(e=>result.push(e));
+      // Render every edge whose BOTH endpoints are visible in this domain view
+      // (co-visible), so two tables the user can see always show their link.
+      // Robust vs. table names containing dots (unlike the prefix-split index).
+      edges.forEach(e=>{
+        if(visibleIds.has(e.data.source)&&visibleIds.has(e.data.target)) result.push(e);
+      });
       const pos=calcDomainViewPositions(result);
       result.forEach(n=>{if(n.data&&pos[n.data.id])n.position=pos[n.data.id];});
       return applyDomainSizes(result);
@@ -1596,6 +1682,32 @@ function App(){
     setTimeout(()=>cy.fit(50),50);
   },[showDomains,sizeScale]);
 
+  // ── Semantic toggle: swap product node labels between the business (semantic)
+  //    name and the original physical table name. Data carries both, so this is
+  //    a pure re-label (no graph rebuild). ───────────────────────────────────
+  useEffect(()=>{
+    const cy=cyRef.current;
+    if(!cy)return;
+    cy.batch(()=>{
+      cy.nodes('.table-node, .domain-node, .subdomain-node').forEach(n=>{
+        const sem=n.data('sem_label'), orig=n.data('orig_label');
+        if(sem||orig) n.data('label', semanticNames ? (sem||orig) : (orig||sem));
+      });
+    });
+  },[semanticNames,graphElements]);
+
+  // ── dbx_fk toggle: hide/show agent-synthesised FK edges (those carrying a
+  //    `_dbx_fk_*` tag). Declared UC FKs are unaffected. Pure display toggle. ──
+  useEffect(()=>{
+    const cy=cyRef.current;
+    if(!cy)return;
+    cy.batch(()=>{
+      cy.edges('.dbx-fk-edge').forEach(e=>{
+        e.style('display', showDbxFk ? 'element' : 'none');
+      });
+    });
+  },[showDbxFk,graphElements]);
+
   // ── Stats ──────────────────────────────────────────────
   const statsText=useMemo(()=>{
     if(!graphData)return '';
@@ -1708,6 +1820,14 @@ function App(){
         h('div',{style:{display:'flex',alignItems:'center',marginLeft:4}},
           h('label',{style:{color:'#aaa',fontSize:10,marginRight:4}},'Domains'),
           h('input',{type:'checkbox',checked:showDomains,onChange:e=>setShowDomains(e.target.checked),style:{cursor:'pointer'}})
+        ),
+        h('div',{style:{display:'flex',alignItems:'center',marginLeft:4}},
+          h('label',{style:{color:'#aaa',fontSize:10,marginRight:4},title:'On: business (semantic) product names. Off: original physical table names.'},'Semantic'),
+          h('input',{type:'checkbox',checked:semanticNames,onChange:e=>setSemanticNames(e.target.checked),style:{cursor:'pointer'}})
+        ),
+        h('div',{style:{display:'flex',alignItems:'center',marginLeft:4}},
+          h('label',{style:{color:'#aaa',fontSize:10,marginRight:4},title:'Show agent-synthesised (_dbx_fk) foreign-key links. Off: only declared UC FKs.'},'dbx FK'),
+          h('input',{type:'checkbox',checked:showDbxFk,onChange:e=>setShowDbxFk(e.target.checked),style:{cursor:'pointer'}})
         ),
         h('select',{value:layout,onChange:e=>setLayout(e.target.value),style:{fontSize:11}},
           h('option',{value:'circle'},'Circular'),

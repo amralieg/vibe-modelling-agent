@@ -1,0 +1,9 @@
+{
+  "vibe_classification": {
+    "operation_intent": "maintain",
+    "scope": "model",
+    "priority_themes": ["fk_density", "metric_views"]
+  },
+  "hard_constraints": [],
+  "soft_guidance": []
+}

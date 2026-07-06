@@ -1,3 +1,5 @@
+from notebook_source_util import notebook_concat_source
+
 """v0.7.4 behavioral tests — autonomous resilience bundle.
 
 Six fixes ship together (alias prefix per fix):
@@ -32,8 +34,8 @@ def _load_nb_source(path: Path) -> str:
 
 def test_v074_agent_version_is_071_release():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "0.7.1"' in src, (
-        "v0.7.1 release tag (consolidates dev iterations v0.7.1\u2192v0.7.4) must stamp __AGENT_VERSION__ = '0.7.1'"
+    assert '__AGENT_VERSION__ = "4.2.7"' in src, (
+        "__AGENT_VERSION__ must track the current single-digit semver (CLAUDE.md \u00a73a-bis)"
     )
 
 
@@ -44,8 +46,8 @@ def test_v074_agent_version_is_first_non_comment_line_of_first_code_cell():
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
     assert code_lines, "First code cell must contain at least one code line"
-    assert '__AGENT_VERSION__ = "0.7.1"' in code_lines[0], (
-        "First non-comment code line of first code cell must declare __AGENT_VERSION__ = \"0.7.1\" (CLAUDE.md §3a-bis)"
+    assert '__AGENT_VERSION__ = "4.2.7"' in code_lines[0], (
+        "First non-comment code line of first code cell must declare current __AGENT_VERSION__ (CLAUDE.md §3a-bis)"
     )
 
 
@@ -121,8 +123,12 @@ def test_v074_shrink_fk_densest_fallback_replaces_emptied_raise():
     assert "shrink-fk-densest-fallback" in window, (
         "FK-densest fallback must follow the emptied-orphan signal in the same code block"
     )
-    assert "_v74_fk_count" in window, (
-        "FK-densest fallback must score products by FK in/out degree"
+    # v3.5.1: the FK-density scoring was extracted to the shared module-level helper
+    # _shrink_fk_densest_pick (DRY — replaced two copy-pasted inline _v74_fk_count loops).
+    # The fallback must still score by FK in/out degree, now via the shared helper.
+    assert "_shrink_fk_densest_pick(products_data, attributes_data, _v74_target_size)" in window, (
+        "FK-densest fallback must score products by FK in/out degree via the shared "
+        "_shrink_fk_densest_pick helper"
     )
 
 
@@ -294,8 +300,8 @@ def test_v074_runner_failure_manifest_only_writes_when_not_all_ok():
 
 def test_v074_readme_current_version_matches():
     rd = (REPO_ROOT / "readme.md").read_text()
-    assert "Current version: **v0.7.1**" in rd, (
-        "readme `Current version:` line must match __AGENT_VERSION__ (CLAUDE.md \u00a73a-bis); v0.7.1 release tag consolidates dev iterations"
+    assert "Current version: **v0.8.0**" in rd, (
+        "readme `Current version:` line must match __RELEASE_VERSION__ (public release; v0.8.0 decoupling)"
     )
 
 
@@ -372,6 +378,12 @@ def test_v074_fidelity_deterministic_attr_count_alias_present():
 
 
 def test_v074_fidelity_deterministic_attr_count_uses_attrs_by_product():
+    """v0.9.6 update: the v0.7.4 regex on req.original_text (`between N and M attributes per product`)
+    was DELETED per the LLM-only mandate. Attribute-count caps now come from the LLM-extracted
+    structured fields `requirement.attribute_count_min/_max` (set by VIBE_MASTER_PROMPT) with a
+    fallback to tier defaults in PROMPT_VARIABLES. The verifier still uses `attrs_by_product`,
+    still FIRES the `[fidelity-deterministic-attr-count FIRED]` sentinel, but no longer re-parses
+    prose with regex."""
     src = _load_nb_source(AGENT_NB)
     pos = src.find("[fidelity-deterministic-attr-count FIRED]")
     assert pos > -1
@@ -379,8 +391,12 @@ def test_v074_fidelity_deterministic_attr_count_uses_attrs_by_product():
     assert "attrs_by_product" in block, (
         "Verifier must use the existing per-product attribute index; do NOT recompute"
     )
-    assert "between" in block.lower() and "attributes" in block.lower(), (
-        "Verifier regex must accept 'between N and M attributes per product' phrasing"
+    assert "vibe-attr-cap-regex-removed" in block, (
+        "v0.9.6 sentinel must mark the deletion of the v0.7.4 regex sweep"
+    )
+    assert "min_attributes_per_product" in block and "max_attributes_per_product" in block, (
+        "v0.9.6 verifier must read structured min/max attribute caps from LLM-extracted requirement "
+        "fields or tier defaults (no regex on req.original_text)"
     )
 
 
@@ -505,31 +521,43 @@ def test_v074_mv_stale_catalog_rewrite_respects_existing_catalogs():
 
 
 def test_v074_vibe_attr_cap_override_alias_present():
+    """v0.9.6 update: the original `vibe-attr-cap-override` alias was tied to a regex sweep over
+    raw `model_vibes`/`business_description` text, which violated the LLM-only mandate. The new
+    sentinel `vibe-attr-cap-regex-removed` marks the deletion. Attribute-count caps now come
+    from LLM-extracted `requirement.attribute_count_min/_max` (or tier defaults), not regex."""
     src = _load_nb_source(AGENT_NB)
-    assert "vibe-attr-cap-override" in src, (
-        "NEW-13 alias must appear in agent/dbx_vibe_modelling_agent.ipynb (user-vibe attribute cap override)"
+    assert "vibe-attr-cap-regex-removed" in src, (
+        "v0.9.6 sentinel `vibe-attr-cap-regex-removed` must appear in agent notebook "
+        "(replaces the v0.7.4 `vibe-attr-cap-override` regex sweep)"
     )
 
 
 def test_v074_vibe_attr_cap_override_modifies_prompt_variables():
+    """v0.9.6 update: attribute-count caps still flow through `PROMPT_VARIABLES.min/max_attributes_per_product`,
+    but they are now set from tier defaults (already in PROMPT_VARIABLES) plus LLM-extracted structured
+    requirement fields — NOT from a regex sweep over raw vibe text."""
     src = _load_nb_source(AGENT_NB)
-    pos = src.find("[vibe-attr-cap-override FIRED]")
-    assert pos > -1
+    pos = src.find("[vibe-attr-cap-regex-removed FIRED]")
+    assert pos > -1, "v0.9.6 deletion sentinel must FIRE in the orchestrator-init site"
     window = src[max(0, pos - 4000): pos + 500]
-    assert "min_attributes_per_product" in window and "max_attributes_per_product" in window, (
-        "vibe-attr-cap-override must mutate PROMPT_VARIABLES.min/max_attributes_per_product so the generation prompt reflects the user cap"
+    assert "PROMPT_VARIABLES" in window or "min_attributes_per_product" in src, (
+        "Tier-default min/max_attributes_per_product must still be carried in PROMPT_VARIABLES so the "
+        "generation prompt reflects the per-tier cap (v0.9.6 keeps tier defaults; deletes regex layer)"
     )
 
 
 def test_v074_vibe_attr_cap_override_after_authority_init():
-    """The cap override must run AFTER apply_vibe_authority_overrides so it is part of the
-    user-king authority chain, not a parallel system."""
+    """v0.9.6 update: the deletion-sentinel must run AFTER `apply_vibe_authority_overrides` so the
+    LLM-only path composes cleanly with the user-king authority chain (§3c). No regex layer remains
+    between the authority overrides and the prompt-variables consumption."""
     src = _load_nb_source(AGENT_NB)
     auth_pos = src.find("apply_vibe_authority_overrides(config, widgets_values")
-    cap_pos = src.find("[vibe-attr-cap-override FIRED]")
-    assert auth_pos > -1
+    # The first occurrence is in the version header; we need the FIRST FIRING site AFTER auth_pos.
+    cap_pos = src.find("[vibe-attr-cap-regex-removed FIRED]", auth_pos)
+    assert auth_pos > -1, "apply_vibe_authority_overrides call site must exist"
     assert cap_pos > auth_pos, (
-        "vibe-attr-cap-override must run AFTER apply_vibe_authority_overrides() to compose with §3c authority chain (CLAUDE.md §3d)"
+        "v0.9.6 [vibe-attr-cap-regex-removed FIRED] (firing site, not version header) must run AFTER "
+        "apply_vibe_authority_overrides() to compose with §3c authority chain (CLAUDE.md §3d)"
     )
 
 

@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+from notebook_source_util import notebook_concat_source
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 AGENT_NB = REPO_ROOT / "agent" / "dbx_vibe_modelling_agent.ipynb"
 RUNNER_NB = REPO_ROOT / "runner" / "vibe_runner.ipynb"
@@ -39,7 +41,7 @@ CANONICAL_TIMEOUT_SECONDS = 54000  # 15 * 3600
 
 
 def test_agent_joblauncher_task_timeout_is_15h():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert re.search(
         r'task_key="vibe_modeling_task"[^"]*?notebook_task[^}]*?timeout_seconds=54000',
         src,
@@ -55,7 +57,7 @@ def test_agent_joblauncher_task_timeout_is_15h():
 def test_agent_wait_for_run_terminal_default_is_15h():
     """Both copies of wait_for_run_terminal (the original + v0.8.2 P7 duplicate)
     must default timeout_seconds=54000."""
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     matches = re.findall(
         r"def wait_for_run_terminal\(run_id, heartbeat_seconds=60, timeout_seconds=(\d+)",
         src,
@@ -103,15 +105,26 @@ def test_orchestrator_sector_timeout_is_15h_global():
 # ---------- 4. Vibe-tester: run_test default ----------
 
 
-def test_vibe_tester_run_test_default_is_15h():
+def test_vibe_tester_run_test_default_is_bounded_per_op():
+    """SUPERSEDED by v4.2.0 [v420-tester-bounded-op-timeout]: the flat 54000s (15h)
+    tester default meant a SINGLE hung op froze the entire suite for 15h instead of
+    failing fast. The tester now takes timeout_seconds=None and derives a bounded
+    per-op wall-clock cap (heavy LLM build 9000s, physical lifecycle 1800s, guard-rail
+    900s). The 15h ceiling still governs the AGENT JobLauncher + runner + orchestrator
+    (asserted by the other tests in this file); it is NO LONGER the tester default.
+    """
     src = TESTER_NB.read_text(encoding="utf-8")
-    assert "def run_test(test_def, timeout_seconds=54000)" in src, (
-        "tests/vibe_tester.ipynb run_test default timeout_seconds MUST be 54000 (15h) "
-        "per user directive 2026-05-18"
+    assert "def run_test(test_def, timeout_seconds=None)" in src, (
+        "tests/vibe_tester.ipynb run_test MUST default timeout_seconds=None so the "
+        "v4.2.0 bounded per-op cap applies (a hung op fails fast, not after 15h)"
     )
-    assert "def run_test(test_def, timeout_seconds=43200)" not in src, (
-        "Old 12h tester timeout (43200) must be removed"
+    assert "v420-tester-bounded-op-timeout" in src, (
+        "the bounded per-op timeout derivation (alias=v420-tester-bounded-op-timeout) "
+        "must be present"
     )
+    # the flat 15h/12h tester defaults must be gone
+    assert "def run_test(test_def, timeout_seconds=54000)" not in src
+    assert "def run_test(test_def, timeout_seconds=43200)" not in src
 
 
 # ---------- 5. Anti-regression: no stale 4h timeouts anywhere ----------
@@ -142,7 +155,7 @@ def test_no_stale_14400_timeouts_in_job_creation_paths():
 
 def test_agent_version_constant_is_075():
     """v0.7.5 ships the 15h-everywhere change; constant must reflect it."""
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     m = re.search(r'__AGENT_VERSION__\s*=\s*\\?"(\d+)\.(\d+)\.(\d+)\\?"', src)
     assert m, "__AGENT_VERSION__ literal not found in agent notebook"
     major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))

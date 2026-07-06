@@ -4,6 +4,23 @@ These instructions apply to every session in this repository. Follow them verbat
 
 ---
 
+## MISSION (read this first, every session — never forget it)
+
+The single purpose of this agent is to PRODUCE A DATA MODEL THAT 100% ADHERES TO THE USER'S VIBES (hard floor 90% VERIFIED adherence), is production-ready, and is good enough to recommend to peers or propose as a global standard. This will run for HUNDREDS of industries.
+
+The mission is judged by VERIFIED VIBE ADHERENCE = (VREQs verified-applied) / (VREQs extracted), with two mandatory halves: (a) EXTRACTION COMPLETENESS — every requirement in the vibe becomes a VREQ; (b) APPLICATION + VERIFICATION — every VREQ is actually applied AND deterministically provable against the real catalog. A "Max retries exhausted, proceeding" soft-accept is NOT applied.
+
+NON-NEGOTIABLE OPERATING RULES FOR THIS MISSION:
+- NEVER OVERFIT or HARDCODE any industry (ncdot, airlines, automotive, healthcare, etc.). Every fix must be generic and read from the vibe / runtime / catalog, never from a baked-in name.
+- For EVERY failed VREQ, examine its FULL LIFECYCLE: extracted? → applied to model dict? → physically built? → verified? Find the exact stage where it dropped and fix THAT stage's root cause.
+- Three systemic failure classes drive non-adherence (diagnosed from the NCDOT v3.4.0 24-VREQ trace + live HEALTH sandbox, 2026-06-08):
+  1. VERIFIER FALSE-NEGATIVES (the "lying scoreboard") — the model DID follow the vibe but the verifier scores it failed because its snapshot is lossy (missing `_metrics` schema MVs, missing column tags) and its matching is too literal (user display name "Vacancy Rate" vs physical `hr_vacancy_rate`). This is the LARGEST lever. Fix = ground every VREQ class against the REAL catalog with NAME NORMALIZATION (display→snake, domain-prefix-tolerant, substring/contains).
+  2. GENUINE NAME/SHAPE SUBSTITUTION — generators that receive only a COUNT free-invent names. Fix = forward the user's EXACT named artifacts as a USER-KING mandate into the generator prompt.
+  3. DEAD AGENTIC REPAIR — the SelfFixer (sandbox code-gen residual repair) ran inert because it was built with ai_agent=None. Fix = resolve a live AIAgent at the single shared entry point; the sandbox mechanism itself is proven working (HEALTH made 397 VOV_2_SANDBOX code-gen calls).
+- Run AUTONOMOUSLY: monitor → RCA every miss → generic root-cause fix → behavioral test (fail pre-patch, pass post-patch) → bump version → redeploy → re-run FROM V1 (no chaining) → loop until ALL targets ≥90% with zero §10.6 signatures. Do not stop until the goal is met.
+
+---
+
 ## 0. Release-note detail standard (when tagging to main)
 
 REFERENCE: https://example.com/releases/v0/
@@ -31,6 +48,41 @@ Short, emoji-filled, or pure-feature-list changelogs are NOT acceptable for tag-
 ## 1. Regression report after every delivery
 
 AFTER FINISHING YOUR JOB, FIND EVERY SINGLE REGRESSION ERROR AND RACTIFY THE ROOT CAUSE BEFORE YOU DELIVER, AND THEN SHOW ME REGRESSION RESPORT WITH HOW CRITICAL THE ISSUE IS.
+
+## 1a-bis. SUCCESS-GATE APPLIES TO `main` ONLY — SCRATCH BRANCHES KEEP FULL HISTORY (clarified 2026-06-08)
+
+**The success-verification gate is a `main`-branch rule, NOT a global ban on committing.** (updated 2026-06-08)
+
+There are two distinct branch classes, with opposite rules:
+
+### Scratch / work branches (e.g. `scratch/*`, `agent-vov-fix`, any non-`main` working branch) — COMMIT FREELY
+
+- **You MUST checkpoint every fix here as you go.** Commit + push in-flight attempts, partial fixes, RCA snapshots, redeploys — the whole iteration trail. The point is to preserve the history of WHAT WAS TRIED so nothing is lost between sessions and the user can audit the path.
+- No success-verification is required before committing or pushing to a scratch branch. "Let me commit this WIP" is correct behaviour here.
+- Use descriptive commit messages that say what the attempt was and its live result so far (e.g. "v3.4.4 vibe-conventions-override — deployed, NCDOT run 1089… RUNNING, not yet audited").
+- A long-lived scratch branch per task is preferred so the fix history is contiguous. Push it to `origin` so it survives.
+
+### `main` (and any protected/release branch the user designates) — SUCCESS-GATED
+
+The `main` branch is the record of WHAT SHIPPED AND WORKED. A commit reaches `main` ONLY via a merge/PR after the change has been verified end-to-end on live runs to satisfy the user's success criteria (typically: ≥90% / 100% adherence to user vibes + ZERO §10.6 hard signatures).
+
+**Promotion-to-`main` workflow (HARD):**
+
+1. Iterate on a scratch branch: edit working tree, commit checkpoints freely.
+2. Bump `__AGENT_VERSION__` to the next single-digit semver (per §3a).
+3. **Deploy directly from the working-tree file to the workspace** as `dbx_vibe_modelling_agent_v<NN>` via `databricks workspace import` (CLI reads from disk).
+4. Patch the JOB notebook_path → `_v<NN>`.
+5. Drop catalogs, prior runs, submit fresh runs.
+6. Monitor per §11. KILL early on RED trajectory, iterate on the scratch branch (re-deploy from working tree).
+7. **ONLY AFTER** the run terminates with `result_state=SUCCESS` AND the adherence audit passes success criteria, merge the scratch branch into `main` (`git merge` / PR) and push `main`.
+8. The merge/commit on `main` references the live run_id that proved the fix worked.
+
+**Hard prohibitions (apply to `main` ONLY):**
+- ❌ Merging/pushing to `main` before the live run terminates with SUCCESS + target adherence.
+- ❌ Fast-forwarding an unverified scratch commit onto `main` to "save a step".
+- ❌ Bypassing with "the test passes locally, that's good enough" — local tests cover ~20% of production behavior; `main` needs live proof.
+
+**These prohibitions do NOT apply to scratch branches** — on scratch branches, committing/pushing in-flight work is REQUIRED, not prohibited.
 
 ## 2. Databricks Serverless compatibility (hard constraint)
 
@@ -475,9 +527,13 @@ Keep this watchlist in the monitor prompt on every run. If a signature is detect
 | R6 | `[Metrics] Failed metric view '<name>'.*UNRESOLVED_COLUMN` | Metric-view ↔ normalizer contract mismatch |
 | R7 | `[MODEL-PARAMS] <field> missing from LLM output — using midpoint N` | LLM JSON-schema non-compliance |
 | R8 | `[CYCLE DETECTION] Found N cycle(s)` where N > 0 after finalization | FK cycle recurrence |
+| R8b | finalization `[CYCLE DETECTION] ✅ No cycles` BUT the output `model.json` still has FK cycles (SCC on the nested dict > 0) | Lying-scoreboard: the flat-list finalization breaker (`_v394` on `products_data/attributes_data`) ran clean, but cycles persisted in the NESTED `data_model` serialized to model.json (VOV sandbox-authoritative FK adds / SSOT resolver / flat↔nested desync). Live: mfg vov_v3 my-aws run 696361916556037 = 11 SCC cycles, finalization said 0. FIXED v4.0.3 `v403-serialize-cycle-guard` (deterministic detect+break on the nested dict at the model.json serialization boundary). PRESENT if `[v403-serialize-cycle-guard FIRED]` reports `remaining>0`, or model.json SCC > 0 on any run. |
 | N1 | install test failure at ~50-60s with `Workload failed, see run output for details` + no info log on volume | Install early-exit, no diagnostics |
 | N2 | `Fidelity gates FAILED: precision < 0.85 — rollback recommended` | Memory/JSON attribute-name drift |
 | N3 | `⚠️ DBML FK SCRUB: Skipping dangling ref` (cosmetic) | DBML exporter naming drift |
+| N4 | `mutator raised: AttributeError: '<scalar>' object has no attribute '<append/get/extend>'` recurring across all 3 retries → `rejected_unsafe` (VREQ lost) | Mis-directed retry hint: the generic `_v204_ast_class_hints` needle assumed the bad value was a DICT and gave dict-only advice, so the LLM kept crashing on a STRING scalar field. FIXED v4.0.2 `vov-scalar-attr-typed-hint` (type-accurate advice + suppress contradictory dict hint). PRESENT if a `'str'/'int'/'float' object has no attribute` crash survives all retries with NO `STRING-NOT-LIST`/`TYPE-MISMATCH` hint in the trace. |
+| N5 | `[UC-DDL] ■ Finished SET TAGS in NN:NN` where NN > ~20min at 8 workers (e.g. mfg 14585 stmts = 28min, 0 failures) | Tag-DDL wall-clock is the post-VOV bottleneck (~6% of tier-1 runtime). NOT a defect — the 8-worker cap (`TAG_DDL_MAX_WORKERS`, `settags-sparkconnect-concurrency-cap`) is CORRECT (prevents the 97.7% Spark-Connect-saturation failure cascade). The ONLY proven safe speedup is routing tag DDL through a SQL-Warehouse REST endpoint (v3.6.6 repro: 1800 tags @ 60 workers = 0% fail, 12/s). Do NOT naively raise the worker cap — that reintroduces the cascade. |
+| N6 | A `[VOV-2.0 LLM BRIDGE FIRED]` line with large `output_chars` (>150K) is the LAST non-flush content line, then ONLY `[VolumeLogFlush]` lines for >25min while the run stays RUNNING (the "looks-alive-but-stalled" hang). Live: ngo shrink-ecm v397 run 511083019748570 sat 82min with one 158K-char bridge output as the last content line, zero progress, then was killed. | Silent main-thread hang AFTER a successful LLM bridge return. Sandbox subprocess (240s) and `ai_query` (240s/360s) BOTH have enforced timeouts, so the hang is NOT those — it is pure-Python post-processing of the huge payload OR a bounded-pool nested-submission deadlock (`_SharedPoolHandle.__exit__` does `_cf2.wait(self._futs)` with NO timeout; `run_parallel_with_rate_limit_backoff` uses `mark_guard=False`, so a `run_parallel` call from inside a saturated global-pool worker can block its worker forever). DIAGNOSE: v4.0.4 `heartbeat-stalldump` dumps ALL thread stacks once per stall episode when `app_silent>=600s` — the next occurrence will show exactly which frame each thread is blocked in (`_cf2.wait`, an HTTP read, or a DDL). DETECT: external poller flags STALL when the last non-flush content line is >25min old while RUNNING; kill + relaunch on the latest version. |
 
 ### 9.5 Positive signals to look for (don't regress what works)
 
@@ -488,6 +544,10 @@ Equally important — affirmatively detect and record these, because absence ove
 - `✅ Step N: <name> - PASSED validation` → each step self-verified
 - `Architect Self-Review iter N landed=K regressed=0 blocked=0` → corrective actions landing cleanly
 - `🛡️ BLOCKED product move: '<name>' is protected` → defense-in-depth guard working even when LLM pushes against it
+- `[vov-scalar-attr-typed-hint FIRED v4.0.2]` → type-accurate scalar-attribute retry hint firing (str/int/float `.append`/`.get` crash steered with the RIGHT advice instead of the contradictory dict hint; prevents adherence loss from un-recoverable retries)
+- `[vov-deterministic-preskip FIRED v4.0.1]` → a VREQ already satisfied per the deterministic dict probe was credited `applied` WITHOUT spending an LLM synth+verify+sandbox cycle (speed + anti-false-negative; reduces the `noop_failed` empty-diff class)
+- `[v403-serialize-cycle-guard FIRED]` with `remaining=0` → the model.json serialization boundary verified the NESTED `data_model` has 0 FK cycles before writing; `cleared=0` on a clean model is the expected idempotent no-op, `cleared>0` means residual cycles that escaped the flat finalization breaker were deterministically broken in place (R8b backstop; user-vibed edges protected per §3c)
+- `[HEARTBEAT-STACKDUMP v4.0.4 FIRED]` (only on a genuine stall, `app_silent>=600s`) → the heartbeat localized a silent hang (N6) by dumping every thread's stack ONCE per stall episode; this is a DIAGNOSTIC, so its presence means a real stall occurred AND is now diagnosable (read the dumped frames to see if it is `_cf2.wait`/HTTP/DDL). ABSENCE on a healthy run is the normal state (the helper returns immediately when `app_silent<threshold`)
 - `[NORM-FIX] BLOCKED semantic mismatch` → normalizer correctly rejecting a bad join
 - LLM health: all models `0 timeouts, 0 errors, ✅ healthy` in the runtime-profile summary
 
@@ -1174,3 +1234,56 @@ After every pulse-monitored run terminates:
 2. For each pulse, ask: **"Was anything I said inconsistent with what I knew at the time?"**
 3. If YES, surface this in the post-run report under `[PULSE-DISCIPLINE FAILURE]` with the specific pulse number + the misleading claim + the truth I should have said.
 4. Honesty score (§6) MUST be deducted by 25 points for each pulse that violated §11.3 or §11.5, regardless of run outcome.
+
+---
+
+## 12. STRUCTURED QUALITY-GATE CATALOG (QGATE) — the honest scoreboard (added 2026-06-17)
+
+Added after the ncdot base-MVM "lying scoreboard" incident: the agent reported high adherence while the model degraded, because the VREQ verifier scored governance/tagging VREQs off a LOSSY snapshot (attribute tags/subdomain/division/descriptions omitted). It false-FAILED glossary/subdomain VREQs that were PHYSICALLY present (vibe_ncdot_basemvm: 3031 glossary + 7 subdomain tags). This section is the permanent contract for structured quality.
+
+### 12.1 The four-layer anti-lying architecture
+
+1. **Deterministic gates** (`run_metamodel_static_analysis`) read the REAL model dict, so a gate verdict cannot false-negative or false-positive. 66 categories today.
+2. **Agentic-loop wiring** (`_v366_sa_findings_requeue` `_fixable` whitelist) — every gate category is requeued to the SelfFixer closed loop so a discovered gap is REPAIRED, not merely reported. Curated completeness categories (descriptions/tags/types) requeue even at info severity.
+3. **Authoritative verifier override** (`VibeOrchestrator._verify_bulk_coverage`, alias `verifier-bulk-coverage-authoritative`) — for glossary/subdomain/division coverage VREQs, the deterministic dict verdict runs FIRST in `_verify_deterministic` and OVERRIDES the LLM verdict. Conservative thresholds: coverage >=0.9 fulfilled, ==0 failed, else partial. rename/drop and non-coverage VREQs are deferred (no hijack).
+4. **Physical ground-truth parity** (existing `gt-tag-enrich`/`gt-mv-enrich`/`gt-tag-verify`/`gt-mv-verify`) — post-build, query `information_schema.column_tags`, `information_schema.columns`, and the `_metrics` schema; verify tag/type/MV VREQs against the live catalog. This is the ultimate anti-lying check. DO NOT build a second physical-parity system — extend these.
+
+The deterministic quality score (`_compute_deterministic_confidence_and_status`) is computed from ALL severity issues and is AUTHORITATIVE over the LLM self-score. Every new gate feeds it automatically.
+
+### 12.2 The gate catalog (enforce ALL; add more whenever a new failure class appears)
+
+**Keys & relationships**
+- Every table has a PK (`missing_pk`, `pk_attribute_missing`).
+- Every FK resolves to an existing target PK (`broken_fk`, `pk_mismatch`, `fk_target_missing`, `unlinked_fk`, `invalid_fk_domain_refs`).
+- FK column type == target PK type (`fk_pk_type_mismatch`) — MEDIUM weight (join hazard).
+- No FK cycles (`fk_cycle`), no self-FK on a PK (`self_fk_on_pk`, `self_referencing_fk`), no direct bidirectional links. Enforced at THREE layers: base-model Step 7D cycle-break, VOV-finalize flat backstop (`_v394_break_post_vov_cycles`), and the v4.0.3 serialization-boundary guard (`_v403_break_cycles_in_serialized_model`) that re-checks the NESTED `data_model` immediately before `model.json` is written — the last line of defense against R8b (flat finalization clean while the serialized nested dict still cycles).
+- No siloed tables (`siloed_table`, `silo_product`); FK density / over-hubby cap (`fk_density_over_hubby`).
+- Multi-FK label completeness; FK namespace/format/naming (`multi_fk_missing_label`, `fk_namespace_mismatch`, `fk_format_invalid`, `fk_column_naming`, `fk_name_target_mismatch`).
+
+**Governance / tagging**
+- Glossary-term tag on every business attribute when a glossary is in use (`missing_glossary_tag`).
+- PII/sensitivity tag on every person-pattern attribute (`pii_tagging_missing`).
+- Division tag on every domain (`missing_division_tag`).
+- Division within the canonical set + balance (`invalid_division`, `division_imbalance`).
+- Subdomain tag on every table (`missing_subdomain_tag`); subdomain SSOT collisions (`subdomain_ssot_collision`).
+- Generic tag presence (`missing_tags`).
+
+**Descriptions**
+- Domain/table/attribute descriptions present (`missing_domain_description`, `missing_product_description`, `missing_attribute_description`).
+- Non-placeholder, non-echo, >=10 chars (`low_quality_description`); no banned boilerplate (`banned_boilerplate_in_output`).
+
+**Types**
+- Type present & valid (`missing_data_type`, `invalid_data_type`); PK datatype consistency (`pk_datatype_inconsistency`, `datatype_mismatch`); well-known-column type sanity.
+
+**Structure / naming / dedup**
+- snake_case for domain/table/attribute; PK naming convention; no product-prefix on attribute.
+- Duplicate names/attributes/product-pairs; cross-domain SSOT duplicate (`cross_domain_duplicate`); denormalized natural keys (`denormalized_natural_key`).
+- Domain bloat caps; empty/orphaned domains; too-few-attributes; missing table/db names.
+
+### 12.3 Canonical division taxonomy — EXACTLY 3 (HARD)
+
+Every domain MUST be classified into EXACTLY ONE of three canonical divisions: **`operations`, `business`, `corporate`**. No other value is allowed. Legacy synonyms (`supporting`, `support`, `back_office`, `backoffice`) fold to `corporate`. Balance rule (DOM-RUL-001): Operations + Business >= 80% of domains; Corporate <= 20%. No early corporate (DOM-RUL-003): no corporate domains until Operations >= 2 and Business >= 2. The taxonomy lives in `get_division_taxonomy`; prompts, normalizer, and gates all read it (never hardcode the set elsewhere).
+
+### 12.4 Adding new gates (the standing instruction)
+
+Whenever a production run surfaces a new structural/governance defect class: (1) add a deterministic gate in `run_metamodel_static_analysis` reading the real dict; (2) add its category to the `_fixable` whitelist so it self-repairs; (3) if it is a coverage VREQ class, extend `_verify_bulk_coverage` so the scoreboard is authoritative; (4) add the rule to both `rules/vibe-data-modelling-rules*.csv` under the `Quality Gate` group; (5) add a fail-pre/pass-post behavioral test (§8.10). "Add AS MANY static structure checks AS POSSIBLE" is a standing directive, not a one-time task.

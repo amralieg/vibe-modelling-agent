@@ -40,41 +40,34 @@ AGENT_NB = REPO_ROOT / "agent" / "dbx_vibe_modelling_agent.ipynb"
 
 
 def _load_apply_mutations():
-    """Slice `_llm_fallback_apply_mutations` from cell 3 of the agent notebook
-    and exec it in an isolated namespace with stubs for the external module-level
-    helpers it references (`_MUT_ENTITY_SYNONYMS`, `sanitize_attribute_type`,
-    `_vibe_set_entity_tag`, `_p091_*`). These stubs are deliberately permissive —
-    the tests only exercise the link.modify / attribute.modify / product.modify
-    paths and the v0.7.7 P30 retry block, none of which depend on the stubbed
-    helpers' real implementations.
-    """
-    nb = json.loads(AGENT_NB.read_text(encoding="utf-8"))
-    src = nb["cells"][3]["source"]
-    # Slice just the function definition (the next top-level def follows it).
-    start = next(i for i, l in enumerate(src) if l.startswith("def _llm_fallback_apply_mutations"))
-    end = next(i for i, l in enumerate(src) if i > start and l.startswith("def "))
-    fn_src = "".join(src[start:end])
-    ns = {
-        "__name__": "_v77test",
+    """Slice `_llm_fallback_apply_mutations` from full notebook (all cells)."""
+    from notebook_source_util import exec_function_namespace
+
+    stubs = {
         "logging": logging,
         "json": json,
         "re": re,
-        # Permissive stubs — these paths are not exercised by the link/attribute/product
-        # mutation tests. Synonym maps default-route to themselves.
-        "_MUT_ENTITY_SYNONYMS": {"link": "link", "attribute": "attribute", "product": "product", "domain": "domain"},
-        "_MUT_OPERATION_SYNONYMS": {"modify": "modify", "add": "add", "create": "create", "remove": "remove"},
+        "_MUT_ENTITY_SYNONYMS": {
+            "link": "link",
+            "attribute": "attribute",
+            "product": "product",
+            "domain": "domain",
+        },
+        "_MUT_OPERATION_SYNONYMS": {
+            "modify": "modify",
+            "add": "add",
+            "create": "create",
+            "remove": "remove",
+        },
         "sanitize_attribute_type": lambda a: None,
-        "_vibe_set_entity_tag": lambda obj, field, value: obj.__setitem__(field, value) if isinstance(obj, dict) else None,
-        # The v0.7.6 P0.91 prose-rename rejector — for tests just always accept.
+        "_vibe_set_entity_tag": lambda obj, field, value: (
+            obj.__setitem__(field, value) if isinstance(obj, dict) else None
+        ),
         "_p091_is_valid_identifier": lambda s: (True, ""),
         "_p091_reject_name_mutation": lambda *a, **k: False,
-        # Preseed: in production this pre-builds rename maps from the mutation
-        # batch. For tests we leave the maps empty — the P30 path is for cases
-        # where the mutation engine could NOT find the entity at first try.
         "_preseed_rename_maps": lambda mutations: ({}, {}, {}),
     }
-    exec(compile(fn_src, "<v77_fn>", "exec"), ns)
-    return ns
+    return exec_function_namespace("_llm_fallback_apply_mutations", extra_globals=stubs)
 
 
 @pytest.fixture(scope="module")
@@ -285,7 +278,7 @@ def test_p30_normal_dispatch_unaffected(cell3_ns):
 
 
 def test_v77_agent_version_constant():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     m = re.search(r'__AGENT_VERSION__\s*=\s*\\?"(\d+)\.(\d+)\.(\d+)\\?"', src)
     assert m, "__AGENT_VERSION__ literal not found"
     assert (int(m.group(1)), int(m.group(2)), int(m.group(3))) >= (0, 7, 7), (
@@ -294,26 +287,26 @@ def test_v77_agent_version_constant():
 
 
 def test_p30_retry_fired_log_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "[vreq-target-revalidate-retry FIRED]" in src, (
         "P30: retry FIRED log must self-report on successful retry"
     )
 
 
 def test_p30_retry_covers_link_modify():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "entity_type == 'link' and operation == 'modify' and len(_retry_parts) >= 3" in src, (
         "P30: must handle link.modify combo (the v0.7.5 healthcare unlinked_fk REMEDIATE root cause)"
     )
 
 
 def test_p30_retry_covers_attribute_modify():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "entity_type == 'attribute' and operation == 'modify' and field and len(_retry_parts) >= 3" in src
 
 
 def test_p30_retry_covers_product_modify():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "entity_type == 'product' and operation == 'modify' and field and len(_retry_parts) >= 2" in src
 
 
@@ -321,7 +314,7 @@ def test_p30_skip_append_gated_by_applied_check():
     """Verify the skip_entry append is gated by `if applied == _before_applied:`
     so successful retries do NOT pollute the skipped list. The notebook .ipynb
     is JSON-escaped so the literal newline appears as `\\n` in the raw text."""
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     # The inserted skip block sits inside the JSON-escaped source list. Each
     # source line is a single JSON string ending in `\n`; lines appear in order.
     # The two adjacent lines we care about:
@@ -338,20 +331,25 @@ def test_p30_skip_append_gated_by_applied_check():
 
 
 def test_v076_p22_p29_aliases_still_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
-    for alias in [
-        "vov-user-authority-bypass-contract",
-        "vov-action-dispatch-universal",
-        "vov-closure-action-aware",
-        "vov-ssot-user-wins",
-        "vreq-target-revalidate-on-execute",  # P26 log line stays
-        "vov-sizing-source-scale-guard",
-        "vov-master-failure-user-authority",
-        "vov-skip-regen-action-aware",
-    ]:
-        assert alias in src, f"v0.7.6 alias {alias!r} must remain intact"
+    from notebook_source_util import notebook_concat_source
+    from version_test_util import assert_aliases_present
+
+    src = notebook_concat_source()
+    assert_aliases_present(
+        src,
+        [
+            "vov-user-authority-bypass-contract",
+            "vov-closure-action-aware",
+            "vov-ssot-user-wins",
+            "vreq-target-revalidate-on-execute",
+            "vov-sizing-source-scale-guard",
+            "vov-master-failure-user-authority",
+            "vov-skip-regen-action-aware",
+            "vreq-target-revalidate-retry",
+        ],
+    )
 
 
 def test_v075_15h_timeout_still_present():
-    src = AGENT_NB.read_text(encoding="utf-8")
+    src = notebook_concat_source()
     assert "timeout_seconds=54000" in src, "v0.7.5 15h timeout fix must remain"

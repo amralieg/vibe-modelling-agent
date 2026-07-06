@@ -1,0 +1,11 @@
+{
+  "_schema_version": "1.0.0",
+  "_purpose": "Prompt-name keyed canned LLM responses for unit tests. Extend per prompt as behavioral tests are added.",
+  "_models_repo": "https://github.com/amralieg/vibe-business-data-models",
+  "_default_industry": "airlines",
+  "responses": {
+    "VIBE_PARSE_PROMPT": "airlines/vibe_parse_minimal.json",
+    "DOMAIN_GENERATE_PROMPT": "airlines/domain_generate_minimal.json",
+    "FK_FIND_MISSING_PROMPT": "airlines/fk_find_missing_minimal.json"
+  }
+}
