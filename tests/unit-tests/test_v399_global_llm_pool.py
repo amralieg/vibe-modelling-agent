@@ -186,4 +186,4 @@ def test_teardown_and_exit_call_shutdown(ns):
 
 
 def test_version_bumped(ns):
-    assert '__AGENT_VERSION__ = "4.2.5"' in _concat(NB)
+    assert '__AGENT_VERSION__ = "4.2.7"' in _concat(NB)

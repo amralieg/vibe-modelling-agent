@@ -71,4 +71,4 @@ def test_v339_aliases_present():
 
 def test_v339_version_constant():
     src = notebook_concat_source()
-    assert '__AGENT_VERSION__ = "4.2.5"' in src
+    assert '__AGENT_VERSION__ = "4.2.7"' in src

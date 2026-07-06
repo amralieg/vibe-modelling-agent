@@ -223,6 +223,10 @@ def pytest_collection_modifyitems(config, items):
 
 def pytest_sessionfinish(session, exitstatus):
     """Print symbol-coverage summary after the full test run."""
+    # Opt-out for CI/local full-suite validation runs where the notebook-parsing coverage +
+    # scenario reports add multi-minute session-finish overhead that can stall under xdist.
+    if os.environ.get("VIBE_SKIP_COV_REPORT") == "1":
+        return
     try:
         from coverage_report import emit_symbol_coverage_report
 
