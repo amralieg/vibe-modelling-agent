@@ -1,1 +1,0 @@
-Retail is a massive consumer-facing industry operating hypermarkets, department stores, discount outlets, and e-commerce platforms, offering groceries, apparel, electronics, and household goods at competitive prices to diverse demographics.

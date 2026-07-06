@@ -1,5 +1,5 @@
-from agent.vov_2_0.llm import CannedResponse, MockLLM
-from agent.vov_2_0.outline import build_outline
+from vov_2_0.llm import CannedResponse, MockLLM
+from vov_2_0.outline import build_outline
 from tests.vov_2_0.fixtures.simulated_vibes import HEALTHCARE_VIBE, NCDOT_MINIMAL, EMPTY_VIBE
 
 

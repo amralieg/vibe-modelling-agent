@@ -2,8 +2,8 @@ import copy
 import json
 from typing import Any
 
-from agent.vov_2_0.llm import CannedResponse, MockLLM
-from agent.vov_2_0.pipeline import run_vov_pipeline
+from vov_2_0.llm import CannedResponse, MockLLM
+from vov_2_0.pipeline import run_vov_pipeline
 from tests.vov_2_0.fixtures.simulated_vibes import (
     ADVERSARIAL_VIBE,
     HEALTHCARE_VIBE,

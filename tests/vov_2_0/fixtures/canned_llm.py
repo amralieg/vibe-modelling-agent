@@ -1,5 +1,5 @@
 from typing import Any, Callable
-from agent.vov_2_0.llm import CannedResponse, MockLLM
+from vov_2_0.llm import CannedResponse, MockLLM
 
 
 def predicate_contains(needle: str) -> Callable[[str], bool]:

@@ -1,11 +1,11 @@
-from agent.vov_2_0.deduper import (
+from vov_2_0.deduper import (
     cluster_vreqs,
     dedupe_vreqs,
     jaccard,
     merge_cluster,
     _shingle_set,
 )
-from agent.vov_2_0.types import RawVREQ
+from vov_2_0.types import RawVREQ
 
 
 def _v(vid, intent, target="x", quote="...", chunk="C1"):

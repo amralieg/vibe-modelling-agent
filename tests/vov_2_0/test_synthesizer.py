@@ -1,7 +1,7 @@
-from agent.vov_2_0.llm import CannedResponse, MockLLM
-from agent.vov_2_0.synthesizer import synthesize_handler, synthesize_batch_handlers
-from agent.vov_2_0.types import Batch
-from agent.vov_2_0.sandbox import execute_in_sandbox
+from vov_2_0.llm import CannedResponse, MockLLM
+from vov_2_0.synthesizer import synthesize_handler, synthesize_batch_handlers
+from vov_2_0.types import Batch
+from vov_2_0.sandbox import execute_in_sandbox
 
 
 def _batch(intent="add pii=true tag", target_entities=(("customer", "*"),), data_payload=()):
