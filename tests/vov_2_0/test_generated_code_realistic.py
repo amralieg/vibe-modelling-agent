@@ -6,8 +6,8 @@ and proves the sandbox executes them and produces the expected end state.
 """
 import copy
 
-from agent.vov_2_0.sandbox import execute_in_sandbox
-from agent.vov_2_0.invariants import (
+from vov_2_0.sandbox import execute_in_sandbox
+from vov_2_0.invariants import (
     capture_invariants,
     diff_models_summary,
     diff_within_summary_scope,

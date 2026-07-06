@@ -1,11 +1,11 @@
-from agent.vov_2_0.chunker import chunk_vibe
-from agent.vov_2_0.extractor import (
+from vov_2_0.chunker import chunk_vibe
+from vov_2_0.extractor import (
     extract_all,
     extract_from_chunk,
     make_tool_handlers,
 )
-from agent.vov_2_0.llm import CannedResponse, MockLLM
-from agent.vov_2_0.types import VibeOutline, VibeSection
+from vov_2_0.llm import CannedResponse, MockLLM
+from vov_2_0.types import VibeOutline, VibeSection
 from tests.vov_2_0.fixtures.simulated_vibes import (
     CROSS_REFERENCE_VIBE,
     HEALTHCARE_VIBE,

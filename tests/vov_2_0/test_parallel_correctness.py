@@ -6,9 +6,9 @@ same target entity.
 """
 import copy
 
-from agent.vov_2_0.pipeline import run_vov_pipeline
-from agent.vov_2_0.planner import plan_waves, _conflicts, _entities_set
-from agent.vov_2_0.types import Handler
+from vov_2_0.pipeline import run_vov_pipeline
+from vov_2_0.planner import plan_waves, _conflicts, _entities_set
+from vov_2_0.types import Handler
 
 
 def _initial_model():

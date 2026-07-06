@@ -1,4 +1,4 @@
-from agent.vov_2_0.invariants import (
+from vov_2_0.invariants import (
     capture_invariants,
     diff_models_summary,
     diff_within_summary_scope,

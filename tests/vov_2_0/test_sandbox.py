@@ -1,5 +1,5 @@
 import pytest
-from agent.vov_2_0.sandbox import (
+from vov_2_0.sandbox import (
     UnsafeCodeError,
     execute_in_sandbox,
     required_function_present,

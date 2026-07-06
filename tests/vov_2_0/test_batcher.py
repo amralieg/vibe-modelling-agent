@@ -1,10 +1,10 @@
-from agent.vov_2_0.batcher import (
+from vov_2_0.batcher import (
     batch_vreqs,
     deterministic_pre_group,
     _heuristic_batch,
 )
-from agent.vov_2_0.llm import CannedResponse, MockLLM
-from agent.vov_2_0.types import RawVREQ
+from vov_2_0.llm import CannedResponse, MockLLM
+from vov_2_0.types import RawVREQ
 
 
 def _v(vid, intent, target="x", quote="..."):

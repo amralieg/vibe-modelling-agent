@@ -1,4 +1,4 @@
-from agent.vov_2_0.chunker import chunk_vibe, find_section_offsets, _atomic_block_ranges
+from vov_2_0.chunker import chunk_vibe, find_section_offsets, _atomic_block_ranges
 from tests.vov_2_0.fixtures.simulated_vibes import (
     NCDOT_MINIMAL,
     HEALTHCARE_VIBE,

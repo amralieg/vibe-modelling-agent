@@ -17,8 +17,8 @@ Thumbs.db
 .com.apple.timemachine.donotpresent
 
 # Model outputs are generated artifacts — stored in Databricks volumes
-models/*
-!models/.gitkeep
+models/
+vibe_inputs/
 __pycache__/
 
 # Pre-edit notebook backups (local working-tree snapshots, never committed)

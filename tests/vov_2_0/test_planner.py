@@ -1,5 +1,5 @@
-from agent.vov_2_0.planner import plan_waves, _conflicts, _entities_set
-from agent.vov_2_0.types import Handler
+from vov_2_0.planner import plan_waves, _conflicts, _entities_set
+from vov_2_0.types import Handler
 
 
 def _h(bid, target_entities):
