@@ -2,7 +2,7 @@
 v3.8.5 behavioral test for the canonical-key VREQ-011 lifecycle fix
 (alias=canonical-key-attr-flag).
 
-ROOT CAUSE (ncdot v3.8.4 audit, VREQ-011 partial): when a vibe DECLARES a canonical/business
+ROOT CAUSE (gov_transport v3.8.4 audit, VREQ-011 partial): when a vibe DECLARES a canonical/business
 key for an entity, _v384_apply_canonical_keys honored it by setting product['primary_key'] and
 re-pointing FKs -- but the PHYSICAL build/PK-tag determines the primary key from the
 ATTRIBUTE-level is_primary_key flag (and a 'primary_key' tag token), NOT product['primary_key'].

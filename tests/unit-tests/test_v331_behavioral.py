@@ -1,8 +1,8 @@
 """v3.3.1 — verifier snapshot full-inventory fix (alias=verifier-snapshot-full-inventory).
 
-ROOT CAUSE (live NCDOT run 112113323045894, 2026-06-05): the per-VREQ LLM verifier
+ROOT CAUSE (live gov_transport run <run_id>, 2026-06-05): the per-VREQ LLM verifier
 (_verify_via_llm) serialized the ENTIRE model attribute-by-attribute into one snapshot
-hard-capped at 150K chars. On wide models (NCDOT: 77 products / 3448 attrs) the cap was
+hard-capped at 150K chars. On wide models (gov_transport: 77 products / 3448 attrs) the cap was
 reached mid-model, eliding whole domains off the end. The LLM then saw "project domain
 contains zero products" (actual 33) and "hr contains 30 products" (actual 50), marked
 ~25 VREQs falsely FAILED, crashed precision to 22.6%, and drove the SelfFixer to RECREATE
@@ -55,7 +55,7 @@ def _run_inventory_block(products_data):
 
 
 def test_inventory_surfaces_full_roster_on_wide_model():
-    # 50 hr + 33 project products — mirrors the live NCDOT shape that overflowed the cap.
+    # 50 hr + 33 project products — mirrors the live gov_transport shape that overflowed the cap.
     products = ([{"domain": "hr", "product": f"h{i}"} for i in range(50)]
                 + [{"domain": "project", "product": f"p{i}"} for i in range(33)])
     lines = _run_inventory_block(products)

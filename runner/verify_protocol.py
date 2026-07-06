@@ -6,7 +6,7 @@ WHY THIS EXISTS (the breakthrough, 2026-06-08)
 The agent's own verifier scores adherence against a lossy model.json SNAPSHOT and
 matches user display-names literally against physical snake_case names. That produces
 FALSE-NEGATIVES (the "lying scoreboard"): the model physically satisfies a vibe but the
-agent scores it failed (e.g. NCDOT VREQ-016 scored "Vacancy Rate MV NOT present" while
+agent scores it failed (e.g. gov_transport VREQ-016 scored "Vacancy Rate MV NOT present" while
 `hr_vacancy_rate` physically existed). Worse, the only way to learn whether a verifier
 fix worked was to run the entire 2-5 hour pipeline.
 
@@ -21,7 +21,7 @@ GENERIC: no business / industry / catalog name is hardcoded. Every directive is 
 the vibe text and every fact is read from information_schema at runtime. Runs for any industry.
 
 Usage:
-  python3 verify_protocol.py --profile my-adp --catalog ncdot_v1 --business ncdot \
+  python3 verify_protocol.py --profile <profile> --catalog gov_transport_v1 --business gov_transport \
       --version mvm_v1 [--vibes /path/to/vibes.txt] [--warehouse <id>]
 
 Exit 0 = physical adherence >= 90%; 1 = below floor; 2 = fatal (no model/catalog).

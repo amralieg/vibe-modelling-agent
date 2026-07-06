@@ -11,9 +11,9 @@ The single purpose of this agent is to PRODUCE A DATA MODEL THAT 100% ADHERES TO
 The mission is judged by VERIFIED VIBE ADHERENCE = (VREQs verified-applied) / (VREQs extracted), with two mandatory halves: (a) EXTRACTION COMPLETENESS — every requirement in the vibe becomes a VREQ; (b) APPLICATION + VERIFICATION — every VREQ is actually applied AND deterministically provable against the real catalog. A "Max retries exhausted, proceeding" soft-accept is NOT applied.
 
 NON-NEGOTIABLE OPERATING RULES FOR THIS MISSION:
-- NEVER OVERFIT or HARDCODE any industry (ncdot, airlines, automotive, healthcare, etc.). Every fix must be generic and read from the vibe / runtime / catalog, never from a baked-in name.
+- NEVER OVERFIT or HARDCODE any industry (gov_transport, airlines, automotive, healthcare, etc.). Every fix must be generic and read from the vibe / runtime / catalog, never from a baked-in name.
 - For EVERY failed VREQ, examine its FULL LIFECYCLE: extracted? → applied to model dict? → physically built? → verified? Find the exact stage where it dropped and fix THAT stage's root cause.
-- Three systemic failure classes drive non-adherence (diagnosed from the NCDOT v3.4.0 24-VREQ trace + live HEALTH sandbox, 2026-06-08):
+- Three systemic failure classes drive non-adherence (diagnosed from the gov_transport v3.4.0 24-VREQ trace + live HEALTH sandbox, 2026-06-08):
   1. VERIFIER FALSE-NEGATIVES (the "lying scoreboard") — the model DID follow the vibe but the verifier scores it failed because its snapshot is lossy (missing `_metrics` schema MVs, missing column tags) and its matching is too literal (user display name "Vacancy Rate" vs physical `hr_vacancy_rate`). This is the LARGEST lever. Fix = ground every VREQ class against the REAL catalog with NAME NORMALIZATION (display→snake, domain-prefix-tolerant, substring/contains).
   2. GENUINE NAME/SHAPE SUBSTITUTION — generators that receive only a COUNT free-invent names. Fix = forward the user's EXACT named artifacts as a USER-KING mandate into the generator prompt.
   3. DEAD AGENTIC REPAIR — the SelfFixer (sandbox code-gen residual repair) ran inert because it was built with ai_agent=None. Fix = resolve a live AIAgent at the single shared entry point; the sandbox mechanism itself is proven working (HEALTH made 397 VOV_2_SANDBOX code-gen calls).
@@ -59,7 +59,7 @@ There are two distinct branch classes, with opposite rules:
 
 - **You MUST checkpoint every fix here as you go.** Commit + push in-flight attempts, partial fixes, RCA snapshots, redeploys — the whole iteration trail. The point is to preserve the history of WHAT WAS TRIED so nothing is lost between sessions and the user can audit the path.
 - No success-verification is required before committing or pushing to a scratch branch. "Let me commit this WIP" is correct behaviour here.
-- Use descriptive commit messages that say what the attempt was and its live result so far (e.g. "v3.4.4 vibe-conventions-override — deployed, NCDOT run 1089… RUNNING, not yet audited").
+- Use descriptive commit messages that say what the attempt was and its live result so far (e.g. "v3.4.4 vibe-conventions-override — deployed, gov_transport run 1089… RUNNING, not yet audited").
 - A long-lived scratch branch per task is preferred so the fix history is contiguous. Push it to `origin` so it survives.
 
 ### `main` (and any protected/release branch the user designates) — SUCCESS-GATED
@@ -527,14 +527,14 @@ Keep this watchlist in the monitor prompt on every run. If a signature is detect
 | R6 | `[Metrics] Failed metric view '<name>'.*UNRESOLVED_COLUMN` | Metric-view ↔ normalizer contract mismatch |
 | R7 | `[MODEL-PARAMS] <field> missing from LLM output — using midpoint N` | LLM JSON-schema non-compliance |
 | R8 | `[CYCLE DETECTION] Found N cycle(s)` where N > 0 after finalization | FK cycle recurrence |
-| R8b | finalization `[CYCLE DETECTION] ✅ No cycles` BUT the output `model.json` still has FK cycles (SCC on the nested dict > 0) | Lying-scoreboard: the flat-list finalization breaker (`_v394` on `products_data/attributes_data`) ran clean, but cycles persisted in the NESTED `data_model` serialized to model.json (VOV sandbox-authoritative FK adds / SSOT resolver / flat↔nested desync). Live: mfg vov_v3 my-aws run 696361916556037 = 11 SCC cycles, finalization said 0. FIXED v4.0.3 `v403-serialize-cycle-guard` (deterministic detect+break on the nested dict at the model.json serialization boundary). PRESENT if `[v403-serialize-cycle-guard FIRED]` reports `remaining>0`, or model.json SCC > 0 on any run. |
+| R8b | finalization `[CYCLE DETECTION] ✅ No cycles` BUT the output `model.json` still has FK cycles (SCC on the nested dict > 0) | Lying-scoreboard: the flat-list finalization breaker (`_v394` on `products_data/attributes_data`) ran clean, but cycles persisted in the NESTED `data_model` serialized to model.json (VOV sandbox-authoritative FK adds / SSOT resolver / flat↔nested desync). Live: mfg vov_v3 <profile> run <run_id> = 11 SCC cycles, finalization said 0. FIXED v4.0.3 `v403-serialize-cycle-guard` (deterministic detect+break on the nested dict at the model.json serialization boundary). PRESENT if `[v403-serialize-cycle-guard FIRED]` reports `remaining>0`, or model.json SCC > 0 on any run. |
 | N1 | install test failure at ~50-60s with `Workload failed, see run output for details` + no info log on volume | Install early-exit, no diagnostics |
 | N2 | `Fidelity gates FAILED: precision < 0.85 — rollback recommended` | Memory/JSON attribute-name drift |
 | N3 | `⚠️ DBML FK SCRUB: Skipping dangling ref` (cosmetic) | DBML exporter naming drift |
 | N4 | `mutator raised: AttributeError: '<scalar>' object has no attribute '<append/get/extend>'` recurring across all 3 retries → `rejected_unsafe` (VREQ lost) | Mis-directed retry hint: the generic `_v204_ast_class_hints` needle assumed the bad value was a DICT and gave dict-only advice, so the LLM kept crashing on a STRING scalar field. FIXED v4.0.2 `vov-scalar-attr-typed-hint` (type-accurate advice + suppress contradictory dict hint). PRESENT if a `'str'/'int'/'float' object has no attribute` crash survives all retries with NO `STRING-NOT-LIST`/`TYPE-MISMATCH` hint in the trace. |
 | N5 | `[UC-DDL] ■ Finished SET TAGS in NN:NN` where NN > ~20min at 8 workers (e.g. mfg 14585 stmts = 28min, 0 failures) | Tag-DDL wall-clock is the post-VOV bottleneck (~6% of tier-1 runtime). NOT a defect — the 8-worker cap (`TAG_DDL_MAX_WORKERS`, `settags-sparkconnect-concurrency-cap`) is CORRECT (prevents the 97.7% Spark-Connect-saturation failure cascade). The ONLY proven safe speedup is routing tag DDL through a SQL-Warehouse REST endpoint (v3.6.6 repro: 1800 tags @ 60 workers = 0% fail, 12/s). Do NOT naively raise the worker cap — that reintroduces the cascade. |
-| N6 | A `[VOV-2.0 LLM BRIDGE FIRED]` line with large `output_chars` (>150K) is the LAST non-flush content line, then ONLY `[VolumeLogFlush]` lines for >25min while the run stays RUNNING (the "looks-alive-but-stalled" hang). Live: ngo shrink-ecm v397 run 511083019748570 sat 82min with one 158K-char bridge output as the last content line, zero progress, then was killed. | Silent main-thread hang AFTER a successful LLM bridge return. Sandbox subprocess (240s) and `ai_query` (240s/360s) BOTH have enforced timeouts, so the hang is NOT those — it is pure-Python post-processing of the huge payload OR a bounded-pool nested-submission deadlock (`_SharedPoolHandle.__exit__` does `_cf2.wait(self._futs)` with NO timeout; `run_parallel_with_rate_limit_backoff` uses `mark_guard=False`, so a `run_parallel` call from inside a saturated global-pool worker can block its worker forever). DIAGNOSE: v4.0.4 `heartbeat-stalldump` dumps ALL thread stacks once per stall episode when `app_silent>=600s` — the next occurrence will show exactly which frame each thread is blocked in (`_cf2.wait`, an HTTP read, or a DDL). DETECT: external poller flags STALL when the last non-flush content line is >25min old while RUNNING; kill + relaunch on the latest version. |
-| N7 | The `physical_ground_truth` scoreboard pass (`gt-headline-reground`) scores a model-wide STRUCTURAL invariant VREQ (e.g. "every table has a primary key") `failed` while the SAME VREQ scored `fulfilled` on the earlier logical pass, and the physical `failed` verdict becomes authoritative → reported adherence drops below the honest value with the model actually correct. Live: coffee_roastery basemvm run 933671823193704 = VREQ-005 PK fulfilled 13/13 logical, failed 13/13 physical → 88.9% instead of 100%. | Lying-scoreboard from a LOSSY PHYSICAL SNAPSHOT: `_run_ground_truth_audit` rebuilds the verification snapshot from `information_schema` and enriched `foreign_key_to` from physical FK constraints, but Delta/UC stores NO enforced PK constraint, so the physical snapshot carried ZERO PK signal and the deterministic PK invariant false-failed every table. Same class as the §12.1 tag/MV enrichment. FIXED v4.2.7 `gt-pk-from-model-declared` (enrich the physical snapshot with the model's declared `primary_key` WHEN every declared PK column physically exists in `information_schema.columns` — cannot false-positive nor false-negative; composite-PK-aware). PRESENT if a structural invariant flips fulfilled→failed between the logical and physical passes with no corresponding physical schema change. |
+| N6 | A `[VOV-2.0 LLM BRIDGE FIRED]` line with large `output_chars` (>150K) is the LAST non-flush content line, then ONLY `[VolumeLogFlush]` lines for >25min while the run stays RUNNING (the "looks-alive-but-stalled" hang). Live: ngo shrink-ecm v397 run <run_id> sat 82min with one 158K-char bridge output as the last content line, zero progress, then was killed. | Silent main-thread hang AFTER a successful LLM bridge return. Sandbox subprocess (240s) and `ai_query` (240s/360s) BOTH have enforced timeouts, so the hang is NOT those — it is pure-Python post-processing of the huge payload OR a bounded-pool nested-submission deadlock (`_SharedPoolHandle.__exit__` does `_cf2.wait(self._futs)` with NO timeout; `run_parallel_with_rate_limit_backoff` uses `mark_guard=False`, so a `run_parallel` call from inside a saturated global-pool worker can block its worker forever). DIAGNOSE: v4.0.4 `heartbeat-stalldump` dumps ALL thread stacks once per stall episode when `app_silent>=600s` — the next occurrence will show exactly which frame each thread is blocked in (`_cf2.wait`, an HTTP read, or a DDL). DETECT: external poller flags STALL when the last non-flush content line is >25min old while RUNNING; kill + relaunch on the latest version. |
+| N7 | The `physical_ground_truth` scoreboard pass (`gt-headline-reground`) scores a model-wide STRUCTURAL invariant VREQ (e.g. "every table has a primary key") `failed` while the SAME VREQ scored `fulfilled` on the earlier logical pass, and the physical `failed` verdict becomes authoritative → reported adherence drops below the honest value with the model actually correct. Live: coffee_roastery basemvm run <run_id> = VREQ-005 PK fulfilled 13/13 logical, failed 13/13 physical → 88.9% instead of 100%. | Lying-scoreboard from a LOSSY PHYSICAL SNAPSHOT: `_run_ground_truth_audit` rebuilds the verification snapshot from `information_schema` and enriched `foreign_key_to` from physical FK constraints, but Delta/UC stores NO enforced PK constraint, so the physical snapshot carried ZERO PK signal and the deterministic PK invariant false-failed every table. Same class as the §12.1 tag/MV enrichment. FIXED v4.2.7 `gt-pk-from-model-declared` (enrich the physical snapshot with the model's declared `primary_key` WHEN every declared PK column physically exists in `information_schema.columns` — cannot false-positive nor false-negative; composite-PK-aware). PRESENT if a structural invariant flips fulfilled→failed between the logical and physical passes with no corresponding physical schema change. |
 
 ### 9.5 Positive signals to look for (don't regress what works)
 
@@ -637,10 +637,10 @@ For EACH iteration:
    - Co-authored-by: Isaac
 10. **Verify push reachability** — `git ls-remote origin dev | grep <sha>` and `git branch --contains <sha>` per §8.6/§8.7. NEVER claim "shipped" without this verification.
 11. **Re-deploy + re-submit — VERSIONED PATHS ONLY**:
-    a. Upload agent to `/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v<NN>` (NOT canon path — canon-cache renders post-deploy fixes invisible).
-    b. Upload tester to `/Users/amr.ali@databricks.com/vibe_tester_v<NN>` (versioned).
-    c. Upload runner to `/Users/amr.ali@databricks.com/vibe_runner_v<NN>` (versioned).
-    d. **Patch the JOB definition** so every task's `notebook_task.notebook_path` points at the versioned agent: `databricks jobs reset --json @<patch>` after editing `notebook_path` to `/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v<NN>`.
+    a. Upload agent to `/Users/user@databricks.com/dbx_vibe_modelling_agent_v<NN>` (NOT canon path — canon-cache renders post-deploy fixes invisible).
+    b. Upload tester to `/Users/user@databricks.com/vibe_tester_v<NN>` (versioned).
+    c. Upload runner to `/Users/user@databricks.com/vibe_runner_v<NN>` (versioned).
+    d. **Patch the JOB definition** so every task's `notebook_task.notebook_path` points at the versioned agent: `databricks jobs reset --json @<patch>` after editing `notebook_path` to `/Users/user@databricks.com/dbx_vibe_modelling_agent_v<NN>`.
     e. Verify the JOB now points at the versioned path: `databricks jobs get <job_id> | python3 -c "..."` shows all tasks → `dbx_vibe_modelling_agent_v<NN>`.
     f. Then submit a fresh run via `databricks jobs run-now <job_id>`. Each unique versioned path has a UNIQUE workspace `object_id`, so the executor pool's notebook cache CANNOT serve a stale version.
     g. NEVER trust the canon path for deploy verification — always export the versioned archive and grep for the new aliases.
@@ -707,7 +707,7 @@ This is the canonical cookbook. NEVER skip a step. NEVER take shortcuts. NEVER a
 
 **Inputs you need:**
 - A version number `NN` (single-digit semver per §3a; never 2-digit segments).
-- The Databricks workspace profile (e.g., `emirates-gcp`).
+- The Databricks workspace profile (e.g., `<profile>`).
 - The canonical tester JOB id (e.g., `191701398472200`).
 - The target run scope (tiny tester / airline MVM no-vibe / etc.).
 
@@ -1003,7 +1003,7 @@ This is the exact recipe that produced the clean v0.6.1 tiny run (5/5 tasks SUCC
 
 Before touching anything:
 - Current version `NN` you are about to ship (single-digit semver per §3a; e.g. v0.6.1 → `_v61`).
-- Databricks profile (`databricks auth profiles`) — pick the one labelled `emirates-gcp` unless user says otherwise.
+- Databricks profile (`databricks auth profiles`) — pick the one labelled `<profile>` unless user says otherwise.
 - Canonical JOB id (read from `databricks jobs list --profile $PROFILE`).
 - Target business + vibe + operation. If not specified: tiny ECM+MVM with the canonical JOB's existing widgets.
 
@@ -1218,8 +1218,8 @@ The §10.6 contract lists `Max retries exhausted` as a hard-zero criterion. If t
 - Downstream stages assume responses are valid → bad LLM response → bad model artifact → user-facing failure
 - Historical examples:
   - v0.6.5 telecom vov_v2: `find_missing_fk_links_order` soft-accept → R2 metric view drop downstream
-  - v0.6.6 airlines (run 76240803654456): `architect_self_review` soft-accept → silo product survived to MVM
-  - v0.7.0 airlines (run 453386975947787 — KILLED): `find_missing_fk_links_workforce` soft-accept on `timesheet.schedule_id` → would have produced unlinked FK → install would have failed
+  - v0.6.6 airlines (run <run_id>): `architect_self_review` soft-accept → silo product survived to MVM
+  - v0.7.0 airlines (run <run_id> — KILLED): `find_missing_fk_links_workforce` soft-accept on `timesheet.schedule_id` → would have produced unlinked FK → install would have failed
 
 ### 11.6 Re-attempt detection (the rule that would have prevented the burning failure)
 
@@ -1243,7 +1243,7 @@ After every pulse-monitored run terminates:
 
 ## 12. STRUCTURED QUALITY-GATE CATALOG (QGATE) — the honest scoreboard (added 2026-06-17)
 
-Added after the ncdot base-MVM "lying scoreboard" incident: the agent reported high adherence while the model degraded, because the VREQ verifier scored governance/tagging VREQs off a LOSSY snapshot (attribute tags/subdomain/division/descriptions omitted). It false-FAILED glossary/subdomain VREQs that were PHYSICALLY present (vibe_ncdot_basemvm: 3031 glossary + 7 subdomain tags). This section is the permanent contract for structured quality.
+Added after the gov_transport base-MVM "lying scoreboard" incident: the agent reported high adherence while the model degraded, because the VREQ verifier scored governance/tagging VREQs off a LOSSY snapshot (attribute tags/subdomain/division/descriptions omitted). It false-FAILED glossary/subdomain VREQs that were PHYSICALLY present (vibe_gov_transport_basemvm: 3031 glossary + 7 subdomain tags). This section is the permanent contract for structured quality.
 
 ### 12.1 The four-layer anti-lying architecture
 

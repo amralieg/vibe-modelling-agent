@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Lean v3.7.0 ncdot base-MVM relaunch (reuse base_mvm_proof helpers, non-blocking).
+"""Lean v3.7.0 gov_transport base-MVM relaunch (reuse base_mvm_proof helpers, non-blocking).
 
-Proves the THREE batched root-cause fixes live on the EXACT workspace (fe-gcp):
+Proves the THREE batched root-cause fixes live on the EXACT workspace (<profile>):
   - selffixer-endpoint-default-fallback (v3.7.0): SelfFixer cascade returned None
     -> closed-loop fixer inert on the Spark UDF path -> N2 fidelity 0.6364 < 0.85.
     Now falls back to the authoritative widget endpoint the main path uses.
@@ -11,7 +11,7 @@ Proves the THREE batched root-cause fixes live on the EXACT workspace (fe-gcp):
     physical columns no longer fail metric-view DDL.
 
 Non-blocking: agent self-launches a child; poll the child from the shell. Drops the
-catalog first via prepare_catalog so the run starts from a clean vibe_ncdot_basemvm.
+catalog first via prepare_catalog so the run starts from a clean vibe_gov_transport_basemvm.
 """
 import os
 import sys
@@ -20,15 +20,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import base_mvm_proof as B  # noqa: E402
 
 M = B.M
-NEW = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v370"
+NEW = "/Users/user@databricks.com/dbx_vibe_modelling_agent_v370"
 B.AGENT_PATH = NEW
 M.AGENT_PATH = NEW
 
-IND, PROF, DOMAINS = "ncdot", "fe-gcp", "hr, project"
+IND, PROF, DOMAINS = "gov_transport", "<profile>", "hr, project"
 
 
 def main():
-    M.prepare_catalog(PROF, IND)               # drop + recreate vibe_ncdot_basemvm
+    M.prepare_catalog(PROF, IND)               # drop + recreate vibe_gov_transport_basemvm
     vibe_path = B.stage_vibe(PROF, IND)
     desc = B.read_desc(IND)
     spec = B.build_spec(IND, PROF, vibe_path, desc, DOMAINS)

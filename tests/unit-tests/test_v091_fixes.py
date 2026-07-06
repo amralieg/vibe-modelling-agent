@@ -1,6 +1,6 @@
 """v0.9.1 hotfix bundle test.
 
-The v0.8.9 tester run 401706974398159 TERMINATED in INTERNAL_ERROR/FAILED
+The v0.8.9 tester run <run_id> TERMINATED in INTERNAL_ERROR/FAILED
 because tiny_mvm_shrink hit a deterministic ValueError on BOTH retry
 attempts. The v0.8.2 P4 silo validator rejected any plan that left a
 product siloed, but `category` and `segment` were ALREADY siloed in the

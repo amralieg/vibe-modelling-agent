@@ -10,8 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-DEFAULT_PROFILE = "emirates-gcp"
-DEFAULT_RUNNER_PATH = "/Users/amr.ali@databricks.com/vibe_runner_v71"
+DEFAULT_PROFILE = "<profile>"
+DEFAULT_RUNNER_PATH = "/Users/user@databricks.com/vibe_runner_v71"
 DEFAULT_GLOBAL_VOLUME = "/Volumes/_root/default/root_vol"
 DEFAULT_SECTOR_UPLOAD_DIR = "_sectors"
 DEFAULT_PULSE_FILE = os.path.expanduser("~/claude/vibe-agent/global_run_pulses.txt")
@@ -707,7 +707,7 @@ def preflight(profile, runner_path, global_volume, pulse_file):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sequentially submit 10 sector runs through the canonical runner job on emirates-gcp.")
+    parser = argparse.ArgumentParser(description="Sequentially submit 10 sector runs through the canonical runner job on <profile>.")
     parser.add_argument("--profile", default=DEFAULT_PROFILE)
     parser.add_argument("--runner-path", default=DEFAULT_RUNNER_PATH)
     parser.add_argument("--global-volume", default=DEFAULT_GLOBAL_VOLUME)
@@ -723,7 +723,7 @@ def main():
              "order specified. Example: --sectors "
              "healthcare_and_life_sciences,travel_transport_logistics,retail_and_consumer_goods. "
              "When omitted, all 10 sectors run in canonical SECTOR_FILES_ORDER. Used by the "
-             "Option B multi-cloud launcher to split sectors across emirates-gcp and fe-vm-feip.",
+             "Option B multi-cloud launcher to split sectors across <profile> and fe-vm-feip.",
     )
     parser.add_argument("--dry-preflight", action="store_true",
                         help="Run pre-flight checks only and exit without submitting any sector.")

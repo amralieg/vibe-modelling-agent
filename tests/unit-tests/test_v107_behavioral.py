@@ -1,7 +1,7 @@
 """
 v1.0.7 behavioral test — qa-widgets-values-via-config
 
-Reproduces NCDOT install_base run 584523372060026 crash:
+Reproduces gov_transport install_base run <run_id> crash:
   NameError: name 'widgets_values' is not defined
   at run_quality_assurance_checks Step 7A-0 (Remove Empty/Siloed Domains)
 

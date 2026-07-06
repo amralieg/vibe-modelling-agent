@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 AGENT_VER = "424"  # matches __AGENT_VERSION__ 4.2.4 (semver minus dots, §3a); never run stale
-AGENT_PATH = f"/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v{AGENT_VER}"
+AGENT_PATH = f"/Users/user@databricks.com/dbx_vibe_modelling_agent_v{AGENT_VER}"
 STAGE_DIR = "/tmp/vov_stage"
 OUT_DIR = "/tmp/vov_out"
 PULSE_FILE = os.path.expanduser("~/claude/vibe-agent/vov2_pulses.txt")
@@ -65,28 +65,28 @@ SHRINK_TIMEOUT_S = 9000      # 2.5h: functional shrink 66-106m; same serverless 
 # DEFERRED to a separate v4.2.4 track (needs junk-domain + name-prefix fixes, not just a relaunch).
 # manufacturing (was accumulated v6) + ngo (was accumulating to v5) + water_utilities (rebuild) are
 # relaunched CLEAN v1->v2, one-per-profile for true parallelism (user "no queue, run in parallel").
-# retail is a clean v1->v2 already RUNNING on my-gcp -> re-attach and let it finish.
+# retail is a clean v1->v2 already RUNNING on <profile> -> re-attach and let it finish.
 # 2026-07-03 v4.2.4 relaunch: healthcare, restaurants, ngo, manufacturing already PUBLISHED
 # (clean v1->v2, gate-passed) and are NOT in the active list. The v4.2.4 track relaunches the
 # three that missed the gate on v4.2.3, one-per-droppable-profile for true parallelism:
-#   automotive (fe-gcp)     — RC-A junk/empty-domain guard + RC-C move-FQN verifier
-#   retail     (fe-aws)     — VOV holistic/refactor VREQ grounding (live-iterative)
-#   water_utilities (my-adp)— verifier-pipeline-meta-informational (VREQ-029) + create-entity grounding
+#   automotive (<profile>)     — RC-A junk/empty-domain guard + RC-C move-FQN verifier
+#   retail     (<profile>)     — VOV holistic/refactor VREQ grounding (live-iterative)
+#   water_utilities (<profile>)— verifier-pipeline-meta-informational (VREQ-029) + create-entity grounding
 # All three sit on CREATE/DROP-CATALOG-capable profiles so prepare_catalog can do a clean
-# DROP+install v1 -> VOV -> shrink. None is a FIXED_CATALOG (my-aws) or flaky-Azure profile.
+# DROP+install v1 -> VOV -> shrink. None is a FIXED_CATALOG (<profile>) or flaky-Azure profile.
 ASSIGN = {
-    "fe-gcp": ["automotive"],
-    "fe-aws": ["retail"],
-    "my-adp": ["water_utilities"],
+    "<profile>": ["automotive"],
+    "<profile>": ["retail"],
+    "<profile>": ["water_utilities"],
 }
 
 WAREHOUSE = {
-    "fe-gcp": "d6d89fb9fd47b835",
-    "fe-aws": "862f1d757f0424f7",
-    "my-gcp": "2023d0a3a188bd24",
-    "my-adp": "2ad1b26db73a7c6f",
+    "<profile>": "d6d89fb9fd47b835",
+    "<profile>": "862f1d757f0424f7",
+    "<profile>": "2023d0a3a188bd24",
+    "<profile>": "2ad1b26db73a7c6f",
     "my-uae": "6b2c33b3b2aae3ac",
-    "my-aws": "7c313dcbcd3119c1",
+    "<profile>": "7c313dcbcd3119c1",
 }
 
 # FIXED_CATALOG (user directive 2026-06-19): on environments where the principal lacks
@@ -96,7 +96,7 @@ WAREHOUSE = {
 # assigned to, and prepare_catalog() skips the DROP/CREATE CATALOG dance for these profiles
 # (the agent's _ensure_catalog_exists SHOW-CATALOGS check then skips creation too).
 FIXED_CATALOG = {
-    "my-aws": "serverless_stable_8nstmo_catalog",
+    "<profile>": "serverless_stable_8nstmo_catalog",
 }
 # reverse index ind -> profile, built from the static ASSIGN map, so cat_name(ind) (which only
 # receives the industry) can tell whether that industry lives on a fixed-catalog profile.
@@ -512,7 +512,7 @@ def build_job_spec(ind, installed=False):
     # v4.0.8 alias=self-cancel-reuse-vibe-session-id: vibe_session_id carries the Databricks-native
     # {{job.run_id}} (substituted at runtime). ONE identifier now drives both the progress-tracking
     # session AND the control-plane self-cancel (which arms even when the serverless context exposes
-    # no run_id tags, e.g. my-aws tag_keys=[]). Replaces the retired separate self_run_id base-param.
+    # no run_id tags, e.g. <profile> tag_keys=[]). Replaces the retired separate self_run_id base-param.
     common = {"business_name": ind, "business_description": desc,
               "deployment_catalog": cat, "generate_samples": "0",
               "vibe_session_id": "{{job.run_id}}"}
@@ -610,7 +610,7 @@ HANG_STALL_S = 1200   # 20 min of ecm-log flatline AFTER the teardown marker => 
 # HANG_STALL_S info-log flatline (gate c), proves the vov body finished and only teardown remains,
 # so a control-plane cancel is loss-free. All are emitted ONLY at/after finalization -> no mid-run
 # false positive. FINAL-FLUSH + JobTags were added 2026-06-19 after the restaurants hang
-# (run 83272126670362) ended at exactly these two lines and NEVER reached the pkw watchdog ARM-LOG.
+# (run <run_id>) ended at exactly these two lines and NEVER reached the pkw watchdog ARM-LOG.
 _TEARDOWN_DONE_MARKERS = (
     "[VolumeLogFlush][FINAL-FLUSH]",   # volume log flusher's final flush -- only at pipeline shutdown
     "[JobTags] Updated job tags",      # terminal ECM tagging step -- last functional action
@@ -625,12 +625,12 @@ def _ls_json(profile, dir_path, timeout=120):
 def _vov_teardown_hang_cancel(profile, ind, run_id, info, hang_state):
     """v3.9.3 alias=marathon-vov-teardown-hang-cancel.
 
-    PROVEN (probe run 798401088196186, my-gcp serverless, 2026-06-19): the agent's in-driver
+    PROVEN (probe run <run_id>, <profile> serverless, 2026-06-19): the agent's in-driver
     self-cancel CANNOT resolve its own run_id in serverless -- env DATABRICKS_RUN_ID/TASK_RUN_ID
     are null, spark.conf.get('spark.databricks.job.runId') raises AnalysisException, and
     dbutils...getContext().toJson() raises Py4JSecurityException. So a vov task that FINISHED its
     functional work (wrote v2/ecm/model.json + JobTags) but then hung in a GIL-held teardown stays
-    RUNNING until the 15h vov cap -- wasting hours of compute (live: restaurants run 83272126670362
+    RUNNING until the 15h vov cap -- wasting hours of compute (live: restaurants run <run_id>
     hung from 21:16, model.json already on the volume). The marathon DOES hold the run_id, so it is
     the ONLY actor that can flip the run to TERMINATED.
 
@@ -640,7 +640,7 @@ def _vov_teardown_hang_cancel(profile, ind, run_id, info, hang_state):
     failed), and (d) the log tail carries ANY genuine finalization marker in _TEARDOWN_DONE_MARKERS.
 
     On gate (d): the original build required ONLY the 'process-kill-watchdog ARM-LOG FIRED ...
-    source=pipeline-finally' pair, but the LIVE restaurants hang (run 83272126670362, 2026-06-19)
+    source=pipeline-finally' pair, but the LIVE restaurants hang (run <run_id>, 2026-06-19)
     does NOT emit it -- its 8665-line info.log ends cleanly at the final '[JobTags] Updated job tags'
     + '[VolumeLogFlush][FINAL-FLUSH]' and then the driver freezes BEFORE the pkw watchdog arms (or
     its ARM-LOG is never flushed). A gate that only accepts the pkw pair is therefore a false-negative

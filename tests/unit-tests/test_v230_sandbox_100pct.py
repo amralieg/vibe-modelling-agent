@@ -1,6 +1,6 @@
 """v2.3.0 — 100% sandbox-coverage targeting.
 
-Four sandbox-rejection root causes were identified from NCDOT v219 (run 176354425058101)
+Four sandbox-rejection root causes were identified from gov_transport v219 (run <run_id>)
 where VOV-2.0 SHIM coverage_pct=36.2% with 78/104 batches rejected. Breakdown:
 
   - 69 noop_failed (88% of rejections) - empty diff after AST+sandbox accept
@@ -183,7 +183,7 @@ def test_fix2_non_rename_remove_still_out_of_scope(module_ns):
 
 def test_fix2_pre_patch_would_have_rejected(src):
     """Static-grep proof: the pre-patch diff_within_summary_scope (without
-    _balanced_rename guard) would have rejected the NCDOT v219 batches. The
+    _balanced_rename guard) would have rejected the gov_transport v219 batches. The
     new code must contain the v230 guard before the products_removed check."""
     body_match = re.search(
         r"def diff_within_summary_scope[\s\S]+?return True, \"\"",

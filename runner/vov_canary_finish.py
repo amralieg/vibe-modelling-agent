@@ -18,10 +18,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vov_v2_marathon as M  # reuse db/dbj/export_industry/AGENT_PATH/pulse/now/cat_name
 
 CANARIES = {
-    "travel_hospitality": ("fe-gcp", 1090375305579926),
-    "ngo": ("fe-aws", 1038474851523515),
-    "restaurants": ("my-gcp", 928273654399800),
-    "water_utilities": ("my-adp", 198227957962821),
+    "travel_hospitality": ("<profile>", 1090375305579926),
+    "ngo": ("<profile>", 1038474851523515),
+    "restaurants": ("<profile>", 928273654399800),
+    "water_utilities": ("<profile>", 198227957962821),
     "construction": ("my-uae", 27912144474758),
 }
 
@@ -33,8 +33,8 @@ PULSE_S = 900            # 15-min pulse cadence
 # and raced vov on the same catalog. The hang-guard (model.json present + log idle this long) is the
 # ONLY early-exit, reserved for a genuine GIL teardown-hang where the run never terminates.
 HANG_GRACE_S = 1800      # 30m of TRUE log silence + model.json present => teardown-hang -> cancel & advance
-# Shrink functional completion (ECM->MVM up to mvm model.json) measured 06-10: fe-gcp travel ~83m,
-# my-gcp restaurants ~66m, my-uae construction >90m (slow workspace, missed old 90m cap mid-subdomain
+# Shrink functional completion (ECM->MVM up to mvm model.json) measured 06-10: <profile> travel ~83m,
+# <profile> restaurants ~66m, my-uae construction >90m (slow workspace, missed old 90m cap mid-subdomain
 # -> KPI MV gen). 2h gives the slowest workspaces functional headroom; the hang-guard (mj=True + 30m
 # substantive idle) still bounds any post-mvm teardown hang, so a larger cap is pure upside.
 SHRINK_TIMEOUT_S = 7200  # 120m platform cap on the shrink follow-on task

@@ -80,7 +80,7 @@ def _apply_subdomain_stewards(products, mappings, prefix=""):
 
 
 def test_v349_steward_populates_from_vibe_mapping():
-    # Mirrors NCDOT S2: 4 named HR subdomains; pre-patch all stewards empty.
+    # Mirrors gov_transport S2: 4 named HR subdomains; pre-patch all stewards empty.
     products = [
         {"product": "employee", "subdomain": "employee_records", "steward": "", "tags": ""},
         {"product": "position", "subdomain": "employee_records", "steward": "", "tags": ""},
@@ -96,12 +96,12 @@ def test_v349_steward_populates_from_vibe_mapping():
         {"subdomain": "terminations_and_exits", "steward": "Daphne Wright, Chris Law"},
         {"subdomain": "talent_development", "steward": ""},  # advisory N/A -> must NOT tag
     ]
-    added = _apply_subdomain_stewards(products, mappings, prefix="ncdot_")
+    added = _apply_subdomain_stewards(products, mappings, prefix="gov_transport_")
 
     by = {p["product"]: p for p in products}
     # all 4 named stewards now applied to BOTH the model field and the physical tag
     assert by["employee"]["steward"] == "Keisha Isley"
-    assert _parse_tags(by["employee"]["tags"])["ncdot_subdomain_steward"] == "Keisha Isley"
+    assert _parse_tags(by["employee"]["tags"])["gov_transport_subdomain_steward"] == "Keisha Isley"
     assert by["comp_plan"]["steward"] == "Sara Royster"
     assert by["policy"]["steward"] == "Daphne Wright"
     assert by["term"]["steward"] == "Daphne Wright, Chris Law"
@@ -109,7 +109,7 @@ def test_v349_steward_populates_from_vibe_mapping():
     assert by["position"]["steward"] == "Keisha Isley"
     # N/A subdomain must NOT be tagged (no fabrication)
     assert by["skill"]["steward"] == ""
-    assert "ncdot_subdomain_steward" not in _parse_tags(by["skill"]["tags"])
+    assert "gov_transport_subdomain_steward" not in _parse_tags(by["skill"]["tags"])
     assert added == 4  # 4 named, talent_development skipped
 
 
@@ -128,9 +128,9 @@ def test_v349_prepatch_leaves_stewards_empty():
     products = [{"product": "employee", "subdomain": "employee_records", "steward": "", "tags": ""}]
     # pre-patch: no population happens
     assert products[0]["steward"] == ""
-    assert "ncdot_subdomain_steward" not in _parse_tags(products[0]["tags"])
+    assert "gov_transport_subdomain_steward" not in _parse_tags(products[0]["tags"])
     # post-patch recovers it
-    _apply_subdomain_stewards(products, [{"subdomain": "employee_records", "steward": "Keisha Isley"}], "ncdot_")
+    _apply_subdomain_stewards(products, [{"subdomain": "employee_records", "steward": "Keisha Isley"}], "gov_transport_")
     assert products[0]["steward"] == "Keisha Isley"
 
 

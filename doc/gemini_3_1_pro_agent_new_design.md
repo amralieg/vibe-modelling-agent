@@ -8759,7 +8759,7 @@ Process:
 
 Per CLAUDE.md §3c the user vibe is SUPREME AUTHORITY - this step ensures vibe-mandated
 tag presence is HONORED on every relevant entity, closing the prior version gap where 0 of 531
-attributes carried user-mandated NCDOT custom tags.
+attributes carried user-mandated gov_transport custom tags.
 ```
 
 ### `Function: step_architect_review`

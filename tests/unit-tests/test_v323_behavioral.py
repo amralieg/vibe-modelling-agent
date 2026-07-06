@@ -1,7 +1,7 @@
 """v3.2.3 behavioral tests.
 
 Root-cause fix for the ~36% VOV adherence ceiling + serial slowness observed on the
-NCDOT mvm_v3 ground-truth run (2026-06-04: 26/72 landed = 36.1%, 59 zero-target synth
+gov_transport mvm_v3 ground-truth run (2026-06-04: 26/72 landed = 36.1%, 59 zero-target synth
 calls, slip parse-failed=23).
 
 Root cause: in synthesize_handler, batches whose target_entities resolve to an EMPTY set

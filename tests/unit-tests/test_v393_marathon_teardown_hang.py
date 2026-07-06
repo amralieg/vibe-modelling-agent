@@ -59,7 +59,7 @@ PKW_TAIL = (
     "source=pipeline-finally grace=300s pkw_grace=360s pid=2819 alias=pkw-arm-volume-log\n"
 )
 
-# The LIVE restaurants hang (run 83272126670362) ended at exactly these two lines and never
+# The LIVE restaurants hang (run <run_id>) ended at exactly these two lines and never
 # reached the pkw watchdog. The teardown-hang signature is real, but the marathon must NOT
 # cancel: a run-level cancel-run cancels the WHOLE run, so the dependent shrink task goes
 # UPSTREAM_CANCELED and the MVM stage is LOST. Instead, the vov task rides its 15h task timeout

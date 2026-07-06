@@ -1,7 +1,7 @@
 """
 v4.2.5 behavioral tests -- gt-rescue-refactor (RC3).
 
-ROOT CAUSE (retail v2 ECM VOV, run 257229033091163): holistic-refactor VReqs
+ROOT CAUSE (retail v2 ECM VOV, run <run_id>): holistic-refactor VReqs
     "ensure a household table exists in the customer domain" / "re-home service_case
     out of the customer domain" scored PARTIAL with the generic "Model changed but
     cannot confirm intent" evidence and were NOT credited, keeping physical adherence

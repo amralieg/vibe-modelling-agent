@@ -6,7 +6,7 @@ causing renames like `audit.audit_type → audit.type` to be persisted to
 model.json — but the DDL renderer downstream re-prefixed these to avoid
 Spark SQL keyword collisions, leaving model.json↔physical desynced.
 
-Visible symptom on airline MVM run 368656354285786:
+Visible symptom on airline MVM run <run_id>:
 - 2 metric views failed: safety_investigation, safety_audit
 - ~129 columns total renamed to reserved bare names
 - model.json said `safety.audit.type` while physical UC had `safety.audit.audit_type`
@@ -66,7 +66,7 @@ class TestNamingReservedWordGuard:
         )
 
     def test_reserved_set_includes_observed_failure_keywords(self, agent_src):
-        """The 4 keywords that failed on airline run 368656354285786
+        """The 4 keywords that failed on airline run <run_id>
         (type, category, status, code) MUST be in the reserved set
         so they get blocked from renaming."""
         # Find the _NAMING_RESERVED set definition near the guard
@@ -153,7 +153,7 @@ class TestNamingReservedWordGuard:
         )
 
     def test_guard_blocks_observed_v95_renames(self, agent_src):
-        """The 6 specific desyncs from airline run 368656354285786:
+        """The 6 specific desyncs from airline run <run_id>:
         - safety.audit.audit_type → type
         - safety.audit.audit_category → category
         - safety.audit.audit_status → status

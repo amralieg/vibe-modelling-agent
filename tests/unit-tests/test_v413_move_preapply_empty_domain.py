@@ -1,5 +1,5 @@
 """v4.1.3 behavioral tests -- three root-cause fixes from the automotive v4 ECM
-audit (fe-gcp run 506068096347423, vov task SUCCESS, physical precision 0.6855):
+audit (<profile> run <run_id>, vov task SUCCESS, physical precision 0.6855):
 
 1. v413-mech-vreq-preapply -- mechanical move_product/rename VReqs batched WITH
    non-deterministic VReqs hit the all-or-nothing _v337 gate and deferred the

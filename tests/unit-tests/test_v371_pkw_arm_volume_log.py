@@ -1,6 +1,6 @@
 """Behavioral tests for v3.7.1 alias=pkw-arm-volume-log (BUG-C diagnostic).
 
-ROOT CAUSE context: ncdot v3.7.0 (run 980958435536744 @ fe-gcp) crashed with a
+ROOT CAUSE context: gov_transport v3.7.0 (run <run_id> @ <profile>) crashed with a
 transient AttributeError, then sat RUNNING ~57 minutes despite the v3.6.9
 process-kill-watchdog being armed on the crash path (finally -> _arm_finalization_watchdog
 -> _spawn_process_kill_watchdog, 360s grace). The watchdog ARM event was only print()ed

@@ -10,7 +10,7 @@ logic (the only Phase 0 pieces that don't require a live Databricks runtime).
 
 The Spark-free HTTP-direct helper (verifier-spark-free-path) cannot be unit-tested in
 isolation because it requires a live WorkspaceClient + serving endpoint — covered by
-the live v207 deploy validation (test cycle on RT/NCDOT/HC).
+the live v207 deploy validation (test cycle on RT/gov_transport/HC).
 """
 
 from __future__ import annotations

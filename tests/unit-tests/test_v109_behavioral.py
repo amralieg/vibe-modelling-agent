@@ -1,6 +1,6 @@
 """v1.0.9 behavioral test — p70-respect-user-pinned-domains.
 
-Reproduces NCDOT iter=8 mvm_v2 phantom-domains regression:
+Reproduces gov_transport iter=8 mvm_v2 phantom-domains regression:
   Widget business_domains = "hr, project"  (per CLAUDE.md §3b SUPREME)
   But mvm_v2 ended with 6 domains: [project, hr, based, gisu_prod, products, pse]
 
@@ -19,7 +19,7 @@ source.
 
 Behavioral assertion (NOT a tautology): verify the patch SOURCE contains
 the intersect-with-widget guard AND simulate the seed loop with the
-NCDOT-shaped inputs to demonstrate the rejection path.
+gov_transport-shaped inputs to demonstrate the rejection path.
 """
 import json
 import re
@@ -94,13 +94,13 @@ def test_v109_guard_runs_BEFORE_p72_reserved_block():
     )
 
 
-def test_v109_simulated_ncdot_rejection():
-    """Simulate the v1.0.9 guard logic with NCDOT-shaped inputs.
+def test_v109_simulated_gov_transport_rejection():
+    """Simulate the v1.0.9 guard logic with gov_transport-shaped inputs.
     
     This is a BEHAVIORAL simulation (per CLAUDE.md §8.10) — extract the
-    guard logic from source, then run it on real NCDOT-shaped inputs and
+    guard logic from source, then run it on real gov_transport-shaped inputs and
     assert the 4 phantoms are dropped while user-pinned hr/project pass."""
-    # NCDOT-shaped inputs — exactly the values seen in iter=8 mvm_v2
+    # gov_transport-shaped inputs — exactly the values seen in iter=8 mvm_v2
     _missing_new = {"hr", "project", "based", "gisu_prod", "products", "pse"}
     _p72_user_widget_domains = {"hr", "project"}  # business_domains widget
 
@@ -143,7 +143,7 @@ def test_v109_simulated_empty_widget_passthrough():
 
 def test_v109_anti_tautology_proves_phantoms_were_seeded_pre_v109():
     """Anti-tautology probe (CLAUDE.md §8.3): demonstrate that without
-    the v1.0.9 guard, the same NCDOT-shaped input would auto-seed the
+    the v1.0.9 guard, the same gov_transport-shaped input would auto-seed the
     phantoms — proving the patch is not an empty no-op."""
     _missing_new_pre = {"hr", "project", "based", "gisu_prod", "products", "pse"}
     _p72_reserved = {

@@ -10,8 +10,8 @@ construction/travel/ngo/retail 2026-06-01 swarm gate logs):
   silent fallback degraded self_auditor/self_fixer/architect/judge to a weaker
   thinker mid-run.
 
-  Live ai_query probes (2026-06-02) confirmed opus-4-8 succeeds on fe-aws AND
-  my-gcp; opus-4-7 is intermittent. opus-4-8 is also the model the user wants.
+  Live ai_query probes (2026-06-02) confirmed opus-4-8 succeeds on <profile> AND
+  <profile>; opus-4-7 is intermittent. opus-4-8 is also the model the user wants.
 
 FIX (alias=model-type-resolution-no-hardcode):
   A. Config: opus-4-8 added as order=1 top thinker/large (enabled); opus-4-7

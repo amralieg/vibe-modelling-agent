@@ -91,7 +91,7 @@ def test_budgets_lowered_in_notebook():
     assert "vov-batch-budget-wider" in src
     assert "vov-lowprog-converge" in src
     # v3.2.1 SUPERSEDED: the v3.2.0 wider budget (64000) made per-batch sandbox mutate+verify
-    # exceed the time budget on large models (NCDOT mvm_v2: 27 time_budget_exceeded VREQs), so it
+    # exceed the time budget on large models (gov_transport mvm_v2: 27 time_budget_exceeded VREQs), so it
     # was reverted to 48000 (alias=vov-batch-budget-narrower-revert). Assert the reverted literal.
     assert "budget=48000" in src
     # the old 660-min loop budget must be gone (lowered to 300)
@@ -160,7 +160,7 @@ def _model_with_attr_tags(tagged_fraction):
     ]
     k = int(round(tagged_fraction * len(attrs)))
     for a in attrs[:k]:
-        a["tags"] = "ncdot_source_attribute=orig_col"
+        a["tags"] = "gov_transport_source_attribute=orig_col"
     return {"model": {"domains": [
         {"name": "hr", "products": [{"product": "employee", "attributes": attrs}]}
     ], "metric_views": []}}

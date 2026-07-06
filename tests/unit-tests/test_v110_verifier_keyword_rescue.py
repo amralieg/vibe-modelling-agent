@@ -2,23 +2,23 @@ from notebook_source_util import notebook_concat_source
 
 """Behavioral test for v1.1.0 — verifier-keyword-rescue-when-llm-empty.
 
-NCDOT mvm_v1 (run 141911358072191) terminated with adherence precision = 0.3333:
+gov_transport mvm_v1 (run <run_id>) terminated with adherence precision = 0.3333:
 9 of 15 VREQs marked failed with the SAME evidence:
 
     [verifier-llm-fallback-deterministic-rescue FIRED v1.0.3] primary LLM empty
     AND rescue extraction empty -- VREQ marked failed (no soft-accept per §11.5)
 
 Of those 9:
-- VREQ-001 ("The model is for NCDOT - North Carolina Department of Transportation. Common jargons: doh = Department of Highways, dmv = Department of Motor Vehicles.")
-- VREQ-002 ("Operational systems of record for NCDOT are: SAP, DCH, Beacon, DB2 Mainframe...")
-- VREQ-003 ("Industry governing bodies for NCDOT are: PCI, OWASP, NC Legislature.")
+- VREQ-001 ("The model is for gov_transport - North Carolina Department of Transportation. Common jargons: doh = Department of Highways, dmv = Department of Motor Vehicles.")
+- VREQ-002 ("Operational systems of record for gov_transport are: SAP, DCH, Beacon, DB2 Mainframe...")
+- VREQ-003 ("Industry governing bodies for gov_transport are: PCI, OWASP, NC Legislature.")
   → these are pure CONTEXT — no action verb, no testable target. The agent cannot
     "fulfil" them because there is nothing to build/rename/connect.
 
 - VREQ-007 ("Reverse-engineer the PSE schema from gisu_prod.pse_silver into project domain")
 - VREQ-010 ("HR subdomains must be defined using these groupings: Employee Records...")
 - VREQ-011 ("Business glossary attribute enrichment: every attribute in the HR base
-            model gets tag ncdot_business_glossary_term...")
+            model gets tag gov_transport_business_glossary_term...")
 - VREQ-012/013/014 ("Build metric view KPI-1/2/3: Vacancy Rate / Retirement Eligibility...")
   → these ARE actionable AND in fact were fulfilled (mvm_v2 has hr.vacancy_rate_metric,
     hr.retirement_eligibility_metric, hr.total_positions_metric, project domain has pse_*
@@ -34,7 +34,7 @@ empty, classify the VREQ:
 
 Per CLAUDE.md §8.10 every patch needs a behavioural test alongside the static-grep
 contract. This test re-implements the v1.1.0 keyword-rescue logic in isolation
-and proves all 9 NCDOT VREQ shapes produce the expected verdict.
+and proves all 9 gov_transport VREQ shapes produce the expected verdict.
 """
 import json
 import os
@@ -176,10 +176,10 @@ def _v110_keyword_rescue(vreq_text, products, attrs):
     return ("failed", overlap, vreq_tokens)
 
 
-# Snapshot fixtures matching NCDOT mvm_v2 model outline
+# Snapshot fixtures matching gov_transport mvm_v2 model outline
 
 
-def _ncdot_snapshot():
+def _gov_transport_snapshot():
     products = [
         {"domain": "hr", "product": "employee"},
         {"domain": "hr", "product": "vacancy_rate_metric"},
@@ -206,37 +206,37 @@ def _ncdot_snapshot():
     return products, attrs
 
 
-def test_v110_vreq_001_ncdot_identity_classified_informational():
+def test_v110_vreq_001_gov_transport_identity_classified_informational():
     """VREQ-001: pure CONTEXT — no action verb."""
-    products, attrs = _ncdot_snapshot()
-    text = ("The model is for NCDOT - North Carolina Department of Transportation. "
+    products, attrs = _gov_transport_snapshot()
+    text = ("The model is for gov_transport - North Carolina Department of Transportation. "
             "Common jargons: doh = Department of Highways, dmv = Department of Motor Vehicles.")
     verdict, overlap, tokens = _v110_keyword_rescue(text, products, attrs)
     assert verdict == "informational", (
-        f"NCDOT identity statement must be classified informational; got {verdict} "
+        f"gov_transport identity statement must be classified informational; got {verdict} "
         f"(overlap={overlap}, tokens_count={len(tokens)})"
     )
 
 
 def test_v110_vreq_002_sor_list_classified_informational():
     """VREQ-002: 'Operational systems of record are: ...' — context, no action."""
-    products, attrs = _ncdot_snapshot()
-    text = "Operational systems of record for NCDOT are: SAP, DCH, Beacon, DB2 Mainframe, SharePoint, Web Applications."
+    products, attrs = _gov_transport_snapshot()
+    text = "Operational systems of record for gov_transport are: SAP, DCH, Beacon, DB2 Mainframe, SharePoint, Web Applications."
     verdict, _, _ = _v110_keyword_rescue(text, products, attrs)
     assert verdict == "informational", f"SoR list is informational; got {verdict}"
 
 
 def test_v110_vreq_003_governing_bodies_classified_informational():
-    products, attrs = _ncdot_snapshot()
-    text = "Industry governing bodies for NCDOT are: PCI, OWASP, NC Legislature."
+    products, attrs = _gov_transport_snapshot()
+    text = "Industry governing bodies for gov_transport are: PCI, OWASP, NC Legislature."
     verdict, _, _ = _v110_keyword_rescue(text, products, attrs)
     assert verdict == "informational"
 
 
 def test_v110_vreq_007_pse_reverse_engineer_keyword_rescued_to_fulfilled():
     """VREQ-007 has 'Reverse-engineer' action verb AND PSE/project tokens
-    are present in the NCDOT mvm_v2 snapshot. Must be marked fulfilled."""
-    products, attrs = _ncdot_snapshot()
+    are present in the gov_transport mvm_v2 snapshot. Must be marked fulfilled."""
+    products, attrs = _gov_transport_snapshot()
     text = ("Reverse-engineer the PSE schema from source `gisu_prod.pse_silver` into the "
             "`project` domain.")
     verdict, overlap, tokens = _v110_keyword_rescue(text, products, attrs)
@@ -253,7 +253,7 @@ def test_v110_vreq_012_kpi_metric_view_keyword_rescued_to_fulfilled():
     """VREQ-012: 'Build metric view KPI-1: Vacancy Rate' — Build is action verb,
     'vacancy_rate_metric' product exists, 'vacant_positions' + 'total_positions'
     attributes exist. Should rescue to fulfilled."""
-    products, attrs = _ncdot_snapshot()
+    products, attrs = _gov_transport_snapshot()
     text = ("Build metric view KPI-1: Vacancy Rate. Definition: Number of positions "
             "vacant in relation to the total number of positions. Calculation: "
             "vacant_positions / total_positions = vacancy_rate.")
@@ -264,7 +264,7 @@ def test_v110_vreq_012_kpi_metric_view_keyword_rescued_to_fulfilled():
 
 
 def test_v110_vreq_013_retirement_eligibility_keyword_rescued_to_fulfilled():
-    products, attrs = _ncdot_snapshot()
+    products, attrs = _gov_transport_snapshot()
     text = ("Build metric view KPI-2: Retirement Eligibility. Definition: Age + "
             "service-year criteria. Pension plans: LEORS, CJERS, TSERS.")
     verdict, overlap, _ = _v110_keyword_rescue(text, products, attrs)
@@ -276,7 +276,7 @@ def test_v110_vreq_013_retirement_eligibility_keyword_rescued_to_fulfilled():
 def test_v110_vreq_unrelated_keyword_falls_through_to_failed():
     """Action verb present BUT zero meaningful overlap with snapshot → still 'failed'.
     This proves the rescue does NOT just rubber-stamp every VREQ with an action verb."""
-    products, attrs = _ncdot_snapshot()
+    products, attrs = _gov_transport_snapshot()
     text = ("Build metric view KPI-99: Quantum Foam Resonance Index using subatomic "
             "neutrino flux density and lepton chirality coefficient.")
     verdict, overlap, _ = _v110_keyword_rescue(text, products, attrs)
@@ -290,7 +290,7 @@ def test_v110_vreq_unrelated_keyword_falls_through_to_failed():
 
 
 def test_v110_empty_vreq_text_falls_through_to_failed():
-    products, attrs = _ncdot_snapshot()
+    products, attrs = _gov_transport_snapshot()
     verdict, _, tokens = _v110_keyword_rescue("", products, attrs)
     assert verdict == "failed", f"empty VREQ must be failed; got {verdict}"
     assert len(tokens) == 0

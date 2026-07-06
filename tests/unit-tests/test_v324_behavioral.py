@@ -1,6 +1,6 @@
 """Behavioral + contract tests for v3.2.4 vov-verify-already-satisfied.
 
-Live failure reproduced (NCDOT mvm_v3 clean+matched, run 239923648275285,
+Live failure reproduced (gov_transport mvm_v3 clean+matched, run <run_id>,
 2026-06-04): the VOV adherence ceilinged at 50.0% (24/48). The dominant
 residual cause was NOT missing targets — it was the LLM mutator's rule-4
 self-check `raise ValueError('mutator did not touch any target entity')`

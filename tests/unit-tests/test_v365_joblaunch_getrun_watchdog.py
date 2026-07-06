@@ -1,6 +1,6 @@
 """Behavioral tests for v3.6.5 alias=joblaunch-getrun-watchdog.
 
-ROOT CAUSE this fixes (live, ncdot parent launcher run 23674965251537 @ fe-gcp):
+ROOT CAUSE this fixes (live, gov_transport parent launcher run <run_id> @ <profile>):
 the agent self-relaunches as a child job (Job Launch Gate) and the parent blocks in
 JobLauncher.wait_for_run_terminal, which polls the child via SDK jobs.get_run(). That
 SDK call has NO client-side timeout, so a stalled control-plane call blocks the poll

@@ -1,6 +1,6 @@
 """v4.1.2 behavioral tests -- gt-headline-reground.
 
-ROOT CAUSE (automotive v3 fe-gcp run): the headline `vibe_orchestrator_scored`
+ROOT CAUSE (automotive v3 <profile> run): the headline `vibe_orchestrator_scored`
 event reported precision 0.5935 while the PHYSICAL model scored 0.805. Eight
 move_product VReqs landed AFTER the mid-loop audit_all emitted the scoreboard;
 the LATE verifier-move-product re-audit recognized them, but the headline event

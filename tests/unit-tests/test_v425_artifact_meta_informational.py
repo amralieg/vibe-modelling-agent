@@ -1,7 +1,7 @@
 """
 v4.2.5 behavioral tests -- verifier-artifact-meta-informational (RC2).
 
-ROOT CAUSE (retail v2 ECM VOV, run 257229033091163):
+ROOT CAUSE (retail v2 ECM VOV, run <run_id>):
     VREQ-022 "the file named _v1_mvm.sql writes DDL into the retail_ecm.customer
     catalog, so MVM and ECM files target the same catalog" and VREQ-043 "add a
     provenance disclosure (LLM-generated, last human-reviewed YYYY-MM-DD by ...)"

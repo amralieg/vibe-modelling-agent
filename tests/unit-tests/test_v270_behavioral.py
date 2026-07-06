@@ -5,7 +5,7 @@ engine — the VOV-2.0 SANDBOX. The dual-architecture conflict that caused low
 vibe-adherence is removed:
 
   1. DELETED the legacy strict-diff-guard subsystem that reverted sandbox-applied
-     FKs/attributes as "phantoms" (248 reverts on NCDOT v263 run 427597124968597):
+     FKs/attributes as "phantoms" (248 reverts on gov_transport v263 run <run_id>):
        _strict_vov_diff_guard, _vov_diff_guard_products, _vov_diff_guard_attrs,
        _v264_sandbox_change_closure_triples (the v264 band-aid).
   2. DELETED dead code with zero callers:

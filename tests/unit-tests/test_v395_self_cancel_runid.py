@@ -1,7 +1,7 @@
 """v3.9.5 behavioral guard (§8.10 fail-pre/pass-post) for the teardown-hang fix
 (alias=self-cancel-runid-jobparam).
 
-ROOT CAUSE (my-aws manufacturing run 74633503090396): the model finished building at 23:54Z but the
+ROOT CAUSE (<profile> manufacturing run <run_id>): the model finished building at 23:54Z but the
 run stayed RUNNING for 6h until the 15h job timeout. The error log proved BOTH terminators failed:
   - process-kill-watchdog armed (pid=10235, grace=360s) but the external SIGKILL child is ineffective
     on serverless;

@@ -1,6 +1,6 @@
 """v3.3.2 — verifier metadata-blindness fix.
 
-ROOT CAUSE (live NCDOT mvm_v8 run 827289371896631): the per-VREQ verifier snapshot
+ROOT CAUSE (live gov_transport mvm_v8 run <run_id>): the per-VREQ verifier snapshot
 exposed ONLY products + attributes. It omitted TAGS, METRIC VIEWS and the CATALOG name,
 so the LLM verifier (and its deterministic-blind fallback) reported "No tags present",
 "Metric view absent" and "no catalog reference" for a model that actually carried 785
@@ -54,7 +54,7 @@ def _run_metadata_block(attributes_data, metric_views, catalog):
 def test_tag_inventory_surfaced():
     attrs = [
         {"domain": "hr", "product": "employee", "attribute": "employee_id",
-         "tags": "primary_key,confidential,pii,ncdot_cde=CDE-26"},
+         "tags": "primary_key,confidential,pii,gov_transport_cde=CDE-26"},
         {"domain": "hr", "product": "employee", "attribute": "division_id", "tags": "foreign_key"},
         {"domain": "hr", "product": "employee", "attribute": "name", "tags": ""},
     ]
@@ -74,8 +74,8 @@ def test_metric_view_inventory_surfaced():
 
 
 def test_catalog_surfaced():
-    snap = _run_metadata_block([], [], "ncdot_v1")
-    assert "CATALOG (authoritative): ncdot_v1" in snap, snap
+    snap = _run_metadata_block([], [], "gov_transport_v1")
+    assert "CATALOG (authoritative): gov_transport_v1" in snap, snap
 
 
 def test_metadata_absent_when_model_has_none():

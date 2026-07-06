@@ -40,7 +40,7 @@ def _io_with_timeout(fn, timeout_s, logger=None, label="io"):
         raise _box["exc"]
     return _box["val"], False
 
-VOL = "/Volumes/vibe_ncdot_basemvm/_metamodel/vol_root"
+VOL = "/Volumes/vibe_gov_transport_basemvm/_metamodel/vol_root"
 TARGET = f"{VOL}/business/diagv3_{int(time.time())}/v1/mvm"
 
 # warmup

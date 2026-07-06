@@ -320,7 +320,7 @@ def test_v068_preserves_v0_6_x_aliases():
 def test_v068_industry_agnostic():
     """No customer-specific industry name in the v0.6.8 fix snippets."""
     txt = _agent_text()
-    forbidden = ["telecom", "airline", "airlines", "emirates", "etihad", "qatar", "delta_air"]
+    forbidden = ["telecom", "airline", "airlines", "example_air", "etihad", "qatar", "delta_air"]
     auto_coerce_idx = txt.find("fmfl-auto-coerce-keep")
     assert auto_coerce_idx > 0
     window = txt[max(0, auto_coerce_idx - 800) : auto_coerce_idx + 800]

@@ -1,10 +1,10 @@
-"""Behavioral tests for v2.7.1 — the two precision fixes that lifted NCDOT VOV
+"""Behavioral tests for v2.7.1 — the two precision fixes that lifted gov_transport VOV
 adherence past the 0.85 fidelity gate (v270 ceiling was 0.804):
 
   FIX 1 [v271-vov-pass1-fixpoint] — `_v251_apply_pass1_priorities` ran a SINGLE
   pass and PERMANENTLY dropped (structural_unresolvable) any connect_table whose
   FK-target attribute did not exist YET, even when a LATER priority creates it.
-  96 such ordering drops on the 48-priority NCDOT run. The fix re-attempts
+  96 such ordering drops on the 48-priority gov_transport run. The fix re-attempts
   prevalidate-deferred priorities round-over-round as long as the previous round
   applied >=1 mutation; only a zero-progress round declares the remainder
   genuinely unresolvable.

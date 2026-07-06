@@ -1,6 +1,6 @@
 """Behavioral tests for v2.7.2 (mv-exact-count + ddl-drop-empty-product).
 
-Pre-fix evidence: NCDOT new-base baseline v2.7.1 (run 915669391125577,
+Pre-fix evidence: gov_transport new-base baseline v2.7.1 (run <run_id>,
 TERMINATED SUCCESS) produced 11 metric views while the vibe said
 "EXACTLY 3 metric views". Root cause: step_generate_kpi_first_metric_views
 computed target_kpi_count = max(5, min(120, max(len(domains)*5, len(products)//2)))

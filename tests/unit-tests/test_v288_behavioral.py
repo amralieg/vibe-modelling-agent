@@ -2,7 +2,7 @@
 
 Aliases: selffixer-no-import (prompt) + selffixer-retry-hint (retry feedback).
 
-Live my-gcp/construction VOV run (2026-05-30) printed, for the VREQs the main pass
+Live <profile>/construction VOV run (2026-05-30) printed, for the VREQs the main pass
 missed and handed to the closed-loop SelfFixer:
     [selffixer-sandbox-result FIRED] req=VREQ-003 attempt=0 ok=False ver_ok=False err=unsafe_ast: forbidden AST node: Import
     [selffixer-sandbox-result FIRED] req=VREQ-003 attempt=1 ok=False ver_ok=False err=unsafe_ast: forbidden AST node: Import

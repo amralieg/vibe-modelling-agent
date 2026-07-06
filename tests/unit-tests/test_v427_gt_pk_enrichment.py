@@ -1,6 +1,6 @@
 """v4.2.7 anti-lying-scoreboard: physical ground-truth PK enrichment (fail-pre / pass-post, §8.10).
 
-Root cause (coffee_roastery re-val run 933671823193704): _run_ground_truth_audit rebuilt the
+Root cause (coffee_roastery re-val run <run_id>): _run_ground_truth_audit rebuilt the
 physical verification snapshot from information_schema.columns and enriched foreign_key_to from
 physical FK constraints, but carried NO primary key -- products_data = [{"domain","product"}] and
 phys_attrs had no is_primary_key. Delta/UC has no enforced PK constraint, so the physical snapshot

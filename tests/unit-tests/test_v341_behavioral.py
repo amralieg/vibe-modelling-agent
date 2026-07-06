@@ -104,12 +104,12 @@ def test_glossary_term_tag_grounds_fulfilled():
     """A glossary-term VREQ with the matching tag key physically present -> fulfilled."""
     d = _bind_verify_deterministic()
     req = _Req(
-        "Attribute-level tag ncdot_business_glossary_term must carry the CDE glossary term.",
+        "Attribute-level tag gov_transport_business_glossary_term must carry the CDE glossary term.",
         rid="VREQ-014",
     )
     attrs = _attrs([
-        ("hr", "employee", "employee_id", "", "ncdot_business_glossary_term=Employee Identifier"),
-        ("hr", "employee", "tenure_years", "", "ncdot_business_glossary_term=Tenure"),
+        ("hr", "employee", "employee_id", "", "gov_transport_business_glossary_term=Employee Identifier"),
+        ("hr", "employee", "tenure_years", "", "gov_transport_business_glossary_term=Tenure"),
     ])
     res = d._verify_deterministic(req, [{"domain": "hr"}], [{"domain": "hr", "product": "employee"}], attrs)
     assert res.get("status") == "fulfilled", res
@@ -119,18 +119,18 @@ def test_glossary_term_tag_grounds_fulfilled():
 def test_tag_prefix_rule_clean_fulfilled_and_violation_partial():
     """Prefix rule fulfilled when all observed keys carry the prefix; partial when one violates."""
     d = _bind_verify_deterministic()
-    req = _Req("All NCDOT-specific tags use the prefix ncdot_ on every tag key.", rid="VREQ-004")
+    req = _Req("All gov_transport-specific tags use the prefix gov_transport_ on every tag key.", rid="VREQ-004")
     clean = _attrs([
-        ("hr", "employee", "employee_id", "", "ncdot_source_attribute=EMP_ID"),
-        ("hr", "employee", "salary", "", "ncdot_source_attribute=SAL"),
+        ("hr", "employee", "employee_id", "", "gov_transport_source_attribute=EMP_ID"),
+        ("hr", "employee", "salary", "", "gov_transport_source_attribute=SAL"),
     ])
     res_ok = d._verify_deterministic(req, [{"domain": "hr"}], [{"domain": "hr", "product": "employee"}], clean)
     assert res_ok.get("status") == "fulfilled", res_ok
     assert "gt-tag-verify FIRED v3.4.1" in res_ok.get("evidence", "")
 
     dirty = _attrs([
-        ("hr", "employee", "employee_id", "", "ncdot_source_attribute=EMP_ID"),
-        ("hr", "employee", "salary", "", "cg_source_attribute=SAL"),  # violates ncdot_ prefix
+        ("hr", "employee", "employee_id", "", "gov_transport_source_attribute=EMP_ID"),
+        ("hr", "employee", "salary", "", "cg_source_attribute=SAL"),  # violates gov_transport_ prefix
     ])
     res_bad = d._verify_deterministic(req, [{"domain": "hr"}], [{"domain": "hr", "product": "employee"}], dirty)
     assert res_bad.get("status") == "partial", res_bad

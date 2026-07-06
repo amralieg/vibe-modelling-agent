@@ -90,7 +90,7 @@ def test_v345_hint_nontautology_clean_trace_returns_empty():
 
 
 # ---- gt-tag-prefix-compound-violation: per-token prefix check (behavioral) ----
-def _exec_prefix_checker(prefix="ncdot_"):
+def _exec_prefix_checker(prefix="gov_transport_"):
     src = _cell_src(9)
     # universal-token helper
     uni = _slice(src, '_UNIVERSAL_TAGS = {"pii"',
@@ -105,12 +105,12 @@ def _exec_prefix_checker(prefix="ncdot_"):
 
 
 def test_v345_compound_key_with_prefixed_token_not_violation():
-    # The exact NCDOT VREQ-005 false-positive: universal classification tokens + a prefixed
+    # The exact gov_transport VREQ-005 false-positive: universal classification tokens + a prefixed
     # industry token -> compliant (NOT a violation).
     v = _exec_prefix_checker()
-    assert v("confidential,pii_address,ncdot_business_glossary_term") is False
-    assert v("restricted,pii_demographic,ncdot_business_glossary_term") is False
-    assert v("ncdot_source_table") is False
+    assert v("confidential,pii_address,gov_transport_business_glossary_term") is False
+    assert v("restricted,pii_demographic,gov_transport_business_glossary_term") is False
+    assert v("gov_transport_source_table") is False
     assert v("pii,confidential") is False  # all universal
 
 

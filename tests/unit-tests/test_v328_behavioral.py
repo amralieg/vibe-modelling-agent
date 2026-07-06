@@ -95,7 +95,7 @@ def test_pack45_safe_fallback_on_bad_input():
 
 
 # --- teardown-watchdog-force-exit (post-success teardown hang) ---
-# NCDOT mvm_v6 finished (model written + FINAL-FLUSH 11:58) but the serverless
+# gov_transport mvm_v6 finished (model written + FINAL-FLUSH 11:58) but the serverless
 # command stayed RUNNING +4h48m: dbutils.notebook.exit() does not force-kill
 # lingering non-daemon threads / volume-FUSE stalls. The watchdog arms a daemon
 # timer BEFORE the exit call and force-terminates after a grace period, since the

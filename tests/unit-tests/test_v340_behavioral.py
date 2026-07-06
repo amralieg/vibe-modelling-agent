@@ -34,7 +34,7 @@ def _extract_nested_fn(src, name):
 
 # ---------------------------------------------------------------------------
 # FIX-A: vibe-enumerated-product-cap-floor — deterministic per-domain floor
-# Root cause (NCDOT 38.1%): max_data_products_per_domain=16 trimmed the user's
+# Root cause (gov_transport 38.1%): max_data_products_per_domain=16 trimmed the user's
 # 43 verbatim HR products. The floor helper must derive 43 from the checklist.
 # ---------------------------------------------------------------------------
 def _bind_cap_floor():

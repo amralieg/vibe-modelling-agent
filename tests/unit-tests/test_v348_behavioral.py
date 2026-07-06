@@ -73,7 +73,7 @@ def _add_missing_provenance(products, src_tbl_by_norm, prov_keys):
 
 
 def test_v348_desc_scan_recovers_missing_provenance():
-    # Mirrors NCDOT VREQ-008: PSE products lack ncdot_original_table_name; the source name is in the description.
+    # Mirrors gov_transport VREQ-008: PSE products lack gov_transport_original_table_name; the source name is in the description.
     src_tbl_by_norm = {
         "dsctrcategory": "dsctrcategory",
         "dsctrcategorygroup": "dsctrcategorygroup",
@@ -81,24 +81,24 @@ def test_v348_desc_scan_recovers_missing_provenance():
         "dsctrdropdownlookup": "dsctrdropdownlookup",
     }
     products = [
-        {"product": "pse_control", "tags": "ncdot_original_table_name=dsctrgroupcontrol", "description": "from dsctrgroupcontrol"},
+        {"product": "pse_control", "tags": "gov_transport_original_table_name=dsctrgroupcontrol", "description": "from dsctrgroupcontrol"},
         {"product": "pse_category", "tags": "", "description": "PSE decision-tree category master derived from dsctrcategory source."},
         {"product": "pse_category_group", "tags": "", "description": "Second-level grouping reverse-engineered from dsctrcategorygroup."},
         {"product": "pse_data_type", "tags": "", "description": "PSE control data types from dsctrdatatype reference."},
         {"product": "pse_dropdown_option", "tags": "", "description": "Dropdown values from dsctrdropdownlookup."},
         {"product": "employee", "tags": "", "description": "Native HR employee master. No source schema origin."},
     ]
-    prov_keys = ["ncdot_original_table_name"]
+    prov_keys = ["gov_transport_original_table_name"]
     added = _add_missing_provenance(products, src_tbl_by_norm, prov_keys)
 
     by = {p["product"]: _parse_tags(p.get("tags")) for p in products}
     # longest-first: pse_category_group must map to dsctrcategorygroup, NOT dsctrcategory
-    assert by["pse_category_group"].get("ncdot_original_table_name") == "dsctrcategorygroup"
-    assert by["pse_category"].get("ncdot_original_table_name") == "dsctrcategory"
-    assert by["pse_data_type"].get("ncdot_original_table_name") == "dsctrdatatype"
-    assert by["pse_dropdown_option"].get("ncdot_original_table_name") == "dsctrdropdownlookup"
+    assert by["pse_category_group"].get("gov_transport_original_table_name") == "dsctrcategorygroup"
+    assert by["pse_category"].get("gov_transport_original_table_name") == "dsctrcategory"
+    assert by["pse_data_type"].get("gov_transport_original_table_name") == "dsctrdatatype"
+    assert by["pse_dropdown_option"].get("gov_transport_original_table_name") == "dsctrdropdownlookup"
     # native product with no source must NOT be tagged (no over-tagging)
-    assert "ncdot_original_table_name" not in by["employee"]
+    assert "gov_transport_original_table_name" not in by["employee"]
     # pse_control already had it -> not double counted
     assert added == 4
 
@@ -109,7 +109,7 @@ def test_v348_prepatch_would_skip_missing_keys():
         {"product": "pse_category", "tags": "", "description": "derived from dsctrcategory"},
     ]
     src_tbl_by_norm = {"dsctrcategory": "dsctrcategory"}
-    prov_keys = ["ncdot_original_table_name"]
+    prov_keys = ["gov_transport_original_table_name"]
 
     # pre-patch behavior: skip when key absent
     prepatch_added = 0
@@ -119,9 +119,9 @@ def test_v348_prepatch_would_skip_missing_keys():
             continue  # the bug
         prepatch_added += 1
     assert prepatch_added == 0  # bug: nothing added
-    assert "ncdot_original_table_name" not in _parse_tags(products[0]["tags"])
+    assert "gov_transport_original_table_name" not in _parse_tags(products[0]["tags"])
 
     # post-patch recovers it
     added = _add_missing_provenance(products, src_tbl_by_norm, prov_keys)
     assert added == 1
-    assert _parse_tags(products[0]["tags"])["ncdot_original_table_name"] == "dsctrcategory"
+    assert _parse_tags(products[0]["tags"])["gov_transport_original_table_name"] == "dsctrcategory"

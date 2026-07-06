@@ -1,6 +1,6 @@
 """v4.0.7 behavioral tests — two root-cause fixes proven fail-pre (v4.0.6) / pass-post.
 
-Diagnosed from the live mfg v5 ground-truth audit (my-aws 2026-06-21) and the 6-run
+Diagnosed from the live mfg v5 ground-truth audit (<profile> 2026-06-21) and the 6-run
 batch teardown hang:
 
   1. verifier-relation-domain-prefix-resolve — VREQ-046/047 'add FK production.plant ->

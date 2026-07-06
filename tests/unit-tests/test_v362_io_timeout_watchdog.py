@@ -1,8 +1,8 @@
 """Behavioral tests for v3.6.2 alias=io-timeout-watchdog.
 
 ROOT CAUSE this fixes: the new-base-model pipeline froze SILENTLY for the full
-job budget on serverless. Deterministically reproduced on both fe-gcp (ncdot) and
-fe-aws (healthcare): both stalled 28+ min at the setup cleanup step
+job budget on serverless. Deterministically reproduced on both <profile> (gov_transport) and
+<profile> (healthcare): both stalled 28+ min at the setup cleanup step
 ("Removing Previous Run Business Folder") which calls
 `dbutils.fs.rm(TARGET_VOLUME, recurse=True)`. Serverless dbutils.fs / Files-API
 calls have NO client-side timeout, so a stalled UC Volume blocks the calling

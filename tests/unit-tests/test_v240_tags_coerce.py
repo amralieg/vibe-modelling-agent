@@ -2,7 +2,7 @@
 
 alias=v240-pk-consistency-tags-string-coerce
 
-Regression target: NCDOT install_base run 388372284033213 (2026-05-28 00:07) crashed with
+Regression target: gov_transport install_base run <run_id> (2026-05-28 00:07) crashed with
     AttributeError: 'dict' object has no attribute 'lower'
 at enforce_configured_pk_consistency line `tags = (a.get("tags") or "").lower()` because
 an upstream LLM stage produced an attribute whose `tags` field was a dict instead of the

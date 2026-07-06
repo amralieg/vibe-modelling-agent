@@ -76,7 +76,7 @@ def _exec_filter_logic(domains_list, allowed_divisions, user_pinned):
 
 
 def test_v106_user_pinned_hr_with_corporate_division_survives_when_org_divisions_excludes_corporate():
-    """Behavioral test reproducing NCDOT v1.0.5 hr-domain-drop bug.
+    """Behavioral test reproducing gov_transport v1.0.5 hr-domain-drop bug.
     Pre-v1.0.6 path would have dropped 'hr' (corporate) when allowed_divisions={'business','operations'}."""
     domains_list = [
         {"domain": "hr", "division": "corporate"},

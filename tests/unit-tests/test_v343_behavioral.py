@@ -87,9 +87,9 @@ def test_v343_context_rescue_wrong_systems_not_fulfilled():
 # ---- FIX C: conditional bulk-tag grounds against physical tag presence ----
 def test_v343_conditional_tag_present_fulfilled():
     _, _, rescue = _exec_rescue()
-    req = _Req("For every attribute, attach the tag `ncdot_business_glossary_term` whenever a match "
+    req = _Req("For every attribute, attach the tag `gov_transport_business_glossary_term` whenever a match "
                "exists in the business glossary table.")
-    phys = [{"attribute": "c%d" % i, "tags": "ncdot_business_glossary_term=cde_%d" % i} for i in range(100)]
+    phys = [{"attribute": "c%d" % i, "tags": "gov_transport_business_glossary_term=cde_%d" % i} for i in range(100)]
     phys += [{"attribute": "u%d" % i, "tags": ""} for i in range(200)]  # most untagged (conditional => OK)
     res = rescue(req, phys, {})
     assert res and res["status"] == "fulfilled", res
@@ -98,7 +98,7 @@ def test_v343_conditional_tag_present_fulfilled():
 def test_v343_tag_no_physical_hits_returns_none():
     # honesty: tag-key never physically present -> no rescue
     _, _, rescue = _exec_rescue()
-    req = _Req("Attach the tag `ncdot_business_glossary_term` whenever a match exists.")
+    req = _Req("Attach the tag `gov_transport_business_glossary_term` whenever a match exists.")
     phys = [{"attribute": "c%d" % i, "tags": "pii=true"} for i in range(50)]
     res = rescue(req, phys, {})
     assert res is None, res
@@ -107,8 +107,8 @@ def test_v343_tag_no_physical_hits_returns_none():
 def test_v343_unconditional_tag_low_coverage_partial_not_fulfilled():
     # unconditional "every attribute" with only 33% coverage must be partial, never fulfilled
     _, _, rescue = _exec_rescue()
-    req = _Req("Attach the tag `ncdot_source_attribute` to every attribute in the model.")
-    phys = [{"attribute": "c%d" % i, "tags": "ncdot_source_attribute=x"} for i in range(33)]
+    req = _Req("Attach the tag `gov_transport_source_attribute` to every attribute in the model.")
+    phys = [{"attribute": "c%d" % i, "tags": "gov_transport_source_attribute=x"} for i in range(33)]
     phys += [{"attribute": "u%d" % i, "tags": ""} for i in range(67)]
     res = rescue(req, phys, {})
     assert res and res["status"] == "partial", res

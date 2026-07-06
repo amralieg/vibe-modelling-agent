@@ -4,7 +4,7 @@ ast-class-retry-feedback + mv-preservation-invariant).
 Pre-fix evidence from v203 live runs (2026-05-25):
   RT mvm_v3: 16 ERRORs, 11 verifier-failed, 3 unsafe-AST, 1 cycle introduction,
             1 bidirectional pair introduced.
-  NCDOT mvm_v3: 26 ERRORs, 41 invariant-violations ("user-pinned domains removed:
+  gov_transport mvm_v3: 26 ERRORs, 41 invariant-violations ("user-pinned domains removed:
             ['hr', 'project']"), 7 unsafe-AST, 1 Max retries exhausted, MV count
             collapsed 41 -> 8 (R2-class regression).
 
@@ -147,7 +147,7 @@ def test_v204_f2_synthesis_prompt_forbids_collection_replacement():
     assert "MUTATE IN PLACE" in src, "v204 F2: prompt must say 'MUTATE IN PLACE'"
     assert "metric_views" in src and "OBLITERATES" in src, (
         "v204 F2: prompt must specifically warn that reassigning metric_views OBLITERATES "
-        "the existing list (the root cause of NCDOT v203 MV collapse 41 -> 8)."
+        "the existing list (the root cause of gov_transport v203 MV collapse 41 -> 8)."
     )
 
 

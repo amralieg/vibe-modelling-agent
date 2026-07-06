@@ -4,7 +4,7 @@ ROOT CAUSE this fixes: the top-level pipeline exception handler logged ONLY
 `short_error` (first line of str(e)) via logger.critical, plus
 `error_details=f"[{error_type}] {str(e)[:2000]}"` to VibeWriter. For an
 AttributeError the message is just "'str' object has no attribute 'get'" with NO
-file:line frame. So when ncdot v3.7.0 (run 980958435536744 @ fe-gcp) crashed with
+file:line frame. So when gov_transport v3.7.0 (run <run_id> @ <profile>) crashed with
 exactly that AttributeError inside step_create_logical_schema, the raising frame
 was never written to the error log and the bug could not be root-caused.
 

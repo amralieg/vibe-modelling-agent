@@ -3,7 +3,7 @@
 
 The first shrink hit the 2h SHRINK_TIMEOUT_S cap (TERMINATED/TIMEDOUT) before writing the MVM —
 healthcare is the largest ECM (22 domains / 563 products / 24259 attrs) and ran on the slower
-fe-aws endpoint. The v2 ECM is fully persisted in vibe_healthcare_v1._metamodel (audit: precision
+<profile> endpoint. The v2 ECM is fully persisted in vibe_healthcare_v1._metamodel (audit: precision
 0.889 / recall 0.889, 344 metric views), so a shrink-only resubmit with a 5h cap recovers the MVM.
 
 Reuse-first: vov_canary_finish.submit_shrink + wait_for_completion (hang-aware MVM detection),
@@ -20,7 +20,7 @@ import vov_audit_extract as A
 C.SHRINK_TIMEOUT_S = 18000  # 5h cap (was 2h) — healthcare large-model shrink on slow endpoint
 
 IND = "healthcare"
-PROFILE = "fe-aws"
+PROFILE = "<profile>"
 
 
 def main():

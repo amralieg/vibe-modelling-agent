@@ -15,13 +15,13 @@ Root cause (fixed in v3.5.6):
   - alias=v356-source-trace-parse-tags-coerce: _parse_tags crashed `'list' object has no attribute
     'split'` on list/dict tags (media_broadcasting [source-trace-enforce ERROR] + B0040 mutator).
 
-Both deployed + alias-verified on /Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v356
-(my-gcp + fe-gcp). This runs the FULL install->vov->shrink pipeline on v3.5.6, one industry per
+Both deployed + alias-verified on /Users/user@databricks.com/dbx_vibe_modelling_agent_v356
+(<profile> + <profile>). This runs the FULL install->vov->shrink pipeline on v3.5.6, one industry per
 idle workspace, in parallel, on CLEAN catalogs. Exports overwrite /tmp/vov_out/<ind> only on
 success (the exploded v3.5.5 ECMs remain until then). Reuses the marathon prepare/stage/job/wait/
 export/audit; does NOT touch the shared marathon state file (avoids cross-process write race).
 
-healthcare is finishing its shrink on fe-aws under vov_finish_healthcare.py; keep fe-aws free here.
+healthcare is finishing its shrink on <profile> under vov_finish_healthcare.py; keep <profile> free here.
 """
 import os
 import sys
@@ -33,12 +33,12 @@ import vov_audit_extract as A
 
 # Point every job built by the marathon at the v3.5.6 archive (find_or_create_job resets the
 # existing _v355 job's notebook_task.notebook_path to this via build_job_spec).
-M.AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v356"
+M.AGENT_PATH = "/Users/user@databricks.com/dbx_vibe_modelling_agent_v356"
 M.INSTALL_TIMEOUT_S = 2700   # 45m: bounds the install teardown hang; vov is run_if=ALL_DONE anyway
 
 ASSIGN = [
-    ("media_broadcasting", "my-gcp"),
-    ("ngo", "fe-gcp"),
+    ("media_broadcasting", "<profile>"),
+    ("ngo", "<profile>"),
 ]
 
 

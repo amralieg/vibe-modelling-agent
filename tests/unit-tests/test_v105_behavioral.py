@@ -1,6 +1,6 @@
 """v1.0.5 behavioral tests — target-state-as-obj-helper + llm-fallback-classify-target-stringify.
 
-Root causes (LG iter-5 run 414381475381882 + iter-6 run 445906933640133):
+Root causes (LG iter-5 run <run_id> + iter-6 run <run_id>):
 
 1. The LLM emits `action.target_state` as either a JSON-encoded STRING or a Python dict
    (depending on the prompt + model that produced it). 51 sites in the agent did

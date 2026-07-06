@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v3.8.3 healthcare base-MVM live-prove on fe-aws (reuse base_mvm_proof helpers, non-blocking).
+"""v3.8.3 healthcare base-MVM live-prove on <profile> (reuse base_mvm_proof helpers, non-blocking).
 
 Fresh healthcare rebuild on the FIXED agent. The prior healthcare run (1011303912650792) ran on
 v3.8.0, which (a) lacked the 6 generic VREQ-lifecycle fixes shipped in v3.8.3 and (b) lacked the
@@ -20,11 +20,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import base_mvm_proof as B  # noqa: E402
 
 M = B.M
-NEW = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v383"
+NEW = "/Users/user@databricks.com/dbx_vibe_modelling_agent_v383"
 B.AGENT_PATH = NEW
 M.AGENT_PATH = NEW
 
-IND, PROF, DOMAINS = "healthcare", "fe-aws", ""
+IND, PROF, DOMAINS = "healthcare", "<profile>", ""
 
 
 def main():

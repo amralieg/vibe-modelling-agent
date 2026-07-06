@@ -2,7 +2,7 @@
 
 Live Pulse 6 on the v2.8.5 swarm: VOV_2_SANDBOX synthesis prompts crossed the Claude Opus
 context limit -> HARD `ValueError: Context size exceeded` (fe-adp/consumer_goods 955,579 chars,
-my-adp/manufacturing 889,151 chars, fe-aws/healthcare 1033K). Root cause: TARGET_ENTITIES_FULL
+<profile>/manufacturing 889,151 chars, <profile>/healthcare 1033K). Root cause: TARGET_ENTITIES_FULL
 was the ONE uncapped field; v2.8.5 Fix 1A made many VREQs resolve to DOMAIN-LEVEL (d,'*')
 targets and each domain expanded to all 60+ products x attrs in a SINGLE prompt.
 

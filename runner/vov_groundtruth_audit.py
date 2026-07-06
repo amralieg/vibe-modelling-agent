@@ -225,7 +225,7 @@ def verify(v, v2pd, v2pa, v1_products):
 
 # ---------------- LLM-structured VReq extraction -----------------
 LLM_ENDPOINT = "databricks-claude-sonnet-4-6"
-LLM_PROFILE = "fe-aws"
+LLM_PROFILE = "<profile>"
 
 _ACTIONS = ("connect_table", "rename_attribute", "move_product", "remove_fk",
             "rename_product", "add_entity", "expand_stub", "expand_thin",

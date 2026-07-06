@@ -10,7 +10,7 @@ fields and returns (False, 'rename-names-missing' / 'rename-new-name-missing').
 PRE-PATCH: such a directive was TERMINALLY marked skipped_unsafe and never
 added to _residual, so the LLM residual synthesizer (which reads the full
 source_quote and could apply the real intent) never saw it -> the vibe was
-silently lost even after the agentic loops (the dominant NCDOT mvm_v4 +
+silently lost even after the agentic loops (the dominant gov_transport mvm_v4 +
 Retail ecm_v4 vibe-loss class, ground-truth 2026-06-05).
 
 POST-PATCH: these label/body-mismatch diags are routed into _residual with

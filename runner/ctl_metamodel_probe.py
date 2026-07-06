@@ -3,9 +3,9 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vov_v2_marathon as M
 
-WS = "/Users/amr.ali@databricks.com"
-PROFILE = "fe-gcp"
-LOCAL_VIBE = "/tmp/basemvm/ncdot/model_vibes.txt"
+WS = "/Users/user@databricks.com"
+PROFILE = "<profile>"
+LOCAL_VIBE = "/tmp/basemvm/gov_transport/model_vibes.txt"
 BUDGET_S = 5400
 JOB_TIMEOUT_S = 6000
 M.PULSE_FILE = os.path.expanduser("~/claude/vibe-agent/ctl_probe_pulses.txt")
@@ -13,8 +13,8 @@ M.STATE_FILE = os.path.expanduser("~/claude/vibe-agent/ctl_probe_state.json")
 M.KILL_FILE = os.path.expanduser("~/claude/vibe-agent/ctl_probe_KILL")
 
 ARMS = [
-    {"tag": "cur",  "agent": f"{WS}/dbx_vibe_modelling_agent_v367",        "cat": "vibe_ncdotcur_basemvm"},
-    {"tag": "good", "agent": f"{WS}/dbx_vibe_modelling_agent_v367goodctl", "cat": "vibe_ncdotgood_basemvm"},
+    {"tag": "cur",  "agent": f"{WS}/dbx_vibe_modelling_agent_v367",        "cat": "vibe_gov_transportcur_basemvm"},
+    {"tag": "good", "agent": f"{WS}/dbx_vibe_modelling_agent_v367goodctl", "cat": "vibe_gov_transportgood_basemvm"},
 ]
 
 
@@ -36,8 +36,8 @@ def spec(tag, agent, cat, vibe):
         "tasks": [{
             "task_key": "probe",
             "notebook_task": {"notebook_path": agent, "source": "WORKSPACE", "base_parameters": {
-                "operation": "new base model", "business_name": "ncdot",
-                "business_description": "NCDOT enterprise data model.",
+                "operation": "new base model", "business_name": "gov_transport",
+                "business_description": "gov_transport enterprise data model.",
                 "model_vibes": vibe, "data_model_scopes": "Minimum Viable Model - MVM",
                 "deployment_catalog": cat, "model_version": "1", "generate_samples": "0",
                 "business_domains": "hr, project", "runtime_budget_seconds": str(BUDGET_S),
@@ -74,7 +74,7 @@ def launch(arm):
 
 def main():
     Path(os.path.dirname(M.PULSE_FILE)).mkdir(parents=True, exist_ok=True)
-    M.pulse("=== CTL METAMODEL PROBE START (cur vs good, ncdot, fe-gcp) ===")
+    M.pulse("=== CTL METAMODEL PROBE START (cur vs good, gov_transport, <profile>) ===")
     ts = []
     for a in ARMS:
         t = threading.Thread(target=launch, args=(a,), name=a["tag"], daemon=True)

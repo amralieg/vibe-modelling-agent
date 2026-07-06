@@ -23,11 +23,11 @@ import vov_v2_marathon as M
 import vov_canary_finish as C
 import vov_audit_extract as A
 
-M.AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v356"
-C.SHRINK_TIMEOUT_S = 10800  # 3h cap — ngo ECM (322 products) shrink on fe-gcp
+M.AGENT_PATH = "/Users/user@databricks.com/dbx_vibe_modelling_agent_v356"
+C.SHRINK_TIMEOUT_S = 10800  # 3h cap — ngo ECM (322 products) shrink on <profile>
 
 IND = "ngo"
-PROFILE = "fe-gcp"
+PROFILE = "<profile>"
 WEDGED_RUN = 737771602698581
 
 

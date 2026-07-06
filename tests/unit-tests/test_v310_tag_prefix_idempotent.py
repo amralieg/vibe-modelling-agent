@@ -1,10 +1,10 @@
 """v3.1.0 behavioral test: install-time tag-prefix idempotency.
 
-Root cause (NCDOT mvm_v2 ground-truth catalog audit 2026-06-03):
+Root cause (gov_transport mvm_v2 ground-truth catalog audit 2026-06-03):
 The install-time SET TAGS construction prepended `tag_prefix` to every `tag_key`
 read from model.json. System tag keys (business_glossary_term, cde, self_ref_fk,
 source_table, source_attribute) already carry the prefix baked in by generation,
-so the unconditional prepend produced `ncdot_ncdot_business_glossary_term` on
+so the unconditional prepend produced `gov_transport_gov_transport_business_glossary_term` on
 2000+ physical tags. The fix makes the prefix application idempotent at the single
 install boundary (table-level + column-level SET TAGS).
 
@@ -35,13 +35,13 @@ def _effective_tag_key_prefix_only(tag_key, tag_prefix):
 @pytest.mark.parametrize(
     "tag_key,tag_prefix,expected",
     [
-        ("business_glossary_term", "ncdot_", "ncdot_business_glossary_term"),
-        ("ncdot_business_glossary_term", "ncdot_", "ncdot_business_glossary_term"),
-        ("ncdot_cde", "ncdot_", "ncdot_cde"),
-        ("ncdot_self_ref_fk", "ncdot_", "ncdot_self_ref_fk"),
-        ("ncdot_source_table", "ncdot_", "ncdot_source_table"),
-        ("confidential", "ncdot_", "ncdot_confidential"),
-        ("pii_personal_data", "ncdot_", "ncdot_pii_personal_data"),
+        ("business_glossary_term", "gov_transport_", "gov_transport_business_glossary_term"),
+        ("gov_transport_business_glossary_term", "gov_transport_", "gov_transport_business_glossary_term"),
+        ("gov_transport_cde", "gov_transport_", "gov_transport_cde"),
+        ("gov_transport_self_ref_fk", "gov_transport_", "gov_transport_self_ref_fk"),
+        ("gov_transport_source_table", "gov_transport_", "gov_transport_source_table"),
+        ("confidential", "gov_transport_", "gov_transport_confidential"),
+        ("pii_personal_data", "gov_transport_", "gov_transport_pii_personal_data"),
         ("data_type", "dbx_", "dbx_data_type"),
         ("dbx_data_type", "dbx_", "dbx_data_type"),
     ],
@@ -56,13 +56,13 @@ def test_idempotent_prefix_no_double(tag_key, tag_prefix, expected):
 
 def test_prefix_only_logic_would_double_pre_prefixed():
     """Anti-tautology: the OLD unconditional prepend DID double a pre-prefixed key."""
-    bad = _effective_tag_key_prefix_only("ncdot_business_glossary_term", "ncdot_")
-    assert bad == "ncdot_ncdot_business_glossary_term"
-    assert bad.startswith("ncdot_ncdot_")
+    bad = _effective_tag_key_prefix_only("gov_transport_business_glossary_term", "gov_transport_")
+    assert bad == "gov_transport_gov_transport_business_glossary_term"
+    assert bad.startswith("gov_transport_gov_transport_")
     # and the fixed logic does NOT
-    good = _effective_tag_key_fixed("ncdot_business_glossary_term", "ncdot_")
+    good = _effective_tag_key_fixed("gov_transport_business_glossary_term", "gov_transport_")
     assert good != bad
-    assert not good.startswith("ncdot_ncdot_")
+    assert not good.startswith("gov_transport_gov_transport_")
 
 
 def _iter_code_cells():

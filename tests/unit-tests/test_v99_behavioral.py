@@ -2,7 +2,7 @@
 
 ROOT-CAUSE FIX for v0.9.8 RT iter-2 GENERATIVE-bypass.
 
-Symptom (RT iter-2, run 358541968803010):
+Symptom (RT iter-2, run <run_id>):
     The VIBE_MASTER_PROMPT timed out at 720s SQL timeout. The caller fallback
     at `step_interpret_model_instructions` then hardcoded
     `vibe_classification['classification'] = 'GENERATIVE'`, completely ignoring

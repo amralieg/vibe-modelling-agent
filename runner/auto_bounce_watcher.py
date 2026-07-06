@@ -31,11 +31,11 @@ GLOBAL_VOLUME = "/Volumes/_root/default/root_vol"
 TARGETS = [
     {
         "cloud": "AWS",
-        "profile": "fe-aws",
+        "profile": "<profile>",
         "industry_snake": "consumer_goods",
         "industry_repo_dir": "consumer_goods",
         "sectors": "retail_and_consumer_goods,manufacturing",
-        "runner_path": "/Users/amr.ali@databricks.com/vibe_runner_v73",
+        "runner_path": "/Users/user@databricks.com/vibe_runner_v73",
         "job_name": "dbx_vibe_modelling_sector_runner_v73_aws",
         "pulse_file": "/Users/amr.ali/claude/vibe-agent/aws_pulses.txt",
         "state_file": "/Users/amr.ali/claude/vibe-agent/aws_state.json",
@@ -49,7 +49,7 @@ TARGETS = [
         "industry_snake": "mining",
         "industry_repo_dir": "mining",
         "sectors": "energy_and_utilities,public_sector_education_nonprofit,communications_media_entertainment,manufacturing",
-        "runner_path": "/Users/amr.ali@databricks.com/vibe_runner_v72",
+        "runner_path": "/Users/user@databricks.com/vibe_runner_v72",
         "job_name": "dbx_vibe_modelling_sector_runner_v72_azure",
         "pulse_file": "/Users/amr.ali/claude/vibe-agent/azure_pulses.txt",
         "state_file": "/Users/amr.ali/claude/vibe-agent/azure_state.json",

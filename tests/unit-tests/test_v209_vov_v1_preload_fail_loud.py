@@ -1,6 +1,6 @@
 """Behavioral tests for v2.0.9 vov-v1-preload-fail-loud fix.
 
-Live run 796631851201494 (NCDOT 2026-05-27 02:00) failed at consolidate with
+Live run <run_id> (gov_transport 2026-05-27 02:00) failed at consolidate with
 `CRITICAL: Products file is empty`. Root cause: vov-v1-preload outer
 `isinstance(business_context_raw, dict)` gate silently fell through when
 business_context_raw was not dict-shaped, leaving VOV to mutate an empty

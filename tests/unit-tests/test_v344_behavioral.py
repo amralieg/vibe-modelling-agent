@@ -72,7 +72,7 @@ def test_v344_prompt_instructs_convention_extraction():
     # the instruction lives in VIBE_PARSE_PROMPT
     assert "`model_conventions`: Object capturing ANY EXPLICIT MODELING CONVENTION" in src
     assert "the EXACT tag prefix the user demanded" in src
-    assert "ncdot_" in src  # the verbatim-prefix example
+    assert "gov_transport_" in src  # the verbatim-prefix example
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ def _exec_is_universal_tag():
 
 def test_v344_compound_classification_key_is_exempt():
     _is_universal_tag = _exec_is_universal_tag()
-    # compound comma-joined classification labels -> universal (the NCDOT false-flag)
+    # compound comma-joined classification labels -> universal (the gov_transport false-flag)
     assert _is_universal_tag("restricted,pii_dob") is True
     assert _is_universal_tag("confidential,pii_name") is True
     assert _is_universal_tag("restricted,pii") is True
@@ -135,15 +135,15 @@ def _exec_override(declared_conv, config, widgets_values):
 
 
 def test_v344_vibe_prefix_overrides_generated_cg():
-    # The exact NCDOT failure: setup resolved TAG_PREFIX='cg_' from generated context;
-    # vibe declared tag_prefix='ncdot_'. After override, config must carry ncdot_.
+    # The exact gov_transport failure: setup resolved TAG_PREFIX='cg_' from generated context;
+    # vibe declared tag_prefix='gov_transport_'. After override, config must carry gov_transport_.
     cfg = {"TAG_PREFIX": "cg_", "SCHEMA_PREFIX": "", "TAG_SUFFIX": "", "SCHEMA_SUFFIX": "",
            "MODEL_CONVENTIONS": {"tag_prefix": "cg_"}}
     wv = {"business_context_data": {"model_conventions": {"tag_prefix": "cg_"}}}
-    s = _exec_override({"tag_prefix": "ncdot_"}, cfg, wv)
-    assert s.config["TAG_PREFIX"] == "ncdot_"
-    assert s.config["MODEL_CONVENTIONS"]["tag_prefix"] == "ncdot_"
-    assert s.widgets_values["business_context_data"]["model_conventions"]["tag_prefix"] == "ncdot_"
+    s = _exec_override({"tag_prefix": "gov_transport_"}, cfg, wv)
+    assert s.config["TAG_PREFIX"] == "gov_transport_"
+    assert s.config["MODEL_CONVENTIONS"]["tag_prefix"] == "gov_transport_"
+    assert s.widgets_values["business_context_data"]["model_conventions"]["tag_prefix"] == "gov_transport_"
 
 
 def test_v344_override_noop_when_vibe_silent():

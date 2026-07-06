@@ -70,8 +70,8 @@ def test_pregroup_has_no_hardcoded_run_specific_literals():
     src = _nb_src()
     start = src.find("def deterministic_pre_group(")
     block = src[start: start + 1400]
-    assert '"ncdot_source_table" in text' not in block, "hardcoded run-specific tag key must be gone"
-    assert '"ncdot_business_glossary_term" in text' not in block
+    assert '"gov_transport_source_table" in text' not in block, "hardcoded run-specific tag key must be gone"
+    assert '"gov_transport_business_glossary_term" in text' not in block
     assert '"exactly 3 metric" in text' not in block, "hardcoded count literal must be gone"
     assert "pregroup-generic-no-run-overfit" in block, "generic-intent sentinel missing"
 

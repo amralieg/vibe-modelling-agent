@@ -1,6 +1,6 @@
 """v3.2.2 behavioral tests.
 
-Root-cause fixes for the NCDOT mvm_v2 ~37% adherence ceiling. The architectural gap:
+Root-cause fixes for the gov_transport mvm_v2 ~37% adherence ceiling. The architectural gap:
 "MISSED VIBES" directives in next_vibes were routed to flaky LLM synthesis, bypassing
 deterministic handlers that read widget input (dead on VOV runs), and missing-target
 priorities were permanently dropped.
@@ -54,7 +54,7 @@ def _load_mv_directive():
 
 def test_mv_count_read_from_nextvibes_when_widget_silent():
     fn = _load_mv_directive()
-    # VOV run: widget vibe_classification is EMPTY (the dead-code condition on NCDOT)
+    # VOV run: widget vibe_classification is EMPTY (the dead-code condition on gov_transport)
     widgets = {}
     nv = (
         "MISSED VIBES\n"

@@ -144,7 +144,7 @@ def test_industry_agnostic_no_hardcoded_names_in_prompt():
     """SelfFixer prompt must NOT contain any specific industry / customer name."""
     src = _load_selffixer_cell()
     forbidden = ["airline", "healthcare", "banking", "retail", "manufacturing",
-                 "telecom", "ncdot", "emirates", "patient", "passenger", "claim"]
+                 "telecom", "gov_transport", "example_air", "patient", "passenger", "claim"]
     # Examine prompt template + class only, not all of source (comments may mention these)
     m = re.search(r'_SELFFIXER_PROMPT\s*=\s*"""(.*?)"""', src, re.DOTALL)
     assert m, "_SELFFIXER_PROMPT not found"

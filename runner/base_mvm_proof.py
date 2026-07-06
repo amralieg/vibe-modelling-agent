@@ -5,14 +5,14 @@ User directive (2026-06-15): "AGENTIC LOOP MUST RUN FOR ANY OPERATION base model
 vov, shrink, enlarge ... you exit the agentic loop when you are done, or there is no
 more convergence or you are at good quality or approaching the timeout of 15hrs ...
 choose a more complex industry with bigger complex vibes to test against in addition
-to ncdot, so run both in autonomous mode."
+to gov_transport, so run both in autonomous mode."
 
 This launches TWO independent `new base model` (MVM scope) builds in parallel on two
 workspaces and drives each to terminal, proving the architect-review agentic loop runs
 (and exits on convergence/quality/15h, NOT a fixed 3-iter cap) for the base-model path:
 
-  - ncdot      @ fe-gcp  : 2-domain (hr, project) NCDOT base vibe (21.8KB model_vibes)
-  - healthcare @ fe-aws  : most-complex repo vibe (22 domains / 541 products, 34.5KB)
+  - gov_transport      @ <profile>  : 2-domain (hr, project) gov_transport base vibe (21.8KB model_vibes)
+  - healthcare @ <profile>  : most-complex repo vibe (22 domains / 541 products, 34.5KB)
 
 Reuse-first (CLAUDE.md 3d): marathon prepare_catalog / sql_exec / wait_terminal /
 get_run / export helpers + audit extract. Only the single-task `new base model`
@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vov_v2_marathon as M
 
-AGENT_PATH = "/Users/amr.ali@databricks.com/dbx_vibe_modelling_agent_v368"
+AGENT_PATH = "/Users/user@databricks.com/dbx_vibe_modelling_agent_v368"
 BUDGET_S = 54000          # 15h user-directive agent budget -> runtime_budget_seconds
 JOB_TIMEOUT_S = 57600     # 16h job ceiling (15h agent + 1h teardown margin)
 LOCAL_STAGE = "/tmp/basemvm"
@@ -44,8 +44,8 @@ M.cat_name = lambda ind: f"vibe_{ind}_basemvm"
 M.PULSE_S = 600  # 10-min pulses
 
 CASES = [
-    {"ind": "ncdot", "profile": "fe-gcp", "business_domains": "hr, project"},
-    {"ind": "healthcare", "profile": "fe-aws", "business_domains": ""},
+    {"ind": "gov_transport", "profile": "<profile>", "business_domains": "hr, project"},
+    {"ind": "healthcare", "profile": "<profile>", "business_domains": ""},
 ]
 
 
