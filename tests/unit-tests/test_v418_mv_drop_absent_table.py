@@ -94,4 +94,4 @@ def test_per_table_serial_query_removed_post():
 
 def test_version_bumped_post():
     src = _nb_source(NB_HEAD)
-    assert '__AGENT_VERSION__ = "4.2.5"' in src
+    assert '__AGENT_VERSION__ = "4.2.7"' in src

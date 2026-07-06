@@ -34,7 +34,7 @@ def _load_nb_source(path: Path) -> str:
 
 def test_v074_agent_version_is_071_release():
     src = _load_nb_source(AGENT_NB)
-    assert '__AGENT_VERSION__ = "4.2.5"' in src, (
+    assert '__AGENT_VERSION__ = "4.2.7"' in src, (
         "__AGENT_VERSION__ must track the current single-digit semver (CLAUDE.md \u00a73a-bis)"
     )
 
@@ -46,7 +46,7 @@ def test_v074_agent_version_is_first_non_comment_line_of_first_code_cell():
     src_lines = "".join(first_code_cell.get("source", [])).splitlines()
     code_lines = [ln for ln in src_lines if ln.strip() and not ln.lstrip().startswith("#")]
     assert code_lines, "First code cell must contain at least one code line"
-    assert '__AGENT_VERSION__ = "4.2.5"' in code_lines[0], (
+    assert '__AGENT_VERSION__ = "4.2.7"' in code_lines[0], (
         "First non-comment code line of first code cell must declare current __AGENT_VERSION__ (CLAUDE.md §3a-bis)"
     )
 

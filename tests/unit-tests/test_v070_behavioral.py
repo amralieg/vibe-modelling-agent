@@ -34,7 +34,7 @@ from pathlib import Path
 AGENT = Path(__file__).resolve().parents[2] / "agent" / "dbx_vibe_modelling_agent.ipynb"
 README = Path(__file__).resolve().parents[2] / "readme.md"
 
-EXPECTED_VERSION = "4.2.5"  # engine build (__AGENT_VERSION__); public release label is __RELEASE_VERSION__ = 0.8.0
+EXPECTED_VERSION = "4.2.7"  # engine build (__AGENT_VERSION__); public release label is __RELEASE_VERSION__ = 0.8.0
 
 
 def _agent_cells():

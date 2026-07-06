@@ -32,7 +32,7 @@ def _load_notebook_source():
 
 def test_v073_agent_version_is_071_release():
     src = _load_notebook_source()
-    assert '__AGENT_VERSION__ = "4.2.5"' in src, (
+    assert '__AGENT_VERSION__ = "4.2.7"' in src, (
         "v0.7.1 release tag (consolidates dev iterations v0.7.1\u2192v0.7.4) must stamp __AGENT_VERSION__ = '0.7.1'"
     )
 
