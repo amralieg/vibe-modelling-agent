@@ -23,7 +23,9 @@ __pycache__/
 
 # Pre-edit notebook backups (local working-tree snapshots, never committed)
 *.ipynb.*.bak
+*.ipynb.v*
 *.bak
+*bak
 *_BACKUP.ipynb
 .scratch_audit/
 
