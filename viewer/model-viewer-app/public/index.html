@@ -952,8 +952,12 @@ function writeCachedModel(owner,repo,branch,dirPath,content){
     localStorage.setItem(k,v);
   }catch(_){/* give up silently */}
 }
-function readLastRepo(){try{const raw=localStorage.getItem(REPO_LS_KEY);return raw?JSON.parse(raw):null;}catch(_){return null;}}
-function writeLastRepo(spec){try{localStorage.setItem(REPO_LS_KEY,JSON.stringify(spec));}catch(_){}}
+// Bump when the default repo changes so returning users with a stale saved
+// repo in localStorage are auto-reset to DEFAULT_REPO (the latest published
+// models) instead of silently re-loading a previously-browsed repo.
+const REPO_SCHEMA_VERSION=2;
+function readLastRepo(){try{const raw=localStorage.getItem(REPO_LS_KEY);if(!raw)return null;const p=JSON.parse(raw);return (p&&p._sv===REPO_SCHEMA_VERSION)?p:null;}catch(_){return null;}}
+function writeLastRepo(spec){try{localStorage.setItem(REPO_LS_KEY,JSON.stringify({...spec,_sv:REPO_SCHEMA_VERSION}));}catch(_){}}
 
 // Scan flat git/trees output for every industry model.json blob and group by
 // industry. Supports two on-disk layouts:
