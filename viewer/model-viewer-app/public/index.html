@@ -873,7 +873,7 @@ const CACHE_PREFIX='model_viewer:cache:';
 const MODEL_DIR_RE=/^(ecm|mvm)(_v?\d+)?$/i;
 // Default repo shown in the From Repo dialog when no saved repo exists.
 // Change this single constant if you fork this viewer for a different project.
-const DEFAULT_REPO='databricks-industry-solutions/lakehouse-business-data-models';
+const DEFAULT_REPO='databricks-industry-solutions/lakehouse-industry-data-models';
 const DEFAULT_BRANCH='main';
 
 function parseRepoSpec(raw){
@@ -1003,6 +1003,38 @@ function buildIndustryRows(treeEntries){
   })).sort((a,b)=>a.industry.localeCompare(b.industry)||a.parentPath.localeCompare(b.parentPath));
 }
 
+// One industry+scope cell. Enforces "always use the latest version": the newest
+// version (items are pre-sorted newest-first) is the PRIMARY button; older
+// versions stay reachable behind a collapsed "history" toggle so the default
+// action a user can take is always the latest published model.
+function ScopeCell({scope,items,resolved,loadingPath,onSelect,cacheTick}){
+  const [showHistory,setShowHistory]=useState(false);
+  if(!items||!items.length)return h('span',{style:{color:'#555'}},'—');
+  const latest=items[0];
+  const older=items.slice(1);
+  const verBtn=(item,primary)=>{
+    const cached=resolved?!!readCachedModel(resolved.owner,resolved.repo,resolved.branch,item.path):false;
+    const isLoading=loadingPath===item.path;
+    const bg=isLoading?'#666':(scope==='ecm'?'#4ECDC4':'#BB8FCE');
+    return h('button',{key:item.path,onClick:()=>onSelect(item.path),disabled:isLoading,
+      title:`Load ${item.path}/model.json`,
+      style:{padding:primary?'5px 12px':'3px 9px',background:bg,color:'#fff',border:'none',borderRadius:4,
+             fontSize:primary?12:10,fontWeight:primary?700:600,cursor:isLoading?'wait':'pointer',
+             opacity:primary?1:0.7,display:'inline-flex',alignItems:'center',gap:5,marginRight:6,marginBottom:4}},
+      isLoading?'Loading…':(primary?`Load ${item.name} (latest)`:`Load ${item.name}`),
+      cached&&!isLoading&&h('span',{style:{fontSize:9,background:'rgba(0,0,0,0.25)',
+        padding:'1px 5px',borderRadius:6}},'✓'));
+  };
+  return h('div',{style:{display:'flex',flexWrap:'wrap',alignItems:'center'}},
+    verBtn(latest,true),
+    older.length>0&&h('button',{key:'__hist',onClick:()=>setShowHistory(v=>!v),
+      title:`${older.length} older version${older.length>1?'s':''}`,
+      style:{padding:'3px 8px',background:'transparent',color:'#888',border:'1px solid #444',
+             borderRadius:4,fontSize:10,cursor:'pointer',marginRight:6,marginBottom:4,whiteSpace:'nowrap'}},
+      `history (${older.length}) ${showHistory?'▴':'▾'}`),
+    showHistory&&older.map(it=>verBtn(it,false)));
+}
+
 function IndustryTable({rows,onSelect,loadingPath,resolved,cacheTick}){
   if(!rows||!rows.length){
     return h('div',{style:{textAlign:'center',padding:40,color:'#888',fontSize:12}},
@@ -1012,22 +1044,6 @@ function IndustryTable({rows,onSelect,loadingPath,resolved,cacheTick}){
       h('code',{style:{color:'#4ECDC4'}},'<industry>/v*/mvm/model.json'),' (or legacy ',
       h('code',{style:{color:'#4ECDC4'}},'<industry>/(ecm|mvm)_v*/model.json'),') anywhere in the repo.');
   }
-  const versionBtn=(scope,item)=>{
-    const cached=resolved?!!readCachedModel(resolved.owner,resolved.repo,resolved.branch,item.path):false;
-    const isLoading=loadingPath===item.path;
-    const bg=isLoading?'#666':(scope==='ecm'?'#4ECDC4':'#BB8FCE');
-    return h('button',{key:item.path,onClick:()=>onSelect(item.path),disabled:isLoading,
-      title:`Load ${item.path}/model.json`,
-      style:{padding:'4px 10px',background:bg,color:'#fff',border:'none',borderRadius:4,
-             fontSize:11,fontWeight:600,cursor:isLoading?'wait':'pointer',
-             display:'inline-flex',alignItems:'center',gap:5,marginRight:6,marginBottom:4}},
-      isLoading?'Loading…':`Load ${item.name}`,
-      cached&&!isLoading&&h('span',{style:{fontSize:9,background:'rgba(0,0,0,0.25)',
-        padding:'1px 5px',borderRadius:6}},'✓'));
-  };
-  const cell=(scope,items)=>!items||!items.length
-    ? h('span',{style:{color:'#555'}}, '—')
-    : h('div',{style:{display:'flex',flexWrap:'wrap'}}, items.map(it=>versionBtn(scope,it)));
   const thStyle={textAlign:'left',padding:'10px 14px',fontSize:11,color:'#888',
                  textTransform:'uppercase',letterSpacing:0.5,borderBottom:'1px solid #333',
                  background:'#0f0f1a',position:'sticky',top:0,zIndex:1};
@@ -1040,8 +1056,8 @@ function IndustryTable({rows,onSelect,loadingPath,resolved,cacheTick}){
     h('tbody',{},rows.map(row=>h('tr',{key:row.parentPath},
       h('td',{style:{...tdStyle,color:'#fff',fontWeight:600}}, row.industry,
         row.parentPath!==row.industry&&h('div',{style:{color:'#666',fontSize:10,fontWeight:400,marginTop:2}},row.parentPath)),
-      h('td',{style:tdStyle}, cell('ecm',row.ecm)),
-      h('td',{style:tdStyle}, cell('mvm',row.mvm)))))
+      h('td',{style:tdStyle}, h(ScopeCell,{scope:'ecm',items:row.ecm,resolved,loadingPath,onSelect,cacheTick})),
+      h('td',{style:tdStyle}, h(ScopeCell,{scope:'mvm',items:row.mvm,resolved,loadingPath,onSelect,cacheTick})))))
   );
 }
 
@@ -1066,10 +1082,11 @@ function RepoBrowser({onLoadModel,onClose}){
   const [loadingPath,setLoadingPath]=useState(null);
   const [cacheTick,setCacheTick]=useState(0); // bump to force re-render after cache writes
 
-  const browseRepo=useCallback(async()=>{
+  const browseRepo=useCallback(async(overrideRepo)=>{
     setError(null);setRows(null);setLoading(true);setTruncated(false);setResolved(null);
     try{
-      const spec=parseRepoSpec(repoInput);
+      const raw=(typeof overrideRepo==='string')?overrideRepo:repoInput;
+      const spec=parseRepoSpec(raw);
       if(!spec)throw new Error('Could not parse repo. Use https://github.com/owner/repo, owner/repo, or git@github.com:owner/repo');
       // A branch embedded in a pasted /tree/<branch> URL is the most explicit signal,
       // so honour it over a stale value left in the Branch box, and reflect it back.
@@ -1093,6 +1110,16 @@ function RepoBrowser({onLoadModel,onClose}){
     autoRanRef.current=true;
     if((last.owner&&last.repo)||DEFAULT_REPO){browseRepo();}
   },[]); // eslint-disable-line
+
+  // Reset back to this viewer's default repo. Clears any stale saved repo in
+  // localStorage (a common reason a previously-browsed repo hides newly
+  // published versions) and re-browses the default so the latest is shown.
+  const resetToDefault=useCallback(()=>{
+    try{localStorage.removeItem(REPO_LS_KEY);}catch(_){}
+    const durl=DEFAULT_REPO?`https://github.com/${DEFAULT_REPO}`:'';
+    setRepoInput(durl);setBranchInput(DEFAULT_REPO?DEFAULT_BRANCH:'');setTokenInput('');
+    if(durl)browseRepo(durl);
+  },[browseRepo]);
 
   const handleSelect=useCallback(async(dirPath)=>{
     if(!resolved)return;
@@ -1180,6 +1207,11 @@ function RepoBrowser({onLoadModel,onClose}){
             style:{padding:'6px 10px',background:'#333',color:'#ccc',border:'1px solid #444',
                    borderRadius:4,fontSize:10,cursor:'pointer',whiteSpace:'nowrap'}},
             'Clear cache'),
+          DEFAULT_REPO&&h('button',{onClick:resetToDefault,disabled:loading,
+            title:`Reset to the default repository (${DEFAULT_REPO}) and show the latest published models`,
+            style:{padding:'6px 10px',background:'#333',color:'#ccc',border:'1px solid #444',
+                   borderRadius:4,fontSize:10,cursor:loading?'wait':'pointer',whiteSpace:'nowrap'}},
+            'Use default repo'),
           rows&&h('span',{style:{color:'#666',fontSize:10,marginLeft:'auto'}},
             `${rows.length} ${rows.length===1?'industry':'industries'}`)
         ),
@@ -1201,9 +1233,10 @@ function RepoBrowser({onLoadModel,onClose}){
       ),
       // Footer hint
       h('div',{style:{padding:'10px 18px',borderTop:'1px solid #333',fontSize:10,color:'#666',flexShrink:0}},
-        'Each row is one industry. ECM / MVM buttons load the corresponding ',
+        'Each row is one industry. The primary ECM / MVM button always loads the ',
+        h('strong',{style:{color:'#4ECDC4'}},'latest'),' ',
         h('code',{style:{color:'#4ECDC4'}},'<industry>/v<N>/(ecm|mvm)/model.json'),
-        '. Newest version first. Loaded files are cached in your browser.')
+        '; older versions are under “history”. Loaded files are cached in your browser.')
     )
   );
 }
