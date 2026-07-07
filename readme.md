@@ -13,7 +13,7 @@
 
 ---
 
-[How it works](#how-a-vibe-becomes-a-data-model) · [What you get](#what-you-get-from-one-run) · [Scopes](#two-scopes-mvm-and-ecm) · [Vibe it](#vibe-it-until-it-fits) · [Getting started](#available-today) · [Docs](#documentation)
+[How to run it](#how-to-run-it) · [How it works](#how-a-vibe-becomes-a-data-model) · [What you get](#what-you-get-from-one-run) · [Scopes](#two-scopes-mvm-and-ecm) · [Vibe it](#vibe-it-until-it-fits) · [Docs](#documentation)
 
 </div>
 
@@ -25,6 +25,71 @@
 - From prompt to a deployed model in **hours**, replacing the six-to-thirty-six-month projects that hand-built Silver models — or the trimmed generic industry templates — have historically required.
 - **Iterate in natural language:** every "vibe" produces a new versioned model, validated against enforceable rules, reviewed by two architect personas, repaired by a closed agentic loop, and redeployed to Unity Catalog. No version is ever overwritten.
 - **One logical model, many physical layouts:** render the same model as one catalog, a catalog per division, or a catalog per domain. No rebuild required.
+
+---
+
+## How to run it
+
+Everything runs from one notebook: **`agent/dbx_vibe_modelling_agent.ipynb`**. Import it into a Databricks workspace, attach **Serverless** compute, run all cells to render the widgets, set the widgets, then run again.
+
+**Prerequisites:** a Unity Catalog you can create schemas in (for physical deployment), and access to the model-serving endpoints the ensemble uses.
+
+### 1. Build a new model (minimum widgets)
+
+Set only these, leave everything else on its default, and run:
+
+| Widget | Value |
+|:---|:---|
+| **01. Business (name)** | e.g. `Airlines` |
+| **02. Description** | 2–3 sentences on what the business does |
+| **03. Operation** | `new base model` |
+| **05. Model Scope** | `Minimum Viable Model - MVM` (lean) or `Expanded Coverage Model - ECM` (full) |
+| **09. Installation Catalog** | a UC catalog you own, e.g. `airlines_mvm_v1` (omit to produce the logical model only, no physical deploy) |
+
+That produces v1: the logical `model.json`, physical schemas/tables/FKs/tags, metric views, sample data, docs, and a `next_vibes.txt`.
+
+### 2. Every other operation (the cheat-sheet)
+
+Same notebook — change **03. Operation** and fill the few widgets each mode needs:
+
+| To do this | Set Operation to | Also set |
+|:---|:---|:---|
+| **Refine an existing version (VOV)** | `vibe modeling of version` | **04. Version** = the version to build on · **08. Model Vibes** = your changes in plain English (or paste `next_vibes.txt`). Writes a **new** version N+1; the source version is untouched. |
+| **Shrink an ECM to a lean MVM** | `shrink ecm` | **04. Version** · **09. Installation Catalog** |
+| **Enlarge an MVM to a full ECM** | `enlarge mvm` | **04. Version** · **09. Installation Catalog** |
+| **Deploy a logical model to the catalog** | `install model` | **11. Model JSON File** (path to a `model.json`) · **09. Installation Catalog** |
+| **Remove a version's physical objects** | `uninstall model version` | **01. Business** · **04. Version** · **09. Installation Catalog** |
+| **Add sample rows to a deployed model** | `generate sample data` | **11. Model JSON File** · **09. Installation Catalog** · **10. Sample Records** (> 0) |
+
+**Vibes** (widget 08) are free-form English — inline (up to 2,000 chars) or a path to a `.txt` on a UC Volume. Examples: `"Add a compliance domain with regulatory_filing and audit_trail tables"`, `"Mark all email columns as PII"`, `"Merge customer_support into the customer domain"`.
+
+### 3. Where the outputs land
+
+**Artifact files — on a UC Volume** under the installation catalog:
+
+```
+/Volumes/{catalog}/_metamodel/vol_root/
+├── business/{business}/{scope}_v{N}/      # e.g. airlines/mvm_v1
+│   ├── model.json                         # the authoritative logical model
+│   ├── domains/ products/ attributes/ fk_links/
+│   ├── artifacts/                         # README, Excel, DBML diagram, RDFS ontology
+│   ├── samples/                           # one CSV per table
+│   └── vibes/next_vibes.txt               # suggested refinements for the next run
+└── logs/{business}/{scope}_v{N}/          # info + error logs for the run
+```
+
+**Model state — in the `_metamodel` schema** (query it with plain SQL):
+
+| Table | What it holds |
+|:---|:---|
+| `{catalog}._metamodel.business` | one row per `(business, version, model_scope)` with run status and the result JSON |
+| `{catalog}._metamodel.domain` | every domain in the model |
+| `{catalog}._metamodel.product` | every product (table) |
+| `{catalog}._metamodel.attribute` | every attribute (column), types, and foreign keys |
+
+The **physical deployment** lands directly in your installation catalog: domains become **schemas**, products become **Delta tables**, attributes become **columns**, plus FK constraints, classification tags, and metric views.
+
+> Want both ECM and MVM built and install-tested in one job? Use the **`vibe_runner`** notebook — see [Both scopes in one job](#both-scopes-in-one-job-runner-mode).
 
 ---
 
@@ -300,18 +365,7 @@ for d in m['domains']:
 
 ## Available today
 
-The reference implementation is a **single Databricks notebook** at `agent/dbx_vibe_modelling_agent.ipynb`. Fill in the four core widgets and run; everything else defaults from your industry.
-
-### Quick start (4 widgets)
-
-| Widget | Value |
-|:---|:---|
-| `business_name` | e.g. `Airlines` |
-| `business_description` | 2–3 sentences describing the business |
-| `data_model_scopes` | `Minimum Viable Model - MVM` (lean) or `Expanded Coverage Model - ECM` (full) |
-| `deployment_catalog` | Unity Catalog target, e.g. `airlines_mvm_v1` |
-
-Everything else auto-fills. You get a complete logical model, physical schemas, sample data, documentation, and a `next_vibes.txt` for the next iteration. Runs on **Databricks Serverless** with **Unity Catalog** governance.
+The reference implementation is a **single Databricks notebook** at `agent/dbx_vibe_modelling_agent.ipynb`. Fill in a handful of core widgets and run; everything else defaults from your industry. For the minimum inputs and the per-operation cheat-sheet, see [How to run it](#how-to-run-it) at the top. Runs on **Databricks Serverless** with **Unity Catalog** governance.
 
 ### Both scopes in one job (runner mode)
 
