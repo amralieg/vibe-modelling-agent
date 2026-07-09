@@ -42,6 +42,8 @@
 | Location | Purpose |
 |:---|:---|
 | [../readme.md](../readme.md) | Project overview, quick start, widgets, and end-to-end architecture |
+| [../agent/dbx_vibe_modelling_agent.ipynb](../agent/dbx_vibe_modelling_agent.ipynb) | Production notebook (v4.2.8+: multi-cell layout; top markdown = widget reference) |
+| [../scripts/refactor_notebook_layout.py](../scripts/refactor_notebook_layout.py) | Maintainer script to rebuild the multi-cell notebook from `.bak-layout` |
 | [../runner/readme.md](../runner/readme.md) | Multi-industry pipeline orchestrator (batch ECM + MVM generation) |
 | [../tests/readme.md](../tests/readme.md) | End-to-end integration test suite |
 | [../models/manufacturing/readme.md](../models/manufacturing/readme.md) | Sample generated model (MVM vs ECM overview) |
