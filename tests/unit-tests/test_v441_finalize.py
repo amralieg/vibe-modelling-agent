@@ -317,3 +317,131 @@ def test_generic_root_domain_name():
     order_fk = next(a for a in activity["attributes"] if a["name"] == "order_id")["foreign_key_to"]
     # the transactional cross-domain FK from the reviewer-named ROOT ('member') is pruned/re-pointed
     assert not order_fk.startswith("sales.order"), order_fk
+
+
+# =========================================================================================
+# v4.4.3 — generic structural hardening (G1/G3/G9/G12), operation-agnostic, no reviewer text.
+# Fail-pre proof: on v4.4.2 HEAD `_v443_structural_hardening` does not exist -> slice_functions
+# raises LookupError -> every test below errors. Pass-post: it exists and flips the four gate
+# classes on the FINAL nested data_model regardless of operation (so the shrink MVM hardens too).
+# =========================================================================================
+
+
+def _harden_ns():
+    return slice_functions(["_v443_structural_hardening"], concat_source(), extra_globals={"re": re})
+
+
+def _harden_model():
+    # deliberately NON-retail domain names to prove genericity (no "customer"/"retail" hardcoding)
+    return {
+        "model": {
+            "domains": [
+                {"name": "party", "description": "", "products": [
+                    # G1: has party_account_id but NO pk flag -> must be asserted
+                    {"name": "party_account", "description": "", "attributes": [
+                        {"name": "party_account_id", "type": "BIGINT"},
+                        {"name": "opened_at", "type": "TIMESTAMP"},
+                    ]},
+                    # G12: SCD cols with empty descriptions
+                    {"name": "party_profile", "attributes": [
+                        {"name": "party_profile_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key",
+                         "description": "PK."},
+                        {"name": "effective_start_date", "type": "DATE", "description": ""},
+                        {"name": "scd_status", "type": "VARCHAR", "description": ""},
+                    ]},
+                ]},
+                {"name": "billing", "products": [
+                    # G3: FK STRING -> target BIGINT PK ; G9: campaign_code twin where target OWNS it -> drop
+                    {"name": "invoice", "attributes": [
+                        {"name": "invoice_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                        {"name": "campaign_id", "type": "STRING", "foreign_key_to": "marketing.campaign.campaign_id",
+                         "tags": "foreign_key"},
+                        {"name": "campaign_code", "type": "VARCHAR"},
+                    ]},
+                    # G9 safety: order_code twin where target does NOT own it -> KEEP (own natural key)
+                    {"name": "credit_note", "attributes": [
+                        {"name": "credit_note_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                        {"name": "order_id", "type": "BIGINT", "foreign_key_to": "sales.order.order_id",
+                         "tags": "foreign_key"},
+                        {"name": "order_code", "type": "VARCHAR"},
+                    ]},
+                ]},
+                {"name": "marketing", "products": [
+                    {"name": "campaign", "attributes": [
+                        {"name": "campaign_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                        {"name": "campaign_code", "type": "VARCHAR"},
+                    ]},
+                ]},
+                {"name": "sales", "products": [
+                    {"name": "order", "attributes": [
+                        {"name": "order_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                    ]},  # NOTE: order does NOT own order_code
+                ]},
+            ]
+        }
+    }
+
+
+def _find_prod(dm, dom, prod):
+    d = next(x for x in dm["model"]["domains"] if x["name"] == dom)
+    return next(p for p in d["products"] if p["name"] == prod)
+
+
+def test_g1_asserts_pk_on_table_missing_flag():
+    ns = _harden_ns()
+    dm = _harden_model()
+    ns["_v443_structural_hardening"](dm, _Log())
+    acct = _find_prod(dm, "party", "party_account")
+    pk = next(a for a in acct["attributes"] if a["name"] == "party_account_id")
+    assert pk.get("is_primary_key") is True, "G1 must flag <product>_id as PK when none present"
+
+
+def test_g3_coerces_fk_type_to_target_pk_type():
+    ns = _harden_ns()
+    dm = _harden_model()
+    ns["_v443_structural_hardening"](dm, _Log())
+    inv = _find_prod(dm, "billing", "invoice")
+    fk = next(a for a in inv["attributes"] if a["name"] == "campaign_id")
+    assert fk["type"].split("(")[0] == "BIGINT", "G3 must coerce STRING FK to target BIGINT PK type"
+
+
+def test_g9_drops_denorm_twin_only_when_target_owns_it():
+    ns = _harden_ns()
+    dm = _harden_model()
+    ns["_v443_structural_hardening"](dm, _Log())
+    inv = _find_prod(dm, "billing", "invoice")
+    cols = {a["name"] for a in inv["attributes"]}
+    assert "campaign_code" not in cols, "G9 must drop denormalized twin the target owns"
+
+
+def test_g9_keeps_own_natural_key_when_target_does_not_own_it():
+    ns = _harden_ns()
+    dm = _harden_model()
+    ns["_v443_structural_hardening"](dm, _Log())
+    cn = _find_prod(dm, "billing", "credit_note")
+    cols = {a["name"] for a in cn["attributes"]}
+    assert "order_code" in cols, "G9 must NOT drop a table's own natural key (target does not own it)"
+
+
+def test_g12_backfills_empty_descriptions_non_boilerplate():
+    ns = _harden_ns()
+    dm = _harden_model()
+    ns["_v443_structural_hardening"](dm, _Log())
+    prof = _find_prod(dm, "party", "party_profile")
+    for a in prof["attributes"]:
+        assert str(a.get("description") or "").strip(), "G12 must backfill every empty description"
+    scd = next(a for a in prof["attributes"] if a["name"] == "scd_status")
+    assert "current" in scd["description"].lower() or "historical" in scd["description"].lower()
+    acct = _find_prod(dm, "party", "party_account")
+    dom = next(x for x in dm["model"]["domains"] if x["name"] == "party")
+    assert str(dom.get("description") or "").strip() and str(acct.get("description") or "").strip()
+
+
+def test_g12_preserves_existing_descriptions():
+    ns = _harden_ns()
+    dm = _harden_model()
+    prof = _find_prod(dm, "party", "party_profile")
+    before = next(a for a in prof["attributes"] if a["name"] == "party_profile_id")["description"]
+    ns["_v443_structural_hardening"](dm, _Log())
+    after = next(a for a in prof["attributes"] if a["name"] == "party_profile_id")["description"]
+    assert after == before == "PK.", "existing descriptions must be preserved verbatim"
