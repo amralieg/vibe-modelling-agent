@@ -49,7 +49,11 @@ REVIEWER_TEXT = (
     "REVIEWER-PRIORITY 7 - rehome_non_identity_products: move customer.segment to a marketing domain "
     "(marketing-analytics construct, not identity).\n\n"
     "REVIEWER-PRIORITY 9 - fk_direction_correctness: the customer master must not point OUT to "
-    "transactional domains; prune those cross-domain FKs.\n"
+    "transactional domains; prune those cross-domain FKs.\n\n"
+    "REVIEWER-PRIORITY 11 - customer_type_clean: customer.profile.customer_type must describe only "
+    "the legal-entity type (individual vs organization). Remove the redundancy where classification/"
+    "role values (vip, employee, wholesale) are duplicated across customer_type AND separate "
+    "vip_flag / employee_flag / account_tier columns. Separate legal-entity type from the role.\n"
 )
 
 
@@ -242,6 +246,48 @@ def test_p12_clears_junk_keeps_genuine_and_pii():
     assert all(t.get("key") != "dbx_value_regex" for t in status.get("tag_set", []))
     # genuine glossary term (NOT a title-cased column name) kept
     assert region.get("business_glossary_term", "") == "Customer Home Region"
+
+
+# ============================================================ P11
+def test_p11_drops_reviewer_named_redundant_role_columns():
+    """The reviewer names redundant role/classification flag columns to remove from the master;
+    the pass must drop exactly those (read from the directive) and leave legal-entity + other cols."""
+    ns = _finalize_ns()
+    dm = _base_model()
+    prof = _prod(_cust(dm), "profile")
+    prof["attributes"].extend([
+        {"name": "customer_type", "type": "STRING", "description": "Legal entity type."},
+        {"name": "vip_flag", "type": "BOOLEAN", "description": "VIP flag."},
+        {"name": "employee_flag", "type": "BOOLEAN", "description": "Employee flag."},
+        {"name": "account_tier", "type": "STRING", "description": "Account tier."},
+    ])
+    ns["_v441_reviewer_finalization"](dm, REVIEWER_TEXT, _Log())
+    prof = _prod(_cust(dm), "profile")
+    cols = {a["name"] for a in prof["attributes"]}
+    # the three reviewer-named redundant role columns are removed
+    assert "vip_flag" not in cols, cols
+    assert "employee_flag" not in cols, cols
+    assert "account_tier" not in cols, cols
+    # the legal-entity type column the directive says to KEEP survives, as do unrelated columns
+    assert "customer_type" in cols
+    assert "email" in cols
+
+
+def test_p11_generic_reads_directive_not_hardcoded():
+    """Prove P11 removes only what the directive lists — a column NOT listed is retained even if
+    it looks flag-ish, and a differently-listed column IS removed."""
+    ns = _finalize_ns()
+    dm = _base_model()
+    prof = _prod(_cust(dm), "profile")
+    prof["attributes"].extend([
+        {"name": "customer_type", "type": "STRING"},
+        {"name": "vip_flag", "type": "BOOLEAN"},
+        {"name": "priority_flag", "type": "BOOLEAN"},  # NOT named by the reviewer -> keep
+    ])
+    ns["_v441_reviewer_finalization"](dm, REVIEWER_TEXT, _Log())
+    cols = {a["name"] for a in _prod(_cust(dm), "profile")["attributes"]}
+    assert "vip_flag" not in cols       # listed -> removed
+    assert "priority_flag" in cols      # not listed -> kept
 
 
 # ============================================================ genericity (no hardcoded "customer")
