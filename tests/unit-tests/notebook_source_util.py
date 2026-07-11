@@ -52,3 +52,19 @@ def exec_function_namespace(
         ns.update(extra_globals)
     exec(compile(fn_src, str(NOTEBOOK_PATH), "exec"), ns)
     return ns
+
+
+def exec_functions_namespace(
+    fn_names,
+    extra_globals: Optional[dict] = None,
+    source: Optional[str] = None,
+) -> dict:
+    """Exec several notebook functions into ONE shared namespace (so callees resolve
+    their siblings). Slices are concatenated in the given order and exec'd together."""
+    source = source or notebook_concat_source()
+    ns = {"__name__": "_test_slice_multi"}
+    if extra_globals:
+        ns.update(extra_globals)
+    blob = "\n\n".join(slice_function_source(n, source=source) for n in fn_names)
+    exec(compile(blob, str(NOTEBOOK_PATH), "exec"), ns)
+    return ns

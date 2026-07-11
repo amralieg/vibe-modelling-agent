@@ -1,0 +1,452 @@
+VIBE MODELLING AGENT — INSTRUCTION LEDGER
+Grouped by theme; one imperative per line; deduplicated.
+Authority: CLAUDE.md wins on conflict; this ledger is the auditor checklist.
+
+--- MISSION & VIBE ADHERENCE ---
+Produce production-ready data models targeting 100% verified vibe adherence with hard floor 90% across hundreds of industries
+Verified adherence equals VREQs verified-applied divided by VREQs extracted
+Extraction completeness: every requirement in the vibe becomes a VREQ
+Application plus verification: every VREQ is applied physically built and deterministically provable against the real catalog
+Soft-accept Max retries exhausted proceeding does not count as applied
+Never hardcode or overfit any industry; fixes read from vibe runtime and catalog only
+For every failed VREQ trace full lifecycle extracted applied to model dict physically built verified
+Fix the exact stage where the VREQ dropped not a downstream symptom
+Three systemic failure classes: verifier false-negatives name substitution dead agentic repair
+Lying scoreboard fix: ground VREQ checks on real catalog with name normalization display to snake domain-prefix tolerant substring contains
+Forward user exact named artifacts as USER-KING mandate into generator prompts not just counts
+Wire live AIAgent at shared entry so SelfFixer sandbox repair is active not inert with ai_agent=None
+Autonomous loop: monitor RCA fix behavioral test bump version redeploy re-run from V1 until targets met
+Do not stop until verified adherence at least 90% and zero hard signatures
+Run from V1 no chaining across versions when autonomous fix loop retests
+Never trust self-reported adherence or harvest without model.json and physical verification
+Independent adherence audit must compare scoreboard to model.json ground truth not logs alone
+
+--- USER VIBES & WIDGET AUTHORITY ---
+User vibes in widgets model_vibes business_description are supreme authority over all heuristics
+Priority pyramid: user vibes then deterministic invariants then architect gates then heuristics
+Every prompt must declare user vibes supreme authority
+Every LLM instruction: if conflict with user_vibes or business_description user directive wins
+Every mutation validator must reject proposals violating user vibes
+Every autofix rule blacklist cap must skip itself when user explicitly directed otherwise
+Log line showing heuristic overrode user directive is a critical bug
+business_domains widget names must appear verbatim; never remove rename or substitute
+User-specified business_domains are immutable minimum set; may add domains only when model scope requires
+Ensemble and judge must preserve business_domains; judge must inject missing user domains
+Principal Architect and Domain Architect must treat user-specified domains as protected
+must_have_data_products widget names are verbatim HARD preservation
+Protected product move guard must block LLM relocation of must_have_data_products
+model_vibes and business_description both feed vibe authority
+Free-text vibe count clamps are test instrumentation only not product requirement
+business_domains widget count and names are HARD regardless of free-text vibe
+Widget-driven domain violations are HARD failures
+Free-text vibe count warnings may pass with INFO only when source is natural-language vibe
+Primary goals: model quality and zero pipeline errors over exact free-text counts
+De-prioritize vibe-only exact-N enforcement from natural-language vibes
+Relax architect-gate tier-inappropriate warnings for tiny free-text vibes
+Keep absolute: widget business_domains must_have_data_products structural integrity no cycles orphans broken FKs
+Enlarge ignoring intentionally tiny is critical vibe violation
+Ensemble judge architect tier classifier must not override explicit user domain product counts or names
+Serialize-cycle-guard must protect user-vibed edges per vibe authority when breaking cycles
+Widget business_name business_domains data_model_scopes operation model_version naming_convention generate_samples cataloging_style
+operation vibe modeling of version requires model_version source catalog with prior version artifacts
+cataloging_style and naming_convention flow to normalizer and install DDL
+generate_samples must remain Serverless compatible patterns
+
+--- CODE DISCIPLINE & ENGINEERING ---
+All generated code must work on Databricks Serverless: no cache persist uncache sparkcontext
+Always fix root cause not symptom
+Search and reuse existing code before writing anything new; honor DRY
+Grep Glob read top matches extend compose thin wrapper only if nothing exists
+Never add a second parser validator log helper or cap calculator for an existing concept
+Use VibeOrchestrator VIBE_PARSE_PROMPT _VIBE_PARSE_RESPONSE_SCHEMA for vibe parsing not regex on business_description
+Extend _sample_numeric _sample_temporal _assemble_rows_from_pools before a second sample engine
+Extend _pre_static_analysis_autofix before a duplicate autofix pass
+No second physical parity system; extend gt-tag gt-mv enrich verify paths
+No second vibe parser; extend VibeOrchestrator
+No second cycle breaker; extend existing three-layer stack
+No industry string in fix helpers; read catalog business name from runtime widgets
+Do not add redundant new LLM step when orchestrator already parses vibes into actions
+Karpathy discipline for code changes: think first simplicity surgical edits verify loop
+User-requested quality gates and edge cases are not speculative scope under simplicity rule
+Engineering preferences when changing code: DRY well-tested explicit not clever
+Before significant code change review architecture quality performance tradeoffs
+Present numbered issues lettered options recommended first when user review requested
+If AskUserQuestion unanswered 2 minutes in away mode proceed recommended option
+Well-tested beats untested; behavioral test beats static grep alone
+Extend physical ground truth and verifier before new parallel scoring system
+Never choose lazy route; use most correct approach
+Critique user approach; offer better option when one exists
+Review before multi-file change: coupling data flow bottlenecks N+1 memory hot paths
+Flag DRY violations aggressively in review
+Prefer explicit edge case handling over speed when user preferences apply
+
+--- VERSIONING & DEPLOY ---
+__AGENT_VERSION__ is first non-comment code statement in agent notebook Cell 1
+agent_version is first top-level key in every model.json equal to __AGENT_VERSION__ verbatim
+Every model.json rewrite path must refresh agent_version to running agent value
+Never use version or __version__ instead of __AGENT_VERSION__
+Deployed notebook name dbx_vibe_modelling_agent_vNN where NN is version minus dots
+Single-digit semver only: each segment 0-9; 0.7.9 next is 0.8.0 not 0.7.10
+Never emit 0.7.10 0.10.0 or two-digit segments
+Bump __AGENT_VERSION__ before every test cycle commit deploy together
+Tag to main: same commit updates __AGENT_VERSION__ readme.md and release notes
+Behavioral test test_vNN_behavioral.py must assert version constant position and model.json agent_version
+Release notes to main must match reference depth: summary highlights sections regression evidence metrics migration links contributors
+Log alias convention: bracket alias FIRED vX.Y.Z optional details key=value
+Grep deployed notebook for alias count at least one per fix in version
+Version history readme row and alias table update on each bump when project readme maintained
+Deploy only versioned notebook paths never canon path agent/dbx_vibe_modelling_agent
+Upload dbx_vibe_modelling_agent_vNN vibe_tester_vNN vibe_runner_vNN to user workspace root
+Patch JOB notebook_path to versioned agent path for every task
+Export deployed archive and grep every fix alias before submitting run
+Unique versioned workspace object_id prevents executor notebook cache serving stale code
+Never trust canon path for deploy verification
+When json.dump agent notebook use ensure_ascii=True to avoid massive unicode diff noise
+git diff --stat agent notebook should be tens to hundreds of lines not thousands
+Working tree may hold uncommitted edits across deploy cycles; deployed archive is runtime truth
+Iteration on scratch branch redeploy from working tree without main commit until proof
+
+--- GIT & BRANCH DISCIPLINE ---
+Scratch branches commit and push freely with honest WIP messages
+Main merges only after live SUCCESS adherence pass and zero hard signatures
+Fix every audit issue in current version; no defer-to-next-version roadmap
+Do not promote to main until live run proves success; dev may checkpoint after local tests
+User directive fix everything current version applies to all issues in latest audit before version bump
+Exception: upstream platform bug with documented workaround in same version still ships workaround
+Commit push dev with structured commit message listing issues fixes verify patterns
+Commit message template: version N fixes from prior run_id list each issue root cause file fix alias verify tests readme deploy
+Co-authored-by Isaac on agent fix commits when project convention applies
+Verify git ls-remote and git branch --contains before claiming shipped
+Never git reset --hard with unpushed commits
+Never force push main
+Sync with origin fetch rebase or ff-only merge before assuming remote state
+Grep diff for customer catalog names before commit
+
+--- PIPELINE OPERATIONS ---
+Pipeline operations: new base model vibe modeling of version shrink enlarge install
+Operations widget: new model vibe modeling of version shrink enlarge install model
+ECM builds entity-centric model; MVM builds metric-view model
+Sub-versions named ecm_v1 mvm_v1 mvm_v2 ecm_v2 etc as catalog suffix not prefix
+Catalog pattern sanitized_business_ecm_v1 and sanitized_business_mvm_v1 dedicated catalogs
+Runner pre-launch validates ECM and MVM install catalogs exist
+install model installs model.json into fresh catalog for physical grounding
+Shrink and enlarge resize model against vibe and structural constraints
+VOV reads curated or auto next_vibes.txt applies PRIORITIES and SA findings via mutations
+VOV may write in-place to same version folder e.g. mvm_v3 not always mvm_v4
+Store sandbox artifacts under vol_root logs not business folder when possible
+Do not install every run for VOV marathon; install once reuse catalog when install unchanged
+Re-auth all profiles and parallelize across workspaces when user directs marathon testing
+Maintain on-disk JSON state file for marathon progress across monitor restarts
+ECM install dedicated catalog no schema prefix on domain schemas per runner convention
+MVM install parallel catalog pattern per runner scope map
+Staging catalog runner uses for orchestration distinct from ecm_v1 mvm_v1 install targets
+Pre-launch validate ensures install catalogs creatable before expensive pipeline start
+Sample generation use pool engine _sample_numeric _sample_temporal _assemble_rows_from_pools Serverless safe
+Metric view install must resolve columns against normalizer contract or R6
+Install early-exit without logs is N1 investigate before blaming model quality
+DBML exporter dangling FK scrub N3 is cosmetic unless install depends on DBML
+Tag DDL uses bounded workers TAG_DDL_MAX_WORKERS; raising workers reintroduces Spark Connect cascade failures
+Parallel pools: nested run_parallel inside saturated pool can deadlock on _cf2.wait without timeout
+Register all LLM calls into runtime profile object for observability
+Validate max prompt and vibe length at pipeline steps to avoid silent truncation failures
+Fidelity gate compares memory JSON attribute names; failure triggers rollback recommendation
+Normalizer must block semantically wrong joins NORM-FIX BLOCKED
+Shared domain strict: lookup-only not full entity dump
+
+--- VOV & MUTATIONS ---
+VREQ extraction via orchestrator not ad-hoc regex on vibes file
+VOV synthesis loop batches targets with sandbox mutator and verification
+VOV blind batch nonempty contract and preserve shortcircuit aliases are part of loop discipline
+Prevalidate drop already-satisfied or unresolvable targets before LLM spend
+Hard wall-clock budget per priority when implementing batch controls
+connect_table rename_attribute move_product remove_fk rename_product are core mutation actions
+Scalar attribute mutation retries need type-accurate hints not dict-only append get advice
+Deterministic preskip credits already-satisfied VREQ applied without synth verify sandbox cycle
+Validate domain membership for move_product VREQs against model.json
+Validate attribute counts for thin-product VREQs against model.json
+Do not count hallucinated next_vibes items as adherence failures when sourcing invalid
+Healthcare or industry doc vibes plus next_vibes both count when user required both inputs
+Ignore no_match_or_parts noise only after root-cause fix not as accepted permanent error
+Shrink must not collapse FK density below v1 acceptance bar when that is test criterion
+MVM quality score from next_vibes should be at least v1 and at least prior shipped v2 when replacing v2
+References on attributes and domains must survive VOV load; model.json may use references plural
+Tag prefix from widget clamped; reject reserved pii_ phi_ pci_ as namespace prefix
+Glossary tags must use dbx_business_glossary_term not pii_business_glossary_term or pii_pii corruption
+PII tags on attributes exclude glossary artifact columns from PII coverage numerator
+SEC preserve v1 domain product set in v2 when vibe requires preservation
+Shrink resize path AttributeError str has no get indicates scalar treated as dict in resize or runner child
+Runner child shrink failure after parent reported healthy is pulse discipline failure class
+
+--- MODEL AUDIT & COUNTS ---
+Collect before audit: verbatim model_vibes widget params JobTags model.json per sub-version all logs physical catalog
+model.json counts under model.model.domains not top-level domains
+Products may be products or data_products key per domain
+FK count is attributes with foreign_key_to set
+Metric views under model.metric_views
+Parse quality score from next_vibes.txt Model Quality Score N/100 line
+Cross-check JobTags with model.json and information_schema not JobTags alone
+Domain count must match business_domains widget when set
+Product count soft target plus minus 20% for tilde N; zero tolerance for exactly N from vibe
+Exactly N domains from vibe means no judge-added reference shared analytics unless permitted
+Typical attributes 30-50 per product; flag trim over 60 augment under 12
+Healthy FK density roughly 30-70 for 15-product tiny 500-900 for large airline tier
+Over 25% FKs per product is overlinked red flag
+Physical _metrics table count must equal declared metric_views or R2 regression
+Physical _tags diverging from model is R2-class drop
+Physical parity: information_schema tables columns match model products attributes
+_metrics schema tables match metric_views list
+Tag counts physical vs model.json cross-check after install
+UC tag policy must permit applied tag keys
+Post-terminate audit use Python regex counts not fragile bash grep awk arithmetic
+Pull model.json and next_vibes for every sub-version to tmp final paths
+Query information_schema per catalog for physical table column counts by schema
+Diff each domain product list vs physical schemas excluding _metamodel and _metrics
+Honest model quality score 0-100 per sub-version with per-deduction evidence
+Best model ranking across sub-versions for production usability
+Architect veteran filter: FK direction cardinality missing keys types PII reference data per industry patterns generically
+Industry-specific pattern checks are audit lenses not hardcoded pipeline branches
+SCC on FK graph of nested model dict for cycle audit independent of log line
+Count siloed products by FK in and out degree on product graph
+Thin product under 5 attributes or skeleton only PK FK is critical quality failure
+Empty domain zero products is critical failure
+
+--- MODEL QUALITY & STRUCTURE ---
+Structural integrity: zero FK cycles after finalization
+Zero direct bidirectional FK links
+Zero siloed products zero FK in and zero FK out
+Zero cross_domain_duplicate SSOT violations
+Zero self-FK on primary key
+Zero denormalized_natural_key FK plus natural key same entity
+Fidelity gates precision at least 0.85 or N2 rollback
+Post-normalization unlinked _id columns at most 5; over 10 is IDL CDL concern
+Per-domain: flag domain over 2x FK hub of others
+Flag isolated domain zero FK in and out
+Flag FK-out greater than attribute count
+Flag shared or reference domain with over 5 products
+Cycle defense three layers Step 7D finalize flat v394 serialize nested v403
+Flat list finalization may be clean while nested serialized model still cycles R8b
+VOV sandbox-authoritative FK adds may reintroduce cycles SSOT resolver may desync flat nested
+Vibe modeling adherence: parse PRIORITY N action target from next_vibes
+Parse SA class findings from next_vibes
+Map v2 logs MUTATION-BATCH MUTATION-SUMMARY action applied skipped absent
+Re-run static analysis post-v2 for SA finding resolution
+Adherence percent equals applied priorities plus applied SA over total
+Cross-version delta: domains products attributes FKs metric views added removed renamed
+Compare quality score trend v1 to v2 should improve not drop
+
+--- DIVISION TAXONOMY ---
+Canonical division taxonomy exactly three: operations business corporate
+Legacy supporting support back_office backoffice fold to corporate
+Balance DOM-RUL-001: operations plus business at least 80% domains corporate at most 20%
+DOM-RUL-003: no corporate until operations at least 2 and business at least 2
+Read division set from get_division_taxonomy never hardcode elsewhere
+
+--- QGATE & VERIFIER ---
+Anti-lying four layers: deterministic gates on real dict fixable requeue SelfFixer verifier bulk coverage override physical ground truth enrich verify
+run_metamodel_static_analysis reads real model dict authoritative for gates
+_v366_sa_findings_requeue fixable whitelist requeues gaps to SelfFixer
+_verify_bulk_coverage overrides LLM for glossary subdomain division coverage VREQs
+gt-tag-enrich gt-mv-enrich gt-tag-verify gt-mv-verify extend do not duplicate physical parity
+_compute_deterministic_confidence_and_status authoritative over LLM self-score
+Add new defect class: gate plus fixable plus bulk coverage if applicable plus rules csv plus behavioral test
+Standing directive: add as many static structure checks as possible via deterministic gates
+Add rule to vibe-data-modelling-rules.csv when adding new gate category
+Attribute tag governance: glossary subdomain division PII sensitivity per rules csv Quality Gate group
+Gate: every table has PK missing_pk pk_attribute_missing
+Gate: every FK resolves broken_fk pk_mismatch fk_target_missing unlinked_fk invalid_fk_domain_refs
+Gate: FK column type matches target PK type fk_pk_type_mismatch
+Gate: no FK cycles fk_cycle; break at Step 7D VOV flat backstop v394 and serialize guard v403
+Gate: no self-FK on PK self_fk_on_pk self_referencing_fk
+Gate: no direct bidirectional links
+Gate: no siloed_table silo_product; cap fk_density_over_hubby
+Gate: multi_fk_missing_label fk_namespace_mismatch fk_format_invalid fk_column_naming fk_name_target_mismatch
+Gate: missing_glossary_tag on business attributes when glossary in use
+Gate: pii_tagging_missing on person-pattern attributes
+Gate: missing_division_tag invalid_division division_imbalance
+Gate: missing_subdomain_tag subdomain_ssot_collision missing_tags
+Gate: missing descriptions low_quality_description banned_boilerplate_in_output
+Gate: missing_data_type invalid_data_type pk_datatype_inconsistency datatype_mismatch
+Gate: snake_case naming duplicate names cross_domain_duplicate denormalized_natural_key domain bloat empty domains too-few-attributes
+Verify deterministically before LLM where possible verifier-structural-invariant-deterministic
+Coverage VREQs: fulfilled at least 0.9 coverage zero failed between partial
+Name normalize for verification: display to snake domain prefix tolerant contains fuzzy last component
+Domain create verifier must normalize display names with spaces before fail
+Structural invariant VREQ scope star scored from dict before LLM to avoid Spark false-fail
+Physical pass PK enrichment only when declared PK columns exist in information_schema columns
+SelfFixer closed loop: SA finding fixable triggers repair not report-only
+Curated completeness categories descriptions tags types requeue even at info severity
+Verifier bulk coverage deferred for rename drop non-coverage VREQs no hijack
+Physical ground truth headline reground must not false-fail fulfilled structural VREQs
+
+--- FAILURE SIGNATURES & GOTCHAS ---
+Failure signature F1: Permission denied on tmp model data paths
+Failure signature F2: Max retries 3 exhausted soft-accept hatch
+Failure signature F4: SILOED TABLES DETECTED
+Failure signature F6: KeyError format string like 0,62 in prompt template
+Failure signature F7: parent SUCCESS child FAILED short parent duration
+Failure signature F10 R2: physical _metrics count less than model metric_views
+Failure signature R1: vibe modeling of version overwrote in place leaving only v1 in metamodel
+Failure signature R3: zero-line info log after SUCCESS
+Failure signature R6: Failed metric view UNRESOLVED_COLUMN
+Failure signature R7: MODEL-PARAMS field missing using midpoint
+Failure signature R8: Found N cycles where N greater than zero after finalization
+Failure signature R8b: finalization clean but nested model.json still has cycles flat nested desync
+Fix R8b at serialization boundary v403-serialize-cycle-guard on nested data_model before write
+Failure signature N1: install fails ~50-60s Workload failed no volume info log
+Failure signature N2: Fidelity gates FAILED precision under 0.85
+Failure signature N3: DBML FK SCRUB dangling ref cosmetic
+Failure signature N4: scalar attr append get crash on retries without typed hint
+Failure signature N5: tag DDL wall-clock long at 8 workers is expected not defect; do not raise worker cap blindly
+Failure signature N6: huge VOV bridge output then silent RUNNING over 25 min stall
+Diagnose N6 with heartbeat stackdump when app_silent over 600s
+Failure signature N7: structural VREQ fulfilled logical failed physical due lossy PK snapshot
+Fix N7 enrich physical snapshot with model-declared PK when columns exist gt-pk-from-model-declared
+run-now must use --no-wait or CLI blocks and phantom residual runs block concurrency
+If QUEUED over 3 minutes check active runs and cancel residuals
+databricks jobs list-runs JSON may be bare list or runs wrapper; handle both
+databricks fs ls has no header row; do not use awk NR>1 on fs ls output
+MVM logs live under ECM catalog volume path when ECM+MVM run together not separate tiny_mvm catalog
+Residual run recovery: cancel phantom runs from blocking run-now without no-wait
+Install test workload failed with no info log triggers get-run-output immediately
+
+--- POSITIVE SIGNALS ---
+Positive signal: VALIDATOR User vibes detected count limits relaxed
+Positive signal: USER-KING AUTHORITY in judge architect prompts
+Positive signal: Step N PASSED validation
+Positive signal: Architect Self-Review landed regressed blocked counts
+Positive signal: BLOCKED product move protected
+Positive signal: vov-scalar-attr-typed-hint FIRED
+Positive signal: vov-deterministic-preskip FIRED credited applied without LLM cycle
+Positive signal: v403-serialize-cycle-guard FIRED remaining zero
+Positive signal: HEARTBEAT-STACKDUMP on genuine stall only
+Positive signal: NORM-FIX BLOCKED semantic mismatch
+Positive signal: verifier-domain-create-name-normalize FIRED
+Positive signal: verifier-structural-invariant-deterministic FIRED before LLM route
+Positive signal: gt-pk-from-model-declared FIRED on physical pass
+Positive signal: LLM health zero timeouts zero errors
+
+--- TESTING & ZERO-ERROR CONTRACT ---
+Follow test protocol means execute full 10.7 and 10.11 recipe literally
+Drop non-system catalogs before fresh test cycle
+Delete all prior runs of canonical JOB before new submit
+Delete other jobs keep only canonical tester JOB when following full protocol
+Wait for TERMINATED before triaging run
+Collect all logs from volume logs business version and vibe_tester merged logs
+Read every info error and ailogs line not skim
+Watch progress table stage_started to stage_succeeded
+Triage every warning and error; never call cosmetic without downstream trace
+Each fix: version bump sentinel alias FIRED log behavioral test call site
+Tail logs with background poller appending pulse blocks
+Repeat until tester zero errors and zero hard signatures
+Tiny tester clean then airline MVM no-vibe then ECM then vibe iterations
+Each new scope starts with full catalog and run cleanup
+Tester clean means zero ERROR lines zero F R N signatures zero Max retries exhausted
+Zero cycles after finalization zero Fidelity gates FAILED zero NameError
+Zero Failed metric view zero parent Workload failed without info log
+Positive signals must fire where applicable on healthy runs
+SUCCESS plus zero hard signatures is necessary not sufficient; run 10.9 post-MVM audit
+After MVM SUCCESS run vibe modeling of version from next_vibes and compute adherence
+Produce validation-report and model-quality-audit for every SUCCESS run
+Save artifacts under tmp run tag and claude vibe-agent reports path per project protocol
+Zero errors contract is all of 10.6 list simultaneously not average
+NameError AttributeError TypeError in logs fail iteration
+Traceback in logs fail iteration unless known benign isolated case triaged
+Max retries exhausted count as hard zero even one line
+Tester pipeline tiny ECM MVM canonical JOB widgets when user says follow test protocol
+Airline MVM no-vibe is standard tier-1 validation after tiny clean
+Each industry marathon distributes runs across profiles maximize concurrent workspaces
+Launch next queued industry when workspace run terminates; do not leave compute idle when user mandated marathon
+fe-aws fe-gcp fe-adp my-aws my-gcp my-uae my-adp are typical profile names read from databricks auth profiles
+
+--- MONITORING & PULSE DISCIPLINE ---
+Never use Monitor for polling; use background bash poller
+Poller loops all non-system catalogs for log discovery
+Pulse every 2-5 minutes during runs; never silent over 6 minutes
+Before first pulse gather parent task graph prior attempt failures active-run sanity
+Report top-level vs child run parent_run_id original_attempt_run_id attempt_number
+If attempt_number greater than 1 pull prior failure and flag EXPECTED RECURRENCE when fix not deployed
+Detect zombie peer runs on same JOB
+Each pulse: per-attempt status categorized new log lines soft-accept inventory failure probability
+Read error log lines since last pulse; never only grep -c report count
+Max retries exhausted is RED hard signature not yellow
+List every soft-accept by site with predicted downstream impact
+Track silo and cycle delta by literal table name
+List bidirectional FK pairs until resolved
+Flag stage stuck when over 2x expected duration for tier
+Predict SUCCESS probability with explicit deductions per red signature
+Forbidden without evidence: all signatures clean everything looks good ready for full ECM no red flags
+Acceptable: hard signatures zero yet but K soft-accepts at sites X Y Z
+On Max retries exhausted investigate validator chain immediately
+On Workload failed get-run-output and surface trace
+On non-decreasing cycles identify failing batch
+On Permission denied F1 investigate serverless tmp use
+On recurring FK target not found surface producing LLM call
+On KeyError format-string F6 stop if safe
+Re-attempt detection: if prior attempt failed and code unchanged recommend kill not passive wait
+Prior attempt shrink silo crash trajectory must be flagged in pulse 1 when code unchanged
+Post-run re-read pulses for PULSE-DISCIPLINE FAILURE; deduct honesty score 25 per violation
+Pulse inventory categories: CYCLE SILO SOFT-ACCEPT BIDIRECTIONAL FK-CONSISTENCY SCHEMA-FAIL FIDELITY-FAIL NAMEERROR INSTALL-FAIL
+Quote one literal log line per category per pulse
+Track delta new since prior pulse per category
+LLM ai_logs honesty score under 80 per stage is quality concern log it
+Confirm each version alias FIRED on live run info log or score fix zero for that iteration
+Autonomous away mode: no Monitor no force push pick recommended option after 2 min no fabricated fixed claims
+Kill early on RED trajectory when failure probability under 80% and bug unfixed
+Do not cancel run on first ERROR; let finish to see cascade unless user orders kill
+
+--- HONESTY & DONE INVARIANTS ---
+Provide brutal honesty score 0-100 after every action with specific missed items
+After every delivery find all regressions fix root causes report criticality
+Done per 8.1: code syntax test call-site push deploy grep or score zero
+Never claim shipped without remote SHA and deployed alias grep
+Never helper with zero callers as fix
+Never tautological test; include must-exclude case
+Behavioral test must fail on pre-patch HEAD before claiming fix
+No-op FIRED log without state change is not a fix
+Every version alias needs FIRED site and behavioral test
+Score against live deployed run not local workspace only
+Read environment values from runtime metastore not hardcoded workspace ids
+On audit finding verify mechanically cherry-pick if orphan publish SHA and root cause line
+Never skip honesty score on iteration
+Brutal honesty post-audit: what skipped in log read what soft-accept counted applied what fix shipped without FIRED
+Forbidden claim terminal SUCCESS means install worked without physical tables in catalog
+Forbidden claim vibe adherence without PRIORITY-level mapping
+Forbidden claim fix verified without live volume grep of alias
+Forbidden inflate honesty score when FIRED count zero
+Forbidden skip validation and quality audit on SUCCESS run per project audit protocol
+Forbidden deploy canon path or reuse prior run catalog without drop
+Forbidden skip deployed-archive alias grep step 6
+Forbidden submit before deleting prior JOB runs
+Forbidden merge main before live proof on scratch promotion workflow
+
+--- HARVESTER & PUBLISH GATES ---
+Harvest passing models to data-models repo only after independent validation gates pass
+Harvester gates example: references restored comparable to v1 thousands not zero after VOV
+Harvester gates: namespace prefix dbx_ zero pii_ tokens in glossary tags
+Harvester gates: zero hard signatures ECM and MVM logs
+Harvester gates: ground-truth adherence at least 90% target 100% denominator all vibe VREQs
+Harvester gates: structural audit empty thin skeleton domains improved v2 vs v1
+Harvester gates: MVM density at least v1 when shrink-fix bar active
+Do not harvest on self-assessment alone; independent auditor validates model.json and catalog
+Mark HOLD with reason when hard gate fails; do not silently degrade to pass
+Data models publish path data-models industry v1 or v2 ecm or mvm model.json schemas sql exports readme
+Compare new v2 against v1 baseline and shipped v2 before replacing published artifact
+Published model must parse validate in model-viewer app and pass validation rules
+
+--- RUNNER / TESTER / ARTIFACTS ---
+Agent source agent/dbx_vibe_modelling_agent.ipynb
+Tester tests/vibe_tester.ipynb
+Runner runner/vibe_runner.ipynb
+Rules catalog rules/vibe-data-modelling-rules.csv
+Unit tests tests/unit-tests/test_vNN_topic.py per fix
+vov_2_0 py files are author-source reference not separate runtime dep unless wired
+Model viewer and consumer contracts: model.json shape stable agent_version first key
+Rewrite paths for metric views install location surgical edits all refresh agent_version
+Volume paths follow _metamodel vol_root logs business industry version conventions
+Business artifacts model.json next_vibes.txt under business biz version on volume
+Logs named business_info_vN_ecm or mvm and error counterparts
+JobTags at terminal snapshot domain product attribute FK tag metric counts for cross-check
+Model quality audit separate from validation report per success run structure in project protocol
+Archival table in audit lists tmp paths model json logs reports
+Independent auditor validating instruction ledger should check pass fail per line on runs
+Instruction ledger is source of truth for agent behavior expectations alongside CLAUDE.md
