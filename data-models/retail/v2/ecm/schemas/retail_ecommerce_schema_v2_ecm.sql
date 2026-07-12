@@ -1,5 +1,5 @@
 -- Schema for Domain: ecommerce | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:23
+-- Generated on: 2026-07-12 13:53:21
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`ecommerce` COMMENT 'Manages digital commerce operations including online storefronts, product catalogs, shopping carts, checkout flows, digital payment processing, session tracking, CTR (Click-Through Rate), CR (Conversion Rate), AOV (Average Order Value), and GMV (Gross Merchandise Value). Tracks digital customer journeys, abandoned carts, and online-to-offline attribution. Integrates with Salesforce Commerce Cloud for unified digital commerce platform.';
@@ -57,7 +57,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` (
     `digital_catalog_id` BIGINT COMMENT 'Unique surrogate identifier for each digital catalog record representing a channel-specific published view of a SKU on a given storefront. Primary key for this entity. Entity role: MASTER_RESOURCE — represents a digital presentation asset managed and published via the e-commerce platform.',
     `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Buyers manage online assortment, pricing strategy, and product content decisions for their assigned categories. Digital catalog accountability and performance reporting require buyer attribution for m',
     `category_id` BIGINT COMMENT 'Identifier of the primary digital storefront category (navigation taxonomy node) under which this SKU is merchandised online. May differ from the master merchandise hierarchy in ORMS to reflect digital-specific category management and assortment breadth strategies.',
-    `demand_forecast_id` BIGINT COMMENT 'Foreign key linking to supplychain.demand_forecast. Business justification: Merchandising teams use demand forecasts to optimize online pricing, promotional timing, and product visibility. Direct link enables forecast-driven catalog management and dynamic pricing based on pre',
     `inventory_node_id` BIGINT COMMENT 'Foreign key linking to inventory.inventory_node. Business justification: Online catalog displays store-level availability for BOPIS and ship-from-store fulfillment options. Enables "available at nearby stores" feature and store inventory lookup for omnichannel shoppers.',
     `license_permit_id` BIGINT COMMENT 'Foreign key linking to compliance.license_permit. Business justification: Regulated products (alcohol, tobacco, pharmaceuticals, firearms) require valid licenses to sell. Retail must link catalog SKUs to permits to enforce sales restrictions, prevent unlicensed sales, and p',
     `location_id` BIGINT COMMENT 'Foreign key linking to store.store_location. Business justification: Products displayed online show store-specific availability and fulfillment options. Real business process: "check store availability" feature, store-specific assortment display, local inventory querie',
@@ -66,6 +65,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` (
     `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Online catalog organized by retail seasons (Spring/Summer, Fall/Winter, Holiday). Seasonal merchandising drives publish/unpublish schedules, promotional calendars, and assortment planning. Critical fo',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Catalog publishing process requires authoritative link to product master for attributes, compliance flags, lifecycle status, vendor data, and pricing rules. Retail operations depend on single source o',
     `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Digital catalog product pages must display authoritative online prices from sku_price, which maintains channel-specific and zone-specific pricing. Core business process: e-commerce price display and c',
+    `storefront_id` BIGINT COMMENT 'Identifier of the digital storefront or e-commerce channel on which this catalog record is published (e.g., main website, mobile app storefront, marketplace channel). Enables channel-specific catalog management across the e-commerce platform storefronts.',
     `age_restriction` STRING COMMENT 'Age-gating requirement for this SKU on the digital storefront, applicable to regulated product categories such as alcohol, tobacco, and certain pharmaceuticals. Drives age verification workflows at checkout. Regulated by FTC and FDA.. Valid values are `none|18+|21+`',
     `brand_name` STRING COMMENT 'Consumer-facing brand name associated with this SKU as displayed on the digital storefront. Used for brand-level filtering, faceted navigation, and brand page attribution. Includes private label (store brand) designations.',
     `canonical_url` STRING COMMENT 'The canonical URL of the product detail page (PDP) used to prevent duplicate content issues across multiple storefront URLs or faceted navigation paths. Declared in the HTML link rel=canonical tag. Managed in the e-commerce platform.',
@@ -95,7 +95,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` (
     `short_description` STRING COMMENT 'Brief consumer-facing product description displayed in product listing pages (PLP) and search results. Typically 100-200 characters. Sourced from the e-commerce platform product content and may differ from the master description in PIM.',
     `sort_order` STRING COMMENT 'Numeric position used to control the default display sequence of this SKU within its assigned digital category on the storefront. Lower values appear first. Used by merchandisers to manually curate product listing page (PLP) rankings.',
     `source_system_code` STRING COMMENT 'Code identifying the operational system of record from which this digital catalog record originated or was last updated. Supports data lineage tracking across the e-commerce platform (SFCC), the retail merchandising system Merchandising System (ORMS), the customer master data system, and the retail merchandising system Price Management (RPM).. Valid values are `SFCC|ORMS|MDM|RPM|MANUAL`',
-    `storefront_id` BIGINT COMMENT 'Identifier of the digital storefront or e-commerce channel on which this catalog record is published (e.g., main website, mobile app storefront, marketplace channel). Enables channel-specific catalog management across the e-commerce platform storefronts.',
     `tax_category_code` STRING COMMENT 'Tax classification code assigned to this SKU for digital commerce tax calculation purposes, determining applicable sales tax rates at checkout. Mapped to tax engine rules in the e-commerce platform. Relevant for FDA-regulated food items with tax exemptions.',
     `updated_timestamp` TIMESTAMP COMMENT 'The date and time when this digital catalog record was most recently modified, including content updates, price changes, status transitions, or SEO edits. Used for change detection, incremental ETL processing, and audit compliance.',
     `url_slug` STRING COMMENT 'The human-readable URL path segment for the product detail page (PDP), used in constructing the storefront URL. Must be lowercase, hyphen-separated, and unique per storefront. Example: mens-slim-fit-chino-pants-navy.. Valid values are `^[a-z0-9]+(?:-[a-z0-9]+)*$`',
@@ -152,13 +151,12 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`web_session` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`cart` (
     `cart_id` BIGINT COMMENT 'Unique system-generated identifier for a shopping cart instance created during a customers digital session on a storefront. Serves as the primary key for the cart data product and is referenced by cart line items, abandoned cart recovery workflows, and order conversion records.',
     `associate_id` BIGINT COMMENT 'Foreign key linking to workforce.associate. Business justification: Employee purchase programs require linking carts to associates for discount validation, purchase limit enforcement, and payroll deduction processing. Ubiquitous in retail—associates receive employee d',
-    `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Internal employee purchases and corporate procurement via ecommerce platforms require cost center attribution for departmental charge-back accounting, budget tracking, and GL posting in retail finance',
-    `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: BOPIS and ship-from-store carts create fulfillment orders before checkout completion; enables store associates to track cart-to-fulfillment readiness and pre-pick workflows in omnichannel retail opera',
     `header_id` BIGINT COMMENT 'Reference to the order record created when this cart was successfully converted at checkout. Null for carts that have not yet converted (active, abandoned, or expired). Enables cart-to-order traceability, Conversion Rate (CR) measurement, and reconciliation between the digital commerce platform and the Order Management System (OMS).',
     `location_id` BIGINT COMMENT 'Reference to the physical store location selected by the customer for Buy Online Pick Up In Store (BOPIS) or Reserve Online Pick Up In Store (ROPIS) fulfillment. Null for ship-to-home and drop-ship carts. Supports online-to-offline attribution, store-level BOPIS volume reporting, and inventory reservation at the designated store.',
     `profile_id` BIGINT COMMENT 'Reference to the authenticated customer who owns this cart. Null for guest/anonymous sessions where no login has occurred. Used for abandoned cart recovery, Customer Lifetime Value (CLTV) attribution, and personalization workflows.',
     `promo_campaign_id` BIGINT COMMENT 'Reference to the primary promotion applied to this cart. Used for promotion effectiveness measurement, discount attribution, and digital marketing ROI analysis. A cart may have one primary promotion; additional promotions are tracked at the line level.',
     `storefront_id` BIGINT COMMENT 'Reference to the digital storefront or site context in which this cart was created. Supports multi-brand, multi-region, and multi-locale storefront configurations within the e-commerce platform. Enables Gross Merchandise Value (GMV) and Average Order Value (AOV) analysis by storefront.',
+    `web_session_id` BIGINT COMMENT 'add column web_session_id (BIGINT) with FK to ecommerce.web_session.web_session_id - carts are created within web sessions and this linkage is critical for conversion funnel analysis',
     `abandoned_timestamp` TIMESTAMP COMMENT 'The date and time when the cart was classified as abandoned, either by session timeout or explicit inactivity threshold breach. Null for non-abandoned carts. Used to calculate time-to-abandonment metrics, trigger abandoned cart recovery email sequences, and measure recovery window effectiveness.',
     `abandonment_reason` STRING COMMENT 'Classified reason code for why the cart was abandoned. session_timeout indicates the session expired; inactivity indicates no user action within the inactivity window; explicit_exit indicates the customer navigated away; payment_failure indicates checkout was attempted but payment was declined; out_of_stock indicates items became unavailable; price_change indicates a price change triggered cart exit. Null for non-abandoned carts. Supports abandonment root cause analysis.. Valid values are `session_timeout|inactivity|explicit_exit|payment_failure|out_of_stock|price_change`',
     `cart_number` STRING COMMENT 'Human-readable, externally referenceable business identifier for the cart instance. Used in customer service interactions, abandoned cart recovery email communications, and cross-system reconciliation between the e-commerce platform and the Order Management System (OMS). Formatted as CART- followed by a 10-digit sequence.. Valid values are `^CART-[0-9]{10}$`',
@@ -193,7 +191,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`cart` (
     `total_quantity` STRING COMMENT 'Aggregate unit count across all line items in the cart (sum of quantities for all SKUs). Supports Units Per Transaction (UPT) calculation and inventory reservation planning. Differs from item_count which counts distinct SKU lines.',
     `utm_campaign` STRING COMMENT 'Urchin Tracking Module (UTM) campaign parameter captured from the URL at cart creation, identifying the specific marketing campaign that drove the customer session (e.g., summer_sale_2024, loyalty_reactivation). Supports campaign-level Conversion Rate (CR), Average Order Value (AOV), and Gross Merchandise Value (GMV) attribution.',
     `utm_source` STRING COMMENT 'Urchin Tracking Module (UTM) source parameter captured from the URL at cart creation, identifying the marketing channel or platform that drove the customer to the storefront (e.g., google, facebook, email_newsletter). Supports digital marketing attribution, Customer Acquisition Cost (CAC) analysis, and Return on Investment (ROI) reporting for paid and organic channels.',
-    `web_session_id` BIGINT COMMENT 'add column web_session_id (BIGINT) with FK to ecommerce.web_session.web_session_id - carts are created within web sessions and this linkage is critical for conversion funnel analysis',
     CONSTRAINT pk_cart PRIMARY KEY(`cart_id`)
 ) COMMENT 'Represents a shopping cart instance created during a customers digital session on a storefront. Captures cart creation timestamp, last modified timestamp, cart status (active, abandoned, converted, expired), total item count, subtotal, applied promotion/coupon identifiers, discount amounts, estimated tax, estimated shipping, and the channel/storefront context. Includes digital promotion redemption details: promotion ID, coupon code, discount amount, redemption channel (web, mobile app, email link), redemption status (applied, validated, rejected, reversed), and customer identity reference. SSOT for cart-level data supporting abandoned cart recovery, AOV analysis, and promotion effectiveness measurement within the digital channel. Cart abandonment is determined by timeout or session expiry; recovery workflows are tracked in the abandoned_cart_recovery product.';
 
@@ -203,6 +200,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` (
     `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Cart analytics by merchandise category drive assortment performance reporting, category-level conversion analysis, and merchandising optimization decisions. Replaces denormalized product_category text',
     `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: Split shipments assign individual cart items to separate fulfillment orders; enables item-level fulfillment tracking for multi-node sourcing decisions and partial shipment reporting in retail order ma',
     `location_id` BIGINT COMMENT 'Reference to the physical store selected for BOPIS or ROPIS fulfillment of this cart line item. Null for ship-to-home or drop-ship items. Supports online-to-offline attribution and store-level demand signal analysis.',
+    `profile_id` BIGINT COMMENT 'Reference to the authenticated customer who owns this cart. Null for guest/anonymous sessions. Used for abandoned cart recovery, Customer Lifetime Value (CLTV) analysis, and personalization.',
     `promo_campaign_id` BIGINT COMMENT 'Reference to the item-level promotion applied to this cart line item at the time of add-to-cart. Null if no promotion was applied. Supports Pricing and Promotions Management analytics.',
     `sku_id` BIGINT COMMENT 'Reference to the master product record associated with this cart line item. Links to the product catalog managed in the customer master data system and the retail merchandising system Merchandising System (ORMS).',
     `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Cart items resolve pricing at add-to-cart time from sku_price, which provides channel-specific, zone-specific, and promotion-adjusted prices. Core business process: cart pricing resolution and price l',
@@ -242,8 +240,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`checkout` (
     `checkout_id` BIGINT COMMENT 'Unique system-generated identifier for a checkout session. Primary key for the checkout data product. Tracks the full funnel progression from cart review through order placement.',
     `associate_id` BIGINT COMMENT 'Foreign key linking to workforce.associate. Business justification: Employee checkout sessions require associate linkage for discount application at checkout, payroll deduction setup, and compliance verification with employee purchase policies—critical for employee be',
     `cart_id` BIGINT COMMENT 'Reference to the shopping cart that initiated this checkout session. Links the checkout funnel back to the cart and its line items in the e-commerce domain.',
-    `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Checkouts for internal orders (employee purchases, corporate procurement) need cost center attribution for GL posting, budget variance analysis, and departmental expense tracking in retail accounting.',
-    `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: Checkout completion triggers fulfillment order creation; checkout.fulfillment_order_id enables checkout-to-fulfillment reconciliation for abandoned-at-payment analysis and fulfillment SLA tracking fro',
     `header_id` BIGINT COMMENT 'Reference to the order record created upon successful checkout completion. Null for abandoned or expired checkouts. Represents the handoff boundary between the checkout domain and the order domain. Enables checkout-to-order attribution and funnel completion tracking.',
     `location_id` BIGINT COMMENT 'Reference to the physical store associated with this checkout when the fulfillment mode is Buy Online Pick Up In Store (BOPIS) or Reserve Online Pick Up In Store (ROPIS). Null for ship-to-home and drop-ship fulfillment modes.',
     `price_zone_id` BIGINT COMMENT 'Foreign key linking to pricing.price_zone. Business justification: Checkout must apply zone-specific pricing rules, tax jurisdictions, and fulfillment-based price adjustments from price_zone. Core business process: final order pricing calculation based on customer lo',
@@ -293,6 +289,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` (
     `digital_payment_id` BIGINT COMMENT 'Unique surrogate identifier for each digital payment transaction record in the e-commerce channel. Primary key for the digital_payment data product.',
     `ar_invoice_id` BIGINT COMMENT 'Foreign key linking to finance.ar_invoice. Business justification: Payment reconciliation and cash application require linking payment transactions to AR invoices for revenue recognition, DSO tracking, and financial close processes in retail accounting systems.',
     `associate_id` BIGINT COMMENT 'Foreign key linking to workforce.associate. Business justification: Employee purchases via payroll deduction or employee-specific payment methods require associate linkage for payroll system integration, purchase reconciliation, and employee benefit accounting—standar',
+    `campaign_id` BIGINT COMMENT 'Foreign key linking to marketing.campaign. Business justification: Payment transactions require campaign attribution for accurate ROAS calculation and marketing spend justification. Enables direct linkage of marketing investment to revenue, critical for CFO-level cam',
     `cart_id` BIGINT COMMENT 'Reference to the shopping cart associated with this payment transaction. Enables abandoned cart recovery analysis and checkout funnel attribution.',
     `checkout_id` BIGINT COMMENT 'Foreign key linking to ecommerce.checkout. Business justification: Payment transactions are processed during checkout sessions. Linking digital_payment to checkout provides complete funnel tracking from cart → checkout → payment. The checkout_id attribute is not curr',
     `payment_method_id` BIGINT COMMENT 'Foreign key linking to finance.payment_method. Business justification: Links payment transaction to stored payment instrument. Business need: payment method performance analysis (authorization rates by card type), fraud pattern detection by instrument, PCI compliance aud',
@@ -387,9 +384,10 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`search_query` (
     `search_query_id` BIGINT COMMENT 'Unique surrogate identifier for each on-site search query event recorded on the digital storefront. Primary key for the search_query data product.',
+    `associate_id` BIGINT COMMENT 'Foreign key linking to workforce.associate. Business justification: Associate search behavior on customer-facing or internal sites informs training needs (what products associates are researching), supports knowledge base improvements, and enables employee engagement',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Search performance reporting by buyer responsibility area enables merchandising teams to identify assortment gaps, optimize search relevance for their categories, and measure discoverability of their',
     `header_id` BIGINT COMMENT 'Reference to the order placed as a direct result of this search query within the same session. Null if is_purchase is False. Enables search-to-order revenue attribution and AOV (Average Order Value) analysis.',
     `profile_id` BIGINT COMMENT 'Reference to the authenticated customer who submitted the search query. Null for anonymous/guest visitors. Enables personalization, RFM (Recency Frequency Monetary) analysis, and CLTV (Customer Lifetime Value) attribution.',
-    `profit_center_id` BIGINT COMMENT 'Foreign key linking to finance.profit_center. Business justification: Search queries are attributed to profit centers for search-to-purchase conversion analysis, merchandising effectiveness by channel, and search investment ROI tracking in retail finance systems.',
     `category_id` BIGINT COMMENT 'Reference to the product category scope within which the search was executed, if the visitor scoped the search to a specific department or category (e.g., Electronics, Apparel). Null for site-wide searches. Supports category management and assortment depth analysis.',
     `storefront_id` BIGINT COMMENT 'Reference to the digital storefront (e.g., main e-commerce site, mobile app storefront, marketplace channel) on which the search query was submitted. Supports multi-storefront and omnichannel analytics.',
     `web_session_id` BIGINT COMMENT 'Reference to the web session during which this search query was submitted. Links the search event to the broader digital customer journey tracked in the web_session product.',
@@ -521,13 +519,12 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` (
     `abandoned_cart_recovery_id` BIGINT COMMENT 'Unique surrogate identifier for each abandoned cart recovery workflow execution record. Primary key for this entity. Role: TRANSACTION_HEADER.',
+    `associate_id` BIGINT COMMENT 'Foreign key linking to workforce.associate. Business justification: Employee purchase cart abandonment recovery (e.g., reminders for uniform orders, required equipment purchases, benefits enrollment purchases) requires associate linkage for targeted recovery campaigns',
     `campaign_id` BIGINT COMMENT 'Identifier of the marketing automation campaign or journey that triggered this recovery workflow execution (e.g., the e-commerce platform ID, Braze Canvas ID). Enables campaign-level aggregation of recovery performance metrics.',
     `cart_id` BIGINT COMMENT 'Reference to the abandoned shopping cart that triggered this recovery workflow. Links to the originating cart record in the e-commerce platform (the e-commerce platform).',
-    `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Recovery campaigns targeted by merchandise category enable category-specific incentive strategies, merchandising optimization, and category-level conversion funnel analysis. Buyers use category-level',
     `checkout_id` BIGINT COMMENT 'Foreign key linking to ecommerce.checkout. Business justification: Abandoned cart recovery workflows need to know WHERE in the checkout funnel the cart was abandoned (cart review, address entry, payment entry, etc.). The checkout entity tracks funnel progression with',
     `header_id` BIGINT COMMENT 'Reference to the order placed as a result of a successful cart recovery. Null when recovery status is not recovered. Enables direct revenue attribution from recovery campaigns.',
     `message_template_id` BIGINT COMMENT 'Identifier of the message template used for this recovery communication, as defined in the marketing automation platform (e.g., the e-commerce platform, Braze). Enables template-level performance analysis and A/B test tracking.',
-    `privacy_assessment_id` BIGINT COMMENT 'Foreign key linking to compliance.privacy_assessment. Business justification: Automated marketing based on cart abandonment requires privacy assessment. Retail must document legal basis for processing (legitimate interest vs consent), assess profiling risks, and demonstrate opt',
     `profile_id` BIGINT COMMENT 'Reference to the customer whose cart was abandoned. Used for recovery channel targeting, personalization, and Customer Lifetime Value (CLTV) attribution. PARTY_REFERENCE category per TRANSACTION_HEADER role.',
     `storefront_id` BIGINT COMMENT 'Reference to the digital storefront (e.g., web, mobile app, marketplace) where the cart was originally created. Supports channel-level recovery performance analysis.',
     `abandoned_cart_gmv` DECIMAL(18,2) COMMENT 'The total Gross Merchandise Value (GMV) of the cart at the time of abandonment, representing the potential revenue at risk. Used to prioritize high-value cart recovery efforts and measure recovery rate against at-risk GMV.',
@@ -621,6 +618,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` (
     `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Personalization rules scoped to merchandise categories for targeted product recommendations, promotional content, and assortment presentation. Category-level personalization strategy aligns digital ex',
     `segment_id` BIGINT COMMENT 'Identifier of the customer segment targeted by this personalization rule, enabling segment-specific experiences.',
     `fallback_personalization_rule_id` BIGINT COMMENT 'Self-referencing FK on personalization_rule (fallback_personalization_rule_id)',
+    `privacy_assessment_id` BIGINT COMMENT 'Foreign key linking to compliance.privacy_assessment. Business justification: Personalization algorithms processing personal data require DPIA under GDPR Article 35 for automated decision-making. Retail must assess profiling risks, document legal basis for behavioral targeting',
     `storefront_id` BIGINT COMMENT 'Identifier of the digital storefront where this personalization rule is applied.',
     `ab_test_variant` STRING COMMENT 'Specific variant or treatment group within the A/B test that this rule represents (e.g., control, variant_a, variant_b).',
     `algorithm_type` STRING COMMENT 'Machine learning or recommendation algorithm used by this rule to generate personalized experiences.. Valid values are `collaborative_filtering|content_based|hybrid|association_rules|popularity_based|contextual`',
@@ -661,6 +659,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` (
     `recommendation_id` BIGINT COMMENT 'Unique identifier for the product recommendation event. Primary key for the recommendation product.',
+    `associate_id` BIGINT COMMENT 'Foreign key linking to workforce.associate. Business justification: Personalized product recommendations for associates (employee purchase programs, uniform/equipment recommendations, role-specific product suggestions for training) require associate linkage for person',
     `campaign_id` BIGINT COMMENT 'Foreign key linking to marketing.campaign. Business justification: Recommendations can be campaign-driven (holiday gift guides, seasonal promotions). Tracks campaign influence on personalization strategy, measures incremental revenue from campaign-targeted recommenda',
     `cart_id` BIGINT COMMENT 'Identifier of the shopping cart to which the recommended product was added. Null if not added to cart.',
     `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Recommendations filtered and organized by merchandise category for cross-sell/upsell strategies within category boundaries. Category-level recommendation performance informs merchandising decisions on',
@@ -714,6 +713,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` (
     `promotion_banner_id` BIGINT COMMENT 'Unique identifier for the promotional banner. Primary key for the promotion banner entity.',
     `campaign_id` BIGINT COMMENT 'External marketing campaign identifier for cross-channel attribution and campaign performance tracking. May reference UTM campaign codes or marketing automation platform campaign IDs.',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Banner campaigns are charged to marketing cost centers for promotional spend tracking, budget variance analysis, and campaign cost management in retail finance systems.',
+    `profit_center_id` BIGINT COMMENT 'Foreign key linking to finance.profit_center. Business justification: Banners are attributed to profit centers for promotional effectiveness analysis, incremental margin contribution by channel, and promotional ROI tracking in retail management accounting systems.',
     `promo_campaign_id` BIGINT COMMENT 'Reference to the underlying promotion campaign that this banner represents. Links to the promotion entity.',
     `replaced_promotion_banner_id` BIGINT COMMENT 'Self-referencing FK on promotion_banner (replaced_promotion_banner_id)',
     `storefront_id` BIGINT COMMENT 'Reference to the digital storefront where this banner is displayed. Links to the storefront entity.',
@@ -916,9 +916,11 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`ecommerce`.`message_template` (
 
 -- ========= FOREIGN KEYS =========
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ADD CONSTRAINT `fk_ecommerce_storefront_digital_catalog_id` FOREIGN KEY (`digital_catalog_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`digital_catalog`(`digital_catalog_id`);
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ADD CONSTRAINT `fk_ecommerce_digital_catalog_storefront_id` FOREIGN KEY (`storefront_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`storefront`(`storefront_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ADD CONSTRAINT `fk_ecommerce_web_session_cart_id` FOREIGN KEY (`cart_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`cart`(`cart_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ADD CONSTRAINT `fk_ecommerce_web_session_storefront_id` FOREIGN KEY (`storefront_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`storefront`(`storefront_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ADD CONSTRAINT `fk_ecommerce_cart_storefront_id` FOREIGN KEY (`storefront_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`storefront`(`storefront_id`);
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ADD CONSTRAINT `fk_ecommerce_cart_web_session_id` FOREIGN KEY (`web_session_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`web_session`(`web_session_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ADD CONSTRAINT `fk_ecommerce_cart_item_cart_id` FOREIGN KEY (`cart_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`cart`(`cart_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ADD CONSTRAINT `fk_ecommerce_cart_item_web_session_id` FOREIGN KEY (`web_session_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`web_session`(`web_session_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ADD CONSTRAINT `fk_ecommerce_checkout_cart_id` FOREIGN KEY (`cart_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`cart`(`cart_id`);
@@ -969,7 +971,6 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `pci_assessme
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price Book ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `analytics_tracking_code` SET TAGS ('dbx_business_glossary_term' = 'Analytics Tracking ID');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `analytics_tracking_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `ccpa_opt_out_enabled` SET TAGS ('dbx_business_glossary_term' = 'California Consumer Privacy Act (CCPA) Opt-Out Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `channel_type` SET TAGS ('dbx_business_glossary_term' = 'Digital Channel Type');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `channel_type` SET TAGS ('dbx_value_regex' = 'web|mobile_app|marketplace|social_commerce|dark_store');
@@ -980,13 +981,10 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `currency_cod
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `customer_service_email` SET TAGS ('dbx_business_glossary_term' = 'Storefront Customer Service Email Address');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `customer_service_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `customer_service_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `customer_service_email` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `decommission_date` SET TAGS ('dbx_business_glossary_term' = 'Storefront Decommission Date');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `default_language_code` SET TAGS ('dbx_value_regex' = '^[a-z]{2}$');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `domain_url` SET TAGS ('dbx_business_glossary_term' = 'Storefront Domain URL');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `domain_url` SET TAGS ('dbx_value_regex' = '^https?://[a-zA-Z0-9.-]+.[a-zA-Z]{2,}(/.*)?$');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `domain_url` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `free_shipping_threshold` SET TAGS ('dbx_business_glossary_term' = 'Free Shipping Threshold Amount');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `gdpr_consent_required` SET TAGS ('dbx_business_glossary_term' = 'GDPR Consent Required Flag');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `is_bopis_enabled` SET TAGS ('dbx_business_glossary_term' = 'Buy Online Pick Up In Store (BOPIS) Enabled Flag');
@@ -1004,13 +1002,12 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `max_cart_lin
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `min_order_amount` SET TAGS ('dbx_business_glossary_term' = 'Minimum Order Amount');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `pci_compliance_level` SET TAGS ('dbx_business_glossary_term' = 'Payment Card Industry (PCI) Compliance Level');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `pci_compliance_level` SET TAGS ('dbx_value_regex' = 'level_1|level_2|level_3|level_4');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `pci_compliance_level` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `platform_version` SET TAGS ('dbx_business_glossary_term' = 'Commerce Platform Version');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `robots_indexing_policy` SET TAGS ('dbx_business_glossary_term' = 'Search Engine Robots Indexing Policy');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `robots_indexing_policy` SET TAGS ('dbx_value_regex' = 'index_follow|index_nofollow|noindex_follow|noindex_nofollow');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `seo_meta_title` SET TAGS ('dbx_business_glossary_term' = 'Storefront SEO Meta Title');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `session_timeout_minutes` SET TAGS ('dbx_business_glossary_term' = 'Session Timeout Duration (Minutes)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `site_code` SET TAGS ('dbx_business_glossary_term' = 'Salesforce Commerce Cloud (SFCC) Site ID');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `site_code` SET TAGS ('dbx_business_glossary_term' = 'the e-commerce platform (SFCC) Site ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `source_system_code` SET TAGS ('dbx_value_regex' = 'SFCC|ORMS|MDM|SAP|MANUAL');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `storefront_status` SET TAGS ('dbx_business_glossary_term' = 'Storefront Lifecycle Status');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ALTER COLUMN `storefront_status` SET TAGS ('dbx_value_regex' = 'active|inactive|maintenance|decommissioned|draft');
@@ -1020,7 +1017,6 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` SET TAGS ('dbx_data_t
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` SET TAGS ('dbx_subdomain' = 'channel_management');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Digital Category ID');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ALTER COLUMN `demand_forecast_id` SET TAGS ('dbx_business_glossary_term' = 'Demand Forecast Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ALTER COLUMN `inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Node Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ALTER COLUMN `license_permit_id` SET TAGS ('dbx_business_glossary_term' = 'License Permit Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Location Id (Foreign Key)');
@@ -1064,18 +1060,13 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `device_type
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `fulfillment_type` SET TAGS ('dbx_value_regex' = 'home_delivery|bopis|ropis|ship_from_store|drop_ship');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `geo_country_code` SET TAGS ('dbx_business_glossary_term' = 'Geographic Country Code');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `geo_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `ip_address` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `ip_address` SET TAGS ('dbx_pii_ip' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `session_duration_seconds` SET TAGS ('dbx_business_glossary_term' = 'Session Duration (Seconds)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `session_status` SET TAGS ('dbx_value_regex' = 'active|completed|abandoned|timed_out|bounced');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `session_token` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ALTER COLUMN `visitor_type` SET TAGS ('dbx_value_regex' = 'new|returning|authenticated|guest');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` SET TAGS ('dbx_subdomain' = 'shopper_engagement');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Converted Order ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Pickup Store ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
@@ -1095,38 +1086,25 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `currency_code` SET
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `data_consent_flag` SET TAGS ('dbx_business_glossary_term' = 'Data Processing Consent Flag');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `device_type` SET TAGS ('dbx_value_regex' = 'desktop|tablet|smartphone|smart_tv|other');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `discount_amount` SET TAGS ('dbx_business_glossary_term' = 'Cart Discount Amount');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `discount_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `discount_amount` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `estimated_shipping_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `estimated_shipping_amount` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `estimated_tax_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `estimated_tax_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `expiry_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Cart Expiry Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `fulfillment_type` SET TAGS ('dbx_value_regex' = 'ship_to_home|bopis|ropis|ship_from_store|drop_ship');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `ip_address` SET TAGS ('dbx_business_glossary_term' = 'Customer IP Address');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `ip_address` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `ip_address` SET TAGS ('dbx_pii_ip' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `is_abandoned` SET TAGS ('dbx_business_glossary_term' = 'Cart Abandoned Indicator');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `is_guest_cart` SET TAGS ('dbx_business_glossary_term' = 'Guest Cart Indicator');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `item_count` SET TAGS ('dbx_business_glossary_term' = 'Cart Item Count');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Cart Last Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `locale_code` SET TAGS ('dbx_value_regex' = '^[a-z]{2}_[A-Z]{2}$');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `recovery_email_sent` SET TAGS ('dbx_business_glossary_term' = 'Recovery Email Sent Indicator');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `recovery_email_sent` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `recovery_email_sent` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `saved_for_later_count` SET TAGS ('dbx_business_glossary_term' = 'Saved For Later Item Count');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `subtotal_amount` SET TAGS ('dbx_business_glossary_term' = 'Cart Subtotal Amount');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `subtotal_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `subtotal_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `total_amount` SET TAGS ('dbx_business_glossary_term' = 'Cart Total Amount');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `total_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `total_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ALTER COLUMN `total_quantity` SET TAGS ('dbx_business_glossary_term' = 'Cart Total Quantity');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` SET TAGS ('dbx_subdomain' = 'shopper_engagement');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Product ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Price Id (Foreign Key)');
@@ -1138,8 +1116,6 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `created_times
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `device_type` SET TAGS ('dbx_value_regex' = 'desktop|mobile|tablet|app');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `discount_amount` SET TAGS ('dbx_business_glossary_term' = 'Item Discount Amount');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `discount_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `discount_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `fulfillment_type` SET TAGS ('dbx_value_regex' = 'ship_to_home|bopis|ropis|ship_from_store|drop_ship');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `is_gift` SET TAGS ('dbx_business_glossary_term' = 'Gift Item Indicator');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `is_in_stock` SET TAGS ('dbx_business_glossary_term' = 'In-Stock Indicator at Add-to-Cart');
@@ -1148,40 +1124,28 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `item_status` 
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `item_status` SET TAGS ('dbx_value_regex' = 'active|removed|saved_for_later|purchased|expired');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `line_sequence` SET TAGS ('dbx_business_glossary_term' = 'Cart Item Line Sequence Number');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `line_subtotal` SET TAGS ('dbx_business_glossary_term' = 'Cart Item Line Subtotal');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `line_subtotal` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `line_subtotal` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `purchased_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Cart Item Purchased Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `quantity` SET TAGS ('dbx_business_glossary_term' = 'Cart Item Quantity');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `quantity_available` SET TAGS ('dbx_business_glossary_term' = 'Available Quantity at Add-to-Cart');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `removal_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Cart Item Removal Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `saved_for_later_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Saved-for-Later Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `tax_amount` SET TAGS ('dbx_business_glossary_term' = 'Cart Item Tax Amount');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `tax_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `tax_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ALTER COLUMN `tax_rate` SET TAGS ('dbx_business_glossary_term' = 'Cart Item Tax Rate');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` SET TAGS ('dbx_subdomain' = 'shopper_engagement');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Placed Order ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `price_zone_id` SET TAGS ('dbx_business_glossary_term' = 'Price Zone Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `address_id` SET TAGS ('dbx_business_glossary_term' = 'Shipping Address Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `web_session_id` SET TAGS ('dbx_business_glossary_term' = 'Digital Session ID');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `web_session_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `web_session_id` SET TAGS ('dbx_pii_ip' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `abandoned_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Checkout Abandoned Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `abandonment_step` SET TAGS ('dbx_business_glossary_term' = 'Checkout Abandonment Step');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `abandonment_step` SET TAGS ('dbx_value_regex' = 'cart_review|address_entry|shipping_selection|payment_entry|order_review');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `address_validation_status` SET TAGS ('dbx_business_glossary_term' = 'Shipping Address Validation Status');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `address_validation_status` SET TAGS ('dbx_value_regex' = 'not_validated|validated|failed|overridden');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `address_validation_status` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `address_validation_status` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Commerce Channel');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'web|mobile_app|in_store_kiosk|call_center');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `checkout_number` SET TAGS ('dbx_business_glossary_term' = 'Checkout Reference Number');
@@ -1193,46 +1157,29 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `currency_code`
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `current_step` SET TAGS ('dbx_business_glossary_term' = 'Current Checkout Step');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `current_step` SET TAGS ('dbx_value_regex' = 'cart_review|address_entry|shipping_selection|payment_entry|order_review|order_placed');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `device_type` SET TAGS ('dbx_value_regex' = 'desktop|mobile|tablet|app');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `discount_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `discount_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `fulfillment_mode` SET TAGS ('dbx_value_regex' = 'ship_to_home|bopis|ropis|drop_ship');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `gift_card_amount` SET TAGS ('dbx_business_glossary_term' = 'Gift Card Redemption Amount');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `gift_card_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `gift_card_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `initiated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Checkout Initiated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `ip_address` SET TAGS ('dbx_business_glossary_term' = 'Customer IP Address');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `ip_address` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `ip_address` SET TAGS ('dbx_pii_ip' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `is_address_entry_completed` SET TAGS ('dbx_business_glossary_term' = 'Address Entry Step Completed Flag');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `is_address_entry_completed` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `is_address_entry_completed` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `is_cart_review_completed` SET TAGS ('dbx_business_glossary_term' = 'Cart Review Step Completed Flag');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `is_gift_order` SET TAGS ('dbx_business_glossary_term' = 'Gift Order Flag');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `is_guest_checkout` SET TAGS ('dbx_business_glossary_term' = 'Guest Checkout Flag');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `is_order_review_completed` SET TAGS ('dbx_business_glossary_term' = 'Order Review Step Completed Flag');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `is_payment_entry_completed` SET TAGS ('dbx_business_glossary_term' = 'Payment Entry Step Completed Flag');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `is_shipping_selection_completed` SET TAGS ('dbx_business_glossary_term' = 'Shipping Selection Step Completed Flag');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `order_total_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `order_total_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `payment_status` SET TAGS ('dbx_business_glossary_term' = 'Payment Authorization Status');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `payment_status` SET TAGS ('dbx_value_regex' = 'pending|authorized|captured|declined|failed');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `promo_code` SET TAGS ('dbx_business_glossary_term' = 'Promotional Code');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `shipping_amount` SET TAGS ('dbx_business_glossary_term' = 'Shipping Charge Amount');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `shipping_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `shipping_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `store_credit_amount` SET TAGS ('dbx_business_glossary_term' = 'Store Credit Redemption Amount');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `store_credit_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `store_credit_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `subtotal_amount` SET TAGS ('dbx_business_glossary_term' = 'Checkout Subtotal Amount');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `subtotal_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `subtotal_amount` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `tax_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `tax_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` SET TAGS ('dbx_subdomain' = 'transaction_processing');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` SET TAGS ('dbx_subdomain' = 'shopper_engagement');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `ar_invoice_id` SET TAGS ('dbx_business_glossary_term' = 'Ar Invoice Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `checkout_id` SET TAGS ('dbx_business_glossary_term' = 'Checkout Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `payment_method_id` SET TAGS ('dbx_business_glossary_term' = 'Customer Payment Method Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
@@ -1245,31 +1192,17 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `authori
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `avs_result_code` SET TAGS ('dbx_business_glossary_term' = 'Address Verification Service (AVS) Result Code');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `billing_country_code` SET TAGS ('dbx_business_glossary_term' = 'Billing Country Code (ISO 3166-1 Alpha-3)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `billing_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `billing_country_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `billing_country_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `billing_postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `billing_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `capture_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Payment Capture Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_bin` SET TAGS ('dbx_business_glossary_term' = 'Card Bank Identification Number (BIN)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_bin` SET TAGS ('dbx_value_regex' = '^[0-9]{6,8}$');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_bin` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_bin` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_expiry_month` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_expiry_month` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_expiry_year` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_expiry_year` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_last_four` SET TAGS ('dbx_business_glossary_term' = 'Card Last Four Digits');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_last_four` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_last_four` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_last_four` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `card_network` SET TAGS ('dbx_value_regex' = 'visa|mastercard|amex|discover|unionpay|other');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `cvv_result_code` SET TAGS ('dbx_business_glossary_term' = 'Card Verification Value (CVV) Result Code');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `cvv_result_code` SET TAGS ('dbx_value_regex' = 'M|N|P|S|U');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `cvv_result_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `cvv_result_code` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `fraud_score` SET TAGS ('dbx_business_glossary_term' = 'Fraud Risk Score');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `fraud_screening_result` SET TAGS ('dbx_value_regex' = 'pass|review|reject');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `gateway_response_code` SET TAGS ('dbx_business_glossary_term' = 'Payment Gateway Response Code');
@@ -1279,21 +1212,11 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `install
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `is_recurring` SET TAGS ('dbx_business_glossary_term' = 'Recurring Payment Indicator');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `is_test_transaction` SET TAGS ('dbx_business_glossary_term' = 'Test Transaction Indicator');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `net_amount` SET TAGS ('dbx_business_glossary_term' = 'Net Payment Amount');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `net_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `net_amount` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `payment_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `payment_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `payment_channel` SET TAGS ('dbx_value_regex' = 'web|mobile_app|mobile_web|marketplace|bopis|ropis');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `payment_gateway` SET TAGS ('dbx_value_regex' = 'adyen|stripe|paypal|braintree|worldpay|other');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `payment_status` SET TAGS ('dbx_value_regex' = 'authorized|captured|declined|voided|refunded|partially_refunded');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `pci_token` SET TAGS ('dbx_business_glossary_term' = 'Payment Card Industry (PCI) DSS Tokenization Reference');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `pci_token` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `pci_token` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `refund_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `refund_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `refund_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Payment Refund Timestamp');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `tax_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `tax_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `three_ds_status` SET TAGS ('dbx_business_glossary_term' = '3D Secure (3DS) Authentication Status');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `three_ds_status` SET TAGS ('dbx_value_regex' = 'authenticated|attempted|failed|not_enrolled|not_applicable');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ALTER COLUMN `three_ds_version` SET TAGS ('dbx_business_glossary_term' = '3D Secure (3DS) Protocol Version');
@@ -1312,7 +1235,6 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ALTER COLUMN `sku_i
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ALTER COLUMN `ab_test_variant` SET TAGS ('dbx_business_glossary_term' = 'A/B Test Variant');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ALTER COLUMN `device_type` SET TAGS ('dbx_value_regex' = 'desktop|mobile|tablet|smart_tv|other');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ALTER COLUMN `displayed_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ALTER COLUMN `fulfillment_type` SET TAGS ('dbx_value_regex' = 'ship_to_home|bopis|ropis|ship_from_store|drop_ship');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ALTER COLUMN `geo_country_code` SET TAGS ('dbx_business_glossary_term' = 'Geographic Country Code');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ALTER COLUMN `geo_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -1334,9 +1256,10 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ALTER COLUMN `updat
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ALTER COLUMN `visitor_type` SET TAGS ('dbx_value_regex' = 'authenticated|guest|loyalty_member');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` SET TAGS ('dbx_subdomain' = 'shopper_engagement');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `ab_test_variant` SET TAGS ('dbx_business_glossary_term' = 'A/B Test Variant');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `clicked_sku` SET TAGS ('dbx_business_glossary_term' = 'Clicked SKU (Stock Keeping Unit)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
@@ -1360,7 +1283,7 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `result_cou
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `top_result_sku` SET TAGS ('dbx_business_glossary_term' = 'Top Result SKU (Stock Keeping Unit)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` SET TAGS ('dbx_subdomain' = 'transaction_processing');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` SET TAGS ('dbx_subdomain' = 'shopper_engagement');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
@@ -1379,8 +1302,6 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `publishe
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `purchase_channel` SET TAGS ('dbx_value_regex' = 'online|bopis|ropis|in_store|drop_ship|marketplace');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `review_body` SET TAGS ('dbx_business_glossary_term' = 'Review Body Text');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `review_language_code` SET TAGS ('dbx_value_regex' = '^[a-z]{2}(-[A-Z]{2})?$');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `reviewer_display_name` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `reviewer_display_name` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `reviewer_expertise_level` SET TAGS ('dbx_value_regex' = 'novice|regular|expert|top_reviewer');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `reviewer_location_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `sentiment_label` SET TAGS ('dbx_value_regex' = 'positive|neutral|negative');
@@ -1389,7 +1310,7 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `syndicat
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `syndication_source` SET TAGS ('dbx_value_regex' = 'native|bazaarvoice|powerreviews|yotpo|google|other');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` SET TAGS ('dbx_subdomain' = 'transaction_processing');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` SET TAGS ('dbx_subdomain' = 'shopper_engagement');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ALTER COLUMN `ab_test_id` SET TAGS ('dbx_business_glossary_term' = 'A/B Test ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Id (Foreign Key)');
@@ -1428,23 +1349,16 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ALTER COLUMN `total_traffic_a
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ALTER COLUMN `traffic_split_config` SET TAGS ('dbx_business_glossary_term' = 'Traffic Split Configuration');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ALTER COLUMN `visitor_code` SET TAGS ('dbx_business_glossary_term' = 'Visitor ID');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ALTER COLUMN `visitor_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ALTER COLUMN `visitor_code` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` SET TAGS ('dbx_subdomain' = 'shopper_engagement');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Recovery Campaign ID');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `checkout_id` SET TAGS ('dbx_business_glossary_term' = 'Checkout Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Recovered Order ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `message_template_id` SET TAGS ('dbx_business_glossary_term' = 'Recovery Message Template ID');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `privacy_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Privacy Assessment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `abandoned_cart_gmv` SET TAGS ('dbx_business_glossary_term' = 'Abandoned Cart Gross Merchandise Value (GMV)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `abandoned_cart_gmv` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `abandoned_cart_gmv` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `contact_address` SET TAGS ('dbx_business_glossary_term' = 'Customer Contact Address');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `contact_address` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `contact_address` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `conversion_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Recovery Conversion Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -1460,12 +1374,6 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN 
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `opt_out_flag` SET TAGS ('dbx_business_glossary_term' = 'Customer Opt-Out Flag');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `promotion_code` SET TAGS ('dbx_business_glossary_term' = 'Recovery Promotion Code');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `recovered_gmv` SET TAGS ('dbx_business_glossary_term' = 'Recovered Gross Merchandise Value (GMV)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `recovered_gmv` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `recovered_gmv` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `recovered_order_discount_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `recovered_order_discount_amount` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `recovered_order_net_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `recovered_order_net_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `recovery_channel` SET TAGS ('dbx_value_regex' = 'email|sms|push_notification|retargeting_ad|direct_mail');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `recovery_status` SET TAGS ('dbx_value_regex' = 'sent|opened|clicked|recovered|expired');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ALTER COLUMN `time_to_conversion_minutes` SET TAGS ('dbx_business_glossary_term' = 'Time to Conversion (Minutes)');
@@ -1481,7 +1389,6 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `sto
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `category_path` SET TAGS ('dbx_business_glossary_term' = 'Marketplace Category Path');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `competitor_price` SET TAGS ('dbx_business_glossary_term' = 'Competitor Reference Price');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `competitor_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `country_code` SET TAGS ('dbx_business_glossary_term' = 'Marketplace Country Code');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
@@ -1502,11 +1409,9 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `loc
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `locale_code` SET TAGS ('dbx_value_regex' = '^[a-z]{2}-[A-Z]{2}$');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `main_image_url` SET TAGS ('dbx_business_glossary_term' = 'Main Listing Image URL');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `marketplace_item_code` SET TAGS ('dbx_business_glossary_term' = 'Marketplace Item Identifier');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `marketplace_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `marketplace_rating` SET TAGS ('dbx_business_glossary_term' = 'Marketplace Product Rating');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `marketplace_seller_code` SET TAGS ('dbx_business_glossary_term' = 'Marketplace Seller ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `msrp` SET TAGS ('dbx_business_glossary_term' = 'Manufacturers Suggested Retail Price (MSRP)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `msrp` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `prime_eligible_flag` SET TAGS ('dbx_business_glossary_term' = 'Prime / Fast Shipping Eligibility Flag');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `reorder_threshold` SET TAGS ('dbx_business_glossary_term' = 'Reorder Threshold Quantity');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `review_count` SET TAGS ('dbx_business_glossary_term' = 'Marketplace Review Count');
@@ -1517,10 +1422,10 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `upc
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `upc` SET TAGS ('dbx_value_regex' = '^[0-9]{12}$');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` SET TAGS ('dbx_data_type' = 'reference_data');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` SET TAGS ('dbx_subdomain' = 'personalization_intelligence');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` SET TAGS ('dbx_subdomain' = 'channel_management');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ALTER COLUMN `ab_test_id` SET TAGS ('dbx_business_glossary_term' = 'A/B Test ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ALTER COLUMN `fallback_personalization_rule_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ALTER COLUMN `privacy_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Privacy Assessment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ALTER COLUMN `ab_test_variant` SET TAGS ('dbx_business_glossary_term' = 'A/B Test Variant');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ALTER COLUMN `algorithm_type` SET TAGS ('dbx_value_regex' = 'collaborative_filtering|content_based|hybrid|association_rules|popularity_based|contextual');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ALTER COLUMN `conversion_rate` SET TAGS ('dbx_business_glossary_term' = 'Conversion Rate (CR)');
@@ -1534,7 +1439,8 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ALTER COLUMN `pl
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ALTER COLUMN `rule_status` SET TAGS ('dbx_value_regex' = 'active|inactive|draft|testing|archived|scheduled');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ALTER COLUMN `rule_type` SET TAGS ('dbx_value_regex' = 'product_recommendation|content_personalization|search_ranking|promotional_targeting|email_personalization|homepage_personalization');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` SET TAGS ('dbx_subdomain' = 'personalization_intelligence');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` SET TAGS ('dbx_subdomain' = 'shopper_engagement');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `fulfillment_node_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Node Id (Foreign Key)');
@@ -1545,7 +1451,6 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `profile_
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `replenishment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Plan Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Recommended Product ID');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `superseded_recommendation_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `ab_test_variant` SET TAGS ('dbx_business_glossary_term' = 'A/B Test Variant');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `algorithm` SET TAGS ('dbx_business_glossary_term' = 'Recommendation Algorithm');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `clicked_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Recommendation Clicked Timestamp');
@@ -1566,10 +1471,10 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `time_to_
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `time_to_purchase_seconds` SET TAGS ('dbx_business_glossary_term' = 'Time to Purchase (Seconds)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ALTER COLUMN `visitor_type` SET TAGS ('dbx_value_regex' = 'new|returning|loyal|guest|registered');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` SET TAGS ('dbx_subdomain' = 'personalization_intelligence');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` SET TAGS ('dbx_subdomain' = 'channel_management');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion ID');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `replaced_promotion_banner_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `ab_test_variant` SET TAGS ('dbx_business_glossary_term' = 'A/B Test Variant');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `alt_text` SET TAGS ('dbx_business_glossary_term' = 'Alternative Text');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `banner_status` SET TAGS ('dbx_value_regex' = 'draft|scheduled|active|paused|expired|archived');
@@ -1580,13 +1485,10 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `creati
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `device_targeting` SET TAGS ('dbx_value_regex' = 'all|desktop|mobile|tablet');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `geo_targeting_country_code` SET TAGS ('dbx_business_glossary_term' = 'Geographic Targeting Country Code');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `mobile_asset_url` SET TAGS ('dbx_business_glossary_term' = 'Mobile Asset URL (Uniform Resource Locator)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `mobile_asset_url` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ALTER COLUMN `mobile_asset_url` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` SET TAGS ('dbx_subdomain' = 'personalization_intelligence');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` SET TAGS ('dbx_subdomain' = 'shopper_engagement');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ALTER COLUMN `bopis_appointment_id` SET TAGS ('dbx_business_glossary_term' = 'Bopis Appointment Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ALTER COLUMN `follow_up_site_notification_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Notification Location Id (Foreign Key)');
@@ -1609,8 +1511,6 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` SET TA
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` SET TAGS ('dbx_subdomain' = 'channel_management');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` SET TAGS ('dbx_association_edges' = 'ecommerce.storefront,supplychain.dc_facility');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` ALTER COLUMN `associate_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Storefront Fulfillment Network - Dc Facility Id');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Storefront Fulfillment Network - Storefront Id');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
@@ -1646,7 +1546,7 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_responsibility` ALTER COLUM
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_responsibility` ALTER COLUMN `primary_responsibility_flag` SET TAGS ('dbx_business_glossary_term' = 'Primary Responsibility Indicator');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_responsibility` ALTER COLUMN `storefront_responsibility_status` SET TAGS ('dbx_business_glossary_term' = 'Assignment Status');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`catalog_node_inventory` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`catalog_node_inventory` SET TAGS ('dbx_subdomain' = 'personalization_intelligence');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`catalog_node_inventory` SET TAGS ('dbx_subdomain' = 'channel_management');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`catalog_node_inventory` SET TAGS ('dbx_association_edges' = 'ecommerce.digital_catalog,fulfillment.node');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`catalog_node_inventory` ALTER COLUMN `catalog_node_inventory_id` SET TAGS ('dbx_business_glossary_term' = 'Catalog Node Inventory - Catalog Node Inventory Id');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`catalog_node_inventory` ALTER COLUMN `digital_catalog_id` SET TAGS ('dbx_business_glossary_term' = 'Catalog Node Inventory - Digital Catalog Id');
@@ -1660,8 +1560,5 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`catalog_node_inventory` ALTER COLUMN `
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`catalog_node_inventory` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Lead Time');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`catalog_node_inventory` ALTER COLUMN `reorder_point` SET TAGS ('dbx_business_glossary_term' = 'Reorder Point Threshold');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`message_template` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`message_template` SET TAGS ('dbx_subdomain' = 'personalization_intelligence');
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`message_template` SET TAGS ('dbx_subdomain' = 'channel_management');
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`message_template` ALTER COLUMN `message_template_id` SET TAGS ('dbx_business_glossary_term' = 'Message Template Identifier');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`message_template` ALTER COLUMN `parent_message_template_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`message_template` ALTER COLUMN `reply_to_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`message_template` ALTER COLUMN `sender_email` SET TAGS ('dbx_confidential' = 'true');

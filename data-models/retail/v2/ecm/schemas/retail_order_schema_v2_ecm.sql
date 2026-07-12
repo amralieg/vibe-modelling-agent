@@ -1,5 +1,5 @@
 -- Schema for Domain: order | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:25
+-- Generated on: 2026-07-12 13:53:24
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`order` COMMENT 'Manages omnichannel order lifecycle from cart creation through fulfillment including online orders, in-store POS transactions, BOPIS (Buy Online Pick Up In Store), ROPIS, ship-from-store (SFS), and drop-ship orders. Tracks order headers, line items, payment methods, fulfillment status, delivery tracking, and RMA (Return Merchandise Authorization). Integrates with OMS for end-to-end order orchestration.';
@@ -8,12 +8,12 @@ CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`order` COMMENT 'Manages omnichan
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`order`.`header` (
     `header_id` BIGINT COMMENT 'Unique identifier for the order header record. Primary key for the order header entity.',
     `account_id` BIGINT COMMENT 'Foreign key linking to customer.account. Business justification: B2B and account-based retail operations require tracking orders against customer accounts for credit limit enforcement, account statement generation, billing cycle management, and corporate purchasing',
+    `compliance_program_id` BIGINT COMMENT 'Foreign key linking to compliance.compliance_program. Business justification: Orders subject to regulatory frameworks (GDPR for EU customers, CCPA for CA residents, export controls) must link to compliance programs. Enables compliance reporting, audit trails, and regulatory fil',
     `corporate_account_id` BIGINT COMMENT 'Foreign key linking to customer.corporate_account. Business justification: Corporate B2B retail requires linking orders to corporate accounts (distinct from individual accounts) for contract pricing application, consolidated invoicing, credit terms enforcement, annual spend',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Retail orders require cost center allocation for internal accounting, departmental P&L tracking, B2B order costing, and management reporting. Standard practice in multi-department retail operations fo',
     `fulfillment_node_id` BIGINT COMMENT 'Reference to the store, distribution center, or warehouse responsible for fulfilling this order. Cross-domain reference to inventory or store domain.',
     `loyalty_membership_id` BIGINT COMMENT 'Foreign key linking to loyalty.membership. Business justification: Online and phone orders must link to loyalty membership for points accrual, tier-based pricing, personalized promotions, and member purchase history tracking—core retail loyalty operations.',
     `price_zone_id` BIGINT COMMENT 'add column pricing_price_zone_id (BIGINT) with FK to pricing.price_zone.price_zone_id - orders should capture the price zone in effect at time of purchase for audit and analytics',
-    `privacy_assessment_id` BIGINT COMMENT 'Foreign key linking to compliance.privacy_assessment. Business justification: Orders containing personal data trigger GDPR Article 35 DPIAs and CCPA risk assessments. DPOs assess order processing activities for privacy risks, data minimization, and subject rights. Links orders',
     `profile_id` BIGINT COMMENT 'Reference to the customer who placed the order. Links to customer master data.',
     `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Retail operations tag customer orders with selling season for seasonal performance analysis, trend reporting, merchandising plan effectiveness measurement, and comparing actual sales against seasonal',
     `purchase_order_id` BIGINT COMMENT 'Foreign key linking to supplychain.purchase_order. Business justification: Retail drop-ship orders where vendor ships directly to customer require tracking the source supplier PO for cost reconciliation, vendor chargeback processing, and fulfillment exception handling. Essen',
@@ -190,7 +190,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`order`.`pos_transaction` (
     `header_id` BIGINT COMMENT 'Reference to the order header for omnichannel transactions such as BOPIS (Buy Online Pick Up In Store) pickups or ship-from-store fulfillments that originated as digital orders.',
     `loyalty_membership_id` BIGINT COMMENT 'Foreign key linking to loyalty.membership. Business justification: POS transactions require direct membership link for real-time points posting, tier validation, member-only pricing, receipt balance printing, and daily loyalty reconciliation—critical in-store loyalty',
     `original_transaction_pos_transaction_id` BIGINT COMMENT 'Reference to the original POS transaction being returned or exchanged when transaction_type is return or exchange.',
-    `pci_assessment_id` BIGINT COMMENT 'Foreign key linking to compliance.pci_assessment. Business justification: PCI DSS assessments scope cardholder data environments including POS terminals. Auditors trace transactions to validate encryption, tokenization, and secure transmission controls. Links transactions t',
     `location_id` BIGINT COMMENT 'Identifier of the retail store location where the transaction occurred.',
     `pos_store_location_id` BIGINT COMMENT 'FK to store.store_location.store_location_id — POS transaction to store location is required for all store-level sales reporting, comparable sales calculations, and store P&L. Every retail operational report needs this join.',
     `pos_terminal_id` BIGINT COMMENT 'Unique identifier of the POS terminal device used to process the transaction.',
@@ -372,7 +371,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`order`.`discount` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`order`.`cancellation` (
     `cancellation_id` BIGINT COMMENT 'Unique identifier for the cancellation event. Primary key for the cancellation record.',
     `associate_id` BIGINT COMMENT 'Reference to the employee or manager who approved the cancellation. Null if no approval required or system-auto-approved.',
-    `audit_finding_id` BIGINT COMMENT 'Foreign key linking to compliance.audit_finding. Business justification: Cancellations may result from compliance audit findings (fraud detection failures, sanctions screening gaps, address verification issues). Links cancellations to findings for root cause analysis, corr',
     `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Cancellation accounting (restocking fees, cancellation charges, refund processing) requires GL account assignment for proper revenue/expense recognition, financial reporting, and audit compliance. Sta',
     `header_id` BIGINT COMMENT 'Reference to the parent order that was cancelled. Links this cancellation to the originating order header.',
     `order_line_id` BIGINT COMMENT 'Reference to the specific order line item that was cancelled. Null if the entire order was cancelled rather than individual lines.',
@@ -504,6 +502,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`order`.`gift_card` (
     `header_id` BIGINT COMMENT 'Identifier of the order transaction in which this gift card was purchased. Links gift card to originating sales transaction. Nullable for cards issued outside normal order flow (e.g., corporate bulk issuance).',
     `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Gift card liability tracking requires specific GL account for deferred revenue, breakage recognition, balance sheet reporting, and ASC 606 compliance. Role-prefixed because gift cards have multiple GL',
     `location_id` BIGINT COMMENT 'Identifier of the physical store location where the gift card was issued or sold. Nullable for non-store channels.',
+    `pci_assessment_id` BIGINT COMMENT 'Foreign key linking to compliance.pci_assessment. Business justification: Gift cards with PANs fall under PCI DSS scope. Assessors validate gift card issuance, activation, and redemption controls. Links gift cards to assessment scope for cardholder data environment validati',
     `profile_id` BIGINT COMMENT 'Identifier of the customer who purchased the gift card. May differ from the recipient. Nullable if purchased anonymously or by guest.',
     `promo_campaign_id` BIGINT COMMENT 'Identifier of the promotional campaign associated with this gift card issuance (e.g., holiday bonus card, purchase-with-purchase offer). Nullable for non-promotional cards.',
     `replacement_for_gift_card_id` BIGINT COMMENT 'Self-referencing FK on gift_card (replacement_for_gift_card_id)',
@@ -665,58 +664,30 @@ ALTER TABLE `vibe_retail_v1`.`order`.`header` SET TAGS ('dbx_data_type' = 'trans
 ALTER TABLE `vibe_retail_v1`.`order`.`header` SET TAGS ('dbx_subdomain' = 'order_management');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order Header ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `account_id` SET TAGS ('dbx_business_glossary_term' = 'Account Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `corporate_account_id` SET TAGS ('dbx_business_glossary_term' = 'Corporate Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `loyalty_membership_id` SET TAGS ('dbx_business_glossary_term' = 'Membership Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `privacy_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Privacy Assessment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Source Purchase Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_address_line1` SET TAGS ('dbx_business_glossary_term' = 'Billing Address Line 1');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_address_line1` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_address_line1` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_address_line2` SET TAGS ('dbx_business_glossary_term' = 'Billing Address Line 2');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_address_line2` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_address_line2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_city` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_city` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_country_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_country_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_state_province` SET TAGS ('dbx_business_glossary_term' = 'Billing State or Province');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_state_province` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `billing_state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Order Channel');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'web|mobile_app|store_pos|call_center|marketplace|kiosk');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `customer_email` SET TAGS ('dbx_business_glossary_term' = 'Customer Email Address');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `customer_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `customer_email` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `customer_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `customer_phone` SET TAGS ('dbx_business_glossary_term' = 'Customer Phone Number');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `customer_phone` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `customer_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `locale` SET TAGS ('dbx_value_regex' = '^[a-z]{2}_[A-Z]{2}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `oms_reference_code` SET TAGS ('dbx_business_glossary_term' = 'Order Management System (OMS) Reference ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `order_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,20}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_address_line1` SET TAGS ('dbx_business_glossary_term' = 'Shipping Address Line 1');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_address_line1` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_address_line1` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_address_line2` SET TAGS ('dbx_business_glossary_term' = 'Shipping Address Line 2');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_address_line2` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_address_line2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_city` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_city` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_country_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_country_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_state_province` SET TAGS ('dbx_business_glossary_term' = 'Shipping State or Province');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_state_province` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ALTER COLUMN `shipping_state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` SET TAGS ('dbx_subdomain' = 'order_management');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `order_line_id` SET TAGS ('dbx_business_glossary_term' = 'Order Line Identifier (ID)');
@@ -731,12 +702,10 @@ ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `sku_price_id` SE
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Uom Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `cancellation_reason_code` SET TAGS ('dbx_value_regex' = 'OUT_OF_STOCK|CUSTOMER_REQUEST|PRICING_ERROR|FRAUD|PAYMENT_FAILED|ADDRESS_INVALID');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `cost_of_goods_sold` SET TAGS ('dbx_business_glossary_term' = 'Cost of Goods Sold (COGS)');
-ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `cost_of_goods_sold` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `fulfillment_method` SET TAGS ('dbx_value_regex' = 'SHIP_TO_HOME|BOPIS|ROPIS|SFS|DROP_SHIP|IN_STORE_PICKUP');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `gtin` SET TAGS ('dbx_business_glossary_term' = 'Global Trade Item Number (GTIN)');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{14}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `margin_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `original_sku` SET TAGS ('dbx_business_glossary_term' = 'Original Stock Keeping Unit (SKU)');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `original_sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,14}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`order_line` ALTER COLUMN `return_reason_code` SET TAGS ('dbx_value_regex' = 'DEFECTIVE|WRONG_ITEM|NOT_AS_DESCRIBED|NO_LONGER_NEEDED|SIZE_FIT|DAMAGED_IN_TRANSIT');
@@ -753,7 +722,6 @@ ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `status_histo
 ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `carrier_service_id` SET TAGS ('dbx_business_glossary_term' = 'Carrier Service Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Triggering User ID');
-ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `created_by_process` SET TAGS ('dbx_business_glossary_term' = 'Record Created By Process');
 ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `customer_notification_channel` SET TAGS ('dbx_value_regex' = 'EMAIL|SMS|PUSH|IN_APP|NONE');
@@ -770,7 +738,6 @@ ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `tracking_num
 ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `transition_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Status Transition Reason Code');
 ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `transition_reason_description` SET TAGS ('dbx_business_glossary_term' = 'Status Transition Reason Description');
 ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `transition_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Status Transition Timestamp');
-ALTER TABLE `vibe_retail_v1`.`order`.`status_history` ALTER COLUMN `triggering_user_name` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`line_status_history` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`order`.`line_status_history` SET TAGS ('dbx_subdomain' = 'order_management');
 ALTER TABLE `vibe_retail_v1`.`order`.`line_status_history` ALTER COLUMN `line_status_history_id` SET TAGS ('dbx_business_glossary_term' = 'Order Line Status History ID');
@@ -795,13 +762,12 @@ ALTER TABLE `vibe_retail_v1`.`order`.`line_status_history` ALTER COLUMN `trackin
 ALTER TABLE `vibe_retail_v1`.`order`.`line_status_history` ALTER COLUMN `tracking_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{10,35}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`line_status_history` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` SET TAGS ('dbx_subdomain' = 'point_sale');
+ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` SET TAGS ('dbx_subdomain' = 'store_transactions');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `pos_transaction_id` SET TAGS ('dbx_business_glossary_term' = 'Point-of-Sale (POS) Transaction ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `loyalty_membership_id` SET TAGS ('dbx_business_glossary_term' = 'Membership Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `original_transaction_pos_transaction_id` SET TAGS ('dbx_business_glossary_term' = 'Original Transaction ID');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `pci_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Pci Assessment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `pos_terminal_id` SET TAGS ('dbx_business_glossary_term' = 'Point-of-Sale (POS) Terminal ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Cashier ID');
@@ -811,19 +777,13 @@ ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `season_id` 
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `stock_ledger_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Ledger Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `fulfillment_type` SET TAGS ('dbx_value_regex' = 'in_store_purchase|bopis_pickup|ropis_pickup|ship_from_store|curbside_pickup');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `loyalty_card_number` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `loyalty_card_number` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `receipt_email` SET TAGS ('dbx_business_glossary_term' = 'Receipt Email Address');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `receipt_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `receipt_email` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `receipt_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `receipt_phone` SET TAGS ('dbx_business_glossary_term' = 'Receipt Phone Number');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `receipt_phone` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `receipt_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `transaction_status` SET TAGS ('dbx_value_regex' = 'completed|voided|suspended|refunded|partially_refunded');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ALTER COLUMN `transaction_type` SET TAGS ('dbx_value_regex' = 'sale|return|exchange|void|no_sale');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` SET TAGS ('dbx_subdomain' = 'point_sale');
+ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` SET TAGS ('dbx_subdomain' = 'store_transactions');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `pos_transaction_line_id` SET TAGS ('dbx_business_glossary_term' = 'Point of Sale (POS) Transaction Line ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Cashier ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
@@ -834,7 +794,6 @@ ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `sku_pr
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `stock_ledger_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Ledger Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `category_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `cost_of_goods_sold` SET TAGS ('dbx_business_glossary_term' = 'Cost of Goods Sold (COGS)');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `cost_of_goods_sold` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `coupon_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,20}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `department_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `ean` SET TAGS ('dbx_business_glossary_term' = 'European Article Number (EAN)');
@@ -845,8 +804,6 @@ ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `gtin` 
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `promotion_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,20}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `return_reason_code` SET TAGS ('dbx_value_regex' = 'defective|wrong_item|changed_mind|damaged|expired|other');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `serial_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,30}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `serial_number` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_device' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,20}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `tax_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,10}$');
@@ -856,75 +813,43 @@ ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `void_r
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `weight_actual` SET TAGS ('dbx_business_glossary_term' = 'Actual Weight');
 ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction_line` ALTER COLUMN `weight_unit` SET TAGS ('dbx_value_regex' = 'lb|kg|oz|g');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` SET TAGS ('dbx_subdomain' = 'point_sale');
+ALTER TABLE `vibe_retail_v1`.`order`.`payment` SET TAGS ('dbx_subdomain' = 'store_transactions');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `bank_account_id` SET TAGS ('dbx_business_glossary_term' = 'Bank Account Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `bank_account_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `bank_account_id` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `plan_id` SET TAGS ('dbx_business_glossary_term' = 'BNPL (Buy Now Pay Later) Installment Plan ID');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `plan_id` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `gift_card_id` SET TAGS ('dbx_business_glossary_term' = 'Gift Card Number');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `gift_card_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `gift_card_id` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `pci_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Pci Assessment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `amount` SET TAGS ('dbx_business_glossary_term' = 'Payment Tender Amount');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `authorization_code` SET TAGS ('dbx_business_glossary_term' = 'Payment Authorization Code');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `authorization_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `avs_result_code` SET TAGS ('dbx_business_glossary_term' = 'AVS (Address Verification Service) Result Code');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `avs_result_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_address_line1` SET TAGS ('dbx_business_glossary_term' = 'Billing Address Line 1');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_address_line1` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_address_line1` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_address_line2` SET TAGS ('dbx_business_glossary_term' = 'Billing Address Line 2');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_address_line2` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_address_line2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_city` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_city` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_postal_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_state_province` SET TAGS ('dbx_business_glossary_term' = 'Billing State or Province');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_state_province` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `billing_state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `bnpl_provider` SET TAGS ('dbx_business_glossary_term' = 'BNPL (Buy Now Pay Later) Provider');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `card_brand` SET TAGS ('dbx_business_glossary_term' = 'Payment Card Brand');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `card_expiry_month` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `card_expiry_month` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `card_expiry_year` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `card_expiry_year` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `cardholder_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `cardholder_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Payment Channel');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'web|mobile_app|in_store_pos|call_center|kiosk|third_party');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `cvv_result_code` SET TAGS ('dbx_business_glossary_term' = 'CVV (Card Verification Value) Result Code');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `cvv_result_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `digital_wallet_type` SET TAGS ('dbx_value_regex' = 'apple_pay|google_pay|samsung_pay|paypal|venmo|other');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `fraud_decision` SET TAGS ('dbx_value_regex' = 'approved|declined|review|challenge');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `fraud_decision` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `fraud_score` SET TAGS ('dbx_business_glossary_term' = 'Fraud Risk Score');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `fraud_score` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `masked_pan` SET TAGS ('dbx_business_glossary_term' = 'Masked Primary Account Number (PAN)');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `masked_pan` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `masked_pan` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `method_type` SET TAGS ('dbx_business_glossary_term' = 'Payment Method Type');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `payment_status` SET TAGS ('dbx_business_glossary_term' = 'Payment Settlement Status');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `payment_status` SET TAGS ('dbx_value_regex' = 'authorized|captured|settled|declined|voided|refunded');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `processor_reference_code` SET TAGS ('dbx_business_glossary_term' = 'Payment Processor Reference ID');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `processor_reference_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `tender_sequence` SET TAGS ('dbx_business_glossary_term' = 'Tender Sequence Number');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `three_ds_authentication_result` SET TAGS ('dbx_business_glossary_term' = '3DS (3-D Secure) Authentication Result');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `three_ds_authentication_result` SET TAGS ('dbx_value_regex' = 'authenticated|not_authenticated|attempted|unavailable|error');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `three_ds_authentication_result` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `three_ds_version` SET TAGS ('dbx_business_glossary_term' = '3DS (3-D Secure) Protocol Version');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `token` SET TAGS ('dbx_business_glossary_term' = 'PCI DSS (Payment Card Industry Data Security Standard) Payment Token');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `token` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `token` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`order`.`discount` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`order`.`discount` SET TAGS ('dbx_subdomain' = 'point_sale');
+ALTER TABLE `vibe_retail_v1`.`order`.`discount` SET TAGS ('dbx_subdomain' = 'store_transactions');
 ALTER TABLE `vibe_retail_v1`.`order`.`discount` ALTER COLUMN `discount_id` SET TAGS ('dbx_business_glossary_term' = 'Discount Identifier');
 ALTER TABLE `vibe_retail_v1`.`order`.`discount` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`discount` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order Identifier (ID)');
@@ -946,12 +871,9 @@ ALTER TABLE `vibe_retail_v1`.`order`.`discount` ALTER COLUMN `percentage` SET TA
 ALTER TABLE `vibe_retail_v1`.`order`.`discount` ALTER COLUMN `reason_code` SET TAGS ('dbx_business_glossary_term' = 'Discount Reason Code');
 ALTER TABLE `vibe_retail_v1`.`order`.`discount` ALTER COLUMN `reason_description` SET TAGS ('dbx_business_glossary_term' = 'Discount Reason Description');
 ALTER TABLE `vibe_retail_v1`.`order`.`discount` ALTER COLUMN `source_system_discount_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Discount Identifier (ID)');
-ALTER TABLE `vibe_retail_v1`.`order`.`discount` ALTER COLUMN `tax_treatment_flag` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`discount` ALTER COLUMN `tax_treatment_flag` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`cancellation` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`order`.`cancellation` SET TAGS ('dbx_subdomain' = 'order_management');
 ALTER TABLE `vibe_retail_v1`.`order`.`cancellation` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Approver ID');
-ALTER TABLE `vibe_retail_v1`.`order`.`cancellation` ALTER COLUMN `audit_finding_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Finding Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`cancellation` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`cancellation` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`cancellation` ALTER COLUMN `primary_cancellation_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Processing Agent ID');
@@ -978,10 +900,7 @@ ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `header_id` SET TAGS ('
 ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `reservation_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Reservation Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `order_line_id` SET TAGS ('dbx_business_glossary_term' = 'Order Line Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Pickup Location Identifier (ID)');
-ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `superseded_hold_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `address_verification_status` SET TAGS ('dbx_value_regex' = 'verified|failed|partial_match|not_verified');
-ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `address_verification_status` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `address_verification_status` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `customer_notification_channel` SET TAGS ('dbx_value_regex' = 'email|sms|push_notification|phone|in_app');
 ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Hold Duration in Minutes');
 ALTER TABLE `vibe_retail_v1`.`order`.`hold` ALTER COLUMN `end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Hold End Timestamp');
@@ -1001,7 +920,6 @@ ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `promise_id` SET TAG
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `carrier_id` SET TAGS ('dbx_business_glossary_term' = 'Carrier Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `carrier_service_id` SET TAGS ('dbx_business_glossary_term' = 'Carrier Service Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
-ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `revised_promise_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `accuracy_flag` SET TAGS ('dbx_business_glossary_term' = 'Promise Accuracy Flag');
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `calculation_source` SET TAGS ('dbx_business_glossary_term' = 'Promise Calculation Source');
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `calculation_source` SET TAGS ('dbx_value_regex' = 'carrier_api|static_sla|dom_engine|manual_override|inventory_availability');
@@ -1013,26 +931,20 @@ ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `last_modified_times
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `order_channel` SET TAGS ('dbx_value_regex' = 'web|mobile_app|store|call_center|marketplace');
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `promise_status` SET TAGS ('dbx_value_regex' = 'active|fulfilled|breached|revised|cancelled');
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `promise_type` SET TAGS ('dbx_value_regex' = 'standard|expedited|same_day|next_day|two_day|scheduled');
-ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `shipping_address_country_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `shipping_address_country_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `shipping_address_postal_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `shipping_address_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `sla_breach_flag` SET TAGS ('dbx_business_glossary_term' = 'Service Level Agreement (SLA) Breach Flag');
 ALTER TABLE `vibe_retail_v1`.`order`.`promise` ALTER COLUMN `sla_target_hours` SET TAGS ('dbx_business_glossary_term' = 'Service Level Agreement (SLA) Target Hours');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` SET TAGS ('dbx_subdomain' = 'gift_subscription');
+ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` SET TAGS ('dbx_subdomain' = 'value_instruments');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Source Order ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Liability Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Issuing Store ID');
+ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `pci_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Pci Assessment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Purchaser Customer ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion ID');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `replacement_for_gift_card_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Storefront Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `barcode` SET TAGS ('dbx_business_glossary_term' = 'Barcode Value');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `card_number` SET TAGS ('dbx_business_glossary_term' = 'Gift Card Number');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `card_number` SET TAGS ('dbx_value_regex' = '^[0-9]{16,19}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `card_number` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `card_number` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `card_status` SET TAGS ('dbx_business_glossary_term' = 'Gift Card Status');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `card_status` SET TAGS ('dbx_value_regex' = 'inactive|active|suspended|expired|depleted|cancelled');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `card_type` SET TAGS ('dbx_business_glossary_term' = 'Gift Card Type');
@@ -1045,24 +957,16 @@ ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `issuing_channel` 
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `pin_code` SET TAGS ('dbx_business_glossary_term' = 'Personal Identification Number (PIN) Code');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `pin_code` SET TAGS ('dbx_value_regex' = '^[0-9]{4,8}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `pin_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `pin_code` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `program_code` SET TAGS ('dbx_business_glossary_term' = 'Gift Card Program Code');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `qr_code` SET TAGS ('dbx_business_glossary_term' = 'Quick Response (QR) Code');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `recipient_email` SET TAGS ('dbx_business_glossary_term' = 'Recipient Email Address');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `recipient_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `recipient_email` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `recipient_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `recipient_phone` SET TAGS ('dbx_business_glossary_term' = 'Recipient Phone Number');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `recipient_phone` SET TAGS ('dbx_value_regex' = '^+?[0-9]{10,15}$');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `recipient_phone` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ALTER COLUMN `recipient_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` SET TAGS ('dbx_subdomain' = 'gift_subscription');
+ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` SET TAGS ('dbx_subdomain' = 'value_instruments');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Cashier ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ALTER COLUMN `gift_card_id` SET TAGS ('dbx_business_glossary_term' = 'Gift Card Number');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ALTER COLUMN `gift_card_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ALTER COLUMN `gift_card_id` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
@@ -1086,7 +990,7 @@ ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ALTER COLUMN `sourc
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ALTER COLUMN `transaction_status` SET TAGS ('dbx_value_regex' = 'pending|approved|declined|reversed|completed|failed');
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ALTER COLUMN `transaction_type` SET TAGS ('dbx_value_regex' = 'activation|load|redemption|balance_inquiry|escheatment|reversal');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`order`.`subscription` SET TAGS ('dbx_subdomain' = 'gift_subscription');
+ALTER TABLE `vibe_retail_v1`.`order`.`subscription` SET TAGS ('dbx_subdomain' = 'value_instruments');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `subscription_id` SET TAGS ('dbx_business_glossary_term' = 'Subscription Identifier');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `carrier_id` SET TAGS ('dbx_business_glossary_term' = 'Carrier Id (Foreign Key)');
@@ -1096,11 +1000,8 @@ ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `loyalty_member
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `payment_method_id` SET TAGS ('dbx_business_glossary_term' = 'Payment Method Identifier');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer Identifier');
-ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `renewed_from_subscription_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Revenue Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `address_id` SET TAGS ('dbx_business_glossary_term' = 'Shipping Address Identifier');
-ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Storefront Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `amount` SET TAGS ('dbx_business_glossary_term' = 'Subscription Amount');
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ALTER COLUMN `auto_renewal_flag` SET TAGS ('dbx_business_glossary_term' = 'Auto-Renewal Flag');

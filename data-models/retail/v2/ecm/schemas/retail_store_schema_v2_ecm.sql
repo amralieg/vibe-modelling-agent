@@ -1,5 +1,5 @@
 -- Schema for Domain: store | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:26
+-- Generated on: 2026-07-12 13:53:26
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`store` COMMENT 'Manages physical retail locations including hypermarkets, department stores, discount outlets, dark stores, and micro-fulfillment centers (MFC). Owns store master records, planograms (POG), gondola and endcap configurations, footfall metrics, comp sales (SSS - Same-Store Sales), visual merchandising standards, POS terminal inventory, and store-level P&L. Supports store operations and omnichannel fulfillment as ship-from-store nodes.';
@@ -10,7 +10,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`location` (
     `format_id` BIGINT COMMENT 'Foreign key linking to store.store_format. Business justification: Every store location is classified by a store format (hypermarket, discount outlet, department store, etc.). The store_location record currently denormalizes format_type as a STRING. Adding FK to stor',
     `legal_entity_id` BIGINT COMMENT 'add column legal_entity_id (BIGINT) with FK to finance.legal_entity.legal_entity_id - store locations operate under specific legal entities for statutory and tax reporting purposes',
     `price_zone_id` BIGINT COMMENT 'Foreign key linking to pricing.price_zone. Business justification: Stores belong to price zones for regional pricing strategies. This is a fundamental retail concept - stores in the same geographic area or market segment share pricing rules. No visible redundant colu',
-    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: store.location has region_code (STRING) but no FK to store.region. Adding region_id -> store.region.region_id establishes the authoritative geographic hierarchy link between a physical store location ',
+    `fulfillment_node_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Every store has a primary DC assignment for standard replenishment routing. Fundamental retail supply chain topology required for: replenishment order routing, freight cost allocation, lead time calcu',
     `accessibility_certified` BOOLEAN COMMENT 'Indicates whether the store location is certified as fully accessible for customers with disabilities, meeting ADA (Americans with Disabilities Act) or equivalent local accessibility standards. True = certified accessible; False = not certified or non-compliant.',
     `address_line1` STRING COMMENT 'Primary street address line for the store location (street number and name). Used for customer navigation, delivery routing, and regulatory filings. Organizational contact data classified as confidential.',
     `address_line2` STRING COMMENT 'Secondary address line for the store location (suite, unit, building). Null if not applicable. Organizational contact data classified as confidential.',
@@ -40,7 +40,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`location` (
     `parking_capacity` STRING COMMENT 'Total number of customer parking spaces available at the store location. Used for site selection, customer convenience analysis, and BOPIS/ROPIS pickup planning. Null for urban locations without dedicated parking.',
     `phone_number` STRING COMMENT 'Primary contact phone number for the store location. Used for customer inquiries, BOPIS/ROPIS coordination, and operational communications. Organizational contact data classified as confidential.',
     `postal_code` STRING COMMENT 'Postal code or ZIP code for the store location. Used for delivery routing, trade area analysis, and demographic segmentation. Organizational contact data classified as confidential.',
-    `primary_dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Every store has a primary DC assignment for standard replenishment routing. Fundamental retail supply chain topology required for: replenishment order routing, freight cost allocation, lead time calcu',
+    `region_code` STRING COMMENT 'Code identifying the retail region to which this store location belongs. Used for hierarchical reporting, regional strategy, and executive-level performance analysis.',
     `ropis_capable` BOOLEAN COMMENT 'Indicates whether this store location supports ROPIS (Reserve Online Pick Up In Store) fulfillment, where customers reserve items online and complete purchase in-store. True = ROPIS enabled; False = ROPIS not available.',
     `selling_square_footage` DECIMAL(18,2) COMMENT 'Square footage of customer-accessible selling floor space, excluding back-of-house, storage, and office areas. Used for sales per square foot calculations, planogram (POG) planning, and merchandising density analysis.',
     `sfs_capable` BOOLEAN COMMENT 'Indicates whether this store location is enabled as a Ship-from-Store (SFS) fulfillment node, capable of picking, packing, and shipping e-commerce orders directly from store inventory. True = SFS enabled; False = SFS not available.',
@@ -185,7 +185,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`fixture` (
     `location_id` BIGINT COMMENT 'Identifier of the retail store location where this fixture is currently assigned. Links to the store master record.',
     `merchandising_planogram_id` BIGINT COMMENT 'Identifier of the current planogram (POG - shelf layout diagram) assigned to this fixture. Links to the planogram master record for product placement instructions.',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Individual fixtures are assigned to promotional campaigns—retailers allocate endcaps, promotional tables, and seasonal displays to specific campaigns. Visual merchandising and store operations teams t',
-    `store_planogram_id` BIGINT COMMENT 'Foreign key linking to store.store_planogram. Business justification: Physical store fixtures (gondolas, endcaps) are placed and configured according to store planograms. Adding store_planogram_id -> store.store_planogram.store_planogram_id links each fixture to the pla',
+    `store_planogram_id` BIGINT COMMENT 'Foreign key linking to store.store_planogram. Business justification: A physical store fixture (gondola, endcap, display unit) is placed and configured according to a specific store planogram (POG). Adding store_planogram_id to fixture creates the direct link between th',
     `vendor_id` BIGINT COMMENT 'Identifier of the vendor or supplier from whom the fixture was purchased. Links to the supplier master record for procurement history and vendor performance tracking.',
     `ada_compliant_flag` BOOLEAN COMMENT 'Indicates whether the fixture meets ADA accessibility requirements for height, reach range, and clearance. True indicates compliant, false indicates non-compliant or exempted.',
     `adjustable_shelves_flag` BOOLEAN COMMENT 'Indicates whether the fixture has adjustable shelf heights. True enables flexible merchandising for varying product sizes, false indicates fixed shelf positions.',
@@ -225,8 +225,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`fixture` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`traffic_count` (
     `traffic_count_id` BIGINT COMMENT 'Primary key for traffic_count',
     `campaign_id` BIGINT COMMENT 'Foreign key linking to marketing.campaign. Business justification: Campaign effectiveness measured via foot traffic lift analysis. Retail analytics attribute in-store traffic increases to marketing campaigns for ROI calculation and media mix optimization. Core market',
-    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Traffic counts are measured at store entrances AND internal zones (counting_zone_code, zone_type columns exist). When a counting zone corresponds to a store department, linking department_id -> store.',
-    `kpi_value_id` BIGINT COMMENT 'Foreign key linking to analytics.kpi_value. Business justification: Footfall metrics (conversion rate, dwell time, peak occupancy) are KPIs calculated from traffic_count data for customer analytics. Store operations and marketing teams track these metrics in performan',
+    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Traffic count sensors are deployed at store entrances AND internal department zones (counting_zone_code, counting_zone_name, zone_type columns exist on traffic_count). When a traffic count record repr',
     `location_id` BIGINT COMMENT 'Identifier of the retail location where the traffic count was measured. Links to the store master record.',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Footfall measurement during promotional periods quantifies campaign-driven traffic—retailers tag traffic counts to campaigns for incremental traffic attribution. Store operations and marketing analyti',
     `accuracy_confidence_percent` DECIMAL(18,2) COMMENT 'Estimated accuracy confidence level of the measurement as a percentage (e.g., 95.5 indicates 95.5% confidence). Provided by advanced sensor systems with built-in quality scoring.',
@@ -263,13 +262,11 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`traffic_count` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`comparable_sales` (
     `comparable_sales_id` BIGINT COMMENT 'Primary key for comparable_sales',
     `campaign_id` BIGINT COMMENT 'Foreign key linking to marketing.campaign. Business justification: Comp sales analysis by campaign measures promotional lift and marketing ROI. Retail finance and marketing teams require campaign attribution for sales variance analysis, budget justification, and prom',
-    `cluster_id` BIGINT COMMENT 'Foreign key linking to store.cluster. Business justification: Comparable store sales (SSS) analysis is a core retail KPI that is routinely performed at cluster level — comparing performance of stores within the same cluster. comparable_sales already has location',
     `financial_period_id` BIGINT COMMENT 'Foreign key linking to finance.financial_period. Business justification: Comp sales reporting requires alignment to fiscal periods for year-over-year variance analysis, investor reporting, and same-store sales metrics—standard retail financial reporting process tied to fis',
     `format_id` BIGINT COMMENT 'Foreign key linking to store.store_format. Business justification: Comparable sales records currently denormalize store_format as a STRING. Adding FK to store_format product allows joining to get format_code, format_name, format_description, format_type, size_band_mi',
     `kpi_value_id` BIGINT COMMENT 'Foreign key linking to analytics.kpi_value. Business justification: Comp sales is a primary retail KPI; each comparable_sales record represents a kpi_value instance for comp_sales_growth_rate KPI. Direct semantic relationship for investor reporting and operational per',
     `location_id` BIGINT COMMENT 'Identifier of the retail store location for which comparable sales are being reported. Links to the store master record.',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Comparable sales analysis isolates promotional campaign impact—finance and merchandising teams attribute sales lifts and traffic increases to specific campaigns. Comp sales reporting by campaign enabl',
-    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: comparable_sales has reporting_region as a STRING column (denormalized). Adding region_id -> store.region.region_id provides a proper FK to the region master for geographic rollup of comp sales perfor',
     `department_id` BIGINT COMMENT 'add column store_department_id (BIGINT) with FK to store.department.department_id - comp sales are analyzed at department level in addition to store level',
     `closure_days` STRING COMMENT 'Number of days the store was closed during the reporting period. Used to adjust comp sales calculations for partial-period operations.',
     `closure_flag` BOOLEAN COMMENT 'Boolean indicator (True/False) denoting whether the store was temporarily closed for any portion of the reporting period (e.g., due to weather, emergency, renovation). Impacts comp sales qualification and interpretation.',
@@ -303,6 +300,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`comparable_sales` (
     `reporting_period_end_date` DATE COMMENT 'The last day of the reporting period for which comparable sales are being measured. Follows yyyy-MM-dd format.',
     `reporting_period_start_date` DATE COMMENT 'The first day of the reporting period for which comparable sales are being measured. Follows yyyy-MM-dd format.',
     `reporting_period_type` STRING COMMENT 'The granularity of the reporting period for this comparable sales record (week, month, quarter, or year).. Valid values are `week|month|quarter|year`',
+    `reporting_region` STRING COMMENT 'The geographic region or market to which this store belongs for reporting purposes (e.g., Northeast, Southwest, EMEA, APAC). Used for regional comp sales aggregation and analysis.',
     `sales_per_sqft` DECIMAL(18,2) COMMENT 'Current period net sales divided by store size in square feet. Key productivity metric measuring revenue efficiency per unit of retail space.',
     `store_number` STRING COMMENT 'Business-facing store number or code used for operational identification and reporting. Human-readable identifier for the store.',
     `store_open_date` DATE COMMENT 'The date the store first opened for business. Used to determine eligibility for comparable sales reporting based on minimum operating period requirements.',
@@ -396,7 +394,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`remodel` (
     `campaign_id` BIGINT COMMENT 'Foreign key linking to marketing.campaign. Business justification: Store remodels trigger grand re-opening campaigns, promotional events, and customer communication programs. Marketing operations require linking remodel projects to campaigns for budget allocation, cr',
     `vendor_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor. Business justification: Remodel projects are executed by general contractors who are vendors. Linking the contractor vendor enables payment processing via AP, warranty claim tracking, contractor performance evaluation, and p',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Remodel project expenses charge to cost centers for capital budget tracking, variance reporting, and project accounting—standard practice for monitoring capital expenditure against approved budgets in',
-    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Store remodels are scoped to specific departments (e.g., grocery reset, apparel department renovation). remodel currently has impacted_departments as a STRING (denormalized list). Adding department_id',
+    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Store remodel projects are frequently scoped to specific departments (e.g., a produce department refresh, a pharmacy renovation). The remodel table has impacted_departments as a STRING field, which is',
     `fixed_asset_id` BIGINT COMMENT 'Foreign key linking to finance.fixed_asset. Business justification: Capital remodels create or modify fixed assets requiring capitalization, depreciation tracking, and asset register updates—mandatory for GAAP compliance and property, plant & equipment accounting in r',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Store remodels are often launched with grand reopening promotional campaigns—retailers coordinate remodel completion with campaign timing for maximum traffic impact. Real estate and marketing teams tr',
     `location_id` BIGINT COMMENT 'Identifier of the retail location undergoing remodel. Links to the store master record.',
@@ -414,6 +412,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`remodel` (
     `contractor_reference_number` STRING COMMENT 'External reference identifier or contract number assigned by the contractor for this remodel project. Used for invoice reconciliation and vendor coordination.',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this remodel project record was first created in the system. Used for audit trail and data lineage tracking.',
     `format_change_flag` BOOLEAN COMMENT 'Indicates whether the remodel includes a change in store format or concept (e.g., converting from discount format to hypermarket, or introducing new department layouts). True means format conversion; false means format unchanged.',
+    `impacted_departments` STRING COMMENT 'Comma-separated list of store departments or categories affected by the remodel (e.g., grocery, apparel, electronics, pharmacy). Used for merchandising planning and assortment adjustments during remodel.',
     `inspection_completion_date` DATE COMMENT 'Date when final building inspections and occupancy certifications were completed and approved by local authorities. Required before store can reopen to customers.',
     `last_modified_timestamp` TIMESTAMP COMMENT 'Timestamp when this remodel project record was last updated. Used for audit trail, change tracking, and data synchronization.',
     `new_fixture_count` STRING COMMENT 'Total number of new fixtures (gondolas, endcaps, display units) installed during the remodel. Used for asset tracking and visual merchandising planning.',
@@ -438,6 +437,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`cluster` (
     `cluster_id` BIGINT COMMENT 'Unique identifier for the store cluster. Primary key.',
     `loyalty_program_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_program. Business justification: Store clusters drive differentiated loyalty strategies (tier thresholds, reward catalogs, campaign targeting). Retail operations align loyalty program rules to cluster segmentation for localized membe',
     `parent_cluster_id` BIGINT COMMENT 'Reference to a parent cluster if this cluster is part of a hierarchical clustering structure (e.g., sub-clusters within a regional cluster). Null for top-level clusters.',
+    `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Promotional campaigns are designed and deployed at cluster level—urban clusters receive different offers than suburban or rural clusters based on demographics and competitive intensity. Marketing and',
     `reporting_hierarchy_id` BIGINT COMMENT 'Foreign key linking to analytics.reporting_hierarchy. Business justification: Store clusters form reporting hierarchies (cluster → region → division) for aggregated performance reporting. Corporate reporting requires hierarchical rollup of store performance through cluster stru',
     `allows_overlap` BOOLEAN COMMENT 'Indicates whether a store can belong to multiple clusters of this type simultaneously. True for concurrent clustering schemes (e.g., a store can be in both an assortment cluster and a pricing zone cluster); false for mutually exclusive schemes.',
     `assortment_depth_strategy` STRING COMMENT 'Planned depth of product assortment for this cluster. Deep assortment offers extensive variety within categories; moderate offers balanced selection; shallow offers limited SKU count; curated offers highly selective premium assortment. Drives OTB planning and space allocation.. Valid values are `deep|moderate|shallow|curated`',
@@ -477,9 +477,9 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`cluster` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`audit` (
     `audit_id` BIGINT COMMENT 'Unique identifier for the store audit record. Primary key.',
     `associate_id` BIGINT COMMENT 'Identifier of the individual or system that conducted the audit. May be employee ID, contractor ID, inspector badge number, or system identifier.',
+    `campaign_id` BIGINT COMMENT 'Foreign key linking to marketing.campaign. Business justification: Audits verify campaign execution compliance (promotional signage accuracy, pricing compliance, display standards). Store operations and marketing teams require campaign-specific audit tracking for pro',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Audit findings result in corrective action expenses (remediation, fines, training) charged to cost centers for accountability tracking and budget impact analysis—standard operational expense allocatio',
-    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Store audits (food safety, compliance, operational) are frequently scoped to specific departments (e.g., deli, pharmacy, produce). Adding department_id -> store.department.department_id allows audit r',
-    `dq_result_id` BIGINT COMMENT 'Foreign key linking to analytics.dq_result. Business justification: Store audits validate data quality (inventory accuracy, price accuracy); audit results map to dq_result records for compliance reporting. Regulatory audits and internal controls require linking audit',
+    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Store operational audits (food safety, compliance, visual merchandising) are frequently scoped to a specific department within a store location (e.g., deli, pharmacy, produce). The audit table already',
     `location_id` BIGINT COMMENT 'Identifier of the retail location where the audit was conducted. Links to the store master record.',
     `merchandising_planogram_id` BIGINT COMMENT 'Foreign key linking to merchandising.planogram. Business justification: Visual merchandising audits verify planogram compliance. Real business process: field teams audit stores against specific planogram versions, scoring fixture execution, shelf positioning, and facing c',
     `previous_audit_id` BIGINT COMMENT 'Identifier of the previous audit of the same type conducted at this store, enabling trend analysis. Null for first audit.',
@@ -528,7 +528,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`audit` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`license` (
     `license_id` BIGINT COMMENT 'Unique identifier for the store license record. Primary key. Role: MASTER_AGREEMENT.',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: License fees and compliance costs charge to cost centers for expense allocation and budget tracking—standard overhead accounting for regulatory compliance expenses in retail operations.',
-    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Licenses and permits are often department-specific within a store (e.g., pharmacy license, deli/food service permit, alcohol license for a specific department). Adding department_id -> store.departmen',
+    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Regulatory licenses and permits are often issued at the department level within a store (e.g., pharmacy license, deli/food service permit, alcohol sales license for a specific department). The license',
     `license_permit_id` BIGINT COMMENT 'Foreign key linking to compliance.license_permit. Business justification: Store licenses (alcohol, pharmacy, food service) are regulatory licenses managed in compliance.license_permit master. Business need: unified license renewal tracking, regulatory filing preparation, co',
     `location_id` BIGINT COMMENT 'Reference to the store location that holds this license. Links to store_location master record.',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Regulated product promotions require license verification—alcohol, tobacco, pharmacy, and lottery promotions are restricted by license type and jurisdiction. Compliance teams link licenses to campaign',
@@ -655,7 +655,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`sales_territory` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`store_profit_loss` (
     `store_profit_loss_id` BIGINT COMMENT 'Unique identifier for the store-level profit and loss record. Primary key for the store P&L data product.',
-    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Store P&L records can be captured at department level (department-level P&L is standard in retail for gross margin management). Adding department_id -> store.department.department_id enables departmen',
+    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Store P&L records can be produced at the department level (department P&L) in addition to the store level. Retailers commonly track gross margin, labor cost, and shrinkage by department for performanc',
     `financial_period_id` BIGINT COMMENT 'Identifier of the fiscal period (week, month, quarter, or year) to which this P&L record applies.',
     `location_id` BIGINT COMMENT 'Identifier of the retail location (hypermarket, department store, discount outlet, dark store, or micro-fulfillment center) for which this P&L record is reported.',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Store P&L attributes promotional costs and revenue to campaigns—finance teams allocate promotional discounts, vendor funding, and incremental labor to specific campaigns. Store-level P&L by campaign e',
@@ -696,7 +696,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`store_profit_loss` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` (
     `ship_from_store_node_id` BIGINT COMMENT 'Unique identifier for the ship-from-store fulfillment node. Primary key for this entity.',
-    `campaign_id` BIGINT COMMENT 'Foreign key linking to marketing.campaign. Business justification: Omnichannel campaigns drive ship-from-store orders; fulfillment nodes track campaign-attributed order volume for capacity planning and marketing attribution. E-commerce operations require campaign lin',
     `inventory_node_id` BIGINT COMMENT 'Foreign key linking to inventory.inventory_node. Business justification: Ship-from-store nodes are stores functioning as fulfillment centers within the inventory network. Linking to inventory_node enables ATP queries, allocation logic, and replenishment planning to treat S',
     `location_id` BIGINT COMMENT 'Reference to the physical store location that serves as this fulfillment node. Links to the store master record.',
     `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Omnichannel promotional offers are node-specific—BOPIS promotions, same-day delivery discounts, and curbside pickup incentives are tied to fulfillment node capabilities. E-commerce and store operation',
@@ -743,7 +742,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` (
     `direct_store_delivery_id` BIGINT COMMENT 'Unique identifier for the DSD receiving transaction. Primary key for the DSD receiving record.',
     `ap_invoice_id` BIGINT COMMENT 'Foreign key linking to finance.ap_invoice. Business justification: DSD receipts trigger AP invoice matching for three-way match (PO, receipt, invoice) and payment processing—core procure-to-pay process ensuring accurate vendor payment and accrual accounting.',
-    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Direct Store Delivery receipts are received into specific store departments (e.g., beverages to grocery department, snacks to convenience department). Adding department_id -> store.department.departme',
+    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Direct Store Delivery (DSD) receipts are delivered to specific departments within a store (e.g., beverages to the grocery department, snacks to the convenience aisle). The DSD record has location_id a',
     `inbound_shipment_id` BIGINT COMMENT 'Foreign key linking to supplychain.inbound_shipment. Business justification: DSD store deliveries are often part of larger multi-stop vendor shipment manifests managed by supply chain. Links store-level receipt to shipment-level tracking for freight reconciliation, multi-locat',
     `inbound_appointment_id` BIGINT COMMENT 'Foreign key linking to supplychain.inbound_appointment. Business justification: DSD receiving at stores often coordinates with DC-managed vendor delivery appointments for consolidated multi-stop deliveries. Links store receipt to supply chain appointment scheduling system for on-',
     `location_id` BIGINT COMMENT 'Identifier of the retail store location where the DSD delivery was received. Links to the store master record.',
@@ -751,7 +750,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` (
     `purchase_order_id` BIGINT COMMENT 'Reference to the purchase order that authorized this DSD delivery. May be null for scan-based trading arrangements.',
     `associate_id` BIGINT COMMENT 'Identifier of the store associate who physically received and processed the DSD delivery. Used for accountability and training purposes.',
     `inventory_node_id` BIGINT COMMENT 'Foreign key linking to inventory.inventory_node. Business justification: DSD receiving at stores must link to inventory_node for stock positioning, ATP calculation, and replenishment planning. Store location alone doesnt provide network-level inventory visibility required',
-    `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: DSD receipts record which SKUs were delivered in each direct store delivery. Essential for DSD invoice reconciliation, vendor compliance tracking, and scan-based trading settlement. Each receipt line ',
+    `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: DSD receipts record which SKUs were delivered in each direct store delivery. Essential for DSD invoice reconciliation, vendor compliance tracking, and scan-based trading settlement. Each receipt line',
     `vendor_id` BIGINT COMMENT 'Identifier of the DSD supplier or vendor who delivered the merchandise directly to the store. Typically beverage, snack, bread, or dairy vendors.',
     `chargeback_amount` DECIMAL(18,2) COMMENT 'Total chargeback amount assessed against the supplier for compliance violations, quantity discrepancies, or quality issues. Deducted from accounts payable.',
     `chargeback_reason` STRING COMMENT 'Description of the reason for the chargeback assessment. Common reasons include short shipment, damaged goods, temperature violations, or late delivery.',
@@ -792,61 +791,49 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`store`.`region` (
     `region_id` BIGINT COMMENT 'Primary key for region',
-    `parent_region_id` BIGINT COMMENT 'Self-referencing foreign key to the parent region in the geographic hierarchy (e.g., a sub-region rolls up to a macro-region). Null for top-level regions.',
-    `area_sq_km` DECIMAL(18,2) COMMENT 'Total geographic area of the region expressed in square kilometres. Used for store density analysis, market penetration calculations, and territory planning.',
-    `climate_zone` STRING COMMENT 'Köppen-Geiger climate classification zone for the region. Influences seasonal merchandise planning, HVAC standards for stores, and cold-chain logistics requirements.',
-    `region_code` STRING COMMENT 'Short, externally-known alphanumeric code that uniquely identifies the region across operational systems (e.g., NE, APAC-SOUTH). Used in reporting, store master data, and cross-system integration.',
-    `country_code` STRING COMMENT 'ISO 3166-1 alpha-3 three-letter country code for the primary country this region belongs to (e.g., GBR, USA, DEU). Used for regulatory, tax, and currency alignment.',
-    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this region record was first created in the data platform. Used for audit trail, data lineage, and SCD-2 history management. Format: yyyy-MM-ddTHH:mm:ss.SSSXXX.',
-    `currency_code` STRING COMMENT 'ISO 4217 three-letter currency code for the primary trading currency used in this region (e.g., GBP, USD, EUR). Drives pricing, P&L reporting, and financial consolidation.',
-    `data_privacy_framework` STRING COMMENT 'Primary data privacy regulatory framework applicable to customer data collected in this region (e.g., GDPR for EU, CCPA for California, PDPA for Thailand). Drives consent management and data retention policies.',
-    `ecommerce_enabled` BOOLEAN COMMENT 'Indicates whether the e-commerce platform is active and accepting orders for delivery or collection within this region. Drives digital marketing spend allocation and last-mile logistics planning.',
-    `effective_end_date` DATE COMMENT 'Date on which this region definition ceased to be operationally effective. Null for currently active records. Supports SCD-2 history and GDPR audit requirements.',
-    `effective_start_date` DATE COMMENT 'Date from which this region definition became operationally effective. Supports SCD-2 history tracking and enables point-in-time analysis of regional boundaries and assignments.',
-    `external_reference_code` STRING COMMENT 'Region identifier as used in external partner systems, government statistical classifications (e.g., NUTS code in Europe, FIPS code in the USA), or third-party data providers. Enables cross-system reconciliation.',
-    `franchise_model` BOOLEAN COMMENT 'Indicates whether stores in this region operate under a franchise model rather than direct corporate ownership. Affects P&L consolidation, compliance obligations, and operational reporting scope.',
-    `gdp_per_capita_usd` DECIMAL(18,2) COMMENT 'Gross Domestic Product (GDP) per capita for the region expressed in USD, sourced from national statistics or IMF data. Used as a proxy for consumer purchasing power in assortment and pricing strategy.',
-    `gdp_reference_year` STRING COMMENT 'The calendar year to which the GDP per capita figure refers, enabling users to assess data currency.',
-    `hierarchy_level` STRING COMMENT 'Numeric depth of this region within the geographic hierarchy. Level 1 is the top (e.g., global zone), increasing integers represent finer granularity (e.g., country, macro-region, sub-region, district).',
-    `hierarchy_path` STRING COMMENT 'Materialised slash-delimited path of region codes from root to this node (e.g., GLOBAL/EMEA/UK/NORTH). Enables efficient subtree queries without recursive CTEs.',
-    `hq_address_line1` STRING COMMENT 'First line of the street address for the regions administrative headquarters office. Used for official correspondence, regulatory filings, and field operations coordination.',
-    `hq_city` STRING COMMENT 'City in which the regions administrative headquarters is located. Used for correspondence, regulatory filings, and geographic reporting.',
-    `hq_country_code` STRING COMMENT 'ISO 3166-1 alpha-3 country code for the country in which the regions administrative headquarters is located. May differ from the regions operational country in cross-border management structures.',
-    `hq_postal_code` STRING COMMENT 'Postal or ZIP code of the regions administrative headquarters. Used for correspondence, tax jurisdiction mapping, and logistics routing.',
-    `is_current` BOOLEAN COMMENT 'SCD-2 indicator that is True for the currently active version of the region record and False for superseded historical versions. Simplifies current-state queries without date-range filtering.',
-    `language_code` STRING COMMENT 'IETF BCP 47 language tag representing the primary language used in this region for store communications, signage, and customer-facing content (e.g., en-GB, fr-FR, de-DE).',
-    `latitude` DECIMAL(18,2) COMMENT 'Decimal latitude of the geographic centroid of the region in WGS-84 coordinate system. Used for mapping, proximity analysis, and logistics optimisation.',
-    `longitude` DECIMAL(18,2) COMMENT 'Decimal longitude of the geographic centroid of the region in WGS-84 coordinate system. Used for mapping, proximity analysis, and logistics optimisation.',
-    `market_maturity` STRING COMMENT 'Assessment of the retail market development stage within the region. Drives investment strategy, promotional intensity, and format mix decisions (e.g., emerging markets favour discount formats).',
-    `region_name` STRING COMMENT 'Full human-readable name of the region as used in business reporting and store operations (e.g., North-East, Pacific Rim). Displayed in dashboards, planograms, and territory management tools.',
-    `notes` STRING COMMENT 'Free-text field for operational notes, boundary change explanations, or special instructions relevant to this region. Intended for internal use by the store operations and data governance teams.',
-    `omnichannel_enabled` BOOLEAN COMMENT 'Indicates whether stores in this region are enabled for omnichannel fulfilment capabilities such as click-and-collect (BOPIS), ship-from-store (SFS), and same-day delivery. True means at least one omnichannel service is live.',
-    `population` BIGINT COMMENT 'Estimated total resident population within the region boundary. Sourced from national census or third-party demographic data. Used for market sizing, store count planning, and catchment analysis.',
-    `population_reference_year` STRING COMMENT 'The calendar year to which the population figure refers, enabling users to assess data currency and apply appropriate growth adjustments.',
-    `region_manager` STRING COMMENT 'Full name of the senior retail operations manager accountable for this region. Used for escalation routing, performance review, and organisational reporting. Classified confidential as it identifies an internal employee in a named role.',
-    `region_manager_email` STRING COMMENT 'Corporate email address of the region manager. Used for automated alerts, escalation workflows, and operational communications. Classified as confidential PII.',
-    `region_type` STRING COMMENT 'Categorical classification of the regions primary business purpose. operational covers day-to-day store management; sales covers revenue territory; franchise covers franchisee groupings; distribution covers supply-chain zones; compliance covers regulatory jurisdictions.',
-    `regulatory_zone` STRING COMMENT 'Identifier for the regulatory or compliance zone governing retail operations in this region (e.g., EU Single Market, US Federal, APAC Free Trade Zone). Determines applicable labour, food safety, and consumer protection regulations.',
-    `short_name` STRING COMMENT 'Abbreviated display name for the region used in space-constrained UI elements, POS terminal screens, and printed reports (e.g., NE Region, SW).',
-    `shrink_rate` DECIMAL(18,2) COMMENT 'Retail shrinkage rate for the region expressed as a percentage of net sales, encompassing theft, administrative error, and supplier fraud. Used for loss-prevention benchmarking and security resource allocation.',
-    `source_system_code` STRING COMMENT 'Code identifying the upstream operational system from which this region record was sourced (e.g., the retail merchandising system, the store master data system). Used for data lineage and reconciliation.',
-    `sss_index` DECIMAL(18,2) COMMENT 'Same-Store Sales (SSS) index for the region, representing the ratio of current-period comparable store sales to the prior-period baseline. A value above 1.0 indicates positive comp sales growth. Used for regional performance benchmarking.',
-    `sss_reference_period` STRING COMMENT 'The fiscal period (e.g., FY2023-Q2) used as the baseline for the SSS index calculation. Ensures consistent interpretation of the SSS index across reporting cycles.',
-    `region_status` STRING COMMENT 'Current lifecycle status of the region record. active means the region is in use for store assignment and reporting; inactive means it has been decommissioned; pending means it is being set up; archived means it is retained for historical reference only.',
-    `store_count` STRING COMMENT 'Number of active retail locations (hypermarkets, department stores, discount outlets, dark stores, MFCs) currently assigned to this region. Maintained as a denormalised reference figure; authoritative count is derived from the store master.',
-    `target_store_count` STRING COMMENT 'Planned number of stores to be operating within this region as per the current strategic expansion plan. Used for gap analysis and capital expenditure planning.',
-    `tax_jurisdiction_code` STRING COMMENT 'Official tax authority jurisdiction code for the region (e.g., state FIPS code in the USA, HMRC region code in the UK). Used for tax filing, audit, and compliance reporting.',
-    `tier` STRING COMMENT 'Strategic importance tier assigned to the region, used to prioritise capital investment, promotional spend, and field support resources. Tier 1 represents highest-priority markets.',
-    `timezone` STRING COMMENT 'IANA timezone identifier for the regions primary operating timezone (e.g., Europe/London, America/New_York). Used for scheduling, trading-hour calculations, and timestamp normalisation.',
-    `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to this region record in the data platform. Used for incremental load detection, audit trail, and change data capture (CDC) processing. Format: yyyy-MM-ddTHH:mm:ss.SSSXXX.',
-    `urbanisation_rate` DECIMAL(18,2) COMMENT 'Percentage of the regions population living in urban areas. Influences store format selection (hypermarket vs convenience), omnichannel investment, and last-mile delivery feasibility.',
-    `vat_rate` DECIMAL(18,2) COMMENT 'Standard Value Added Tax (VAT) or equivalent sales tax rate applicable in this region, expressed as a percentage. Used for price display, financial reporting, and tax remittance calculations.',
+    `associate_id` BIGINT COMMENT 'Identifier of the employee designated as the Regional Director (RD) responsible for overall store performance, P&L accountability, and operational standards within this region.',
+    `ops_vp_employee_associate_id` BIGINT COMMENT 'Identifier of the Vice President of Operations (VP Ops) to whom the Regional Director reports. Used for escalation hierarchies and organizational reporting.',
+    `parent_region_id` BIGINT COMMENT 'Self-referencing identifier pointing to the parent region in the geographic hierarchy (e.g., a sub-region rolls up to a macro-region or division). Null for top-level regions.',
+    `climate_zone` STRING COMMENT 'Köppen-Geiger climate classification zone for the region. Used to drive seasonal merchandise planning, HVAC cost modelling, and category assortment decisions (e.g., winter apparel depth in continental zones).',
+    `comp_sales_base_year` STRING COMMENT 'The fiscal year used as the baseline for same-store sales (SSS) comparisons in this region. Ensures consistent year-over-year comp sales reporting across the regional portfolio.',
+    `country_code` STRING COMMENT 'ISO 3166-1 alpha-3 three-letter country code for the primary country in which this region operates (e.g., USA, GBR, DEU). Used for regulatory jurisdiction mapping and cross-border reporting.',
+    `country_subdivision_code` STRING COMMENT 'ISO 3166-2 code for the principal state, province, or administrative subdivision covered by this region (e.g., US-CA, GB-ENG, DE-BY). Supports tax jurisdiction and compliance reporting.',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this region record was first created in the system, in ISO 8601 format (yyyy-MM-ddTHH:mm:ss.SSSXXX). Supports audit trails and data lineage.',
+    `currency_code` STRING COMMENT 'ISO 4217 three-letter currency code for the primary trading currency used in this region (e.g., USD, EUR, GBP). Drives financial consolidation and same-store sales (SSS) reporting.',
+    `data_privacy_framework` STRING COMMENT 'Primary data privacy regulatory framework applicable to customer data collected in this region. Drives consent management, data retention policies, and subject access request (SAR) workflows for stores in this region.',
+    `effective_end_date` DATE COMMENT 'Date on which this region record ceased to be operationally effective. Null for currently active regions. Supports SCD-2 history and GDPR audit trails.',
+    `effective_start_date` DATE COMMENT 'Date from which this region record became operationally effective. Used for SCD-2 history tracking and to determine which stores were assigned to this region at any point in time.',
+    `external_region_code` STRING COMMENT 'Region identifier as used in external or upstream systems (e.g., ERP, retail analytics platform, franchise management system). Enables cross-system reconciliation without exposing internal surrogate keys.',
+    `fiscal_calendar_code` STRING COMMENT 'Code identifying the fiscal calendar applied to this region for financial period alignment (e.g., 4-5-4, 4-4-5, Gregorian). Critical for P&L consolidation and comp sales (SSS) period matching across regions with different fiscal structures.',
+    `food_safety_authority` STRING COMMENT 'Name or code of the primary food safety regulatory authority governing grocery and perishable operations in this region (e.g., FDA, EFSA, FSA-UK). Drives compliance inspection scheduling and recall notification routing.',
+    `geographic_area_km2` DECIMAL(18,2) COMMENT 'Total geographic area covered by the region in square kilometres. Used for store density analysis, logistics planning, and market penetration assessments.',
+    `hierarchy_level` STRING COMMENT 'Numeric depth of this region within the geographic hierarchy. Level 1 represents the top-most tier (e.g., global division); higher numbers represent finer granularity (e.g., district, zone). Used for rollup reporting and org chart rendering.',
+    `hierarchy_path` STRING COMMENT 'Materialized path string representing the full ancestry of the region from root to current node (e.g., /GLOBAL/AMERICAS/NORTH-AMERICA/NORTHEAST). Enables efficient subtree queries without recursive joins.',
+    `labor_law_jurisdiction` STRING COMMENT 'Identifies the labor law jurisdiction governing employment practices for store associates in this region (e.g., US-Federal, EU-Directive, UK-Employment-Rights-Act). Used by workforce management and payroll systems.',
+    `locale_code` STRING COMMENT 'IETF BCP 47 locale code representing the primary language and regional formatting conventions for this region (e.g., en_US, fr_FR, de_DE). Drives localization of store communications, receipts, and digital content.',
+    `market_maturity` STRING COMMENT 'Classification of the regions retail market development stage. Emerging markets have low store penetration and high growth potential; developing markets are growing; mature markets have stable penetration; saturated markets have limited new-store opportunity. Drives capital allocation and expansion strategy.',
+    `notes` STRING COMMENT 'Free-text field for operational notes, special instructions, or contextual information about the region that does not fit structured attributes (e.g., merger history, boundary change rationale, temporary operational constraints).',
+    `population_estimate` BIGINT COMMENT 'Estimated total population residing within the region boundary, sourced from the most recent census or demographic data provider. Used for market sizing, store count planning, and catchment analysis.',
+    `population_estimate_year` STRING COMMENT 'Calendar year to which the population estimate applies, enabling staleness assessment and refresh scheduling.',
+    `region_code` STRING COMMENT 'Short alphanumeric business code uniquely identifying the region, used in reporting, store master records, and cross-system integration (e.g., NE, SW, EMEA-NORTH).',
+    `region_name` STRING COMMENT 'Full descriptive name of the region as used in business reporting and store operations (e.g., Northeast, Pacific Northwest, Central Europe).',
+    `region_status` STRING COMMENT 'Current lifecycle status of the region record. Active regions are in use for store assignment and reporting. Inactive regions are no longer operational. Pending regions are being set up. Archived regions are retained for historical reference only.',
+    `region_type` STRING COMMENT 'Functional classification of the region indicating its primary business purpose. Operational regions group stores for management; sales regions support territory planning; franchise regions define franchisee boundaries; distribution regions align with supply chain nodes; compliance regions reflect regulatory jurisdictions; marketing regions support campaign targeting.',
+    `regional_director_email` STRING COMMENT 'Business email address of the Regional Director (RD) for escalation routing, store communications, and operational alerts.',
+    `regional_director_name` STRING COMMENT 'Full name of the Regional Director (RD) accountable for this region. Stored as a denormalized display field for operational dashboards and store communications.',
+    `sales_channel_scope` STRING COMMENT 'Indicates the sales channel coverage applicable to this region. Omnichannel regions support both physical stores and digital fulfilment; brick-and-mortar regions cover physical stores only; ecommerce regions are digital-only; hybrid regions have partial digital integration.',
+    `source_system_code` STRING COMMENT 'Code identifying the upstream operational system of record from which this region record originates (e.g., STORE_MASTER, HR_SYSTEM, ERP). Supports data lineage and master data management (MDM) reconciliation.',
+    `store_count` STRING COMMENT 'Number of active retail locations currently assigned to this region. Maintained as a denormalized operational counter for quick regional capacity reporting; authoritative count is derived from the store master.',
+    `store_format_scope` STRING COMMENT 'Comma-separated list of store formats present in this region (e.g., hypermarket, department_store, discount_outlet, dark_store, micro_fulfillment_center). Drives format-specific operational standards and planogram (POG) assignments. [ENUM-REF-CANDIDATE: hypermarket|department_store|discount_outlet|dark_store|micro_fulfillment_center|convenience — promote to reference product]',
+    `tax_jurisdiction_code` STRING COMMENT 'Primary tax jurisdiction code for the region, used to determine applicable sales tax, VAT, or GST rates for store-level transactions. Maps to the tax engines jurisdiction table.',
+    `timezone` STRING COMMENT 'IANA timezone identifier for the primary timezone of the region (e.g., America/New_York, Europe/Berlin). Used to normalize store operating hours, footfall timestamps, and POS transaction times.',
+    `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to this region record, in ISO 8601 format (yyyy-MM-ddTHH:mm:ss.SSSXXX). Used for change detection and incremental data pipeline processing.',
+    `vat_applicable_flag` BOOLEAN COMMENT 'Indicates whether Value Added Tax (VAT) applies to retail transactions in this region. True for VAT-registered jurisdictions; False for sales-tax or tax-exempt jurisdictions. Drives POS tax calculation logic.',
     CONSTRAINT pk_region PRIMARY KEY(`region_id`)
 ) COMMENT 'Master reference table for region. Referenced by region_id.';
 
 -- ========= FOREIGN KEYS =========
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ADD CONSTRAINT `fk_store_location_format_id` FOREIGN KEY (`format_id`) REFERENCES `vibe_retail_v1`.`store`.`format`(`format_id`);
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ADD CONSTRAINT `fk_store_location_region_id` FOREIGN KEY (`region_id`) REFERENCES `vibe_retail_v1`.`store`.`region`(`region_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`format` ADD CONSTRAINT `fk_store_format_parent_format_id` FOREIGN KEY (`parent_format_id`) REFERENCES `vibe_retail_v1`.`store`.`format`(`format_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ADD CONSTRAINT `fk_store_pos_terminal_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ADD CONSTRAINT `fk_store_pos_terminal_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
@@ -857,10 +844,8 @@ ALTER TABLE `vibe_retail_v1`.`store`.`fixture` ADD CONSTRAINT `fk_store_fixture_
 ALTER TABLE `vibe_retail_v1`.`store`.`fixture` ADD CONSTRAINT `fk_store_fixture_store_planogram_id` FOREIGN KEY (`store_planogram_id`) REFERENCES `vibe_retail_v1`.`store`.`store_planogram`(`store_planogram_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ADD CONSTRAINT `fk_store_traffic_count_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ADD CONSTRAINT `fk_store_traffic_count_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
-ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ADD CONSTRAINT `fk_store_comparable_sales_cluster_id` FOREIGN KEY (`cluster_id`) REFERENCES `vibe_retail_v1`.`store`.`cluster`(`cluster_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ADD CONSTRAINT `fk_store_comparable_sales_format_id` FOREIGN KEY (`format_id`) REFERENCES `vibe_retail_v1`.`store`.`format`(`format_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ADD CONSTRAINT `fk_store_comparable_sales_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
-ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ADD CONSTRAINT `fk_store_comparable_sales_region_id` FOREIGN KEY (`region_id`) REFERENCES `vibe_retail_v1`.`store`.`region`(`region_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ADD CONSTRAINT `fk_store_comparable_sales_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ADD CONSTRAINT `fk_store_shrinkage_event_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ADD CONSTRAINT `fk_store_shrinkage_event_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
@@ -898,13 +883,9 @@ ALTER TABLE `vibe_retail_v1`.`store`.`location` SET TAGS ('dbx_subdomain' = 'loc
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store Location ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Store Format Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `price_zone_id` SET TAGS ('dbx_business_glossary_term' = 'Price Zone Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `region_id` SET TAGS ('dbx_business_glossary_term' = 'Region Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `fulfillment_node_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `address_line1` SET TAGS ('dbx_business_glossary_term' = 'Store Address Line 1');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `address_line1` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `address_line2` SET TAGS ('dbx_business_glossary_term' = 'Store Address Line 2');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `address_line2` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `assortment_breadth_norm` SET TAGS ('dbx_value_regex' = 'narrow|moderate|broad|very_broad');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `assortment_depth_norm` SET TAGS ('dbx_value_regex' = 'shallow|moderate|deep|very_deep');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `banner_brand` SET TAGS ('dbx_business_glossary_term' = 'Retail Banner Brand');
@@ -919,31 +900,21 @@ ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `district_code` SET
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `dsd_receiving` SET TAGS ('dbx_business_glossary_term' = 'Direct Store Delivery (DSD) Receiving');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `email_address` SET TAGS ('dbx_business_glossary_term' = 'Store Email Address');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `email_address` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `email_address` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `email_address` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `format_size_band` SET TAGS ('dbx_business_glossary_term' = 'Store Format Size Band');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `format_size_band` SET TAGS ('dbx_value_regex' = 'small|medium|large|extra_large');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `latitude` SET TAGS ('dbx_business_glossary_term' = 'Store Latitude');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `latitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_business_glossary_term' = 'Store Lifecycle Status');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_value_regex' = 'planned|under_construction|open|temporarily_closed|permanently_closed|remodeling');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `locale` SET TAGS ('dbx_business_glossary_term' = 'Store Locale');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `locale` SET TAGS ('dbx_value_regex' = '^[a-z]{2}_[A-Z]{2}$');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `longitude` SET TAGS ('dbx_business_glossary_term' = 'Store Longitude');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `longitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `manager_name` SET TAGS ('dbx_business_glossary_term' = 'Store Manager Name');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `opening_date` SET TAGS ('dbx_business_glossary_term' = 'Store Opening Date');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `operating_hours` SET TAGS ('dbx_business_glossary_term' = 'Store Operating Hours');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `phone_number` SET TAGS ('dbx_business_glossary_term' = 'Store Phone Number');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `phone_number` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `postal_code` SET TAGS ('dbx_business_glossary_term' = 'Store Postal Code');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `primary_dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Dc Facility Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `region_code` SET TAGS ('dbx_business_glossary_term' = 'Retail Region Code');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `ropis_capable` SET TAGS ('dbx_business_glossary_term' = 'Reserve Online Pick Up In Store (ROPIS) Capable');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `sfs_capable` SET TAGS ('dbx_business_glossary_term' = 'Ship From Store (SFS) Capable');
 ALTER TABLE `vibe_retail_v1`.`store`.`location` ALTER COLUMN `staffing_model_type` SET TAGS ('dbx_value_regex' = 'full_service|limited_service|self_service|automated');
@@ -998,13 +969,8 @@ ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `contactless_en
 ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `customer_display_type` SET TAGS ('dbx_value_regex' = 'pole_display|integrated_screen|tablet|none');
 ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `ebt_snap_enabled` SET TAGS ('dbx_business_glossary_term' = 'EBT/SNAP Enabled');
 ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `hardware_serial_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{8,30}$');
-ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `hardware_serial_number` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `ip_address` SET TAGS ('dbx_value_regex' = '^(?:[0-9]{1,3}.){3}[0-9]{1,3}$');
-ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `ip_address` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `mac_address` SET TAGS ('dbx_value_regex' = '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$');
-ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `mac_address` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `mobile_wallet_enabled` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `mobile_wallet_enabled` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `network_zone` SET TAGS ('dbx_value_regex' = 'cardholder_data_environment|corporate_network|guest_network|isolated');
 ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `software_version` SET TAGS ('dbx_value_regex' = '^[0-9]+.[0-9]+.[0-9]+(.[0-9]+)?$');
 ALTER TABLE `vibe_retail_v1`.`store`.`pos_terminal` ALTER COLUMN `terminal_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,20}$');
@@ -1061,11 +1027,10 @@ ALTER TABLE `vibe_retail_v1`.`store`.`fixture` ALTER COLUMN `rfid_enabled_flag` 
 ALTER TABLE `vibe_retail_v1`.`store`.`fixture` ALTER COLUMN `weight_capacity_lbs` SET TAGS ('dbx_business_glossary_term' = 'Weight Capacity (Pounds)');
 ALTER TABLE `vibe_retail_v1`.`store`.`fixture` ALTER COLUMN `width_inches` SET TAGS ('dbx_business_glossary_term' = 'Width (Inches)');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` SET TAGS ('dbx_subdomain' = 'retail_performance');
+ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` SET TAGS ('dbx_subdomain' = 'store_operations');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `traffic_count_id` SET TAGS ('dbx_business_glossary_term' = 'Traffic Count Identifier');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Department Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `kpi_value_id` SET TAGS ('dbx_business_glossary_term' = 'Kpi Value Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `accuracy_confidence_percent` SET TAGS ('dbx_business_glossary_term' = 'Accuracy Confidence (Percent)');
@@ -1075,22 +1040,18 @@ ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `counting_zone
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `measurement_interval_minutes` SET TAGS ('dbx_business_glossary_term' = 'Measurement Interval (Minutes)');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `sensor_device_code` SET TAGS ('dbx_business_glossary_term' = 'Sensor Device ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `sensor_device_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{8,30}$');
-ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `sensor_device_code` SET TAGS ('dbx_internal' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `sensor_device_code` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `sensor_type` SET TAGS ('dbx_value_regex' = 'thermal|video_analytics|infrared|rfid|wifi_tracking|bluetooth_beacon');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `temperature_fahrenheit` SET TAGS ('dbx_business_glossary_term' = 'Temperature (Fahrenheit)');
 ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ALTER COLUMN `zone_type` SET TAGS ('dbx_value_regex' = 'entrance|department|checkout|aisle|endcap|gondola');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` SET TAGS ('dbx_subdomain' = 'retail_performance');
+ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` SET TAGS ('dbx_subdomain' = 'financial_performance');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `comparable_sales_id` SET TAGS ('dbx_business_glossary_term' = 'Comparable Sales Identifier');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `cluster_id` SET TAGS ('dbx_business_glossary_term' = 'Cluster Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `financial_period_id` SET TAGS ('dbx_business_glossary_term' = 'Financial Period Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Store Format Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `kpi_value_id` SET TAGS ('dbx_business_glossary_term' = 'Kpi Value Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `region_id` SET TAGS ('dbx_business_glossary_term' = 'Region Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `comp_sales_growth_rate` SET TAGS ('dbx_business_glossary_term' = 'Comparable Sales (Comp Sales) Growth Rate');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `comp_sales_variance_amount` SET TAGS ('dbx_business_glossary_term' = 'Comparable Sales (Comp Sales) Variance Amount');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `comp_sales_variance_percent` SET TAGS ('dbx_business_glossary_term' = 'Comparable Sales (Comp Sales) Variance Percent');
@@ -1107,7 +1068,7 @@ ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `reporting_
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `sales_per_sqft` SET TAGS ('dbx_business_glossary_term' = 'Sales Per Square Foot (sqft)');
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ALTER COLUMN `store_size_sqft` SET TAGS ('dbx_business_glossary_term' = 'Store Size Square Feet (sqft)');
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` SET TAGS ('dbx_subdomain' = 'retail_performance');
+ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` SET TAGS ('dbx_subdomain' = 'store_operations');
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `adjustment_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Adjustment Transaction ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Store Department Id (Foreign Key)');
@@ -1115,7 +1076,6 @@ ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `dq_issue_id
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Employee ID');
-ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Rma Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ALTER COLUMN `case_reference_number` SET TAGS ('dbx_business_glossary_term' = 'Loss Prevention (LP) Case Reference Number');
@@ -1149,15 +1109,10 @@ ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `item_hierarchy_i
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `marketing_brand_id` SET TAGS ('dbx_business_glossary_term' = 'Brand Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `department_status` SET TAGS ('dbx_value_regex' = 'active|inactive|under_construction|seasonal_closed|remodeling|pending_closure');
-ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `gross_margin_target_percent` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `labor_budget_monthly` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `license_number` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Department Notes');
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `planogram_count` SET TAGS ('dbx_business_glossary_term' = 'Planogram (POG) Count');
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `pos_terminal_count` SET TAGS ('dbx_business_glossary_term' = 'Point of Sale (POS) Terminal Count');
-ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `sales_target_monthly` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `selling_area_sq_ft` SET TAGS ('dbx_business_glossary_term' = 'Selling Area Square Feet');
-ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `shrinkage_rate_percent` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `temperature_range_max_f` SET TAGS ('dbx_business_glossary_term' = 'Temperature Range Maximum Fahrenheit');
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `temperature_range_min_f` SET TAGS ('dbx_business_glossary_term' = 'Temperature Range Minimum Fahrenheit');
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ALTER COLUMN `zone_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,5}$');
@@ -1199,11 +1154,11 @@ ALTER TABLE `vibe_retail_v1`.`store`.`cluster` SET TAGS ('dbx_subdomain' = 'loca
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `cluster_id` SET TAGS ('dbx_business_glossary_term' = 'Store Cluster ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `loyalty_program_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `parent_cluster_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Store Cluster ID');
+ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `reporting_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Reporting Hierarchy Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `allows_overlap` SET TAGS ('dbx_business_glossary_term' = 'Allows Store Overlap Flag');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `assortment_depth_strategy` SET TAGS ('dbx_value_regex' = 'deep|moderate|shallow|curated');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `average_annual_sales_usd` SET TAGS ('dbx_business_glossary_term' = 'Average Annual Sales (USD)');
-ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `average_annual_sales_usd` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `average_store_size_sqft` SET TAGS ('dbx_business_glossary_term' = 'Average Store Size (Square Feet)');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `climate_zone` SET TAGS ('dbx_value_regex' = 'tropical|arid|temperate|continental|polar');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `cluster_status` SET TAGS ('dbx_business_glossary_term' = 'Store Cluster Status');
@@ -1230,23 +1185,20 @@ ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `replenishment_frequ
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `supports_omnichannel` SET TAGS ('dbx_business_glossary_term' = 'Supports Omnichannel Flag');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ALTER COLUMN `urbanization_level` SET TAGS ('dbx_value_regex' = 'urban|suburban|rural|exurban');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`store`.`audit` SET TAGS ('dbx_subdomain' = 'retail_performance');
+ALTER TABLE `vibe_retail_v1`.`store`.`audit` SET TAGS ('dbx_subdomain' = 'store_operations');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `audit_id` SET TAGS ('dbx_business_glossary_term' = 'Store Audit ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Auditor ID');
-ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Department Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `dq_result_id` SET TAGS ('dbx_business_glossary_term' = 'Dq Result Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `merchandising_planogram_id` SET TAGS ('dbx_business_glossary_term' = 'Planogram Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `return_fraud_case_id` SET TAGS ('dbx_business_glossary_term' = 'Return Fraud Case Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Rma Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `audit_number` SET TAGS ('dbx_value_regex' = '^AUD-[0-9]{8}-[A-Z0-9]{6}$');
-ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `auditor_name` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `auditor_type` SET TAGS ('dbx_value_regex' = 'internal_lp_team|third_party_auditor|regulatory_inspector|automated_system|district_manager|corporate_compliance');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `end_time` SET TAGS ('dbx_business_glossary_term' = 'Audit End Time');
-ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `fine_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `fiscal_quarter` SET TAGS ('dbx_value_regex' = 'Q1|Q2|Q3|Q4');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `follow_up_audit_date` SET TAGS ('dbx_business_glossary_term' = 'Follow-Up Audit Date');
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ALTER COLUMN `follow_up_audit_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Follow-Up Audit Required Flag');
@@ -1267,7 +1219,6 @@ ALTER TABLE `vibe_retail_v1`.`store`.`license` ALTER COLUMN `department_id` SET 
 ALTER TABLE `vibe_retail_v1`.`store`.`license` ALTER COLUMN `license_permit_id` SET TAGS ('dbx_business_glossary_term' = 'License Permit Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`license` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`license` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`store`.`license` ALTER COLUMN `renewed_from_license_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`license` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`store`.`license` ALTER COLUMN `source_system_code` SET TAGS ('dbx_business_glossary_term' = 'Source System ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster_membership` SET TAGS ('dbx_data_type' = 'association_data');
@@ -1281,8 +1232,6 @@ ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` SET TAGS ('dbx_s
 ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` SET TAGS ('dbx_association_edges' = 'store.store_format,promotion.promo_offer');
 ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` ALTER COLUMN `format_offer_eligibility_id` SET TAGS ('dbx_business_glossary_term' = 'Format Offer Eligibility Identifier');
 ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Creator User Identifier');
-ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` ALTER COLUMN `associate_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Format Offer Eligibility - Store Format Id');
 ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Format Offer Eligibility - Promo Offer Id');
 ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
@@ -1307,13 +1256,12 @@ ALTER TABLE `vibe_retail_v1`.`store`.`carrier_agreement` ALTER COLUMN `volume_co
 ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` SET TAGS ('dbx_subdomain' = 'location_management');
 ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ALTER COLUMN `sales_territory_id` SET TAGS ('dbx_business_glossary_term' = 'Sales Territory Identifier');
-ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ALTER COLUMN `parent_sales_territory_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ALTER COLUMN `postal_code_range_end` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ALTER COLUMN `postal_code_range_end` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ALTER COLUMN `postal_code_range_start` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ALTER COLUMN `postal_code_range_start` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ALTER COLUMN `postal_code_range_end` SET TAGS ('dbx_classification' = 'restricted');
+ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ALTER COLUMN `postal_code_range_end` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ALTER COLUMN `postal_code_range_start` SET TAGS ('dbx_classification' = 'restricted');
+ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ALTER COLUMN `postal_code_range_start` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`store_profit_loss` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`store`.`store_profit_loss` SET TAGS ('dbx_subdomain' = 'retail_performance');
+ALTER TABLE `vibe_retail_v1`.`store`.`store_profit_loss` SET TAGS ('dbx_subdomain' = 'financial_performance');
 ALTER TABLE `vibe_retail_v1`.`store`.`store_profit_loss` ALTER COLUMN `store_profit_loss_id` SET TAGS ('dbx_business_glossary_term' = 'Store Profit & Loss (P&L) ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`store_profit_loss` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Department Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`store_profit_loss` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
@@ -1332,20 +1280,12 @@ ALTER TABLE `vibe_retail_v1`.`store`.`store_profit_loss` ALTER COLUMN `upt` SET 
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` SET TAGS ('dbx_subdomain' = 'store_operations');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `ship_from_store_node_id` SET TAGS ('dbx_business_glossary_term' = 'Ship-from-Store (SFS) Fulfillment Node ID');
-ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Node Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `carrier_account_number` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `contact_email` SET TAGS ('dbx_business_glossary_term' = 'Contact Email Address');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `contact_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `contact_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `contact_name` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `contact_phone` SET TAGS ('dbx_business_glossary_term' = 'Contact Phone Number');
-ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `contact_phone` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `cost_per_order` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `inventory_sync_frequency_minutes` SET TAGS ('dbx_business_glossary_term' = 'Inventory Synchronization Frequency Minutes');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `next_day_cutoff_time` SET TAGS ('dbx_business_glossary_term' = 'Next-Day Delivery Cutoff Time');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `node_code` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Node Code');
@@ -1364,7 +1304,7 @@ ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `suppor
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `updated_by` SET TAGS ('dbx_business_glossary_term' = 'Updated By User');
 ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ALTER COLUMN `wms_integration_enabled` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Management System (WMS) Integration Enabled');
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` SET TAGS ('dbx_subdomain' = 'retail_performance');
+ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` SET TAGS ('dbx_subdomain' = 'store_operations');
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `direct_store_delivery_id` SET TAGS ('dbx_business_glossary_term' = 'Direct Store Delivery (DSD) Receiving ID');
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `ap_invoice_id` SET TAGS ('dbx_business_glossary_term' = 'Ap Invoice Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Department Id (Foreign Key)');
@@ -1379,8 +1319,6 @@ ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `vendo
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `delivery_window_end` SET TAGS ('dbx_business_glossary_term' = 'Delivery Window End Time');
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `delivery_window_start` SET TAGS ('dbx_business_glossary_term' = 'Delivery Window Start Time');
-ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `driver_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `driver_name` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `driver_signature_captured` SET TAGS ('dbx_business_glossary_term' = 'Driver Signature Captured Flag');
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `invoice_match_status` SET TAGS ('dbx_value_regex' = 'matched|unmatched|variance_within_tolerance|variance_exceeds_tolerance|pending_reconciliation');
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Receiving Notes');
@@ -1395,12 +1333,3 @@ ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ALTER COLUMN `tempe
 ALTER TABLE `vibe_retail_v1`.`store`.`region` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`store`.`region` SET TAGS ('dbx_subdomain' = 'location_management');
 ALTER TABLE `vibe_retail_v1`.`store`.`region` ALTER COLUMN `region_id` SET TAGS ('dbx_business_glossary_term' = 'Region Identifier');
-ALTER TABLE `vibe_retail_v1`.`store`.`region` ALTER COLUMN `hq_address_line1` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`region` ALTER COLUMN `hq_address_line1` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`region` ALTER COLUMN `hq_city` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`region` ALTER COLUMN `hq_city` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`region` ALTER COLUMN `hq_postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`region` ALTER COLUMN `hq_postal_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`region` ALTER COLUMN `region_manager` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`region` ALTER COLUMN `region_manager_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`store`.`region` ALTER COLUMN `region_manager_email` SET TAGS ('dbx_pii_email' = 'true');

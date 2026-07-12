@@ -1,5 +1,5 @@
 -- Schema for Domain: analytics | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:22
+-- Generated on: 2026-07-12 13:53:21
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`analytics` COMMENT 'Manages enterprise reporting definitions, KPI master data, dashboard configurations, data quality rules, and business intelligence metadata. Owns the semantic layer that translates raw data products into business-consumable metrics and dimensions for retail decision-making.';
@@ -59,11 +59,12 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`analytics`.`kpi_value` (
     `campaign_id` BIGINT COMMENT 'Foreign key linking to marketing.campaign. Business justification: KPI measurements often track campaign-level performance (campaign ROAS, campaign conversion rate). Retail analytics teams measure campaign effectiveness; this link enables campaign performance analysi',
     `compliance_program_id` BIGINT COMMENT 'Foreign key linking to compliance.compliance_program. Business justification: Retail KPIs track compliance metrics (food safety scores, OSHA incident rates, audit pass rates). Business filters KPI dashboards and reports by compliance program for regulatory reporting and operati',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Store/department-level KPI tracking requires cost center attribution for P&L analysis, operational scorecards, and manager accountability reporting. Essential dimension for retail operational analytic',
+    `cycle_count_id` BIGINT COMMENT 'Foreign key linking to inventory.cycle_count. Business justification: Inventory accuracy KPIs (count variance %, recount rate, accuracy by zone) directly measure cycle count performance. Operations dashboards track these metrics to manage labor efficiency and inventory',
     `demand_forecast_id` BIGINT COMMENT 'Foreign key linking to supplychain.demand_forecast. Business justification: Forecast accuracy KPIs (MAPE, WMAPE, bias) measured against specific forecast runs. Core supply chain planning metric for demand planning effectiveness and inventory optimization decisions.',
     `department_id` BIGINT COMMENT 'Foreign key linking to store.store_department. Business justification: Department performance (actual margin, actual shrinkage, actual sales) is measured and reported for merchandising decisions. Operational analytics require linking measurements to specific departments',
     `disposition_id` BIGINT COMMENT 'Foreign key linking to returns.disposition. Business justification: Disposition recovery rates, restock rates, liquidation performance, and RTV success rates are key supply chain KPIs tracked for reverse logistics optimization and inventory management decisions.',
     `engagement_campaign_id` BIGINT COMMENT 'Foreign key linking to loyalty.engagement_campaign. Business justification: Campaign performance KPIs (participation rate, incremental spend, ROI, tier upgrade count) are measured per engagement campaign. kpi_value with business_entity_type=engagement_campaign requires FK f',
-    `fulfillment_node_id` BIGINT COMMENT 'Foreign key linking to fulfillment.node. Business justification: Node-level KPIs (throughput, capacity utilization, labor productivity, cost per unit, on-time ship rate) are core to DC and store operations management. Essential for facility performance scorecards,',
+    `fulfillment_node_id` BIGINT COMMENT 'Foreign key linking to fulfillment.node. Business justification: Node-level KPIs (throughput, capacity utilization, labor productivity, cost per unit, on-time ship rate) are core to DC and store operations management. Essential for facility performance scorecards',
     `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: Retail KPIs measure fulfillment-specific metrics (pick accuracy, pack time, SLA compliance, cost per order) at the fulfillment order level. Essential for operational performance dashboards, DC scoreca',
     `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Financial KPIs (revenue per sq ft, COGS %, gross margin) require GL account linkage for reconciliation to general ledger, audit trail, and financial statement mapping.',
     `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.item_hierarchy. Business justification: Category and department-level KPIs (category sales, department margin, subcategory comp) drive merchandising strategy and buyer performance evaluation. Retail planning and reporting operate on hierarc',
@@ -73,6 +74,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`analytics`.`kpi_value` (
     `loyalty_membership_id` BIGINT COMMENT 'Foreign key linking to loyalty.membership. Business justification: Member-level KPIs (lifetime value, engagement score, retention rate, points velocity) are core retail loyalty metrics. kpi_value.business_entity_type=membership pattern requires FK to membership for',
     `markdown_id` BIGINT COMMENT 'Foreign key linking to pricing.markdown. Business justification: Markdown effectiveness KPIs (sell-through rate, markdown ROI, clearance velocity) directly measure individual markdown events. Enables clearance optimization reporting with drill-through to markdown d',
     `member_segment_id` BIGINT COMMENT 'Foreign key linking to loyalty.member_segment. Business justification: Segment performance measurement via KPI values where business_entity_type=member_segment. Retailers measure segment health, engagement, and profitability metrics for personalization strategy and res',
+    `price_change_id` BIGINT COMMENT 'Foreign key linking to pricing.price_change. Business justification: Price change velocity KPIs (approval cycle time, change frequency, competitive response time) track individual price change events. Enables pricing agility dashboards. Real business process: pricing o',
     `prior_period_kpi_value_id` BIGINT COMMENT 'Self-referencing FK on kpi_value (prior_period_kpi_value_id)',
     `profile_id` BIGINT COMMENT 'Foreign key linking to customer.profile. Business justification: Retail KPI dashboards measure customer-level metrics (CLTV, NPS, purchase frequency, churn risk). Customer performance tracking is core to retail CRM and loyalty management. Natural business link for',
     `profit_center_id` BIGINT COMMENT 'Foreign key linking to finance.profit_center. Business justification: Profit center performance measurement is core to retail segment reporting, divisional scorecards, and executive dashboards. Enables channel/region/banner-level KPI analysis for strategic decision-maki',
@@ -216,6 +218,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` (
     `dashboard_widget_id` BIGINT COMMENT 'Unique identifier for the dashboard widget. Primary key.',
+    `audit_event_id` BIGINT COMMENT 'Foreign key linking to compliance.audit_event. Business justification: Retail operations dashboards display recent audit results as widgets (store health scores, recent findings, compliance status). Direct link supports real-time compliance visibility for store managers',
     `campaign_id` BIGINT COMMENT 'Foreign key linking to marketing.campaign. Business justification: Dashboard widgets display campaign-specific metrics (campaign spend vs. budget, campaign conversion funnel). Retail marketing dashboards show campaign performance; this link enables campaign-scoped wi',
     `associate_id` BIGINT COMMENT 'Identifier of the user who owns and is responsible for maintaining this widget.',
     `dashboard_config_id` BIGINT COMMENT 'Identifier of the parent dashboard that contains this widget.',
@@ -306,7 +309,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`analytics`.`dq_rule` (
     `compliance_program_id` BIGINT COMMENT 'Foreign key linking to compliance.compliance_program. Business justification: Data quality rules enforce compliance data integrity (required fields for OSHA logs, food safety temperature ranges, training completion validation). Link enables compliance-driven DQ governance and r',
     `parent_dq_rule_id` BIGINT COMMENT 'Self-referencing FK on dq_rule (parent_dq_rule_id)',
     `semantic_layer_entity_id` BIGINT COMMENT 'Foreign key linking to analytics.semantic_layer_entity. Business justification: DQ rules can target semantic layer entities in addition to raw data products. The dq_rule has target_domain, target_product, target_attribute for raw products, but semantic layer entities are also dat',
-    `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Data quality rules validate specific SKU attributes (required fields populated, weight within range, valid UPC format). Product master stewardship requires SKU-level rule assignment. Operational data',
     `approved_by` STRING COMMENT 'User ID of the data steward or governance authority who approved this rule for production use. Required for critical and major severity rules.',
     `approved_timestamp` TIMESTAMP COMMENT 'Date and time when this rule was formally approved for enforcement. Null for draft or unapproved rules.',
     `blocking_flag` BOOLEAN COMMENT 'Indicates whether violations of this rule should halt downstream pipeline execution. True for critical data integrity rules; false for monitoring-only rules.',
@@ -352,7 +354,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`analytics`.`dq_result` (
     `audit_event_id` BIGINT COMMENT 'Foreign key linking to compliance.audit_event. Business justification: Audit data quality is validated before regulatory submission (OSHA 300 logs, food safety records). Link tracks DQ validation results tied to specific audit cycles for regulatory compliance assurance.',
     `dq_rule_id` BIGINT COMMENT 'Identifier of the data quality rule that was executed. References the rule definition in the DQ rule catalog.',
     `financial_period_id` BIGINT COMMENT 'Foreign key linking to finance.financial_period. Business justification: Data quality checks on financial data are executed per fiscal period for close process validation, SOX compliance, and audit readiness. Period context essential for issue tracking.',
-    `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: Data quality checks on fulfillment order data (missing tracking numbers, invalid statuses, orphaned records, SLA calculation accuracy) ensure operational data integrity. Essential for data governance,',
+    `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: Data quality checks on fulfillment order data (missing tracking numbers, invalid statuses, orphaned records, SLA calculation accuracy) ensure operational data integrity. Essential for data governance',
     `shipment_id` BIGINT COMMENT 'Foreign key linking to fulfillment.shipment. Business justification: Shipment data quality validation (tracking number format, carrier code validity, address completeness, weight/dimension accuracy) ensures reliable logistics operations. Critical for carrier integratio',
     `inbound_shipment_id` BIGINT COMMENT 'Foreign key linking to supplychain.inbound_shipment. Business justification: Validates ASN and receiving data quality (quantity accuracy, timestamp completeness). Essential for warehouse operations data integrity and supplier compliance monitoring.',
     `previous_dq_result_id` BIGINT COMMENT 'Self-referencing FK on dq_result (previous_dq_result_id)',
@@ -544,9 +546,8 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`analytics`.`report_subscription` (
     `financial_period_id` BIGINT COMMENT 'Foreign key linking to finance.financial_period. Business justification: Scheduled financial reports are delivered per fiscal period (monthly close packs, quarterly board decks). Subscription triggers align to period close dates for timely stakeholder distribution.',
     `inventory_node_id` BIGINT COMMENT 'Foreign key linking to inventory.inventory_node. Business justification: Scheduled inventory reports (daily stock status, weekly replenishment summary, cycle count results) are scoped to specific nodes. Report distribution and filtering require node context for operational',
     `org_unit_id` BIGINT COMMENT 'Reference to the team or group that subscribed to this report or dashboard. Nullable if subscription is individual.',
-    `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: Price list distribution reports (sent to vendors, buyers, store ops) reference specific price lists for automated delivery. Enables scheduled price communication workflows. Real business process: week',
     `associate_id` BIGINT COMMENT 'Reference to the individual user who subscribed to this report or dashboard.',
-    `replenishment_plan_id` BIGINT COMMENT 'Foreign key linking to supplychain.replenishment_plan. Business justification: Delivers scheduled replenishment plan reports to inventory planners and buyers. Standard operational reporting for daily/weekly replenishment review meetings and plan approval workflows.',
+    `profile_id` BIGINT COMMENT 'Foreign key linking to customer.profile. Business justification: B2B customers and corporate account holders subscribe to custom reports (spend analysis, order history, compliance reports). Retail B2B self-service portals deliver scheduled reports to customer conta',
     `report_definition_id` BIGINT COMMENT 'Reference to the report or dashboard definition that is being subscribed to.',
     `superseded_report_subscription_id` BIGINT COMMENT 'Self-referencing FK on report_subscription (superseded_report_subscription_id)',
     `tertiary_report_last_modified_by_user_associate_id` BIGINT COMMENT 'Reference to the user who most recently modified this subscription record.',
@@ -715,13 +716,13 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` (
     `department_id` BIGINT COMMENT 'Foreign key linking to store.store_department. Business justification: Department managers receive targets for sales, margin, shrinkage by department. Retail operations management requires department-level goal setting for accountability and performance tracking across s',
     `format_id` BIGINT COMMENT 'Foreign key linking to store.store_format. Business justification: Corporate sets differentiated targets by format (hypermarket target margin 28% vs discount format 18%) for strategic planning. Format-level goal setting is standard retail strategy execution practice.',
     `fulfillment_node_id` BIGINT COMMENT 'Foreign key linking to fulfillment.node. Business justification: Performance targets set at node level (orders per hour, SLA percentage, cost per order, pick accuracy) drive operational planning and performance management. Essential for budget planning, incentive p',
+    `plan_id` BIGINT COMMENT 'Reference to the specific incentive or compensation plan associated with this target. Null if target is not incentive-eligible.',
     `inventory_node_id` BIGINT COMMENT 'Foreign key linking to inventory.inventory_node. Business justification: Inventory KPI targets (turnover rate, fill rate, DOS) are set at node level (DC, store, region). Performance tracking and incentive compensation require node-level target linkage.',
     `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.item_hierarchy. Business justification: Annual targets set at category/department level (category sales plan, department margin target, subcategory unit goal). Retail planning and buyer incentive plans operate on hierarchy. Financial planni',
     `kpi_definition_id` BIGINT COMMENT 'Reference to the KPI definition master record that specifies the metric being targeted (e.g., comp sales, shrinkage rate, NPS score, GMROI).',
     `location_id` BIGINT COMMENT 'Foreign key linking to store.store_location. Business justification: Store managers receive monthly/quarterly targets for sales, margin, shrinkage by location. Standard retail performance management process requires linking targets to specific stores for goal tracking',
     `margin_target_id` BIGINT COMMENT 'Foreign key linking to pricing.margin_target. Business justification: KPI targets for margin metrics must reference operational margin targets set by merchandising/pricing teams. Ensures performance management alignment between analytics layer and operational planning.',
     `associate_id` BIGINT COMMENT 'Identifier of the user or manager who approved the target. Establishes accountability for target authorization.',
-    `profile_id` BIGINT COMMENT 'Foreign key linking to customer.profile. Business justification: Sales associates and customer-facing roles have individual KPI targets (sales quotas, customer satisfaction targets). Retail performance management systems track targets by employee profile for incent',
     `profit_center_id` BIGINT COMMENT 'Foreign key linking to finance.profit_center. Business justification: Segment-level targets require profit center attribution for divisional performance management, strategic planning, and executive compensation metrics. Enables banner/channel/region target tracking.',
     `reporting_hierarchy_id` BIGINT COMMENT 'Foreign key linking to analytics.reporting_hierarchy. Business justification: KPI targets are often set at specific nodes in reporting hierarchies (e.g., regional targets, category targets). This FK links the target to the specific hierarchy node it applies to, enabling hierarc',
     `retail_calendar_id` BIGINT COMMENT 'Foreign key linking to analytics.retail_calendar. Business justification: KPI targets are set for specific fiscal periods defined in the retail calendar. This FK links the target to the authoritative retail calendar date (typically the period_start_date), enabling consisten',
@@ -1010,7 +1011,9 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`analytics`.`sla_kpi_measurement` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`analytics`.`workspace` (
     `workspace_id` BIGINT COMMENT 'Primary key for workspace',
     `access_policy_id` BIGINT COMMENT 'Foreign key linking to analytics.access_policy. Business justification: Workspaces require access control to govern who can access workspace resources. This FK links workspace to its governing access_policy, consistent with the pattern where dashboard_config and report_su',
+    `account_id` BIGINT COMMENT 'Identifier of the billing account responsible for workspace-related charges.',
     `org_unit_id` BIGINT COMMENT 'Identifier of the business unit to which this workspace is assigned.',
+    `department_id` BIGINT COMMENT 'Identifier of the department that owns and manages this workspace.',
     `parent_workspace_id` BIGINT COMMENT 'Self-referencing FK on workspace (parent_workspace_id)',
     `access_level` STRING COMMENT 'Security classification level that determines who can access this workspace.',
     `activation_date` DATE COMMENT 'Date when the workspace was activated and made available for use.',
@@ -1138,7 +1141,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `complian
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Store Department Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Store Format Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `member_segment_id` SET TAGS ('dbx_business_glossary_term' = 'Member Segment Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `parent_kpi_definition_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'draft|pending_review|approved|deprecated|retired');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `bi_tool_integration` SET TAGS ('dbx_business_glossary_term' = 'Business Intelligence (BI) Tool Integration');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -1151,7 +1153,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `last_mod
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `precision_scale` SET TAGS ('dbx_business_glossary_term' = 'Precision and Scale');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `steward_email` SET TAGS ('dbx_business_glossary_term' = 'Data Steward Email Address');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `steward_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `steward_email` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `steward_name` SET TAGS ('dbx_business_glossary_term' = 'Data Steward Name');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `trend_direction` SET TAGS ('dbx_value_regex' = 'higher_is_better|lower_is_better|target_is_optimal|neutral');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
@@ -1163,6 +1164,7 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `adjustment_id
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `cycle_count_id` SET TAGS ('dbx_business_glossary_term' = 'Cycle Count Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `demand_forecast_id` SET TAGS ('dbx_business_glossary_term' = 'Demand Forecast Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Store Department Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `disposition_id` SET TAGS ('dbx_business_glossary_term' = 'Disposition Id (Foreign Key)');
@@ -1177,7 +1179,7 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `location_id` 
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `loyalty_membership_id` SET TAGS ('dbx_business_glossary_term' = 'Membership Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `markdown_id` SET TAGS ('dbx_business_glossary_term' = 'Markdown Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `member_segment_id` SET TAGS ('dbx_business_glossary_term' = 'Member Segment Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `prior_period_kpi_value_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `price_change_id` SET TAGS ('dbx_business_glossary_term' = 'Price Change Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Profile Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `replenishment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Plan Id (Foreign Key)');
@@ -1205,7 +1207,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ALTER COLUMN `unit_of_measu
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` SET TAGS ('dbx_subdomain' = 'reporting_governance');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `parent_report_definition_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `semantic_layer_entity_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Semantic Layer Entity Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `semantic_metric_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Semantic Metric Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected');
@@ -1216,7 +1217,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `gover
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `kpi_count` SET TAGS ('dbx_business_glossary_term' = 'Key Performance Indicator (KPI) Count');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `report_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{3,20}$');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `report_owner_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `report_owner_email` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `report_status` SET TAGS ('dbx_value_regex' = 'draft|active|deprecated|retired|suspended');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `report_type` SET TAGS ('dbx_value_regex' = 'operational|financial|executive|regulatory|analytical|adhoc');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ALTER COLUMN `report_url` SET TAGS ('dbx_business_glossary_term' = 'Report Uniform Resource Locator (URL)');
@@ -1226,47 +1226,34 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` SET TAGS ('dbx_data_
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` SET TAGS ('dbx_subdomain' = 'reporting_governance');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `dashboard_config_id` SET TAGS ('dbx_business_glossary_term' = 'Dashboard Configuration ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `access_policy_id` SET TAGS ('dbx_business_glossary_term' = 'Analytics Access Policy Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `cloned_from_dashboard_config_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `access_tier` SET TAGS ('dbx_value_regex' = 'public|internal|restricted|confidential');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `bi_platform` SET TAGS ('dbx_business_glossary_term' = 'Business Intelligence (BI) Platform');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `certification_status` SET TAGS ('dbx_value_regex' = 'certified|pending_certification|not_certified');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `dashboard_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{3,20}$');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `dashboard_owner_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `dashboard_owner_email` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `dashboard_type` SET TAGS ('dbx_value_regex' = 'operational|strategic|analytical|tactical|executive|compliance');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `embedded_kpi_references` SET TAGS ('dbx_business_glossary_term' = 'Embedded Key Performance Indicator (KPI) References');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `export_enabled` SET TAGS ('dbx_business_glossary_term' = 'Export Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `is_active` SET TAGS ('dbx_business_glossary_term' = 'Is Active Flag');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `mobile_enabled` SET TAGS ('dbx_business_glossary_term' = 'Mobile Enabled Flag');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `mobile_enabled` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `mobile_enabled` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `publication_status` SET TAGS ('dbx_value_regex' = 'draft|in_review|published|archived|deprecated');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `refresh_schedule` SET TAGS ('dbx_value_regex' = 'real_time|hourly|daily|weekly|monthly|on_demand');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `subscription_enabled` SET TAGS ('dbx_business_glossary_term' = 'Subscription Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `tags` SET TAGS ('dbx_business_glossary_term' = 'Dashboard Tags');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `technical_contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `technical_contact_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `technical_contact_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `technical_contact_name` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `thumbnail_url` SET TAGS ('dbx_business_glossary_term' = 'Thumbnail Image Uniform Resource Locator (URL)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `url` SET TAGS ('dbx_business_glossary_term' = 'Dashboard Uniform Resource Locator (URL)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_config` ALTER COLUMN `version_number` SET TAGS ('dbx_value_regex' = '^[0-9]+.[0-9]+.[0-9]+$');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` SET TAGS ('dbx_subdomain' = 'reporting_governance');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `audit_event_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Event Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Owner User ID');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `associate_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `dashboard_config_id` SET TAGS ('dbx_business_glossary_term' = 'Dashboard ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `dashboard_created_by_user_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Created By User ID');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `dashboard_created_by_user_associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `dashboard_created_by_user_associate_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `dashboard_modified_by_user_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `dashboard_modified_by_user_associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `dashboard_modified_by_user_associate_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `dq_rule_id` SET TAGS ('dbx_business_glossary_term' = 'Data Quality Rule ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `kpi_definition_id` SET TAGS ('dbx_business_glossary_term' = 'Key Performance Indicator (KPI) ID');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `parent_dashboard_widget_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `semantic_layer_entity_id` SET TAGS ('dbx_business_glossary_term' = 'Semantic Layer Entity Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `dashboard_widget_status` SET TAGS ('dbx_business_glossary_term' = 'Widget Status');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `dashboard_widget_status` SET TAGS ('dbx_value_regex' = 'active|inactive|draft|archived|deprecated');
@@ -1286,7 +1273,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ALTER COLUMN `width`
 ALTER TABLE `vibe_retail_v1`.`analytics`.`metric_dimension` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`metric_dimension` SET TAGS ('dbx_subdomain' = 'semantic_catalog');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`metric_dimension` ALTER COLUMN `metric_dimension_id` SET TAGS ('dbx_business_glossary_term' = 'Metric Dimension Identifier (ID)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`metric_dimension` ALTER COLUMN `parent_metric_dimension_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`metric_dimension` ALTER COLUMN `primary_replacement_metric_dimension_id` SET TAGS ('dbx_business_glossary_term' = 'Replacement Dimension Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`metric_dimension` ALTER COLUMN `default_aggregation` SET TAGS ('dbx_business_glossary_term' = 'Default Aggregation Method');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`metric_dimension` ALTER COLUMN `dimension_type` SET TAGS ('dbx_value_regex' = 'conformed|degenerate|role_playing|junk|slowly_changing|outrigger');
@@ -1299,12 +1285,10 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`metric_dimension` ALTER COLUMN `refres
 ALTER TABLE `vibe_retail_v1`.`analytics`.`metric_dimension` ALTER COLUMN `scd_type` SET TAGS ('dbx_business_glossary_term' = 'Slowly Changing Dimension (SCD) Type');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`metric_dimension` ALTER COLUMN `security_classification` SET TAGS ('dbx_value_regex' = 'public|internal|confidential|restricted');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` SET TAGS ('dbx_subdomain' = 'quality_access');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` SET TAGS ('dbx_subdomain' = 'quality_control');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `dq_rule_id` SET TAGS ('dbx_business_glossary_term' = 'Data Quality (DQ) Rule ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `parent_dq_rule_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `semantic_layer_entity_id` SET TAGS ('dbx_business_glossary_term' = 'Target Semantic Layer Entity Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Target Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `execution_frequency` SET TAGS ('dbx_value_regex' = 'real_time|hourly|daily|weekly|monthly|on_demand');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `execution_layer` SET TAGS ('dbx_value_regex' = 'bronze|silver|gold');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `rule_status` SET TAGS ('dbx_value_regex' = 'active|inactive|draft|deprecated|suspended');
@@ -1313,7 +1297,7 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `severity_level`
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `threshold_operator` SET TAGS ('dbx_value_regex' = 'less_than|less_than_or_equal|greater_than|greater_than_or_equal|equal|not_equal');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ALTER COLUMN `threshold_unit` SET TAGS ('dbx_value_regex' = 'percentage|count|ratio');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` SET TAGS ('dbx_subdomain' = 'quality_access');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` SET TAGS ('dbx_subdomain' = 'quality_control');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `dq_result_id` SET TAGS ('dbx_business_glossary_term' = 'Data Quality (DQ) Result ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `audit_event_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Event Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `dq_rule_id` SET TAGS ('dbx_business_glossary_term' = 'Data Quality (DQ) Rule ID');
@@ -1321,7 +1305,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `financial_per
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `shipment_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Shipment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `inbound_shipment_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Shipment Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `previous_dq_result_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `retail_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Retail Calendar Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `stock_position_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Position Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Supply Purchase Order Id (Foreign Key)');
@@ -1353,13 +1336,12 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `trend_directi
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `trend_direction` SET TAGS ('dbx_value_regex' = 'improving|stable|degrading|new');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` SET TAGS ('dbx_subdomain' = 'quality_access');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` SET TAGS ('dbx_subdomain' = 'quality_control');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `dq_issue_id` SET TAGS ('dbx_business_glossary_term' = 'Data Quality (DQ) Issue ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Affected Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `dq_result_id` SET TAGS ('dbx_business_glossary_term' = 'Dq Result Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `dq_rule_id` SET TAGS ('dbx_business_glossary_term' = 'Detection Rule ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `inbound_shipment_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Shipment Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `parent_dq_issue_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Profile Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `replenishment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `return_fraud_case_id` SET TAGS ('dbx_business_glossary_term' = 'Return Fraud Case Id (Foreign Key)');
@@ -1388,7 +1370,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `prevention_act
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `priority` SET TAGS ('dbx_business_glossary_term' = 'Remediation Priority');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `priority` SET TAGS ('dbx_value_regex' = 'p1|p2|p3|p4');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `remediation_cost_estimate` SET TAGS ('dbx_business_glossary_term' = 'Remediation Cost Estimate (USD)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `remediation_cost_estimate` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `resolved_by` SET TAGS ('dbx_business_glossary_term' = 'Resolved By User');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `resolved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Resolution Timestamp');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `severity` SET TAGS ('dbx_business_glossary_term' = 'Issue Severity Level');
@@ -1399,15 +1380,12 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ALTER COLUMN `updated_timest
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` SET TAGS ('dbx_subdomain' = 'semantic_catalog');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `loyalty_program_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Program Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `parent_semantic_layer_entity_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `primary_replacement_semantic_layer_entity_id` SET TAGS ('dbx_business_glossary_term' = 'Replacement Entity ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `certified_status` SET TAGS ('dbx_business_glossary_term' = 'Certification Status');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `certified_status` SET TAGS ('dbx_value_regex' = 'certified|provisional|deprecated|draft');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `consumption_tier` SET TAGS ('dbx_value_regex' = 'self_service|governed|restricted');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `data_steward_email` SET TAGS ('dbx_business_glossary_term' = 'Data Steward Email Address');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `data_steward_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `data_steward_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `data_steward_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `documentation_url` SET TAGS ('dbx_business_glossary_term' = 'Documentation URL (Uniform Resource Locator)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `domain` SET TAGS ('dbx_business_glossary_term' = 'Business Domain');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `entity_label` SET TAGS ('dbx_business_glossary_term' = 'Entity Business Label');
@@ -1426,7 +1404,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `v
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_layer_entity` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Created By User');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_metric` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_metric` SET TAGS ('dbx_subdomain' = 'semantic_catalog');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_metric` ALTER COLUMN `derived_from_semantic_metric_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_metric` ALTER COLUMN `financial_period_id` SET TAGS ('dbx_business_glossary_term' = 'Financial Period Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_metric` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_metric` ALTER COLUMN `kpi_definition_id` SET TAGS ('dbx_business_glossary_term' = 'Key Performance Indicator (KPI) Definition ID');
@@ -1452,43 +1429,29 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `dem
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `financial_period_id` SET TAGS ('dbx_business_glossary_term' = 'Financial Period Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Node Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Subscriber Team ID');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Subscriber User ID');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `replenishment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Plan Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `superseded_report_subscription_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Profile Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `tertiary_report_last_modified_by_user_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Last Modified By User ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `delivery_channel` SET TAGS ('dbx_value_regex' = 'email|slack|teams|in_app|sftp|webhook');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `delivery_email_address` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `delivery_email_address` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `delivery_email_address` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `delivery_schedule_type` SET TAGS ('dbx_value_regex' = 'cron|named_cadence|on_demand|event_triggered');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `max_delivery_attempts` SET TAGS ('dbx_business_glossary_term' = 'Maximum Delivery Attempts');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `output_format` SET TAGS ('dbx_value_regex' = 'pdf|excel|csv|html|powerpoint|json');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `priority_level` SET TAGS ('dbx_value_regex' = 'low|normal|high|urgent');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ALTER COLUMN `subscription_status` SET TAGS ('dbx_value_regex' = 'active|paused|cancelled|expired|pending');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` SET TAGS ('dbx_subdomain' = 'quality_access');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` SET TAGS ('dbx_subdomain' = 'quality_control');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `access_policy_id` SET TAGS ('dbx_business_glossary_term' = 'Analytics Access Policy ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned User ID');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `associate_id` SET TAGS ('dbx_pii_identifier' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `parent_access_policy_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `access_level` SET TAGS ('dbx_value_regex' = 'view|export|edit|admin|deny');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `approved_by` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `data_classification_constraint` SET TAGS ('dbx_value_regex' = 'restricted|confidential|internal|public');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `enforcement_mode` SET TAGS ('dbx_value_regex' = 'enforce|audit|warn');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `last_modified_by` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `last_modified_by` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `policy_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{3,20}$');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `policy_status` SET TAGS ('dbx_value_regex' = 'draft|active|suspended|expired|revoked');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `policy_type` SET TAGS ('dbx_value_regex' = 'row_level|column_level|object_level|attribute_level|cell_level|dynamic');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `risk_level` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `created_by` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`access_policy` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`retail_calendar` SET TAGS ('dbx_data_type' = 'reference_data');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`retail_calendar` SET TAGS ('dbx_subdomain' = 'reference_hierarchy');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`retail_calendar` ALTER COLUMN `prior_year_retail_calendar_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`retail_calendar` SET TAGS ('dbx_subdomain' = 'reference_data');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`retail_calendar` ALTER COLUMN `is_53_week_year` SET TAGS ('dbx_business_glossary_term' = 'Is 53-Week Year Flag');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`retail_calendar` ALTER COLUMN `is_back_to_school_period` SET TAGS ('dbx_business_glossary_term' = 'Is Back-to-School Period Flag');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`retail_calendar` ALTER COLUMN `is_black_friday_week` SET TAGS ('dbx_business_glossary_term' = 'Is Black Friday Week Flag');
@@ -1503,8 +1466,7 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`retail_calendar` ALTER COLUMN `iso_wee
 ALTER TABLE `vibe_retail_v1`.`analytics`.`retail_calendar` ALTER COLUMN `season` SET TAGS ('dbx_business_glossary_term' = 'Retail Season');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`retail_calendar` ALTER COLUMN `season` SET TAGS ('dbx_value_regex' = 'Spring|Summer|Fall|Winter');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`reporting_hierarchy` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`reporting_hierarchy` SET TAGS ('dbx_subdomain' = 'reference_hierarchy');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`reporting_hierarchy` ALTER COLUMN `parent_reporting_hierarchy_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`reporting_hierarchy` SET TAGS ('dbx_subdomain' = 'semantic_catalog');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`reporting_hierarchy` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`reporting_hierarchy` ALTER COLUMN `external_system_code` SET TAGS ('dbx_business_glossary_term' = 'External System ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`reporting_hierarchy` ALTER COLUMN `hierarchy_type` SET TAGS ('dbx_value_regex' = 'organizational|geographic|merchandise|channel|financial|customer_segment');
@@ -1525,11 +1487,9 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `kp
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Location Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `margin_target_id` SET TAGS ('dbx_business_glossary_term' = 'Margin Target Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Approved By User ID');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Profile Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `reporting_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Reporting Hierarchy Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `retail_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Retail Calendar Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `revised_analytics_kpi_target_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `semantic_layer_entity_id` SET TAGS ('dbx_business_glossary_term' = 'Business Entity Identifier');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Supply Purchase Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ALTER COLUMN `financial_period_id` SET TAGS ('dbx_business_glossary_term' = 'Target Financial Period Id (Foreign Key)');
@@ -1565,7 +1525,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `cost_center_id` S
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `cycle_count_id` SET TAGS ('dbx_business_glossary_term' = 'Cycle Count Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `demand_forecast_id` SET TAGS ('dbx_business_glossary_term' = 'Demand Forecast Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `dq_result_id` SET TAGS ('dbx_business_glossary_term' = 'Dq Result Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `escalated_from_alert_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `financial_period_id` SET TAGS ('dbx_business_glossary_term' = 'Financial Period Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `fulfillment_node_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Fulfillment Node Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
@@ -1590,7 +1549,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `purchase_order_id
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `alert_status` SET TAGS ('dbx_value_regex' = 'new|acknowledged|investigating|resolved|dismissed|escalated');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `alert_type` SET TAGS ('dbx_value_regex' = 'threshold_breach|anomaly_detection|trend_deviation|forecast_variance|data_quality_issue|target_miss');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `recipient_list` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `rule_version` SET TAGS ('dbx_business_glossary_term' = 'Alert Rule Version');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `severity_level` SET TAGS ('dbx_value_regex' = 'critical|high|medium|low|informational');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
@@ -1599,10 +1557,7 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` SET TAGS ('dbx_sub
 ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ALTER COLUMN `self_service_query_id` SET TAGS ('dbx_business_glossary_term' = 'Self-Service Query ID');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ALTER COLUMN `access_policy_id` SET TAGS ('dbx_business_glossary_term' = 'Access Policy Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'User ID');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ALTER COLUMN `associate_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ALTER COLUMN `dashboard_config_id` SET TAGS ('dbx_business_glossary_term' = 'Dashboard Config Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ALTER COLUMN `forked_from_self_service_query_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ALTER COLUMN `kpi_definition_id` SET TAGS ('dbx_business_glossary_term' = 'Kpi Definition Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ALTER COLUMN `loyalty_membership_id` SET TAGS ('dbx_business_glossary_term' = 'Membership Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ALTER COLUMN `report_definition_id` SET TAGS ('dbx_business_glossary_term' = 'Report Definition Id (Foreign Key)');
@@ -1630,23 +1585,18 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `gl_accoun
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `kpi_definition_id` SET TAGS ('dbx_business_glossary_term' = 'Kpi Definition Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `metric_dimension_id` SET TAGS ('dbx_business_glossary_term' = 'Metric Dimension Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `obligation_id` SET TAGS ('dbx_business_glossary_term' = 'Obligation Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `parent_glossary_term_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `report_definition_id` SET TAGS ('dbx_business_glossary_term' = 'Report Definition Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `semantic_layer_entity_id` SET TAGS ('dbx_business_glossary_term' = 'Semantic Layer Entity Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `semantic_metric_id` SET TAGS ('dbx_business_glossary_term' = 'Semantic Metric Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'draft|pending_review|approved|published|deprecated|retired');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `business_owner_email` SET TAGS ('dbx_business_glossary_term' = 'Business Owner Email Address');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `business_owner_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `business_owner_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `business_owner_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `contains_financial_data` SET TAGS ('dbx_business_glossary_term' = 'Contains Financial Data Flag');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `contains_pii` SET TAGS ('dbx_business_glossary_term' = 'Contains Personally Identifiable Information (PII) Flag');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `criticality_level` SET TAGS ('dbx_value_regex' = 'critical|high|medium|low');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `data_classification` SET TAGS ('dbx_value_regex' = 'restricted|confidential|internal|public');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `data_steward_email` SET TAGS ('dbx_business_glossary_term' = 'Data Steward Email Address');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `data_steward_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `data_steward_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `data_steward_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `is_active` SET TAGS ('dbx_business_glossary_term' = 'Is Active Flag');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `term_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{3,20}$');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
@@ -1699,7 +1649,6 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`sla_kpi_measurement` ALTER COLUMN `mea
 ALTER TABLE `vibe_retail_v1`.`analytics`.`sla_kpi_measurement` ALTER COLUMN `threshold_value` SET TAGS ('dbx_business_glossary_term' = 'SLA-Specific KPI Threshold');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`sla_kpi_measurement` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Created By User');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`workspace` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`workspace` SET TAGS ('dbx_subdomain' = 'semantic_catalog');
+ALTER TABLE `vibe_retail_v1`.`analytics`.`workspace` SET TAGS ('dbx_subdomain' = 'reference_data');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`workspace` ALTER COLUMN `workspace_id` SET TAGS ('dbx_business_glossary_term' = 'Workspace Identifier');
 ALTER TABLE `vibe_retail_v1`.`analytics`.`workspace` ALTER COLUMN `access_policy_id` SET TAGS ('dbx_business_glossary_term' = 'Access Policy Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`analytics`.`workspace` ALTER COLUMN `parent_workspace_id` SET TAGS ('dbx_self_ref_fk' = 'true');

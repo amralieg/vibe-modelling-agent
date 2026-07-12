@@ -1,5 +1,5 @@
 -- Schema for Domain: compliance | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:22
+-- Generated on: 2026-07-12 13:53:21
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`compliance` COMMENT 'Manages regulatory compliance tracking, food safety (FDA/FSMA) audit schedules, OSHA workplace safety compliance, PCI-DSS payment security, GDPR/CCPA privacy compliance programs, environmental regulations, and certification lifecycle management across all retail operations.';
@@ -560,6 +560,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` (
     `privacy_assessment_id` BIGINT COMMENT 'Unique identifier for the privacy assessment record. Primary key.',
     `compliance_program_id` BIGINT COMMENT 'Foreign key linking to compliance.compliance_program. Business justification: Privacy assessments (PIAs, DPIAs) are conducted under privacy compliance programs (GDPR, CCPA, etc.). This FK links each assessment to the master compliance program record. Cardinality: Many assessmen',
     `prior_privacy_assessment_id` BIGINT COMMENT 'Self-referencing FK on privacy_assessment (prior_privacy_assessment_id)',
+    `account_id` BIGINT COMMENT 'Foreign key linking to customer.account. Business justification: Privacy impact assessments may be triggered by new account types or processing activities (e.g., B2B accounts with special data handling). Links assessment to business process being evaluated.',
     `assessment_completion_date` DATE COMMENT 'Date when the privacy assessment was finalized and approved.',
     `assessment_methodology` STRING COMMENT 'Framework or methodology used to conduct the privacy assessment (e.g., ISO/IEC 29134, NIST Privacy Framework, CNIL DPIA methodology, ICO DPIA guidance, Internal privacy assessment framework).',
     `assessment_name` STRING COMMENT 'Business-friendly name or title of the privacy assessment (e.g., Customer Loyalty Program DPIA, E-Commerce Platform PIA).',
@@ -606,7 +607,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` (
     `regulatory_filing_id` BIGINT COMMENT 'Unique identifier for the regulatory filing record. Primary key.',
     `amended_regulatory_filing_id` BIGINT COMMENT 'Self-referencing FK on regulatory_filing (amended_regulatory_filing_id)',
     `certification_id` BIGINT COMMENT 'Foreign key linking to compliance.certification. Business justification: Regulatory filings can be made for certification applications, renewals, or compliance reporting related to a specific certification. This FK links the filing transaction to the certification it perta',
-    `compliance_program_id` BIGINT COMMENT 'Foreign key linking to compliance.compliance_program. Business justification: regulatory_filing represents submissions to regulatory agencies (FDA filings, OSHA reports, EPA notifications). These filings are made to satisfy obligations under a specific compliance_program (e.g.,',
+    `compliance_program_id` BIGINT COMMENT 'Foreign key linking to compliance.compliance_program. Business justification: regulatory_filing represents submissions to regulatory agencies (FDA filings, OSHA reports, EPA notifications). These filings are made to satisfy obligations under a specific compliance_program (e.g.',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Retail regulatory filings (EPA reports, health dept renewals, alcohol/tobacco filings) incur preparation and filing fees allocated to responsible cost centers. Finance tracks regulatory compliance cos',
     `license_permit_id` BIGINT COMMENT 'Foreign key linking to compliance.license_permit. Business justification: Regulatory filings are often made for license applications, renewals, or compliance reporting related to a specific license or permit. This FK links the filing transaction to the license/permit it per',
     `location_id` BIGINT COMMENT 'Identifier of the retail store location to which this filing pertains. Used when the filing is specific to a store-level regulatory requirement (e.g., local health permit, liquor license).',
@@ -825,6 +826,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`compliance`.`training_program` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`compliance`.`training_completion` (
     `training_completion_id` BIGINT COMMENT 'Unique identifier for the training completion record. Primary key for this transactional record of compliance training completion.',
+    `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Associates completing compliance training (alcohol sales certification, pharmacy promotion authorization, tobacco handling) are authorized to execute specific regulated promotional campaigns. Links tr',
     `compliance_program_id` BIGINT COMMENT 'Identifier of the compliance program under which this training is mandated. Links to the compliance program master.',
     `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: DC employees require facility-specific training (forklift certification, hazmat handling, food safety). Training records must be auditable by facility for OSHA and FDA inspections.',
     `associate_id` BIGINT COMMENT 'Unique identifier of the retail associate who completed the training. Links to the workforce associate master record.',
@@ -1214,6 +1216,42 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` (
     CONSTRAINT pk_regulatory_agency PRIMARY KEY(`regulatory_agency_id`)
 ) COMMENT 'Master reference table for regulatory_agency. Referenced by issuing_agency_id.';
 
+CREATE OR REPLACE TABLE `vibe_retail_v1`.`compliance`.`consent` (
+    `consent_id` BIGINT COMMENT 'Primary key for consent',
+    `profile_id` BIGINT COMMENT 'Reference to the customer who provided or withdrew consent. Links to the customer master record.',
+    `collection_channel` STRING COMMENT 'The channel through which the consent was collected: web (e-commerce site), mobile app, POS (point of sale terminal), paper form (in-store signup), call center, email campaign, or in-store kiosk. [ENUM-REF-CANDIDATE: web|mobile_app|pos|paper_form|call_center|email|in_store_kiosk — 7 candidates stripped; promote to reference product]',
+    `consent_status` STRING COMMENT 'Current status of the consent: granted (customer opted in), withdrawn (customer opted out), pending (awaiting customer action), expired (consent period ended), or revoked (administratively cancelled).. Valid values are `granted|withdrawn|pending|expired|revoked`',
+    `consent_timestamp` TIMESTAMP COMMENT 'The exact date and time when the consent decision was captured. Critical for audit trails and regulatory proof of consent timing.',
+    `consent_type` STRING COMMENT 'The specific type of consent being recorded: marketing email, SMS, push notifications, data sharing with partners, profiling for personalization, cookie tracking, or third-party data sharing. [ENUM-REF-CANDIDATE: marketing_email|marketing_sms|marketing_push|data_sharing|profiling|cookies|third_party_sharing — 7 candidates stripped; promote to reference product]',
+    `data_subject_rights_notice` BOOLEAN COMMENT 'Boolean flag indicating whether the customer was informed of their data subject rights (right to access, rectification, erasure, restriction, portability, objection) at the time of consent collection.',
+    `double_opt_in_confirmed` BOOLEAN COMMENT 'Boolean flag indicating whether the customer confirmed their consent via a double opt-in process (e.g., email confirmation link). Best practice for email marketing consent.',
+    `double_opt_in_timestamp` TIMESTAMP COMMENT 'The date and time when the customer confirmed their consent via double opt-in. Null if double opt-in was not used or not yet confirmed.',
+    `expiration_date` DATE COMMENT 'The date on which this consent expires and must be re-obtained. Null if consent does not expire. Used for consent refresh workflows.',
+    `granularity` STRING COMMENT 'The level of granularity at which consent was obtained: global (all purposes), channel-specific (email vs SMS), purpose-specific (marketing vs analytics), or brand-specific (for multi-brand retailers).. Valid values are `global|channel_specific|purpose_specific|brand_specific`',
+    `ip_address` STRING COMMENT 'The IP address from which the consent was submitted. Used as proof of consent origin for regulatory compliance and fraud detection.',
+    `jurisdiction` STRING COMMENT 'The legal jurisdiction (country or state code) under which this consent was collected and is governed. Determines applicable privacy regulations (GDPR, CCPA, etc.).',
+    `language` STRING COMMENT 'The language in which the consent form was presented to the customer (ISO 639-1 two-letter code, e.g., EN, ES, FR). Required for multi-lingual compliance.',
+    `legal_basis` STRING COMMENT 'The legal basis under GDPR for processing this data: consent, contract fulfillment, legal obligation, vital interest, public task, or legitimate interest. Required for GDPR Article 6 compliance.. Valid values are `consent|contract|legal_obligation|vital_interest|public_task|legitimate_interest`',
+    `method` STRING COMMENT 'The method by which consent was obtained: explicit opt-in (customer actively checked box), implicit opt-in (inferred from action), pre-checked box (legacy, non-compliant), verbal (phone), or written signature (paper form).. Valid values are `explicit_opt_in|implicit_opt_in|pre_checked_box|verbal|written_signature`',
+    `minor_consent_flag` BOOLEAN COMMENT 'Boolean flag indicating whether this consent record pertains to a minor (under age of digital consent in jurisdiction). Triggers additional parental consent requirements under GDPR Article 8 and COPPA.',
+    `parental_consent_verified` BOOLEAN COMMENT 'Boolean flag indicating whether parental or guardian consent has been verified for a minor. Required for COPPA and GDPR Article 8 compliance.',
+    `privacy_policy_version` STRING COMMENT 'The specific version of the privacy policy document that was in effect and accepted by the customer at the time of consent. Required for regulatory audit trails.',
+    `proof_document_url` STRING COMMENT 'URL or storage path to the digitally signed or archived copy of the consent form as presented to the customer. Used for audit and regulatory inspection.',
+    `record_created_timestamp` TIMESTAMP COMMENT 'System timestamp when this consent record was first created in the data platform. Immutable. Used for audit trail and data lineage.',
+    `record_source_system` STRING COMMENT 'The name or identifier of the source system that originated this consent record (e.g., the e-commerce platform, POS system, call center CRM). Used for data lineage and troubleshooting.',
+    `scope` STRING COMMENT 'Detailed description of the scope and purpose of the consent. Explains what data will be used for and how, ensuring transparency and specificity required by privacy regulations.',
+    `third_party_recipient` STRING COMMENT 'Name or identifier of the third party with whom data may be shared under this consent. Null if no third-party sharing is involved. Required for transparency under GDPR Article 13.',
+    `user_agent` STRING COMMENT 'The browser or application user agent string captured at the time of consent. Provides additional context for consent collection environment.',
+    `version` STRING COMMENT 'Version identifier of the consent form or privacy policy that was presented to the customer at the time of consent. Enables tracking of which policy version the customer agreed to.',
+    `withdrawal_reason` STRING COMMENT 'Optional free-text reason provided by the customer for withdrawing consent. Used for customer experience analysis and compliance documentation.',
+    `withdrawal_timestamp` TIMESTAMP COMMENT 'The exact date and time when the customer withdrew their consent. Null if consent has not been withdrawn. Critical for right-to-erasure workflows.',
+    `consent_given_at` STRING COMMENT '',
+    `consent_withdrawn_at` STRING COMMENT '',
+    `purpose` STRING COMMENT '',
+    `channel` STRING COMMENT '',
+    CONSTRAINT pk_consent PRIMARY KEY(`consent_id`)
+) COMMENT 'Authoritative audit trail of customer privacy consent decisions required for GDPR and CCPA compliance. Each row captures consent type (marketing email, SMS, data sharing, profiling, cookies), consent status (granted/withdrawn/pending), consent version, collection channel (web/POS/mobile/paper), collection timestamp, IP address at time of consent, the specific privacy policy version accepted, and the profile reference for the consenting customer. Immutable append-only records supporting regulatory reporting, right-to-erasure workflows, and consent proof during audits.';
+
 -- ========= FOREIGN KEYS =========
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ADD CONSTRAINT `fk_compliance_compliance_program_parent_compliance_program_id` FOREIGN KEY (`parent_compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ADD CONSTRAINT `fk_compliance_obligation_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
@@ -1297,7 +1335,6 @@ ALTER SCHEMA `vibe_retail_v1`.`compliance` SET TAGS ('dbx_division' = 'corporate
 ALTER SCHEMA `vibe_retail_v1`.`compliance` SET TAGS ('dbx_domain' = 'compliance');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` SET TAGS ('dbx_subdomain' = 'regulatory_governance');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `parent_compliance_program_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `audit_frequency` SET TAGS ('dbx_value_regex' = 'annual|semi_annual|quarterly|monthly|continuous|ad_hoc');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `certification_status` SET TAGS ('dbx_value_regex' = 'certified|pending_certification|expired|revoked|not_applicable');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
@@ -1305,33 +1342,28 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `com
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `incident_count_ytd` SET TAGS ('dbx_business_glossary_term' = 'Incident Count Year-to-Date (YTD)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `last_audit_result` SET TAGS ('dbx_value_regex' = 'passed|passed_with_findings|failed|not_applicable');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `manager` SET TAGS ('dbx_business_glossary_term' = 'Program Manager');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `manager` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `modified_by` SET TAGS ('dbx_business_glossary_term' = 'Record Modified By');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Program Notes');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `penalty_amount_max` SET TAGS ('dbx_business_glossary_term' = 'Maximum Penalty Amount');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `penalty_amount_max` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `policy_document_url` SET TAGS ('dbx_business_glossary_term' = 'Policy Document URL (Uniform Resource Locator)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `program_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{3,20}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `program_scope` SET TAGS ('dbx_value_regex' = 'enterprise_wide|banner_specific|channel_specific|region_specific|store_specific|dc_specific');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `program_status` SET TAGS ('dbx_value_regex' = 'active|suspended|under_review|retired|pending_activation|non_compliant');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `risk_level` SET TAGS ('dbx_value_regex' = 'critical|high|medium|low');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `sponsor` SET TAGS ('dbx_business_glossary_term' = 'Program Sponsor');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `sponsor` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `training_frequency` SET TAGS ('dbx_value_regex' = 'annual|semi_annual|quarterly|one_time|continuous|not_applicable');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `training_required` SET TAGS ('dbx_business_glossary_term' = 'Training Required Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`compliance_program` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Record Created By');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` SET TAGS ('dbx_subdomain' = 'regulatory_governance');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Owner ID');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `parent_obligation_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `cadence` SET TAGS ('dbx_business_glossary_term' = 'Obligation Cadence');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `obligation_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{3,20}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `due_date` SET TAGS ('dbx_business_glossary_term' = 'Obligation Due Date');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Obligation Effective Date');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `evidence_required` SET TAGS ('dbx_business_glossary_term' = 'Evidence Required Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Obligation Expiration Date');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `financial_penalty_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `is_active` SET TAGS ('dbx_business_glossary_term' = 'Active Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Obligation Notes');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`obligation` ALTER COLUMN `obligation_status` SET TAGS ('dbx_value_regex' = 'pending|in_progress|fulfilled|overdue|waived|cancelled');
@@ -1368,7 +1400,6 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_event` SET TAGS ('dbx_data_type
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_event` SET TAGS ('dbx_subdomain' = 'audit_control');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_event` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Lead Auditor ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_event` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_event` ALTER COLUMN `follow_up_audit_event_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_event` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Business Unit ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_event` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_event` ALTER COLUMN `audit_method` SET TAGS ('dbx_value_regex' = 'on_site|remote|hybrid|document_review');
@@ -1387,7 +1418,6 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_finding` ALTER COLUMN `audit_fi
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_finding` ALTER COLUMN `audit_event_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Event Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_finding` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Distribution Center (DC) Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_finding` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store Identifier (ID)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_finding` ALTER COLUMN `parent_audit_finding_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_finding` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Auditor Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_finding` ALTER COLUMN `primary_previous_finding_audit_finding_id` SET TAGS ('dbx_business_glossary_term' = 'Previous Finding Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_finding` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
@@ -1415,7 +1445,6 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` SET TAGS ('dbx_dat
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` SET TAGS ('dbx_subdomain' = 'audit_control');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `environmental_event_id` SET TAGS ('dbx_business_glossary_term' = 'Environmental Event Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `follow_up_corrective_action_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `osha_incident_id` SET TAGS ('dbx_business_glossary_term' = 'Osha Incident Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned Owner ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
@@ -1425,13 +1454,11 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `acti
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `action_number` SET TAGS ('dbx_value_regex' = '^CA-[0-9]{6,10}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `action_type` SET TAGS ('dbx_business_glossary_term' = 'Corrective Action Type');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `action_type` SET TAGS ('dbx_value_regex' = 'immediate_fix|process_change|training|system_update|policy_revision|equipment_upgrade');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `actual_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `compliance_category` SET TAGS ('dbx_value_regex' = 'food_safety|workplace_safety|payment_security|data_privacy|environmental|product_safety');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `corrective_action_status` SET TAGS ('dbx_value_regex' = 'open|in_progress|pending_verification|closed|overdue');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `effectiveness_rating` SET TAGS ('dbx_value_regex' = 'effective|partially_effective|ineffective|pending');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `escalation_required` SET TAGS ('dbx_business_glossary_term' = 'Escalation Required Flag');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `estimated_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `external_reporting_required` SET TAGS ('dbx_business_glossary_term' = 'External Reporting Required Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `priority` SET TAGS ('dbx_business_glossary_term' = 'Corrective Action Priority');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`corrective_action` ALTER COLUMN `priority` SET TAGS ('dbx_value_regex' = 'critical|high|medium|low');
@@ -1441,7 +1468,6 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` SET TAGS ('dbx_data
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` SET TAGS ('dbx_subdomain' = 'safety_operations');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Facility ID');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `superseded_food_safety_plan_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `allergen_controls_included` SET TAGS ('dbx_business_glossary_term' = 'Allergen Controls Included Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
@@ -1461,9 +1487,7 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `plan_
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `qfsp_certification_date` SET TAGS ('dbx_business_glossary_term' = 'Qualified Food Safety Professional (QFSP) Certification Date');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `qfsp_contact_email` SET TAGS ('dbx_business_glossary_term' = 'Qualified Food Safety Professional (QFSP) Contact Email');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `qfsp_contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `qfsp_contact_email` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `qfsp_contact_phone` SET TAGS ('dbx_business_glossary_term' = 'Qualified Food Safety Professional (QFSP) Contact Phone');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `qfsp_contact_phone` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `qfsp_credentials` SET TAGS ('dbx_business_glossary_term' = 'Qualified Food Safety Professional (QFSP) Credentials');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `qfsp_name` SET TAGS ('dbx_business_glossary_term' = 'Qualified Food Safety Professional (QFSP) Name');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `recall_plan_included` SET TAGS ('dbx_business_glossary_term' = 'Recall Plan Included Flag');
@@ -1471,7 +1495,6 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_plan` ALTER COLUMN `suppl
 ALTER TABLE `vibe_retail_v1`.`compliance`.`haccp_control_point` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`haccp_control_point` SET TAGS ('dbx_subdomain' = 'safety_operations');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`haccp_control_point` ALTER COLUMN `haccp_control_point_id` SET TAGS ('dbx_business_glossary_term' = 'Hazard Analysis and Critical Control Point (HACCP) Control Point ID');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`haccp_control_point` ALTER COLUMN `parent_haccp_control_point_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`haccp_control_point` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`haccp_control_point` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'PCQI Approval Date');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`haccp_control_point` ALTER COLUMN `approved_by_pcqi` SET TAGS ('dbx_business_glossary_term' = 'Approved By Preventive Controls Qualified Individual (PCQI)');
@@ -1487,7 +1510,6 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`haccp_control_point` ALTER COLUMN `no
 ALTER TABLE `vibe_retail_v1`.`compliance`.`haccp_control_point` ALTER COLUMN `severity_level` SET TAGS ('dbx_value_regex' = 'critical|major|moderate|minor');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` SET TAGS ('dbx_subdomain' = 'safety_operations');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `corrected_food_safety_log_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `haccp_control_point_id` SET TAGS ('dbx_business_glossary_term' = 'Haccp Control Point Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Monitoring Employee ID');
@@ -1501,53 +1523,37 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `critic
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `deviation_severity` SET TAGS ('dbx_value_regex' = 'none|minor|major|critical');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `equipment_code` SET TAGS ('dbx_business_glossary_term' = 'Equipment ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `health_department_reportable` SET TAGS ('dbx_business_glossary_term' = 'Health Department Reportable Flag');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `health_department_reportable` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `health_department_reportable` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `instrument_code` SET TAGS ('dbx_business_glossary_term' = 'Instrument ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `limit_status` SET TAGS ('dbx_business_glossary_term' = 'Critical Limit Status');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `limit_status` SET TAGS ('dbx_value_regex' = 'within_limit|limit_exceeded|limit_approached');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `monitoring_employee_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `monitoring_employee_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `monitoring_method` SET TAGS ('dbx_value_regex' = 'manual|automated|calibrated_instrument|visual_inspection');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `product_disposition` SET TAGS ('dbx_value_regex' = 'released|held|destroyed|reworked|returned');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `record_status` SET TAGS ('dbx_value_regex' = 'draft|submitted|verified|archived');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `supervisor_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `supervisor_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ALTER COLUMN `supervisor_verified` SET TAGS ('dbx_business_glossary_term' = 'Supervisor Verified Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` SET TAGS ('dbx_subdomain' = 'safety_operations');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `osha_incident_id` SET TAGS ('dbx_business_glossary_term' = 'Occupational Safety and Health Administration (OSHA) Incident ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `parent_osha_incident_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Employee ID');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `associate_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `associate_id` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `primary_previous_incident_osha_incident_id` SET TAGS ('dbx_business_glossary_term' = 'Previous Incident ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `tertiary_osha_investigator_employee_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Investigator Employee ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `cost_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `days_restricted_duty` SET TAGS ('dbx_business_glossary_term' = 'Days on Restricted Duty');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `estimated_cost_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `incident_number` SET TAGS ('dbx_value_regex' = '^[A-Z]{2,4}-d{4}-d{6}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `incident_type` SET TAGS ('dbx_value_regex' = 'injury|illness|near_miss|property_damage|environmental|vehicle');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `medical_facility_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `medical_facility_name` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `osha_300_log_entry_flag` SET TAGS ('dbx_business_glossary_term' = 'Occupational Safety and Health Administration (OSHA) 300 Log Entry Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `osha_301_reportable_flag` SET TAGS ('dbx_business_glossary_term' = 'Occupational Safety and Health Administration (OSHA) 301 Reportable Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `osha_incident_status` SET TAGS ('dbx_business_glossary_term' = 'Incident Status');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `osha_incident_status` SET TAGS ('dbx_value_regex' = 'reported|under_investigation|investigation_complete|closed|pending_review');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `osha_recordable_flag` SET TAGS ('dbx_business_glossary_term' = 'Occupational Safety and Health Administration (OSHA) Recordable Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `severity_level` SET TAGS ('dbx_value_regex' = 'minor|moderate|serious|severe|fatal');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `treatment_provided` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `treatment_provided` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`osha_incident` ALTER COLUMN `workers_compensation_claim_number` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` SET TAGS ('dbx_subdomain' = 'safety_operations');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Inspector Employee ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` ALTER COLUMN `follow_up_safety_inspection_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` ALTER COLUMN `followup_inspection_date` SET TAGS ('dbx_business_glossary_term' = 'Follow-Up Inspection Date');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` ALTER COLUMN `followup_inspection_required` SET TAGS ('dbx_business_glossary_term' = 'Follow-Up Inspection Required');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` ALTER COLUMN `hazmat_storage_compliant` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Materials (HAZMAT) Storage Compliant');
@@ -1556,12 +1562,11 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` ALTER COLUMN `insp
 ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` ALTER COLUMN `overall_result` SET TAGS ('dbx_business_glossary_term' = 'Overall Inspection Result');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`safety_inspection` ALTER COLUMN `overall_result` SET TAGS ('dbx_value_regex' = 'pass|pass_with_observations|fail|conditional_pass');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` SET TAGS ('dbx_subdomain' = 'privacy_training');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` SET TAGS ('dbx_subdomain' = 'privacy_protection');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `pci_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Payment Card Industry Data Security Standard (PCI-DSS) Assessment ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `prior_pci_assessment_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Qualified Security Assessor (QSA) Company Identifier');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `assessment_date` SET TAGS ('dbx_business_glossary_term' = 'Assessment Completion Date');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `assessment_number` SET TAGS ('dbx_business_glossary_term' = 'Assessment Reference Number');
@@ -1581,10 +1586,9 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `pci_dss
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `qsa_firm_name` SET TAGS ('dbx_business_glossary_term' = 'Qualified Security Assessor (QSA) Firm Name');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_assessment` ALTER COLUMN `vulnerability_scan_vendor` SET TAGS ('dbx_business_glossary_term' = 'Approved Scanning Vendor (ASV) Name');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` SET TAGS ('dbx_subdomain' = 'privacy_training');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` SET TAGS ('dbx_subdomain' = 'privacy_protection');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` ALTER COLUMN `pci_control_id` SET TAGS ('dbx_business_glossary_term' = 'Payment Card Industry (PCI) Control Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` ALTER COLUMN `parent_pci_control_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` ALTER COLUMN `active_flag` SET TAGS ('dbx_business_glossary_term' = 'Payment Card Industry (PCI) Control Active Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` ALTER COLUMN `assessor_notes` SET TAGS ('dbx_business_glossary_term' = 'Payment Card Industry (PCI) Assessor Notes');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` ALTER COLUMN `automation_level` SET TAGS ('dbx_business_glossary_term' = 'Payment Card Industry (PCI) Control Automation Level');
@@ -1621,9 +1625,9 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` ALTER COLUMN `testing_me
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` ALTER COLUMN `third_party_dependency_flag` SET TAGS ('dbx_business_glossary_term' = 'Payment Card Industry (PCI) Third-Party Dependency Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`pci_control` ALTER COLUMN `third_party_provider_name` SET TAGS ('dbx_business_glossary_term' = 'Payment Card Industry (PCI) Third-Party Provider Name');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` SET TAGS ('dbx_subdomain' = 'privacy_training');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` SET TAGS ('dbx_subdomain' = 'privacy_protection');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` ALTER COLUMN `prior_privacy_assessment_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` ALTER COLUMN `account_id` SET TAGS ('dbx_business_glossary_term' = 'Triggering Customer Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` ALTER COLUMN `assessment_outcome` SET TAGS ('dbx_value_regex' = 'approved|approved_with_conditions|rejected|requires_consultation');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` ALTER COLUMN `assessment_status` SET TAGS ('dbx_value_regex' = 'draft|in_review|dpo_review|completed|archived');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` ALTER COLUMN `assessment_type` SET TAGS ('dbx_value_regex' = 'PIA|DPIA|LIA');
@@ -1634,38 +1638,29 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` ALTER COLUMN `res
 ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` ALTER COLUMN `risk_level` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` ALTER COLUMN `third_party_processors` SET TAGS ('dbx_business_glossary_term' = 'Third-Party Processors');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` SET TAGS ('dbx_subdomain' = 'privacy_training');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `amended_regulatory_filing_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` SET TAGS ('dbx_subdomain' = 'regulatory_governance');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `certification_id` SET TAGS ('dbx_business_glossary_term' = 'Certification Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `license_permit_id` SET TAGS ('dbx_business_glossary_term' = 'License Permit Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Facility ID');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `regulatory_agency_id` SET TAGS ('dbx_internal' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Filing Expiration Date');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `filing_date` SET TAGS ('dbx_business_glossary_term' = 'Filing Submission Date');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `filing_document_url` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `filing_fee_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `filing_number` SET TAGS ('dbx_business_glossary_term' = 'Filing Reference Number');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Filing Notes');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_business_glossary_term' = 'Responsible Party Email Address');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `responsible_party_name` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `responsible_party_phone` SET TAGS ('dbx_business_glossary_term' = 'Responsible Party Phone Number');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `responsible_party_phone` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_filing` ALTER COLUMN `responsible_party_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` SET TAGS ('dbx_subdomain' = 'regulatory_governance');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Item Hierarchy Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `renewed_from_license_permit_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `associated_entity_reference` SET TAGS ('dbx_business_glossary_term' = 'Associated Entity ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `associated_entity_type` SET TAGS ('dbx_value_regex' = 'store|banner|enterprise|distribution_center');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `fee_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -1674,11 +1669,6 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `license
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `renewal_frequency` SET TAGS ('dbx_value_regex' = 'annual|biennial|triennial|quinquennial|perpetual');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `renewal_status` SET TAGS ('dbx_value_regex' = 'not_required|pending|submitted|approved|denied');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `responsible_party_name` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `responsible_party_phone` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ALTER COLUMN `responsible_party_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` SET TAGS ('dbx_subdomain' = 'regulatory_governance');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
@@ -1686,13 +1676,10 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `item_hie
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Facility ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Business Unit ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Manager ID');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `renewed_from_certification_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `tertiary_certification_modified_by_user_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `audit_frequency` SET TAGS ('dbx_value_regex' = 'annual|semi_annual|quarterly|biennial|triennial|on_demand');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `certificate_document_url` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `certification_status` SET TAGS ('dbx_value_regex' = 'active|expired|suspended|pending|withdrawn|in_renewal');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `certification_type` SET TAGS ('dbx_value_regex' = 'ISO 22000 Food Safety|ISO 14001 Environmental|GFSI|SQF|BRC|Rainforest Alliance');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `cost_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `cost_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `coverage_level` SET TAGS ('dbx_value_regex' = 'enterprise|division|facility|program|product_line');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ALTER COLUMN `logo_url` SET TAGS ('dbx_business_glossary_term' = 'Certification Logo URL');
@@ -1701,7 +1688,6 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` SET TAGS ('dbx_s
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `parent_environmental_event_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `containment_method` SET TAGS ('dbx_business_glossary_term' = 'Spill Containment Method');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `corrective_action_required` SET TAGS ('dbx_business_glossary_term' = 'Corrective Action Required Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `cost_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -1722,30 +1708,24 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `ma
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `manifest_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{9,12}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `material_type` SET TAGS ('dbx_business_glossary_term' = 'Environmental Material Type');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Environmental Event Notes');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `penalty_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `penalty_assessed` SET TAGS ('dbx_business_glossary_term' = 'Penalty Assessed Flag');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `quantity` SET TAGS ('dbx_business_glossary_term' = 'Material Quantity');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `regulation_reference` SET TAGS ('dbx_business_glossary_term' = 'Regulation Reference Code');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `regulatory_reporting_required` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Reporting Required Flag');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `remediation_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `report_confirmation_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{8,20}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `reported_date` SET TAGS ('dbx_business_glossary_term' = 'Event Reported Date');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `reporting_deadline` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Reporting Deadline');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_business_glossary_term' = 'Responsible Party Email Address');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `responsible_party_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `waste_hauler_license_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{6,20}$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`environmental_event` ALTER COLUMN `waste_hauler_name` SET TAGS ('dbx_business_glossary_term' = 'Licensed Waste Hauler Name');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` SET TAGS ('dbx_subdomain' = 'privacy_training');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` SET TAGS ('dbx_subdomain' = 'training_workforce');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `prerequisite_training_program_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `completion_frequency` SET TAGS ('dbx_value_regex' = 'one_time|annual|biennial|triennial|quarterly|as_needed');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `cost_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `cost_per_learner` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `duration_hours` SET TAGS ('dbx_business_glossary_term' = 'Training Duration Hours');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Training Program Effective Date');
@@ -1767,14 +1747,12 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `train
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Training Program Version Number');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_program` ALTER COLUMN `version_number` SET TAGS ('dbx_value_regex' = '^[0-9]+.[0-9]+$');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` SET TAGS ('dbx_subdomain' = 'privacy_training');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` SET TAGS ('dbx_subdomain' = 'training_workforce');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Authorized Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate ID');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `retake_of_training_completion_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `tertiary_training_waiver_approved_by_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Waiver Approved By ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `training_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `training_associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `training_associate_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `training_program_id` SET TAGS ('dbx_business_glossary_term' = 'Training Course ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `compliance_status` SET TAGS ('dbx_value_regex' = 'current|expiring_soon|expired|not_started|in_progress|overdue');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `cost_amount` SET TAGS ('dbx_business_glossary_term' = 'Training Cost Amount');
@@ -1787,12 +1765,11 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `ma
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Completion Notes');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ALTER COLUMN `pass_fail_result` SET TAGS ('dbx_value_regex' = 'pass|fail|waived|exempt');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` SET TAGS ('dbx_subdomain' = 'audit_control');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` SET TAGS ('dbx_subdomain' = 'regulatory_governance');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Party ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` ALTER COLUMN `parent_violation_notice_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` ALTER COLUMN `appeal_outcome` SET TAGS ('dbx_value_regex' = 'upheld|overturned|modified|pending|withdrawn');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` ALTER COLUMN `followup_inspection_date` SET TAGS ('dbx_business_glossary_term' = 'Follow-up Inspection Date');
@@ -1822,8 +1799,6 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`risk_register` ALTER COLUMN `audit_fi
 ALTER TABLE `vibe_retail_v1`.`compliance`.`risk_register` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`risk_register` ALTER COLUMN `environmental_event_id` SET TAGS ('dbx_business_glossary_term' = 'Environmental Event Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`risk_register` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Business Unit ID');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`risk_register` ALTER COLUMN `parent_risk_register_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`risk_register` ALTER COLUMN `associate_id` SET TAGS ('dbx_internal' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`risk_register` ALTER COLUMN `osha_incident_id` SET TAGS ('dbx_business_glossary_term' = 'Related Incident ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`risk_register` ALTER COLUMN `tertiary_risk_identified_by_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Identified By ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`risk_register` ALTER COLUMN `violation_notice_id` SET TAGS ('dbx_business_glossary_term' = 'Violation Notice Id (Foreign Key)');
@@ -1845,7 +1820,6 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN 
 ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN `certification_id` SET TAGS ('dbx_business_glossary_term' = 'Certification Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Assessor ID');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN `prior_third_party_assessment_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Third-Party ID');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN `assessment_method` SET TAGS ('dbx_value_regex' = 'onsite_audit|remote_audit|document_review|questionnaire|certification_review|continuous_monitoring');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN `assessment_report_url` SET TAGS ('dbx_business_glossary_term' = 'Assessment Report Uniform Resource Locator (URL)');
@@ -1862,37 +1836,43 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN 
 ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN `third_party_name` SET TAGS ('dbx_business_glossary_term' = 'Third-Party Name');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ALTER COLUMN `third_party_type` SET TAGS ('dbx_business_glossary_term' = 'Third-Party Type');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`facility_training_requirement` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`facility_training_requirement` SET TAGS ('dbx_subdomain' = 'privacy_training');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`facility_training_requirement` SET TAGS ('dbx_subdomain' = 'training_workforce');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`facility_training_requirement` SET TAGS ('dbx_association_edges' = 'compliance.training_program,supplychain.dc_facility');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`facility_compliance_certification` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`facility_compliance_certification` SET TAGS ('dbx_subdomain' = 'privacy_training');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`facility_compliance_certification` SET TAGS ('dbx_subdomain' = 'training_workforce');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`facility_compliance_certification` SET TAGS ('dbx_association_edges' = 'compliance.compliance_program,supplychain.dc_facility');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`facility_compliance_certification` ALTER COLUMN `facility_program_compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Facility Compliance Certification - Compliance Program Id');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_checklist_template` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_checklist_template` SET TAGS ('dbx_subdomain' = 'audit_control');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_checklist_template` ALTER COLUMN `audit_checklist_template_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Checklist Template Identifier');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_checklist_template` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_checklist_template` ALTER COLUMN `parent_audit_checklist_template_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_checklist_template` ALTER COLUMN `owner_contact_email` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`requirement` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`requirement` SET TAGS ('dbx_subdomain' = 'regulatory_governance');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`requirement` ALTER COLUMN `requirement_id` SET TAGS ('dbx_business_glossary_term' = 'Requirement Identifier');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` SET TAGS ('dbx_subdomain' = 'regulatory_governance');
 ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `regulatory_agency_id` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Agency Identifier');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `parent_regulatory_agency_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `address_line_1` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `address_line_1` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `address_line_2` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `address_line_2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `city` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `city` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `contact_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `contact_phone` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `primary_contact_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `primary_contact_name` SET TAGS ('dbx_pii_identifier' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `state_province` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `state_province` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `primary_contact_name` SET TAGS ('dbx_classification' = 'restricted');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`regulatory_agency` ALTER COLUMN `primary_contact_name` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` SET TAGS ('dbx_subdomain' = 'privacy_compliance');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `consent_id` SET TAGS ('dbx_business_glossary_term' = 'Consent Identifier');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `consent_status` SET TAGS ('dbx_value_regex' = 'granted|withdrawn|pending|expired|revoked');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `double_opt_in_confirmed` SET TAGS ('dbx_business_glossary_term' = 'Double Opt-In Confirmed');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `double_opt_in_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Double Opt-In Timestamp');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `granularity` SET TAGS ('dbx_business_glossary_term' = 'Consent Granularity');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `granularity` SET TAGS ('dbx_value_regex' = 'global|channel_specific|purpose_specific|brand_specific');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `language` SET TAGS ('dbx_business_glossary_term' = 'Consent Language');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `legal_basis` SET TAGS ('dbx_value_regex' = 'consent|contract|legal_obligation|vital_interest|public_task|legitimate_interest');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `method` SET TAGS ('dbx_value_regex' = 'explicit_opt_in|implicit_opt_in|pre_checked_box|verbal|written_signature');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `proof_document_url` SET TAGS ('dbx_business_glossary_term' = 'Consent Proof Document URL');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `version` SET TAGS ('dbx_business_glossary_term' = 'Consent Version');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `consent_given_at` SET TAGS ('dbx_gdpr_relevant' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `consent_given_at` SET TAGS ('dbx_ccpa_relevant' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `consent_withdrawn_at` SET TAGS ('dbx_gdpr_relevant' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `consent_withdrawn_at` SET TAGS ('dbx_ccpa_relevant' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `purpose` SET TAGS ('dbx_gdpr_relevant' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `purpose` SET TAGS ('dbx_ccpa_relevant' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `channel` SET TAGS ('dbx_gdpr_relevant' = 'true');
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ALTER COLUMN `channel` SET TAGS ('dbx_ccpa_relevant' = 'true');

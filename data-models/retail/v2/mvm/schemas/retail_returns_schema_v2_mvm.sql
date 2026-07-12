@@ -1,5 +1,5 @@
 -- Schema for Domain: returns | Business: Retail | Version: v2_mvm
--- Generated on: 2026-07-12 10:43:58
+-- Generated on: 2026-07-12 15:26:01
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`returns` COMMENT 'Manages reverse logistics, RMA/RTV processing, restocking workflows, disposition of returned merchandise, refund processing, and return reason analytics. Owns the complete returns lifecycle from customer initiation through final disposition including vendor returns and liquidation.';
@@ -7,16 +7,15 @@ CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`returns` COMMENT 'Manages revers
 -- ========= TABLES =========
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`rma` (
     `rma_id` BIGINT COMMENT 'Primary key for rma',
-    `header_id` BIGINT COMMENT 'Reference to the original sales order from which the items are being returned.',
-    `membership_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_membership. Business justification: Tier-specific return policy application (extended windows for Gold/Platinum members), points reversal on returned purchases, and loyalty-segment fraud scoring all require the RMA to reference the cust',
     `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: RMAs must trace back to the specific fulfillment that generated the return for carrier performance analysis, fulfillment quality metrics by node/method, and root-cause analysis of returns. Essential f',
-    `pos_terminal_id` BIGINT COMMENT 'Foreign key linking to store.pos_terminal. Business justification: In-store RMAs are processed at a specific POS terminal. PCI DSS compliance mandates tracking which terminal processed a return transaction. Terminal-level return volume reporting and fraud detection (',
-    `pos_transaction_id` BIGINT COMMENT 'Foreign key linking to order.pos_transaction. Business justification: In-store returns require the RMA to reference the originating POS transaction for cashier reconciliation, fraud detection (comparing return value to original tender amount/method), and loss prevention',
+    `header_id` BIGINT COMMENT 'Reference to the original sales order from which the items are being returned.',
+    `pos_transaction_id` BIGINT COMMENT 'Foreign key linking to order.pos_transaction. Business justification: POS return transactions directly initiate RMAs in-store. Loss prevention, refund reconciliation, and return audit reports require linking the RMA to the originating POS transaction. Retail operations ',
     `profile_id` BIGINT COMMENT 'Reference to the customer who is initiating the return.',
-    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: RMAs on promotional purchases must reference the originating promo_offer to enforce offer-specific return restrictions, calculate vendor-funded discount recovery chargebacks, and produce promotional R',
-    `carrier_id` BIGINT COMMENT 'Foreign key linking to fulfillment.carrier. Business justification: RMA processing assigns a specific carrier for the prepaid return label. Carrier performance reporting, return shipping cost allocation, and prepaid label generation all require knowing which carrier i',
+    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Return refund calculation requires knowing the original promotional offer (BOGO, percentage-off) applied at purchase. Retail return processing and vendor chargeback reports depend on offer-level attri',
+    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: In-store RMAs are processed by a specific department (e.g., customer service within electronics). Department-level RMA tracking drives shrinkage reporting, labor allocation, and restocking workflows b',
     `location_id` BIGINT COMMENT 'Reference to the store or distribution center where the returned merchandise will be received and processed.',
-    `sku_id` BIGINT COMMENT 'Reference to the customer service case associated with this return, if the return was initiated through customer service interaction.',
+    `return_policy_id` BIGINT COMMENT 'Foreign key linking to returns.return_policy. Business justification: An RMA is issued under a specific return policy that governs its terms — return window, restocking fee applicability, accepted conditions, refund method, and vendor return eligibility. Adding return_p',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Returns must be attributed to originating season to calculate accurate season-level sell-through rates, markdown effectiveness, and GMROI. Critical for seasonal buying performance analysis and future ',
     `authorization_date` DATE COMMENT 'The date when the return merchandise authorization was approved and issued to the customer.',
     `authorization_timestamp` TIMESTAMP COMMENT 'Precise timestamp when the RMA was authorized, capturing the exact moment of approval for audit and SLA tracking purposes.',
     `closed_date` DATE COMMENT 'The date when the RMA was closed and all return processing activities were completed.',
@@ -53,20 +52,29 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`rma` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`rma_line` (
     `rma_line_id` BIGINT COMMENT 'Primary key for rma_line',
+    `assortment_item_id` BIGINT COMMENT 'Foreign key linking to merchandising.assortment_item. Business justification: Returns analytics must link to assortment planning to identify high-return SKUs, validate assortment role decisions, and feed return rate data into future assortment depth/breadth planning cycles for ',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Returns must route to responsible buyer for disposition approval, vendor negotiation, and RTV authorization. Buyer accountability for return rates and vendor credit recovery requires direct attributio',
+    `buying_order_line_id` BIGINT COMMENT 'Foreign key linking to merchandising.buying_order_line. Business justification: Returns processing requires tracing returned items to original buying orders for vendor RTV authorization, cost recovery, and landed cost reconciliation. Critical for vendor credit claims and accounta',
     `cost_price_id` BIGINT COMMENT 'Foreign key linking to pricing.cost_price. Business justification: Returns processing requires original landed cost for refund calculations, margin impact analysis, vendor credit determination (RTV), and financial reconciliation. Core operational link between returns',
-    `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Returns processing at DC facilities requires tracking which DC received and inspected returned items for disposition routing, inventory restocking, and warehouse operations. Essential for RTV shipment',
+    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Individual return line items are restocked or written off against a specific departments inventory and shrinkage budget. Department managers track return line volumes for shrinkage rate reporting and',
     `fulfillment_line_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_line. Business justification: Line-level traceability from return to original fulfillment line enables picker/packer quality scoring, defect tracking by associate, lot/serial reconciliation for recalls, and substitution error anal',
     `goods_receipt_id` BIGINT COMMENT 'Foreign key linking to inventory.goods_receipt. Business justification: Connects returned item to original receipt for cost basis validation, vendor chargeback processing, and defect tracking to specific inbound shipments. Critical for vendor performance management and qu',
     `header_id` BIGINT COMMENT 'Reference to the original sales order from which this item is being returned. Links the return to the originating transaction.',
+    `inbound_shipment_id` BIGINT COMMENT 'Foreign key linking to supplychain.inbound_shipment. Business justification: Vendor return (RTV) processing requires linking defective/excess returned items to the original inbound shipment for vendor accountability, credit claims, and root cause analysis. Critical for supplie',
+    `lot_id` BIGINT COMMENT 'Foreign key linking to inventory.lot. Business justification: Lot-tracked returns (food, pharma, cosmetics) require linking to original lot for recall traceability, FEFO compliance, and quality root-cause analysis. Regulatory requirement for perishable goods. En',
     `order_line_id` BIGINT COMMENT 'Reference to the specific line item on the original sales order. Enables precise traceability from return to original purchase.',
-    `pos_transaction_line_id` BIGINT COMMENT 'Foreign key linking to order.pos_transaction_line. Business justification: Line-level in-store returns must map each returned item to its original POS transaction line for accurate per-item refund calculation, inventory shrink reporting, and markdown recovery analysis. rma_l',
-    `po_line_id` BIGINT COMMENT 'Foreign key linking to supplychain.po_line. Business justification: Enables vendor quality scorecarding and defect-driven cost recovery. Retail operations track defective returns back to the original buying order (not just customer order) to support vendor chargebacks',
-    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Line-level return processing requires the promo_offer reference to compute accurate refund amounts (was the unit sold at a promotional price?), determine vendor cost-share recovery per line, and suppo',
-    `item_variant_id` BIGINT COMMENT 'Foreign key linking to product.item_variant. Business justification: Customers frequently return wrong variant (size/color mismatch). Tracking actual returned variant vs. ordered SKU enables root-cause analysis of variant confusion, substitution effectiveness, and size',
+    `pos_transaction_line_id` BIGINT COMMENT 'Foreign key linking to order.pos_transaction_line. Business justification: Item-level POS return lines map directly to rma_line records for inventory adjustment, refund calculation, and vendor chargeback processing. Retail return merchandise accounting requires this link to ',
+    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Line-level promo attribution is required for accurate unit refund pricing and vendor chargeback calculations. Retail operations track which promotional offer applied to each returned SKU line to deter',
+    `purchase_order_id` BIGINT COMMENT 'Foreign key linking to supplychain.purchase_order. Business justification: RTV (Return to Vendor) processing requires the original purchase order reference to claim vendor credits, validate return eligibility against PO terms, and reconcile accounts payable. Fundamental to s',
+    `adjustment_id` BIGINT COMMENT 'Foreign key linking to inventory.adjustment. Business justification: RMA line-level inventory write-off audit trail: returned items assessed as damaged, expired, or unsaleable generate inventory adjustments at the line level. Linking rma_line to the resulting adjustmen',
+    `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Returns processing at DC facilities requires tracking which DC received and inspected returned items for disposition routing, inventory restocking, and warehouse operations. Essential for RTV shipment',
     `rma_id` BIGINT COMMENT 'Foreign key reference to the parent RMA header. Links this line item to the overall return authorization.',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Return lines must reference the product SKU being returned. The product_description column becomes redundant as it can be joined from product.sku. This links returns processing to the product catalog.',
-    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Refund validation and margin recovery reporting require the original sku_price record for each returned line. Retail loss-prevention and finance teams audit rma_line refund amounts against the authori',
-    `stock_position_id` BIGINT COMMENT 'Foreign key linking to inventory.stock_position. Business justification: Processing an RMA line requires checking and updating the SKU-level stock_position (quarantine_qty, reserved_qty, available_to_promise_qty) at the return destination node. Retail returns-to-inventory ',
+    `vendor_id` BIGINT COMMENT 'Supplier identifier for the vendor who originally supplied this product. Used when disposition is Return to Vendor (RTV).',
+    `rtv_request_id` BIGINT COMMENT 'Foreign key linking to supplier.rtv_request. Business justification: rma_line.rtv_authorization_number is a denormalized reference to rtv_request. A proper FK enables direct RTV line-item traceability for vendor credit reconciliation, audit trails, and AP matching. Ret',
+    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Return line refund calculation and restocking eligibility require the authoritative retail price record. rma_line.unit_retail_price is a denormalized copy of sku_price.retail_price. A direct FK to sku',
+    `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: Vendor credit reconciliation process: when processing RTV credits, the returns team references the vendor contract to validate credit terms, restocking fee applicability, and authorized return conditi',
+    `vendor_item_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_item. Business justification: Vendor credit memo generation requires the vendors item number (vendor_item_number) and unit cost from vendor_item. Returns processors look up vendor_item to generate accurate credit memos and valida',
     `condition_code` STRING COMMENT 'Physical condition of the item upon receipt at the returns facility. Determines restocking eligibility and disposition path.. Valid values are `NEW|OPENED|DAMAGED|DEFECTIVE|MISSING_PARTS|EXPIRED`',
     `created_timestamp` TIMESTAMP COMMENT 'Date and time when this RMA line record was first created in the system. Audit trail for record creation.',
     `currency_code` STRING COMMENT 'Three-letter ISO 4217 currency code for all monetary amounts on this line. Ensures proper currency handling in multi-currency operations.. Valid values are `^[A-Z]{3}$`',
@@ -86,7 +94,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`rma_line` (
     `restocking_fee_amount` DECIMAL(18,2) COMMENT 'Fee charged to the customer for processing the return of this line item. May be waived based on return reason or customer status.',
     `return_reason_code` STRING COMMENT 'Standardized code indicating why the customer is returning this item. Used for root cause analysis and quality improvement initiatives. [ENUM-REF-CANDIDATE: DEFECTIVE|DAMAGED|WRONG_ITEM|NOT_AS_DESCRIBED|CHANGED_MIND|SIZE_FIT|DUPLICATE_ORDER|LATE_DELIVERY|OTHER — 9 candidates stripped; promote to reference product]',
     `return_reason_description` STRING COMMENT 'Free-text explanation of the return reason provided by the customer or service representative. Provides additional context beyond the standardized code.',
-    `rtv_authorization_number` STRING COMMENT 'Vendor-issued authorization number permitting the return of defective or excess merchandise back to the supplier. Required for vendor chargeback processing.. Valid values are `^RTV[0-9]{8,12}$`',
     `sku` STRING COMMENT 'Internal stock keeping unit identifier for the product being returned. Used for inventory tracking and product identification.. Valid values are `^[A-Z0-9]{6,20}$`',
     `unit_cost` DECIMAL(18,2) COMMENT 'Cost of goods sold per unit. Used for inventory valuation adjustments and margin analysis on returned merchandise.',
     `upc` STRING COMMENT '12-digit Universal Product Code for the returned item. Standard barcode identifier used in North American retail.. Valid values are `^[0-9]{12}$`',
@@ -97,14 +104,13 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`rma_line` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`return_request` (
     `return_request_id` BIGINT COMMENT 'Unique identifier for the return request. Primary key for the return request entity.',
-    `header_id` BIGINT COMMENT 'Identifier of the original order from which items are being returned.',
-    `location_id` BIGINT COMMENT 'Identifier of the store location where the customer intends to return the items, if in-store return method is selected.',
-    `membership_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_membership. Business justification: Self-service return portals check loyalty tier to determine return window eligibility and auto-approval thresholds before RMA creation. Linking return_request to loyalty_membership enables tier-driven',
     `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: Return requests reference specific fulfillment to identify shipping damage, wrong item picked, or carrier issues during pre-authorization. Enables fraud detection based on fulfillment method patterns',
+    `header_id` BIGINT COMMENT 'Identifier of the original order from which items are being returned.',
     `address_id` BIGINT COMMENT 'Identifier of the address from which the return items should be picked up, if pickup was requested.',
-    `pos_transaction_id` BIGINT COMMENT 'Foreign key linking to order.pos_transaction. Business justification: Return requests initiated in-store must reference the original POS transaction to validate proof of purchase, verify return window eligibility, and confirm original payment method for refund routing. ',
     `profile_id` BIGINT COMMENT 'Identifier of the customer who initiated the return request.',
-    `return_policy_id` BIGINT COMMENT 'Foreign key linking to returns.return_policy. Business justification: return_request currently stores return_policy_code as a STRING, which is a denormalized reference to the return_policy master record. Normalizing this to a proper FK (return_policy_id) enforces refere',
+    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Return eligibility validation requires checking the promotional offer terms at request time — many retail promos carry final-sale or restricted-return clauses. Customer service and automated return ap',
+    `location_id` BIGINT COMMENT 'Identifier of the store location where the customer intends to return the items, if in-store return method is selected.',
+    `return_policy_id` BIGINT COMMENT 'Foreign key linking to returns.return_policy. Business justification: return_request.return_policy_code is a denormalized string reference to the governing return policy. Normalizing this to a return_policy_id FK enforces referential integrity, ensures policy rules (ret',
     `rma_id` BIGINT COMMENT 'Foreign key linking to returns.rma. Business justification: Return request is the customer-initiated intent to return merchandise before formal RMA authorization. Once approved, a return_request results in an RMA (formal authorization). Currently, return_reque',
     `approval_timestamp` TIMESTAMP COMMENT 'Date and time when the return request was approved, triggering the generation of an RMA (Return Merchandise Authorization).',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this return request record was first created in the system.',
@@ -142,15 +148,15 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`return_request` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`return_receipt` (
     `return_receipt_id` BIGINT COMMENT 'Unique identifier for the return receipt record. Primary key.',
     `carrier_id` BIGINT COMMENT 'Identifier of the shipping carrier that delivered the returned merchandise. Applicable for mail-in and shipped returns.',
-    `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Return receipts at DC facilities (vs store locations) require facility tracking for receiving dock scheduling, inspection workflow routing, quality hold processing, and disposition decision execution.',
+    `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: Return receipts must link to original fulfillment for closed-loop cycle time analysis (order→fulfill→return→receipt), reverse logistics SLA measurement, and carrier damage claim validation. Enables co',
     `goods_receipt_id` BIGINT COMMENT 'Foreign key linking to inventory.goods_receipt. Business justification: Links return receipt to original inbound receipt for discrepancy analysis, vendor performance scoring, and cost basis validation. Retail operations use this for vendor chargeback processing and qualit',
     `header_id` BIGINT COMMENT 'Identifier of the original sales order from which the returned merchandise originated. Links return to original transaction.',
-    `inventory_node_id` BIGINT COMMENT 'Foreign key linking to inventory.inventory_node. Business justification: Return receipts are physically received at specific nodes. Required for receiving workflow orchestration, location-level return volume metrics, staffing planning, and dock door scheduling. Retail oper',
-    `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: Return receipts must link to original fulfillment for closed-loop cycle time analysis (order→fulfill→return→receipt), reverse logistics SLA measurement, and carrier damage claim validation. Enables co',
     `profile_id` BIGINT COMMENT 'Identifier of the customer who initiated the return. Used for return analytics, fraud detection, and customer service.',
+    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: Return receipt quantity validation against authorized RMA quantities requires standardized UOM reference for discrepancy detection, inventory putaway, and refund calculation accuracy. The plain quant',
     `location_id` BIGINT COMMENT 'Identifier of the store, distribution center, or micro-fulfillment center where the returned merchandise was received.',
-    `carrier_service_id` BIGINT COMMENT 'Foreign key linking to fulfillment.carrier_service. Business justification: Return receipt processing tracks which carrier service handled the inbound return shipment for SLA compliance, cost analysis, and carrier performance reporting. return_receipt already has carrier_id; ',
-    `return_request_id` BIGINT COMMENT 'Foreign key linking to returns.return_request. Business justification: A return_receipt is generated when returned merchandise physically arrives at a store, DC, or warehouse. It should reference the originating return_request that initiated the return process. This link',
+    `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Return receipts at DC facilities (vs store locations) require facility tracking for receiving dock scheduling, inspection workflow routing, quality hold processing, and disposition decision execution.',
+    `inventory_node_id` BIGINT COMMENT 'Foreign key linking to inventory.inventory_node. Business justification: Return receipts are physically received at specific nodes. Required for receiving workflow orchestration, location-level return volume metrics, staffing planning, and dock door scheduling. Retail oper',
+    `return_request_id` BIGINT COMMENT 'Foreign key linking to returns.return_request. Business justification: A return receipt is the physical confirmation that returned merchandise was received, directly fulfilling the originating return_request. Adding return_request_id to return_receipt creates a direct au',
     `rma_id` BIGINT COMMENT 'Reference to the RMA that authorized this return. Links the physical receipt event to the return authorization.',
     `authorized_quantity` DECIMAL(18,2) COMMENT 'Total quantity of items authorized for return in the original RMA. Used to detect over-returns and under-returns.',
     `carrier_tracking_number` STRING COMMENT 'Tracking number from the shipping carrier for mail-in or shipped returns. Used to reconcile carrier delivery events with physical receipt.',
@@ -165,7 +171,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`return_receipt` (
     `inspection_required_flag` BOOLEAN COMMENT 'Indicates whether detailed quality inspection is required before disposition. Triggered by high-value items, electronics, or condition concerns.',
     `last_updated_timestamp` TIMESTAMP COMMENT 'Timestamp when this return receipt record was last modified in the data platform. Audit trail for change tracking.',
     `packaging_condition` STRING COMMENT 'Condition of the product packaging at receipt. Impacts resale value and disposition options.. Valid values are `original_sealed|original_opened|repackaged|damaged|missing`',
-    `quantity_unit_of_measure` STRING COMMENT 'Unit of measure for the quantity fields. Ensures consistent interpretation of quantity values across different product types. [ENUM-REF-CANDIDATE: each|case|pallet|pound|kilogram|liter|gallon — 7 candidates stripped; promote to reference product]',
     `receipt_number` STRING COMMENT 'Business-facing unique receipt number generated when returned merchandise is physically received. Used for tracking and customer communication.. Valid values are `^RR[0-9]{10}$`',
     `receipt_source_system` STRING COMMENT 'Name of the operational system that captured the return receipt event. Supports data lineage and reconciliation.',
     `receipt_source_system_code` STRING COMMENT 'Unique identifier of this receipt record in the source operational system. Enables traceability and reconciliation.',
@@ -183,16 +188,28 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`return_receipt` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`disposition` (
     `disposition_id` BIGINT COMMENT 'Unique identifier for the disposition record. Primary key for the disposition entity.',
+    `buying_order_line_id` BIGINT COMMENT 'Foreign key linking to merchandising.buying_order_line. Business justification: Disposition decisions (restock/liquidate/RTV) require original purchase context including vendor terms, unit cost, and landed cost to calculate recovery value and determine vendor return eligibility p',
     `cost_price_id` BIGINT COMMENT 'Foreign key linking to pricing.cost_price. Business justification: Disposition decisions (restock vs liquidate vs RTV) require comparing estimated recovery value to original landed cost. Drives financial optimization of returned inventory. Removes denormalized origin',
     `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Disposition decisions (restock/liquidate/RTV/scrap) execute at specific DC facilities. Tracking the facility is required for inventory movements, warehouse task generation, and GL posting. Replaces de',
-    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Disposition decisions (restock, liquidate, destroy) are executed within a store department. Department-level disposition reporting drives shrinkage attribution, restocking rate KPIs, and planogram com',
+    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Disposition decisions (restock, liquidate, destroy) are executed and tracked at the department level. Department shrinkage_rate_percent targets and labor_budget_monthly depend on knowing which departm',
+    `vendor_id` BIGINT COMMENT 'Identifier of the third-party liquidation partner if disposition type is liquidation. Tracks which liquidator handled the item for recovery value reconciliation.',
+    `disposition_vendor_id` BIGINT COMMENT 'Identifier of the vendor to whom the item will be returned if disposition type is return_to_vendor. Used for vendor compliance and credit processing.',
+    `inbound_shipment_id` BIGINT COMMENT 'Foreign key linking to supplychain.inbound_shipment. Business justification: Disposition decisions for RTV items must reference the original inbound shipment to support vendor credit requests, quality claims, and supplier performance tracking. Essential for closing the loop on',
     `inventory_node_id` BIGINT COMMENT 'Foreign key linking to inventory.inventory_node. Business justification: Disposition decisions execute at specific locations (restock at DC, liquidate at warehouse, RTV from store). Needed for location-level recovery rate tracking, disposition capacity planning, and networ',
-    `purchase_order_id` BIGINT COMMENT 'Foreign key linking to supplychain.purchase_order. Business justification: Disposition decisions (restock/RTV/liquidate) directly trigger supplier RTV requests. Loss prevention teams measure recovery rates by linking disposition outcomes to vendor credit receipts. Enables cl',
-    `return_receipt_id` BIGINT COMMENT 'Foreign key linking to returns.return_receipt. Business justification: Disposition records the final fate of returned items after receipt and inspection. The disposition decision is made based on the condition assessment captured in the return_receipt. Linking dispositio',
+    `location_id` BIGINT COMMENT 'Foreign key linking to store.location. Business justification: Audit findings identifying improper disposition practices (hazmat disposal violations, vendor return processing errors) generate corrective actions that mandate disposition procedure changes. Real bus',
+    `lot_id` BIGINT COMMENT 'Foreign key linking to inventory.lot. Business justification: Lot-tracked dispositions enable batch-level quality analysis, vendor chargeback validation, and compliance documentation for perishable/regulated goods. Retail operations require lot linkage for vendo',
+    `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Returned goods fed into liquidation or clearance promotional campaigns require campaign attribution on the disposition record. Retail liquidation campaign planning and vendor recovery reporting depend',
+    `purchase_order_id` BIGINT COMMENT 'Foreign key linking to supplychain.purchase_order. Business justification: Disposition outcomes (RTV, vendor credit, liquidation) require PO reference for financial claims processing, vendor chargeback documentation, and cost recovery. Critical for accounts payable reconcili',
+    `stock_position_id` BIGINT COMMENT 'Foreign key linking to inventory.stock_position. Business justification: Restocking disposition workflow: when a returned item is cleared for restock, the disposition must reference the exact stock_position being replenished. Drives inventory position updates, restocking S',
+    `adjustment_id` BIGINT COMMENT 'Foreign key linking to inventory.adjustment. Business justification: Returns-driven inventory adjustment audit trail: dispositions that result in write-offs, damage adjustments, or shrinkage must reference the generated inventory adjustment record. Required for financi',
+    `return_receipt_id` BIGINT COMMENT 'Foreign key linking to returns.return_receipt. Business justification: Disposition records govern the final fate of returned items AFTER physical receipt and inspection. The disposition workflow is directly triggered by the return_receipt (return_receipt.refund_triggered',
     `rma_line_id` BIGINT COMMENT 'Reference to the specific return line item that this disposition decision applies to. Links disposition to the originating return merchandise authorization line.',
-    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Disposition decisions (restock vs. liquidate vs. donate) are driven by comparing estimated_recovery_value against the current retail price. Retail reverse-logistics teams require sku_price context to ',
-    `stock_position_id` BIGINT COMMENT 'Foreign key linking to inventory.stock_position. Business justification: Restocking disposition outcomes must update the specific SKU+node stock_position record (on_hand_qty, quarantine_qty). Retail inventory restocking reports and available-to-promise calculations depend ',
-    `warehouse_zone_id` BIGINT COMMENT 'Foreign key linking to supplychain.warehouse_zone. Business justification: Disposition decisions (restock/liquidate/destroy) require physical warehouse zone assignment for returned goods placement. Links disposition records to specific zones for capacity planning, slotting s',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Disposition strategy (liquidate vs. hold for next season) depends on seasonal merchandise lifecycle. Clearance disposition decisions require season context to determine if seasonal items can be carrie',
+    `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Disposition decisions (restock/liquidate/destroy) require SKU master data for cost recovery calculations, vendor RTV eligibility, and inventory reintegration. The plain sku text column denormalizes ',
+    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Disposition recovery analysis compares actual_recovery_value and estimated_recovery_value against the current retail price (sku_price) to measure recovery rate. Retail operations teams use this for li',
+    `rtv_request_id` BIGINT COMMENT 'Foreign key linking to supplier.rtv_request. Business justification: Disposition decisions (restock/RTV/liquidate) directly trigger supplier RTV requests. Loss prevention teams measure recovery rates by linking disposition outcomes to vendor credit receipts. Enables cl',
+    `stock_transfer_id` BIGINT COMMENT 'Foreign key linking to inventory.stock_transfer. Business justification: Return disposition triggering inter-node transfer: when disposition type is transfer (e.g., returned goods moved to liquidation DC or another store), the disposition must reference the resulting sto',
+    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: Disposition quantity tracking requires standardized UOM for inventory reconciliation, vendor credit calculations, and liquidation partner reporting. The plain unit_of_measure text column should refe',
     `actual_recovery_value` DECIMAL(18,2) COMMENT 'Realized financial recovery value after disposition execution. Populated after liquidation sale, vendor credit, or restock completion. Used for variance analysis against estimates.',
     `completion_date` DATE COMMENT 'Date when the disposition action was fully executed (item restocked, shipped to vendor, transferred to liquidator, or destroyed). Used for cycle time measurement.',
     `condition_grade` STRING COMMENT 'Quality assessment grade assigned during inspection. A=New/Unopened, B=Like New/Minor Packaging Damage, C=Good/Visible Wear, D=Fair/Functional Defects, F=Unsellable/Damaged. Drives disposition type and recovery value estimation.. Valid values are `A|B|C|D|F`',
@@ -211,31 +228,28 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`disposition` (
     `notes` STRING COMMENT 'Free-text notes from the returns processor providing additional context about the disposition decision, item condition, or special handling requirements.',
     `quantity` STRING COMMENT 'Number of units of the SKU being dispositioned under this record. Typically 1 for individual item returns, may be greater for bulk returns.',
     `reason_code` STRING COMMENT 'Standardized code indicating the primary reason for the disposition decision. Used for root cause analysis and process improvement.. Valid values are `^[A-Z0-9]{2,6}$`',
-    `restock_location_code` STRING COMMENT 'Specific inventory location code where the item will be restocked if disposition type is restock_sellable or restock_clearance. May be a bin, aisle, or zone identifier within the facility.. Valid values are `^[A-Z0-9]{4,10}$`',
     `restocking_fee_amount` DECIMAL(18,2) COMMENT 'Dollar amount of restocking fee charged if restocking_fee_applied is true. Contributes to reverse logistics cost recovery.',
     `restocking_fee_applied` BOOLEAN COMMENT 'Flag indicating whether a restocking fee was charged to the customer for this return. Impacts refund amount and customer satisfaction metrics.',
     `rma_number` STRING COMMENT 'The return merchandise authorization number associated with this disposition. Links to the customer-facing return authorization.. Valid values are `^RMA[0-9]{8,12}$`',
     `serial_number` STRING COMMENT 'Unique serial number of the returned item if is_serialized is true. Used for warranty tracking, theft prevention, and individual item lifecycle management.. Valid values are `^[A-Z0-9]{6,20}$`',
-    `sku` STRING COMMENT 'The stock keeping unit identifier for the returned item being dispositioned. Used for inventory tracking and product identification.. Valid values are `^[A-Z0-9]{8,14}$`',
-    `unit_of_measure` STRING COMMENT 'Unit of measure for the disposition quantity. EA=Each, CS=Case, PK=Pack, BX=Box. Aligns with inventory management standards.. Valid values are `EA|CS|PK|BX`',
     CONSTRAINT pk_disposition PRIMARY KEY(`disposition_id`)
 ) COMMENT 'Disposition record governing the final fate of each returned item after receipt and inspection. Captures disposition type (restock to sellable inventory, restock to clearance, return to vendor via RTV, liquidation, donation, destruction/write-off), decision date, disposition location, responsible associate, estimated and actual recovery value, and disposition status. Central to reverse logistics cost recovery, shrinkage management, and inventory reintegration decisions. Now also carries condition grade assessment (A-New through F-Unsellable) previously in a separate reference table.';
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`refund` (
     `refund_id` BIGINT COMMENT 'Primary key for refund',
+    `cancellation_id` BIGINT COMMENT 'Foreign key linking to order.cancellation. Business justification: Order cancellations trigger refunds; the refund must reference the cancellation for audit trail completeness, finance reconciliation, and regulatory compliance. Retail operations distinguish cancellat',
+    `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Refund processing costs (labor, payment processing fees, fraud review) are allocated to cost centers for departmental P&L and budget variance analysis. Essential for retail operations financial manage',
     `header_id` BIGINT COMMENT 'Reference to the original sales order that is being refunded. Enables traceability to the original purchase transaction.',
     `location_id` BIGINT COMMENT 'Reference to the retail store location where the refund was processed, if applicable. Used for store-level financial reconciliation and performance analysis.',
-    `membership_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_membership. Business justification: Refund processing must reverse points earned on the original purchase and report refund rates by loyalty tier for segment analytics. refund has profile_id but not loyalty_membership_id; the direct FK ',
-    `payment_id` BIGINT COMMENT 'Foreign key linking to order.payment. Business justification: Card network rules and PCI compliance require refunds to be issued to the original payment instrument. Linking refund to the original payment record provides the masked PAN, card brand, authorization ',
-    `pos_terminal_id` BIGINT COMMENT 'Foreign key linking to store.pos_terminal. Business justification: In-store refund transactions are executed at a POS terminal. PCI DSS compliance and end-of-day terminal reconciliation require terminal-level refund tracking. Retail finance and loss prevention use te',
-    `price_change_id` BIGINT COMMENT 'Foreign key linking to pricing.price_change. Business justification: Price-protection refunds — issued when a price drops after purchase — must reference the triggering price_change record for audit, regulatory compliance, and finance reconciliation. Retail price-prote',
+    `discount_id` BIGINT COMMENT 'Foreign key linking to order.discount. Business justification: Refund amount calculation for discounted items requires referencing the original discount to determine the correct refundable amount. Retail finance teams use this link for promotional liability repor',
+    `payment_id` BIGINT COMMENT 'Foreign key linking to order.payment. Business justification: Refunds must be processed back to the original payment instrument (masked PAN, digital wallet, BNPL provider). Payment processor refund routing, PCI compliance reporting, and fraud detection all requi',
+    `pos_terminal_id` BIGINT COMMENT 'Foreign key linking to store.pos_terminal. Business justification: In-store refunds are processed through a specific POS terminal. PCI-DSS compliance and fraud audit requirements mandate that refund transactions be traceable to the terminal that processed them. refun',
+    `pos_transaction_id` BIGINT COMMENT 'Foreign key linking to order.pos_transaction. Business justification: In-store refunds are executed within a POS transaction. End-of-day tender reconciliation, cash drawer balancing, and store-level refund reporting require linking the refund record to the POS transacti',
     `profile_id` BIGINT COMMENT 'Reference to the customer receiving the refund. Links refund to customer master data for reconciliation and customer lifetime value analysis.',
     `promo_redemption_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_redemption. Business justification: Refund processing must reference original promotional redemption to calculate correct refund amount (excluding promotional discount), update vendor funding obligations, and enforce promotional terms.',
-    `redemption_id` BIGINT COMMENT 'Foreign key linking to loyalty.redemption. Business justification: When a purchase that used a loyalty points redemption is returned, the refund amount must account for the discount applied via redemption to avoid over-refunding. Linking refund to the original loyalt',
-    `return_receipt_id` BIGINT COMMENT 'Foreign key linking to returns.return_receipt. Business justification: The return_receipt entity has a refund_triggered_flag and refund_hold_reason, indicating it directly drives refund processing. A refund is often initiated upon receipt and inspection of returned goods',
+    `return_receipt_id` BIGINT COMMENT 'Foreign key linking to returns.return_receipt. Business justification: Refunds are frequently triggered by the return_receipt event (return_receipt.refund_triggered_flag = true). Adding return_receipt_id to refund creates a direct financial-to-physical traceability link,',
     `return_request_id` BIGINT COMMENT 'Reference to the parent return transaction that triggered this refund. Links refund to the originating return merchandise authorization (RMA).',
     `rma_id` BIGINT COMMENT 'FK to returns.rma.rma_id — Refund to RMA linkage is required for return financial reconciliation — every refund must trace back to its authorizing RMA for audit and financial controls.',
-    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Refund reconciliation and over/under-refund audit reports require linking each refund to the authoritative sku_price record. Retail finance teams validate merchandise_amount against the original retai',
     `actual_settlement_date` DATE COMMENT 'Actual date when the refund funds were confirmed as settled and available to the customer. Used for SLA compliance measurement and financial reconciliation. Format: yyyy-MM-dd.',
     `adjustment_amount` DECIMAL(18,2) COMMENT 'Additional positive or negative adjustment applied to the refund for reasons such as damage, missing components, promotional credits, or goodwill gestures.',
     `approved_timestamp` TIMESTAMP COMMENT 'Date and time when the refund was approved by authorized personnel or automated business rules. Represents authorization milestone in the refund workflow. Format: yyyy-MM-ddTHH:mm:ss.SSSXXX.',
@@ -271,19 +285,15 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`refund` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`exchange_order` (
     `exchange_order_id` BIGINT COMMENT 'Unique identifier for the exchange order. Primary key.',
-    `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: When an exchange is approved, a new fulfillment_order is created to ship the replacement item. Operations and customer service teams track this replacement fulfillment_order to monitor delivery SLA, s',
-    `fulfillment_node_id` BIGINT COMMENT 'Reference to the distribution center, store, or fulfillment location from which the replacement item will be shipped.',
     `location_id` BIGINT COMMENT 'Reference to the retail store location where the exchange was initiated or will be fulfilled, if applicable.',
-    `membership_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_membership. Business justification: Exchange orders must apply the correct points accrual on replacement items and honor tier-specific exchange benefits (e.g., free expedited shipping for VIP members). exchange_order has profile_id but ',
-    `order_line_id` BIGINT COMMENT 'Foreign key linking to order.order_line. Business justification: An exchange replaces a specific original order line. Linking exchange_order to order_line enables line-level exchange rate analytics by SKU, supports warranty exchange processing, and feeds merchandis',
-    `outbound_order_id` BIGINT COMMENT 'Foreign key linking to supplychain.outbound_order. Business justification: Exchange replacement items fulfill through DC outbound operations alongside store replenishment. Links exchange orders to outbound shipments for consolidated pick/pack/ship operations, carrier assignm',
+    `fulfillment_node_id` BIGINT COMMENT 'Reference to the distribution center, store, or fulfillment location from which the replacement item will be shipped.',
     `header_id` BIGINT COMMENT 'Reference to the original order from which the returned item originated.',
     `profile_id` BIGINT COMMENT 'Reference to the customer who initiated the exchange.',
-    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Exchange orders initiated under a promotional offer (e.g., exchange at promo price campaigns) require the promo_offer reference for vendor cost recovery on funded exchanges, promotional ROI calculat',
+    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Exchange orders during active promotions require offer attribution to correctly compute price differentials and determine whether the replacement item qualifies for the same promotional pricing. Retai',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Exchange fulfillment requires direct replacement SKU reference for inventory allocation, ATP (available-to-promise) checking, and like-for-like exchange policy enforcement. Essential for retail exchan',
-    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Exchange order price-differential calculation (price_differential_amount) requires the replacement SKUs current sku_price record. Role-prefixed as replacement_sku_price_id to distinguish from the ret',
-    `stock_position_id` BIGINT COMMENT 'Foreign key linking to inventory.stock_position. Business justification: Exchange order fulfillment requires validating available_to_promise_qty for the replacement SKU in stock_position before committing the exchange. Retail exchange fulfillment rate reporting and ATP che',
-    `return_request_id` BIGINT COMMENT 'Foreign key linking to returns.return_request. Business justification: An exchange_order is created when a return is resolved via product replacement. The return_request captures the customers preferred_resolution_type (which may be exchange). Linking exchange_order t',
+    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Exchange order price differential calculation requires the replacement SKUs current retail price from sku_price. price_differential_amount is computed as replacement price minus returned item price. ',
+    `stock_position_id` BIGINT COMMENT 'Foreign key linking to inventory.stock_position. Business justification: Exchange fulfillment inventory allocation: when an exchange order is created, the replacement SKU must be sourced from a specific stock position. Links exchange order to the inventory position being d',
+    `rma_id` BIGINT COMMENT 'Reference to the originating RMA that triggered this exchange order.',
     `address_id` BIGINT COMMENT 'Foreign key linking to customer.address. Business justification: Exchange orders require a shipping address for replacement item delivery. Fulfillment operations depend on this link to route exchange shipments correctly. While exchange_order.profile_id provides ind',
     `created_timestamp` TIMESTAMP COMMENT 'Date and time when the exchange order record was first created in the system.',
     `exchange_approved_timestamp` TIMESTAMP COMMENT 'Date and time when the exchange request was approved by the returns management system or customer service representative.',
@@ -306,6 +316,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`exchange_order` (
     `refund_method` STRING COMMENT 'Method by which any refund amount will be returned to the customer.. Valid values are `original_payment_method|store_credit|gift_card|check|bank_transfer`',
     `replacement_quantity` STRING COMMENT 'Number of units of the replacement SKU being sent to the customer.',
     `returned_quantity` STRING COMMENT 'Number of units of the returned SKU being sent back by the customer.',
+    `returned_sku` STRING COMMENT 'SKU of the product being returned by the customer as part of the exchange.. Valid values are `^[A-Z0-9]{8,14}$`',
     `shipping_cost_waived_flag` BOOLEAN COMMENT 'Indicates whether shipping costs for the replacement item have been waived as a customer service gesture.',
     `special_instructions` STRING COMMENT 'Free-text field for any special handling instructions or notes related to the exchange order.',
     CONSTRAINT pk_exchange_order PRIMARY KEY(`exchange_order_id`)
@@ -313,14 +324,11 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`exchange_order` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`return_policy` (
     `return_policy_id` BIGINT COMMENT 'Unique identifier for the return policy record. Primary key.',
-    `cluster_id` BIGINT COMMENT 'Foreign key linking to store.cluster. Business justification: Store clusters group locations by customer segment and pricing strategy. Retail merchandising teams assign differentiated return policies per cluster (e.g., premium clusters get extended windows, valu',
-    `format_id` BIGINT COMMENT 'Foreign key linking to store.format. Business justification: Return policies in retail are scoped by store format — hypermarkets offer 90-day windows while discount outlets enforce 30-day limits. Format-level policy assignment drives policy configuration, compl',
+    `format_id` BIGINT COMMENT 'Foreign key linking to store.format. Business justification: Retail return policies are scoped by store format — hypermarkets have different return windows and restocking fees than discount outlets. Format-level policy assignment drives POS return policy lookup',
     `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.item_hierarchy. Business justification: Return policies vary by merchandise category (electronics 30-day vs apparel 90-day vs grocery no-return). Essential for POS policy enforcement, return window calculation, restocking fee application, a',
-    `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: Return policies in retail are scoped to price lists — clearance price list items have shorter return windows; loyalty price list items may have extended windows. Policy configuration and compliance re',
-    `program_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_program. Business justification: Co-branded loyalty programs (e.g., private-label credit card programs) carry distinct return terms negotiated at the program level. Linking return_policy to loyalty_program enables program-specific po',
-    `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Retailers define campaign-scoped return policies (e.g., Black Friday items: 15-day window; standard: 30 days). Linking return_policy to promo_campaign enables campaign-specific policy enforcement at P',
-    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: Return policies are region-scoped due to regulatory differences (EU consumer protection law vs. US state law, VAT reclaim rules, data privacy frameworks). store.region carries regulatory_zone and vat_',
-    `tier_id` BIGINT COMMENT 'Foreign key linking to loyalty.tier. Business justification: Retail return policies are routinely differentiated by loyalty tier — Platinum members receive 90-day windows while standard customers get 30 days. return_policy has a plain-text customer_segment fiel',
+    `category_id` BIGINT COMMENT 'add column merchandising_category_id (BIGINT) with FK to merchandising.category.category_id - return policies vary by merchandise category (electronics vs. apparel) and need this linkage beyond just item_hierarchy',
+    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: Consumer protection laws and return window regulations vary by region/jurisdiction. Retail compliance teams assign region-specific return policies to meet local regulatory requirements (e.g., EU consu',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Return policies vary by season (extended holiday windows, clearance restrictions). Retail operations require season-specific policy rules for merchandise purchased during peak/clearance periods to man',
     `accepted_condition` STRING COMMENT 'Required condition of merchandise for return acceptance. Defines whether items must be unopened, unused, or can be returned in any condition.. Valid values are `unopened|unused_with_tags|gently_used|any_condition|defective_only`',
     `approval_required` BOOLEAN COMMENT 'Indicates whether returns under this policy require manager or supervisor approval before processing. Common for high-value items or out-of-window returns.',
     `created_by_user` STRING COMMENT 'User ID or system identifier of the person or process that created this return policy record. Used for audit and accountability.',
@@ -363,14 +371,9 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`return_policy` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`store_credit` (
     `store_credit_id` BIGINT COMMENT 'Unique identifier for the store credit instrument. Primary key.',
     `header_id` BIGINT COMMENT 'Reference to the original order that was returned and resulted in this store credit issuance. Provides full traceability from purchase through return to credit.',
-    `location_id` BIGINT COMMENT 'Reference to the physical store location where the store credit was issued. Null for credits issued through digital channels.',
-    `membership_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_membership. Business justification: Store credit issued as a return resolution is frequently loaded onto the loyalty account or earns bonus points in retail programs. Linking store_credit to loyalty_membership enables account-loading wo',
-    `pos_transaction_id` BIGINT COMMENT 'Foreign key linking to order.pos_transaction. Business justification: Store credit issued during an in-store return must reference the originating POS transaction for store-level P&L reconciliation, cashier accountability audits, and escheatment compliance tracking. The',
     `profile_id` BIGINT COMMENT 'Reference to the customer to whom this store credit was issued. Enables customer-level credit balance tracking and redemption history.',
-    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Store credits issued under promotional return offers (e.g., return and receive 20% bonus credit) must reference the promo_offer for promotional liability accounting, offer redemption cap enforcement',
-    `return_request_id` BIGINT COMMENT 'Foreign key linking to returns.return_request. Business justification: Store credit is issued as a return resolution in lieu of cash or card refund. The return_request captures the customers preferred_resolution_type, which may be store credit. Linking store_credit to r',
     `rma_id` BIGINT COMMENT 'Reference to the originating RMA that triggered this store credit issuance. Links the credit back to the return transaction.',
-    `storefront_id` BIGINT COMMENT 'Foreign key linking to ecommerce.storefront. Business justification: Store credit issued from returns is scoped to a specific ecommerce storefront for issuance and redemption. This FK replaces denormalized issuing_channel and redemption_channel_restriction text fields,',
+    `location_id` BIGINT COMMENT 'Reference to the physical store location where the store credit was issued. Null for credits issued through digital channels.',
     `barcode` STRING COMMENT 'Machine-readable barcode representation of the store credit code for POS scanning. Supports omnichannel redemption workflows.',
     `breakage_estimate_applied_flag` BOOLEAN COMMENT 'Indicates whether a breakage revenue estimate (expected non-redemption) has been applied to this store credit for financial reporting purposes under ASC 606.',
     `combinable_with_promotions_flag` BOOLEAN COMMENT 'Indicates whether the store credit can be combined with other promotional discounts during redemption. Supports pricing and promotion policy enforcement.',
@@ -383,10 +386,12 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`store_credit` (
     `expiration_date` DATE COMMENT 'Calendar date on which the store credit expires and can no longer be redeemed. Nullable for credits with no expiration policy.',
     `issue_date` DATE COMMENT 'Calendar date on which the store credit was issued to the customer. Marks the start of the credits validity period.',
     `issued_amount` DECIMAL(18,2) COMMENT 'Original monetary value of the store credit at the time of issuance. Represents the full stored-value balance before any redemptions.',
+    `issuing_channel` STRING COMMENT 'The customer-facing channel through which the store credit was issued. Supports omnichannel returns and credit issuance analytics.. Valid values are `store|ecommerce|call_center|mobile_app|kiosk`',
     `last_modified_timestamp` TIMESTAMP COMMENT 'Timestamp when the store credit record was most recently updated. Supports audit trail and change tracking.',
     `last_redemption_date` DATE COMMENT 'Calendar date of the most recent partial or full redemption transaction. Null if the credit has never been redeemed.',
     `notes` STRING COMMENT 'Free-text field for additional context, special instructions, or customer service notes related to the store credit issuance or redemption.',
     `pin_code` STRING COMMENT 'Optional security PIN required for redemption of the store credit. Protects against unauthorized use if the credit code is compromised.. Valid values are `^[0-9]{4,8}$`',
+    `redemption_channel_restriction` STRING COMMENT 'Policy constraint on where the store credit can be redeemed. Supports business rules for channel-specific credits.. Valid values are `any|store_only|online_only|issuing_store_only`',
     `remaining_balance` DECIMAL(18,2) COMMENT 'Current unredeemed monetary value available on the store credit. Decreases with each partial redemption until fully redeemed or expired.',
     `store_credit_status` STRING COMMENT 'Current lifecycle state of the store credit. Tracks progression from issuance through redemption, expiration, or voiding. [ENUM-REF-CANDIDATE: issued|active|partially_redeemed|fully_redeemed|expired|voided|suspended — 7 candidates stripped; promote to reference product]',
     `transferable_flag` BOOLEAN COMMENT 'Indicates whether the store credit can be transferred or gifted to another customer. False means the credit is locked to the original recipient.',
@@ -396,6 +401,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`store_credit` (
 ) COMMENT 'Store credit instrument issued as return resolution in lieu of cash or card refund. Functions as a stored-value financial instrument with its own lifecycle: issuance, partial redemption, full redemption, expiration, or voiding. Captures credit code, issued and remaining balance, issue/expiry dates, issuing channel and location, customer and originating RMA references. Integrates with POS and e-commerce systems for omnichannel redemption.';
 
 -- ========= FOREIGN KEYS =========
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ADD CONSTRAINT `fk_returns_rma_return_policy_id` FOREIGN KEY (`return_policy_id`) REFERENCES `vibe_retail_v1`.`returns`.`return_policy`(`return_policy_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ADD CONSTRAINT `fk_returns_rma_line_rma_id` FOREIGN KEY (`rma_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma`(`rma_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ADD CONSTRAINT `fk_returns_return_request_return_policy_id` FOREIGN KEY (`return_policy_id`) REFERENCES `vibe_retail_v1`.`returns`.`return_policy`(`return_policy_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ADD CONSTRAINT `fk_returns_return_request_rma_id` FOREIGN KEY (`rma_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma`(`rma_id`);
@@ -406,8 +412,7 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ADD CONSTRAINT `fk_returns_
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ADD CONSTRAINT `fk_returns_refund_return_receipt_id` FOREIGN KEY (`return_receipt_id`) REFERENCES `vibe_retail_v1`.`returns`.`return_receipt`(`return_receipt_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ADD CONSTRAINT `fk_returns_refund_return_request_id` FOREIGN KEY (`return_request_id`) REFERENCES `vibe_retail_v1`.`returns`.`return_request`(`return_request_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ADD CONSTRAINT `fk_returns_refund_rma_id` FOREIGN KEY (`rma_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma`(`rma_id`);
-ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ADD CONSTRAINT `fk_returns_exchange_order_return_request_id` FOREIGN KEY (`return_request_id`) REFERENCES `vibe_retail_v1`.`returns`.`return_request`(`return_request_id`);
-ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ADD CONSTRAINT `fk_returns_store_credit_return_request_id` FOREIGN KEY (`return_request_id`) REFERENCES `vibe_retail_v1`.`returns`.`return_request`(`return_request_id`);
+ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ADD CONSTRAINT `fk_returns_exchange_order_rma_id` FOREIGN KEY (`rma_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma`(`rma_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ADD CONSTRAINT `fk_returns_store_credit_rma_id` FOREIGN KEY (`rma_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma`(`rma_id`);
 
 -- ========= TAGS =========
@@ -416,14 +421,14 @@ ALTER SCHEMA `vibe_retail_v1`.`returns` SET TAGS ('dbx_domain' = 'returns');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma` SET TAGS ('dbx_subdomain' = 'authorization_processing');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Rma Identifier');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Originating Order ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `membership_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Membership Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `pos_terminal_id` SET TAGS ('dbx_business_glossary_term' = 'Pos Terminal Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Originating Order ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `pos_transaction_id` SET TAGS ('dbx_business_glossary_term' = 'Pos Transaction Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `carrier_id` SET TAGS ('dbx_business_glossary_term' = 'Return Carrier Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Return Department Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `return_policy_id` SET TAGS ('dbx_business_glossary_term' = 'Return Policy Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `disposition_code` SET TAGS ('dbx_value_regex' = 'restock|liquidate|rework|scrap|rtv|donate');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Return Merchandise Authorization (RMA) Expiry Date');
@@ -443,45 +448,46 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`rma` ALTER COLUMN `rma_status` SET TAGS 
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` SET TAGS ('dbx_subdomain' = 'authorization_processing');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `rma_line_id` SET TAGS ('dbx_business_glossary_term' = 'Rma Line Identifier');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `assortment_item_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Item Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `buying_order_line_id` SET TAGS ('dbx_business_glossary_term' = 'Buying Order Line Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Department Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `fulfillment_line_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Line Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `goods_receipt_id` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Original Order ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `pos_transaction_line_id` SET TAGS ('dbx_business_glossary_term' = 'Original Pos Transaction Line Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `po_line_id` SET TAGS ('dbx_business_glossary_term' = 'Buying Order Line Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `inbound_shipment_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Shipment Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `lot_id` SET TAGS ('dbx_business_glossary_term' = 'Lot Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `pos_transaction_line_id` SET TAGS ('dbx_business_glossary_term' = 'Pos Transaction Line Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `item_variant_id` SET TAGS ('dbx_business_glossary_term' = 'Returned Item Variant Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `adjustment_id` SET TAGS ('dbx_business_glossary_term' = 'Resulting Adjustment Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Return Merchandise Authorization (RMA) ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `rtv_request_id` SET TAGS ('dbx_business_glossary_term' = 'Rtv Request Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Price Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `stock_position_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Position Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `vendor_item_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Item Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `condition_code` SET TAGS ('dbx_value_regex' = 'NEW|OPENED|DAMAGED|DEFECTIVE|MISSING_PARTS|EXPIRED');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `disposition_code` SET TAGS ('dbx_value_regex' = 'RESTOCK|RTV|LIQUIDATE|DESTROY|REPAIR|DONATE');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `extended_cost_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `gtin` SET TAGS ('dbx_business_glossary_term' = 'Global Trade Item Number (GTIN)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{14}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `liquidation_sale_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `rtv_authorization_number` SET TAGS ('dbx_business_glossary_term' = 'Return to Vendor (RTV) Authorization Number');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `rtv_authorization_number` SET TAGS ('dbx_value_regex' = '^RTV[0-9]{8,12}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,20}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `unit_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `upc` SET TAGS ('dbx_business_glossary_term' = 'Universal Product Code (UPC)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `upc` SET TAGS ('dbx_value_regex' = '^[0-9]{12}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `vendor_credit_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `warehouse_location_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{3,10}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` SET TAGS ('dbx_subdomain' = 'authorization_processing');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `membership_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Membership Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `pos_transaction_id` SET TAGS ('dbx_business_glossary_term' = 'Pos Transaction Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `return_policy_id` SET TAGS ('dbx_business_glossary_term' = 'Return Policy Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Rma Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
@@ -494,8 +500,6 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `customer_c
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `customer_contact_phone` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `customer_contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `denial_reason_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `fraud_flag` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `fraud_risk_score` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `is_within_return_window` SET TAGS ('dbx_business_glossary_term' = 'Is Within Return Window Flag');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `preferred_resolution_type` SET TAGS ('dbx_value_regex' = 'refund|exchange|store_credit|replacement');
@@ -515,23 +519,21 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `total_item
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `total_quantity_requested` SET TAGS ('dbx_business_glossary_term' = 'Total Quantity Requested for Return');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` SET TAGS ('dbx_subdomain' = 'authorization_processing');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `goods_receipt_id` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Original Order ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Node Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `carrier_service_id` SET TAGS ('dbx_business_glossary_term' = 'Return Carrier Service Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Quantity Uom Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Node Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `return_request_id` SET TAGS ('dbx_business_glossary_term' = 'Return Request Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Return Merchandise Authorization (RMA) ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `authorized_quantity` SET TAGS ('dbx_business_glossary_term' = 'Authorized Return Quantity');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `condition_assessment` SET TAGS ('dbx_business_glossary_term' = 'Merchandise Condition Assessment');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `discrepancy_type` SET TAGS ('dbx_value_regex' = 'over_return|under_return|wrong_item|damaged_in_transit|missing_components|no_discrepancy');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `estimated_recovery_value` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `packaging_condition` SET TAGS ('dbx_value_regex' = 'original_sealed|original_opened|repackaged|damaged|missing');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `quantity_unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Quantity Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `receipt_number` SET TAGS ('dbx_business_glossary_term' = 'Return Receipt Number');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `receipt_number` SET TAGS ('dbx_value_regex' = '^RR[0-9]{10}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `receipt_source_system_code` SET TAGS ('dbx_business_glossary_term' = 'Receipt Source System ID');
@@ -545,16 +547,27 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `refund_hol
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `return_method` SET TAGS ('dbx_value_regex' = 'in_store|mail_in|drop_off|carrier_pickup|vendor_direct');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` SET TAGS ('dbx_subdomain' = 'authorization_processing');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `buying_order_line_id` SET TAGS ('dbx_business_glossary_term' = 'Buying Order Line Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Department Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Liquidation Partner ID');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `inbound_shipment_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Shipment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Node Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Rtv Request Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Corrective Action Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `lot_id` SET TAGS ('dbx_business_glossary_term' = 'Lot Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `stock_position_id` SET TAGS ('dbx_business_glossary_term' = 'Restock Stock Position Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `adjustment_id` SET TAGS ('dbx_business_glossary_term' = 'Resulting Adjustment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `return_receipt_id` SET TAGS ('dbx_business_glossary_term' = 'Return Receipt Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `rma_line_id` SET TAGS ('dbx_business_glossary_term' = 'Return Line ID');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Disposition Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Price Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `stock_position_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Position Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `warehouse_zone_id` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Zone Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `rtv_request_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Rtv Request Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `stock_transfer_id` SET TAGS ('dbx_business_glossary_term' = 'Transfer Stock Transfer Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Uom Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `completion_date` SET TAGS ('dbx_business_glossary_term' = 'Disposition Completion Date');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `condition_grade` SET TAGS ('dbx_value_regex' = 'A|B|C|D|F');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
@@ -571,31 +584,25 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `notes` SET TA
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `quantity` SET TAGS ('dbx_business_glossary_term' = 'Disposition Quantity');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `reason_code` SET TAGS ('dbx_business_glossary_term' = 'Disposition Reason Code');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `reason_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,6}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `restock_location_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,10}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `rma_number` SET TAGS ('dbx_business_glossary_term' = 'Return Merchandise Authorization (RMA) Number');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `rma_number` SET TAGS ('dbx_value_regex' = '^RMA[0-9]{8,12}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `serial_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,20}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,14}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|CS|PK|BX');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` SET TAGS ('dbx_subdomain' = 'financial_settlement');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `refund_id` SET TAGS ('dbx_business_glossary_term' = 'Refund Identifier');
+ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `cancellation_id` SET TAGS ('dbx_business_glossary_term' = 'Cancellation Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Original Order ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `membership_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Membership Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `discount_id` SET TAGS ('dbx_business_glossary_term' = 'Original Discount Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `payment_id` SET TAGS ('dbx_business_glossary_term' = 'Original Payment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `pos_terminal_id` SET TAGS ('dbx_business_glossary_term' = 'Pos Terminal Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `price_change_id` SET TAGS ('dbx_business_glossary_term' = 'Price Change Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `pos_transaction_id` SET TAGS ('dbx_business_glossary_term' = 'Pos Transaction Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `promo_redemption_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Redemption Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `redemption_id` SET TAGS ('dbx_business_glossary_term' = 'Redemption Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `return_receipt_id` SET TAGS ('dbx_business_glossary_term' = 'Return Receipt Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `return_request_id` SET TAGS ('dbx_business_glossary_term' = 'Return ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Refund Approved Timestamp');
-ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `authorization_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Refund Channel');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'store|online|mobile_app|call_center|kiosk');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `completed_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Refund Completed Timestamp');
@@ -611,22 +618,17 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `reason_code` SET T
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `reason_description` SET TAGS ('dbx_business_glossary_term' = 'Refund Reason Description');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `refund_number` SET TAGS ('dbx_value_regex' = '^RFN-[0-9]{10}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `refund_type` SET TAGS ('dbx_value_regex' = 'full|partial|restocking_adjusted|exchange_credit');
-ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `transaction_reference` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` SET TAGS ('dbx_subdomain' = 'financial_settlement');
-ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Exchange Fulfillment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `membership_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Membership Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `order_line_id` SET TAGS ('dbx_business_glossary_term' = 'Original Order Line Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `outbound_order_id` SET TAGS ('dbx_business_glossary_term' = 'Outbound Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Original Order ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Replacement Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Replacement Sku Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `stock_position_id` SET TAGS ('dbx_business_glossary_term' = 'Replacement Stock Position Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `return_request_id` SET TAGS ('dbx_business_glossary_term' = 'Return Request Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Return Merchandise Authorization (RMA) ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `address_id` SET TAGS ('dbx_business_glossary_term' = 'Shipping Address Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
@@ -637,16 +639,14 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `exchange_t
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `fulfillment_channel` SET TAGS ('dbx_value_regex' = 'ship_to_home|in_store_pickup|curbside_pickup|bopis|ropis');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `price_differential_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `refund_method` SET TAGS ('dbx_value_regex' = 'original_payment_method|store_credit|gift_card|check|bank_transfer');
+ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `returned_sku` SET TAGS ('dbx_business_glossary_term' = 'Returned Stock Keeping Unit (SKU)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `returned_sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,14}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` SET TAGS ('dbx_subdomain' = 'financial_settlement');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `cluster_id` SET TAGS ('dbx_business_glossary_term' = 'Cluster Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Format Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Item Hierarchy Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `program_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Program Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `region_id` SET TAGS ('dbx_business_glossary_term' = 'Region Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `tier_id` SET TAGS ('dbx_business_glossary_term' = 'Tier Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `accepted_condition` SET TAGS ('dbx_business_glossary_term' = 'Accepted Return Condition');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `accepted_condition` SET TAGS ('dbx_value_regex' = 'unopened|unused_with_tags|gently_used|any_condition|defective_only');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `approval_required` SET TAGS ('dbx_business_glossary_term' = 'Manager Approval Required Flag');
@@ -691,20 +691,18 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `vendor_retu
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` SET TAGS ('dbx_subdomain' = 'financial_settlement');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Original Order ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Issuing Store ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `membership_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Membership Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `pos_transaction_id` SET TAGS ('dbx_business_glossary_term' = 'Pos Transaction Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `return_request_id` SET TAGS ('dbx_business_glossary_term' = 'Return Request Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Return Merchandise Authorization (RMA) ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Storefront Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Issuing Store ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `credit_code` SET TAGS ('dbx_business_glossary_term' = 'Store Credit Code');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `credit_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{10,20}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `credit_type` SET TAGS ('dbx_business_glossary_term' = 'Store Credit Type');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `credit_type` SET TAGS ('dbx_value_regex' = 'return_resolution|promotional|goodwill|price_adjustment|damaged_goods|service_recovery');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `issuing_channel` SET TAGS ('dbx_value_regex' = 'store|ecommerce|call_center|mobile_app|kiosk');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `pin_code` SET TAGS ('dbx_business_glossary_term' = 'Personal Identification Number (PIN) Code');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `pin_code` SET TAGS ('dbx_value_regex' = '^[0-9]{4,8}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `pin_code` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `pin_code` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `pin_code` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `redemption_channel_restriction` SET TAGS ('dbx_value_regex' = 'any|store_only|online_only|issuing_store_only');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `void_reason_code` SET TAGS ('dbx_value_regex' = 'fraud|duplicate_issuance|customer_request|system_error|policy_violation|expired_unused');

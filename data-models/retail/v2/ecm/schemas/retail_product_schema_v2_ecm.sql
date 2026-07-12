@@ -1,5 +1,5 @@
 -- Schema for Domain: product | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:25
+-- Generated on: 2026-07-12 13:53:24
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`product` COMMENT 'Authoritative catalog of all merchandise including SKUs, UPCs, GTINs, EANs, product hierarchies (department, category, subcategory), attributes, descriptions, images, private label vs. national brands, and assortment depth and breadth classifications. Managed via PIM (Product Information Management) and MDM systems. Supports category management, new item setup, and product lifecycle from introduction to discontinuation.';
@@ -11,7 +11,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`sku` (
     `location_id` BIGINT COMMENT 'Foreign key linking to store.store_location. Business justification: Store-level assortment planning and authorization. Retail assortment systems maintain store-SKU authorization matrices determining which items each store is authorized to carry. Critical for planogram',
     `marketing_brand_id` BIGINT COMMENT 'Foreign key linking to marketing.marketing_brand. Business justification: Retail marketing operations require linking SKUs to marketing brand entities for campaign planning, brand performance analysis, and marketing attribution reporting. Distinct from product_brand (supply',
     `product_brand_id` BIGINT COMMENT 'add column product_brand_id (BIGINT) with FK to product.product_brand.product_brand_id - SKUs belong to brands and this relationship is fundamental for brand-level reporting and assortment planning',
-    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: sku.unit_of_measure (STRING) should be normalized to a proper FK to uom reference table. UOM is the authoritative master for all units of measure with conversion factors and standards compliance (GS1,',
+    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: sku.unit_of_measure (STRING) should be normalized to a proper FK to uom reference table. UOM is the authoritative master for all units of measure with conversion factors and standards compliance (GS1',
     `vendor_id` BIGINT COMMENT 'Identifier of the primary supplier or vendor who provides this SKU to the retailer. Links to the supplier master data.',
     `age_restriction_flag` BOOLEAN COMMENT 'Indicates whether this SKU has age restrictions for purchase (e.g., alcohol, tobacco, mature-rated products). True if age-restricted, False if not.',
     `country_of_origin` STRING COMMENT 'Three-letter ISO 3166-1 alpha-3 country code indicating where the product was manufactured or produced. Required for customs and regulatory compliance.. Valid values are `^[A-Z]{3}$`',
@@ -657,10 +657,7 @@ ALTER TABLE `vibe_retail_v1`.`product`.`sku` ALTER COLUMN `volume_unit_of_measur
 ALTER TABLE `vibe_retail_v1`.`product`.`sku` ALTER COLUMN `weight_unit_of_measure` SET TAGS ('dbx_value_regex' = 'LB|KG|OZ|G');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` SET TAGS ('dbx_subdomain' = 'item_master');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_internal' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_internal' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `parent_hierarchy_node_item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Hierarchy Node ID');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_internal' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `allows_direct_sku_assignment` SET TAGS ('dbx_business_glossary_term' = 'Allows Direct SKU (Stock Keeping Unit) Assignment Flag');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `external_reference_code` SET TAGS ('dbx_business_glossary_term' = 'External Reference ID');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `hierarchy_level` SET TAGS ('dbx_value_regex' = 'division|department|category|subcategory|segment|class');
@@ -700,7 +697,6 @@ ALTER TABLE `vibe_retail_v1`.`product`.`product_brand` SET TAGS ('dbx_subdomain'
 ALTER TABLE `vibe_retail_v1`.`product`.`product_brand` ALTER COLUMN `product_brand_id` SET TAGS ('dbx_business_glossary_term' = 'Product Brand Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_brand` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_brand` ALTER COLUMN `average_margin_percent` SET TAGS ('dbx_business_glossary_term' = 'Average Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`product`.`product_brand` ALTER COLUMN `average_margin_percent` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_brand` ALTER COLUMN `brand_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{3,20}$');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_brand` ALTER COLUMN `brand_status` SET TAGS ('dbx_value_regex' = 'active|inactive|discontinued|pending_approval');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_brand` ALTER COLUMN `brand_tier` SET TAGS ('dbx_value_regex' = 'premium|standard|value|economy');
@@ -740,7 +736,7 @@ ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ALTER COLUMN `variant_gtin
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ALTER COLUMN `variant_upc` SET TAGS ('dbx_business_glossary_term' = 'Variant Universal Product Code (UPC)');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ALTER COLUMN `variant_upc` SET TAGS ('dbx_value_regex' = '^[0-9]{12}$');
 ALTER TABLE `vibe_retail_v1`.`product`.`image` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`image` SET TAGS ('dbx_subdomain' = 'content_assets');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` SET TAGS ('dbx_subdomain' = 'content_enrichment');
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `image_id` SET TAGS ('dbx_business_glossary_term' = 'Product Image ID');
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Uploaded By Associate Id (Foreign Key)');
@@ -769,8 +765,6 @@ ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `license_type` SET T
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `locale` SET TAGS ('dbx_business_glossary_term' = 'Locale Code');
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `locale` SET TAGS ('dbx_value_regex' = '^[a-z]{2}_[A-Z]{2}$');
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `mobile_optimized` SET TAGS ('dbx_business_glossary_term' = 'Mobile Optimized Flag');
-ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `mobile_optimized` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `mobile_optimized` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `planogram_eligible` SET TAGS ('dbx_business_glossary_term' = 'Planogram (POG) Eligible Flag');
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `print_ready` SET TAGS ('dbx_business_glossary_term' = 'Print Ready Flag');
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `quality_score` SET TAGS ('dbx_business_glossary_term' = 'Image Quality Score');
@@ -784,13 +778,10 @@ ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `vendor_image_code` 
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `view_angle` SET TAGS ('dbx_business_glossary_term' = 'Product View Angle');
 ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `zoom_enabled` SET TAGS ('dbx_business_glossary_term' = 'Zoom Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` SET TAGS ('dbx_subdomain' = 'compliance_safety');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` SET TAGS ('dbx_subdomain' = 'regulatory_safety');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Approver User ID');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `buyer_id` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Location Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `primary_item_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Triggered By User ID');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `primary_item_associate_id` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected|auto_approved|not_required');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `event_type` SET TAGS ('dbx_business_glossary_term' = 'Lifecycle Event Type');
@@ -798,11 +789,10 @@ ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `new_
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `prior_status` SET TAGS ('dbx_business_glossary_term' = 'Prior Lifecycle Status');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `reason_code` SET TAGS ('dbx_business_glossary_term' = 'Lifecycle Event Reason Code');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `reason_description` SET TAGS ('dbx_business_glossary_term' = 'Lifecycle Event Reason Description');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `requestor_name` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `source_system_event_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Event ID');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_lifecycle_event` ALTER COLUMN `workflow_stage` SET TAGS ('dbx_value_regex' = 'vendor_submission|buyer_review|data_entry|approval_pending|approved|rejected');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` SET TAGS ('dbx_subdomain' = 'compliance_safety');
+ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` SET TAGS ('dbx_subdomain' = 'regulatory_safety');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` ALTER COLUMN `carrier_service_id` SET TAGS ('dbx_business_glossary_term' = 'Approved Carrier Service Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` ALTER COLUMN `carrier_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Carrier Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Officer Associate Id (Foreign Key)');
@@ -816,10 +806,8 @@ ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` ALTER COLUMN `prop_6
 ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` ALTER COLUMN `prop_65_warning_required` SET TAGS ('dbx_business_glossary_term' = 'California Proposition 65 (Prop 65) Warning Required');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` ALTER COLUMN `recall_severity_level` SET TAGS ('dbx_value_regex' = 'class_1|class_2|class_3');
 ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` ALTER COLUMN `recall_status` SET TAGS ('dbx_value_regex' = 'no_recall|active_recall|recall_completed|recall_pending');
-ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` ALTER COLUMN `responsible_party_contact` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`product_compliance` ALTER COLUMN `responsible_party_contact` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` SET TAGS ('dbx_subdomain' = 'compliance_safety');
+ALTER TABLE `vibe_retail_v1`.`product`.`recall` SET TAGS ('dbx_subdomain' = 'regulatory_safety');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `recall_id` SET TAGS ('dbx_business_glossary_term' = 'Product Recall ID');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Recall Coordinator Associate Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
@@ -827,19 +815,13 @@ ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `gl_account_id` SET
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Location Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `chargeback_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `class` SET TAGS ('dbx_value_regex' = 'class_i|class_ii|class_iii');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `completion_date` SET TAGS ('dbx_business_glossary_term' = 'Recall Completion Date');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_email` SET TAGS ('dbx_business_glossary_term' = 'Recall Coordinator Email');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_phone` SET TAGS ('dbx_business_glossary_term' = 'Recall Coordinator Phone');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_phone` SET TAGS ('dbx_value_regex' = '^+?[0-9]{10,15}$');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_phone` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `country_of_origin_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `estimated_financial_impact_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `initiation_date` SET TAGS ('dbx_business_glossary_term' = 'Recall Initiation Date');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `press_release_url` SET TAGS ('dbx_value_regex' = '^https?://.*$');
 ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `reason` SET TAGS ('dbx_business_glossary_term' = 'Recall Reason');
@@ -906,7 +888,7 @@ ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `registratio
 ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `regulatory_compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending_review|exempt');
 ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `replacement_gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{8}$|^[0-9]{12}$|^[0-9]{13}$|^[0-9]{14}$');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_nutritional` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_nutritional` SET TAGS ('dbx_subdomain' = 'content_assets');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_nutritional` SET TAGS ('dbx_subdomain' = 'content_enrichment');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_nutritional` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_nutritional` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Validated By Associate Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_nutritional` ALTER COLUMN `added_sugars_g` SET TAGS ('dbx_business_glossary_term' = 'Added Sugars (Grams)');
@@ -960,7 +942,6 @@ ALTER TABLE `vibe_retail_v1`.`product`.`item_cross_reference` ALTER COLUMN `vali
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` SET TAGS ('dbx_data_type' = 'reference_data');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` SET TAGS ('dbx_subdomain' = 'item_master');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) ID');
-ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `base_uom_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `class` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) Class');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `class` SET TAGS ('dbx_value_regex' = 'weight|volume|count|length|area|time');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `uom_code` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) Code');
@@ -981,12 +962,12 @@ ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `symbol` SET TAGS ('db
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `unece_code` SET TAGS ('dbx_business_glossary_term' = 'UN/ECE Recommendation 20 Code');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `uom_type` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) Type');
 ALTER TABLE `vibe_retail_v1`.`product`.`category_campaign_plan` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`category_campaign_plan` SET TAGS ('dbx_subdomain' = 'category_planning');
+ALTER TABLE `vibe_retail_v1`.`product`.`category_campaign_plan` SET TAGS ('dbx_subdomain' = 'assortment_planning');
 ALTER TABLE `vibe_retail_v1`.`product`.`category_campaign_plan` SET TAGS ('dbx_association_edges' = 'product.item_hierarchy,marketing.campaign');
 ALTER TABLE `vibe_retail_v1`.`product`.`category_campaign_plan` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Category Campaign Plan - Campaign Id');
 ALTER TABLE `vibe_retail_v1`.`product`.`category_campaign_plan` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Category Campaign Plan - Item Hierarchy Id');
 ALTER TABLE `vibe_retail_v1`.`product`.`assortment` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`assortment` SET TAGS ('dbx_subdomain' = 'category_planning');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` SET TAGS ('dbx_subdomain' = 'assortment_planning');
 ALTER TABLE `vibe_retail_v1`.`product`.`assortment` SET TAGS ('dbx_association_edges' = 'product.sku,fulfillment.node');
 ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `assortment_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Assignment Identifier');
 ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `fulfillment_node_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment - Fulfillment Node Id');
@@ -1002,7 +983,7 @@ ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `min_stock_quan
 ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `replenishment_lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Node-Specific Replenishment Lead Time');
 ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `stocking_status` SET TAGS ('dbx_business_glossary_term' = 'Node-Specific Stocking Status');
 ALTER TABLE `vibe_retail_v1`.`product`.`category_kpi_target` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`category_kpi_target` SET TAGS ('dbx_subdomain' = 'category_planning');
+ALTER TABLE `vibe_retail_v1`.`product`.`category_kpi_target` SET TAGS ('dbx_subdomain' = 'assortment_planning');
 ALTER TABLE `vibe_retail_v1`.`product`.`category_kpi_target` SET TAGS ('dbx_association_edges' = 'product.item_hierarchy,analytics.kpi_definition');
 ALTER TABLE `vibe_retail_v1`.`product`.`category_kpi_target` ALTER COLUMN `category_kpi_target_id` SET TAGS ('dbx_business_glossary_term' = 'Category KPI Target Identifier');
 ALTER TABLE `vibe_retail_v1`.`product`.`category_kpi_target` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Category Kpi Target - Item Hierarchy Id');

@@ -1,5 +1,5 @@
 -- Schema for Domain: pricing | Business: Retail | Version: v2_mvm
--- Generated on: 2026-07-12 10:43:58
+-- Generated on: 2026-07-12 15:26:00
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`pricing` COMMENT 'SSOT for all pricing strategies including EDLP (Everyday Low Price), Hi-Lo pricing, competitive pricing, markdowns, ASP (Average Selling Price), AUR (Average Unit Retail), dynamic pricing rules, price zones, and cost-plus margins. Tracks GMROI (Gross Margin Return on Investment), price change audit trails, and markdown optimization. Integrates with Oracle Retail Price Management (RPM) for enterprise-wide pricing governance.';
@@ -7,9 +7,12 @@ CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`pricing` COMMENT 'SSOT for all p
 -- ========= TABLES =========
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`price_list` (
     `price_list_id` BIGINT COMMENT 'Unique surrogate identifier for the price list record. Primary key for the pricing.price_list data product in the Databricks Silver Layer.',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Price lists are owned and managed by buyers in retail. Buyers are responsible for approving and maintaining price lists for their categories. Linking enables buyer-level price list ownership, accounta',
     `location_id` BIGINT COMMENT 'Foreign key linking to store.location. Business justification: Price lists are managed by merchandising cost centers for budget tracking and P&L accountability. Retail business process: departmental pricing authority and expense allocation for pricing strategy ex',
+    `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Price lists are commonly scoped to category hierarchies to enable segmented pricing strategies (premium categories vs. value categories). Category-level price list assignment supports differentiated m',
     `price_zone_id` BIGINT COMMENT 'Foreign key linking to pricing.price_strategy. Business justification: Price lists implement a pricing strategy (e.g., EDLP base list, Hi-Lo promotional list). Adding price_strategy_id FK links list to strategy. Removes pricing_strategy STRING column as redundant.',
-    `program_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_program. Business justification: Price lists are frequently program-specific (e.g., Rewards Plus Member Pricing, Coalition Partner Pricing). Existing loyalty_tier_code is insufficient for program-level assignment. Supports progra',
+    `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Price lists are created and activated for specific promotional campaigns (e.g., holiday sale price lists). Retailers require this link for campaign budget reconciliation, post-event margin analysis, a',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Price lists in retail are season-specific (Spring/Summer, Fall/Winter). Buyers build seasonal price lists and retire them at season end. Linking enables seasonal price list reporting and ensures price',
     `approval_status` STRING COMMENT 'Workflow approval state of the price list within the retail merchandising systems pricing governance process. PENDING = submitted for approval; APPROVED = authorized for activation; REJECTED = returned for revision; UNDER_REVIEW = in active review by pricing committee. Price lists must be APPROVED before transitioning to ACTIVE status.. Valid values are `PENDING|APPROVED|REJECTED|UNDER_REVIEW`',
     `approved_by` STRING COMMENT 'Name or employee identifier of the pricing manager or director who approved this price list for activation. Supports audit trail requirements for pricing governance and SOX compliance. Sourced from the retail merchandising system workflow approval records.',
     `approved_timestamp` TIMESTAMP COMMENT 'Date and time when the price list was formally approved by the pricing authority in the retail merchandising system of the price change audit trail required for pricing governance and regulatory compliance. Format: yyyy-MM-ddTHH:mm:ss.SSSXXX.',
@@ -88,13 +91,13 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`price_zone` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`sku_price` (
     `sku_price_id` BIGINT COMMENT 'Unique surrogate identifier for each SKU-to-price-list-to-zone-to-channel binding record. Primary key of the sku_price data product in the Databricks Silver Layer.',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: SKU prices are set within buyer-owned categories. Linking sku_price to buyer enables buyer-level retail price management reporting and accountability for margin outcomes — a standard retail buying per',
     `cost_price_id` BIGINT COMMENT 'Foreign key linking to pricing.cost_price. Business justification: SKU retail prices are based on cost prices for margin calculation. Adding cost_price_id FK links retail price to authoritative cost record. Removes cost_price DECIMAL as redundant with cost_price.land',
     `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.item_hierarchy. Business justification: Regulated SKUs (alcohol, tobacco, pharmacy) require valid licenses to price/sell. Pricing systems validate license status before activating prices; expired licenses block price changes.',
-    `markdown_id` BIGINT COMMENT 'Foreign key linking to pricing.markdown. Business justification: sku_price already carries markdown_amount and markdown_pct as denormalized attributes, but has no FK to the markdown record that drove these values. Adding markdown_id to sku_price enables: (1) full t',
     `price_list_id` BIGINT COMMENT 'Reference to the price list under which this SKU price is governed. Supports multi-list resolution priority for EDLP, Hi-Lo, promotional, and clearance price lists.',
     `price_zone_id` BIGINT COMMENT 'Reference to the geographic or competitive price zone in which this price applies. Price zones enable regional pricing differentiation across store clusters and markets.',
-    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Promotional offers define temporary price adjustments at SKU level. Retailers must link offer mechanics to SKU price records to calculate promotional pricing, validate discount limits, and reconcile v',
     `rule_id` BIGINT COMMENT 'Foreign key linking to pricing.pricing_rule. Business justification: SKU prices may be calculated or adjusted by pricing rules (e.g., dynamic pricing rules, competitive response rules). Adding pricing_rule_id FK tracks which rule generated or last adjusted the price.',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: SKU prices are set within seasonal pricing cycles. Buyers and planners need season-level retail price records for seasonal margin analysis, end-of-season markdown planning, and OTB reconciliation. A r',
     `sku_id` BIGINT COMMENT 'Reference to the product SKU for which this price record applies. Resolves to the canonical product master in the Product domain.',
     `approval_status` STRING COMMENT 'Workflow approval status of this price record within the the retail merchandising system Price Management (RPM) pricing governance process. Only records in approved status are eligible for price resolution at POS and digital channels.. Valid values are `draft|pending_approval|approved|rejected|expired|cancelled`',
     `approved_by` STRING COMMENT 'Username or employee identifier of the pricing manager who approved this price record in the retail merchandising system Price Management (RPM). Required for price change audit trail and SOX compliance.',
@@ -112,9 +115,12 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`sku_price` (
     `initial_markup_pct` DECIMAL(18,2) COMMENT 'The Initial Markup (IMU) percentage calculated as (retail_price - cost_price) / retail_price * 100. Represents the planned gross margin at the time of price setting before any markdowns.',
     `is_dynamic_pricing_enabled` BOOLEAN COMMENT 'Indicates whether dynamic pricing rules are active for this SKU in this price list, zone, and channel context. When True, the price may be algorithmically adjusted within price_floor and price_ceiling bounds based on demand signals from SAP Customer Activity Repository (CAR).',
     `is_price_locked` BOOLEAN COMMENT 'Indicates whether this price record is locked and protected from automated price changes or markdown optimization algorithms. When True, the price can only be changed through a manual approval workflow in the retail merchandising system Price Management (RPM).',
+    `markdown_amount` DECIMAL(18,2) COMMENT 'The absolute currency amount by which the original retail price has been reduced (markdown). Markdown = original_retail_price - retail_price. Used for markdown optimization and P&L (Profit and Loss) reporting.',
+    `markdown_pct` DECIMAL(18,2) COMMENT 'The percentage reduction from the original retail price to the current retail price. Markdown% = (original_retail_price - retail_price) / original_retail_price * 100. Supports markdown depth analysis and clearance optimization.',
     `min_advertised_price` DECIMAL(18,2) COMMENT 'The Minimum Advertised Price (MAP) floor set by the supplier or brand for this SKU. The retail_price must not be advertised below this threshold. Enforced for compliance with supplier MAP agreements and FTC advertising standards.',
     `original_retail_price` DECIMAL(18,2) COMMENT 'The initial retail price at which the SKU was first offered for sale in this zone and channel, prior to any markdowns or price changes. Used for markdown optimization and sell-through rate analysis.',
     `price_ceiling` DECIMAL(18,2) COMMENT 'The maximum allowable retail price for this SKU in this zone and channel. Prevents price gouging and ensures compliance with consumer protection regulations. Used in dynamic pricing guardrails.',
+    `price_change_reason` STRING COMMENT 'Business reason code or description explaining why this price was set or changed. Examples: Competitive match, Seasonal markdown, Clearance, Cost increase, Promotional event. Supports price change audit trail and markdown optimization analysis.',
     `price_floor` DECIMAL(18,2) COMMENT 'The minimum allowable retail price for this SKU in this zone and channel, below which the price cannot be set without executive override. Protects gross margin and prevents below-cost selling. Distinct from MAP which is a supplier-imposed advertising constraint.',
     `price_per_unit_display` DECIMAL(18,2) COMMENT 'The normalized price per standard unit (e.g., price per 100g, price per litre) used for shelf-edge price comparison display. Required by consumer protection regulations for grocery and FMCG categories to enable fair price comparison.',
     `price_per_unit_uom` STRING COMMENT 'The unit of measure denominator for the price_per_unit_display field (e.g., 100G, 1L, 1OZ). Required alongside price_per_unit_display for regulatory shelf-edge unit pricing compliance.. Valid values are `^[A-Z0-9/]{2,15}$`',
@@ -131,18 +137,21 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`sku_price` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`price_change` (
     `price_change_id` BIGINT COMMENT 'Unique surrogate identifier for each price change event record in the pricing audit trail. Primary key for the price_change data product.',
+    `assortment_item_id` BIGINT COMMENT 'Foreign key linking to merchandising.assortment_item. Business justification: Price changes affect specific assortment items. Buyers review price change history per assortment item during line reviews and assortment resets. Linking enables assortment-item-level price change aud',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Buyers initiate and approve price changes for their categories. Price change workflows route to buyers for authorization when changes exceed thresholds or impact margin targets. Buyer accountability f',
     `cost_price_id` BIGINT COMMENT 'Foreign key linking to pricing.cost_price. Business justification: Price changes triggered by cost changes should reference the authoritative cost record. Adding cost_price_id FK links to cost_price. Keeps prior_cost/new_cost as point-in-time snapshots for audit trai',
-    `location_id` BIGINT COMMENT 'Reference to the specific store or location where the price change applies. Null when the change applies enterprise-wide or to a price zone rather than a single store.',
-    `markdown_id` BIGINT COMMENT 'Foreign key linking to pricing.markdown. Business justification: Price changes are frequently triggered by markdown events. Adding markdown_id FK allows tracking which markdown event caused a price change. Removes markdown_type as it can be retrieved from markdown.',
+    `inbound_shipment_id` BIGINT COMMENT 'Foreign key linking to supplychain.inbound_shipment. Business justification: Cost-driven price changes in retail are triggered when inbound shipment receiving reveals a cost variance vs. the cost_price master. price_change.is_cost_change and new_cost/prior_cost fields capture ',
     `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: Price changes are often scoped to specific price lists (e.g., updating the promotional price list vs. base price list). Adding price_list_id FK tracks which price list is being modified.',
+    `location_id` BIGINT COMMENT 'Reference to the specific store or location where the price change applies. Null when the change applies enterprise-wide or to a price zone rather than a single store.',
     `rule_id` BIGINT COMMENT 'Reference to the pricing rule or pricing strategy definition in the retail merchandising system that generated or governs this price change event. Links to the EDLP, Hi-Lo, cost-plus, or competitive pricing rule configuration.',
+    `sku_id` BIGINT COMMENT 'Reference to the specific SKU (Stock Keeping Unit) for which the price or cost change is being recorded. Links to the product master.',
+    `vendor_id` BIGINT COMMENT 'Reference to the supplier associated with a cost-side change event (e.g., supplier cost increase, contract renegotiation, tariff change). Null for retail-only price changes with no supplier involvement.',
     `price_zone_id` BIGINT COMMENT 'Reference to the geographic or competitive price zone to which this price change applies. Price zones group stores with similar competitive environments for unified pricing governance.',
-    `promo_calendar_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_calendar. Business justification: Price changes in retail are scheduled within promotional calendar windows (e.g., a price reduction aligned to a fiscal week promotion period). Linking price_change to promo_calendar enables promotiona',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Price changes are frequently triggered by promotional campaigns (weekly ads, seasonal events). Linking campaign to price change enables promotional effectiveness analysis, margin impact tracking, vend',
     `promo_offer_id` BIGINT COMMENT 'Reference to the promotion or promotional event that triggered this temporary price change. Null for non-promotional price changes. Links the price change audit trail to the promotions management domain.',
-    `replenishment_plan_id` BIGINT COMMENT 'The externally-known price event identifier assigned by the retail merchandising system Price Management (RPM). Used for cross-system reconciliation and audit traceability back to the source pricing system.',
-    `sku_id` BIGINT COMMENT 'Reference to the specific SKU (Stock Keeping Unit) for which the price or cost change is being recorded. Links to the product master.',
-    `stock_position_id` BIGINT COMMENT 'Foreign key linking to inventory.stock_position. Business justification: Inventory-driven price changes (overstock markdowns, velocity-based dynamic pricing) must reference the specific stock_position that triggered the change. price_change has trigger_signal and trigger_t',
+    `replenishment_plan_id` BIGINT COMMENT 'Foreign key linking to supplychain.replenishment_plan. Business justification: Overstock replenishment signals trigger promotional price reductions in retail. price_change.trigger_signal captures the signal type but not the source plan. Linking to the replenishment_plan that tri',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Price changes are triggered by seasonal transitions (end-of-season clearance, new season launch). Linking price_change to season enables seasonal price change analysis and supports markdown planning w',
+    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: A price change event modifies a specific SKU price record. Linking price_change.sku_price_id → sku_price.sku_price_id establishes the direct audit trail from the transactional change event to the auth',
     `approval_status` STRING COMMENT 'Current workflow lifecycle state of the price change event: pending (awaiting approval), approved (authorized and scheduled), rejected (denied by approver), cancelled (withdrawn before execution), or superseded (overridden by a subsequent change).. Valid values are `pending|approved|rejected|cancelled|superseded`',
     `approved_timestamp` TIMESTAMP COMMENT 'The date and time when the price change was formally approved by an authorized pricing manager or automated approval workflow. Null if not yet approved or if approval is not required for the execution mode.',
     `change_category` STRING COMMENT 'High-level classification of the change event: retail_price_change (consumer-facing price), supplier_cost_change (vendor invoice cost), landed_cost_adjustment (total delivered cost including duties/tariffs), or freight_surcharge (transportation cost component).. Valid values are `retail_price_change|supplier_cost_change|landed_cost_adjustment|freight_surcharge`',
@@ -178,19 +187,26 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`price_change` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`markdown` (
     `markdown_id` BIGINT COMMENT 'Unique system-generated identifier for each markdown event record. Primary key for the markdown data product in the pricing domain.',
+    `assortment_item_id` BIGINT COMMENT 'Foreign key linking to merchandising.assortment_item. Business justification: Markdowns are applied at the SKU-location level, which maps directly to assortment_item. Linking tracks which assortment items triggered markdowns, supporting assortment performance reviews and future',
+    `assortment_plan_id` BIGINT COMMENT 'Foreign key linking to merchandising.assortment_plan. Business justification: Markdowns are executed against items in an assortment plan. Linking enables assortment-level markdown performance tracking, sell-through analysis, and clearance planning against the original assortmen',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Buyers approve and manage markdown events within their category portfolios. Markdown decisions require buyer authorization because they impact margin targets, inventory turn goals, and OTB budget util',
+    `category_id` BIGINT COMMENT 'Reference to the merchandise category associated with this markdown. Enables category-level markdown analysis and assortment management reporting.',
     `cost_price_id` BIGINT COMMENT 'Foreign key linking to pricing.cost_price. Business justification: Markdown decisions consider cost price to avoid selling below cost. Adding cost_price_id FK links to authoritative cost record. Removes cost_price DECIMAL as redundant with cost_price.landed_cost.',
     `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Audit findings for markdown policy violations, clearance control failures, or margin breaches reference specific markdown events as evidence. Auditors trace findings to markdown transactions.',
+    `demand_forecast_id` BIGINT COMMENT 'Foreign key linking to supplychain.demand_forecast. Business justification: Markdown depth and timing decisions in retail are driven by demand forecast sell-through projections. Linking markdown to the demand_forecast that justified the clearance action enables sell_through_t',
     `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Markdowns should align with the pricing strategy for that category/department (e.g., Hi-Lo strategy has planned markdown cycles, EDLP has minimal markdowns). Links markdown decisions to governing stra',
     `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.item_hierarchy. Business justification: Clearance/markdown of regulated goods (alcohol, tobacco, pharmacy) must comply with license terms. Some permits restrict below-cost selling; markdown systems check license conditions.',
     `location_id` BIGINT COMMENT 'Reference to the store, zone, or distribution center where the markdown is applied. Supports price zone and location-level markdown governance.',
-    `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: A markdown event is always executed within the context of a specific price list (e.g., a Hi-Lo promotional list, a clearance list, or an e-commerce markdown list). markdown currently has price_zone_id',
+    `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: A markdown event is applied within the context of a specific price list (e.g., EDLP base, Hi-Lo promotional). Linking markdown.price_list_id → price_list.price_list_id provides the pricing context und',
     `price_zone_id` BIGINT COMMENT 'Reference to the price zone grouping under which this markdown is governed. Price zones aggregate locations with identical pricing strategies for enterprise-wide markdown management.',
-    `promo_calendar_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_calendar. Business justification: Markdowns are planned within promotional calendar periods (end-of-season clearance, fiscal quarter-end). Linking markdown to promo_calendar enables markdown planning to align with inventory build star',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Markdowns are coordinated with promotional campaigns (clearance events, end-of-season sales). Retailers track which campaign drove markdown decisions for vendor funding claims, promotional markdown bu',
-    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Markdowns are frequently executed as part of a specific promotional offer (e.g., a clearance offer tied to a vendor-funded promotion). Retail markdown management requires tracing which promo offer tri',
-    `replenishment_plan_id` BIGINT COMMENT 'Foreign key linking to supplychain.replenishment_plan. Business justification: Clearance markdown initiation must suppress or reduce active replenishment plans for the same SKU/location. Retailers link markdown events to replenishment plans to halt auto-replenishment during clea',
+    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Markdown events are published as promotional offers (e.g., clearance markdowns surfaced as promo offers). This offer-level link enables markdown-to-offer reconciliation for vendor funding and chargeba',
+    `replenishment_plan_id` BIGINT COMMENT 'Foreign key linking to supplychain.replenishment_plan. Business justification: Clearance markdowns in retail are directly triggered by excess weeks_of_supply signals from replenishment plans. Linking markdown to the replenishment plan that initiated the clearance action enables ',
     `rule_id` BIGINT COMMENT 'Foreign key linking to pricing.pricing_rule. Business justification: Markdowns may be triggered by pricing rules (e.g., automated clearance rules based on weeks of supply, sell-through targets). Adding pricing_rule_id FK distinguishes rule-driven markdowns from manual',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Markdowns are seasonal lifecycle events (end-of-season clearance, holiday exit). Linking markdown to season enables seasonal markdown budget tracking, clearance calendar management, and sell-through r',
     `sku_id` BIGINT COMMENT 'Reference to the specific SKU (Stock Keeping Unit) subject to the markdown event. Links to the product master for item-level markdown tracking.',
+    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: A markdown event targets a specific resolved SKU price record. Linking markdown.sku_price_id → sku_price.sku_price_id connects the markdown lifecycle management record to the authoritative current pri',
+    `vendor_allowance_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_allowance. Business justification: Vendor-funded markdown accounting is a core retail process: vendors fund clearance markdowns via allowances, and the markdown record must reference the funding vendor_allowance for GL accrual, settlem',
     `actual_exit_date` DATE COMMENT 'The actual date on which all inventory units subject to this markdown were fully cleared, returned, or liquidated. Compared against planned_exit_date to measure markdown execution efficiency.',
     `amount` DECIMAL(18,2) COMMENT 'The absolute monetary reduction applied to the original retail price (original_retail_price minus marked_down_price). Used for financial reporting, P&L impact analysis, and markdown budget tracking.',
     `approved_by` STRING COMMENT 'The name or employee identifier of the merchandising or pricing manager who authorized the markdown event. Required for markdown audit trail compliance and governance under the retail merchandising system Price Management (RPM) approval workflows.',
@@ -228,10 +244,15 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`markdown` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`cost_price` (
     `cost_price_id` BIGINT COMMENT 'Unique surrogate identifier for each cost price record in the pricing domain. Primary key for the cost_price data product.',
-    `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Landed costs for food products include food safety compliance costs (cold chain, HACCP controls, testing). Cost records reference applicable food safety plan driving cost components.',
-    `po_line_id` BIGINT COMMENT 'Foreign key linking to supplychain.po_line. Business justification: Cost validation at PO line level is a core retail accounts payable process. cost_price already links to the PO header via purchase_order_id, but line-level cost audit (unit_cost, net_cost, allowances)',
-    `purchase_order_id` BIGINT COMMENT 'Reference to the purchase order associated with this cost record, if the cost was established or confirmed via a specific PO. Supports cost traceability to procurement events.',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Cost prices are negotiated by buyers with vendors. Linking cost_price to buyer enables buyer performance analysis (cost negotiation effectiveness, margin contribution) and audit trails for cost approv',
     `sku_id` BIGINT COMMENT 'Reference to the product SKU for which this cost record applies. Links to the product master to identify the specific item being costed.',
+    `vendor_id` BIGINT COMMENT 'Reference to the supplier from whom this SKU is sourced. Cost records are supplier-specific as different suppliers may offer different costs for the same SKU.',
+    `location_id` BIGINT COMMENT 'Foreign key linking to store.location. Business justification: Cost prices are managed by buying departments (cost centers) for procurement budget tracking. Business process: purchasing department cost management, vendor negotiation accountability, and department',
+    `po_line_id` BIGINT COMMENT 'Foreign key linking to supplychain.po_line. Business justification: Cost prices in retail are established at PO line level. cost_price already links to purchase_order (header) but not to the specific line. Linking to po_line enables line-level cost variance analysis —',
+    `purchase_order_id` BIGINT COMMENT 'Reference to the purchase order associated with this cost record, if the cost was established or confirmed via a specific PO. Supports cost traceability to procurement events.',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Cost prices are negotiated per season with vendors. Seasonal cost tracking is fundamental to OTB and margin planning. Buyers reconcile seasonal cost agreements against cost_price records; this link en',
+    `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: Cost negotiations are contract-specific. Buyers trace landed costs to contract terms, pricing tiers, payment terms, and volume commitments for vendor negotiations, cost variance analysis, and contract',
+    `vendor_item_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_item. Business justification: Vendor cost reconciliation process requires matching each cost_price record to the specific vendor_item it was derived from, enabling cost validation against vendor item master (unit_cost, effective d',
     `approved_by` STRING COMMENT 'The user ID or name of the buyer, merchandise manager, or finance approver who authorized this cost record. Part of the cost change audit trail required for financial controls and SOX compliance.',
     `approved_timestamp` TIMESTAMP COMMENT 'The date and time when this cost record was formally approved by the authorized buyer or finance manager. Part of the cost change audit trail for financial controls and SOX compliance.',
     `base_cost` DECIMAL(18,2) COMMENT 'The unit purchase cost of the SKU as invoiced by the supplier before any additional charges such as freight, duty, or handling. Represents the ex-works or FOB (Free on Board) cost. Core input for COGS (Cost of Goods Sold) and GMROI (Gross Margin Return on Investment) calculations.',
@@ -267,12 +288,13 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`cost_price` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`rule` (
     `rule_id` BIGINT COMMENT 'Unique system-generated identifier for each pricing rule record. Serves as the primary key for the pricing_rule data product within the the retail merchandising system Price Management (RPM) integrated lakehouse silver layer.',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Pricing rules are assigned to buyers who have approval authority and execution responsibility for pricing actions within their category portfolios. Buyers manage rule activation, compliance monitoring',
+    `category_id` BIGINT COMMENT 'Reference to the merchandise category (e.g., Fresh Produce, Mens Denim, Laptops) to which this pricing rule is scoped when sku_scope = category. Supports category management and assortment-level pricing governance in the retail merchandising system if rule applies at a different scope level.',
     `department_id` BIGINT COMMENT 'Reference to the merchandise department (e.g., Grocery, Apparel, Electronics) to which this pricing rule is scoped when sku_scope = department. Aligns with the retail merchandising system Merchandising System (ORMS) department hierarchy. Null if rule applies at a different scope level.',
     `location_id` BIGINT COMMENT 'Foreign key linking to store.location. Business justification: Pricing rules are owned by merchandising cost centers for strategy execution and budget accountability. Business process: departmental pricing strategy ownership, rule maintenance responsibility, and',
-    `tier_id` BIGINT COMMENT 'Foreign key linking to loyalty.tier. Business justification: Pricing rules frequently target specific loyalty tiers (e.g., Platinum: 20% off electronics, Gold: 10% off apparel). Replaces denormalized text-based tier references with proper FK for tier-based',
-    `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: Pricing rules in Oracle RPM are typically scoped to a specific price list (e.g., an EDLP rounding rule applies only to the EDLP base list, a Hi-Lo promotional rule applies only to the Hi-Lo list). rul',
     `price_zone_id` BIGINT COMMENT 'Reference to the geographic or market-based price zone to which this rule applies. Price zones allow differentiated pricing across store clusters, regions, or markets. Null if the rule applies uniformly across all zones. Managed in the retail merchandising system Price Management (RPM) zone configuration.',
-    `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Promotional pricing rules are scoped to specific campaigns (e.g., a BOGO rule active only during a campaign window). Retail pricing teams create campaign-specific rules; linking rule to promo_campaign',
+    `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Pricing rules are authored specifically for promotional campaigns (e.g., BOGO rules for a campaign). This link enables campaign-level rule audits, ensures rules deactivate when campaigns end, and supp',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Pricing rules are frequently season-scoped (holiday rules, back-to-school rules). Buyers configure and activate rules per season. Linking enables seasonal rule activation/deactivation and seasonal pri',
     `adjustment_method` STRING COMMENT 'Specifies the mathematical method used to compute the price adjustment. percentage = apply a % change to the base price (e.g., 15% markdown); absolute = apply a fixed monetary amount change (e.g., reduce by $5.00); index_based = adjust relative to a reference index (e.g., competitor price index, CPI).. Valid values are `percentage|absolute|index_based`',
     `adjustment_value` DECIMAL(18,2) COMMENT 'The numeric magnitude of the price adjustment as defined by the adjustment_method. For percentage, this is the rate (e.g., 15.00 = 15%); for absolute, this is the currency amount (e.g., 5.0000 = $5.00); for index_based, this is the index multiplier. Negative values represent price reductions (markdowns); positive values represent increases.',
     `algorithm_version` STRING COMMENT 'Version identifier of the dynamic pricing algorithm or rule engine logic applied by this rule. Used for reproducibility, audit, and A/B testing of pricing models. Example: v2.1.0, v3.0. Applicable for rule_type = dynamic_trigger, demand_based, or inventory_based. Null for static manual rules.. Valid values are `^vd+.d+(.d+)?$`',
@@ -312,19 +334,64 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`rule` (
     CONSTRAINT pk_rule PRIMARY KEY(`rule_id`)
 ) COMMENT 'Defines all business logic and constraints governing how prices are calculated, adjusted, and enforced — covering manual policies, batch processes, and real-time algorithm-driven automation. Includes rule type (cost-plus floor, competitive match ceiling, EDLP lock, Hi-Lo swing limit, rounding, dynamic trigger, demand-based, inventory-based, time-of-day), priority, applicable SKU scope, channel (in-store, e-commerce, mobile app), execution mode (manual, batch, real-time/near-real-time), trigger conditions (inventory threshold, demand surge, competitor undercut, time-based, weather, event-driven), adjustment method (percentage, absolute, index-based), min/max price guardrails, effective dates, activation status, algorithm version reference, and override permissions. Serves as the unified policy engine for all pricing governance — from static business rules to real-time algorithmic adjustments.';
 
+CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`competitive_price` (
+    `competitive_price_id` BIGINT COMMENT 'Unique surrogate identifier for each competitive price observation record in the pricing domain. Primary key for the competitive_price data product.',
+    `assortment_item_id` BIGINT COMMENT 'Foreign key linking to merchandising.assortment_item. Business justification: Competitive price observations are matched to specific assortment items to drive buyer response actions. Linking enables competitive response tracking at the assortment item level — a standard retail ',
+    `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Competitive price observations inform pricing strategy decisions. Adding price_strategy_id FK links observations to the strategy they inform. Removes pricing_strategy_type STRING as redundant.',
+    `sku_id` BIGINT COMMENT 'Reference to the internal SKU (Stock Keeping Unit) for which the competitive price observation was captured. Links the observation to the retailers own product master.',
+    `price_zone_id` BIGINT COMMENT 'Reference to the price zone in which the competitive observation was made. Price zones define geographic or market segments used in the retail merchandising system Price Management (RPM) for zone-based pricing governance.',
+    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Competitive price observations compare competitor prices against our own retail price. Adding sku_price_id FK links to authoritative retail price record. Removes own_retail_price DECIMAL as redundant',
+    `competitor_channel` STRING COMMENT 'Sales channel through which the competitor price was observed. Distinguishes between in-store shelf prices, e-commerce website prices, mobile app prices, and third-party marketplace listings to support omnichannel competitive analysis.. Valid values are `in_store|online|mobile_app|marketplace|catalog`',
+    `competitor_in_stock_flag` BOOLEAN COMMENT 'Indicates whether the competitor had the product in stock at the time of the price observation (True = in stock, False = out of stock). Out-of-stock competitor observations may reduce the urgency of a price response.',
+    `competitor_name` STRING COMMENT 'Name of the competing retailer or marketplace whose price was observed (e.g., Walmart, Target, Amazon). Used for competitive index tracking and Hi-Lo / EDLP strategy calibration.',
+    `competitor_pack_size` DECIMAL(18,2) COMMENT 'Numeric pack size or quantity of the competitors product offering (e.g., 12 for a 12-pack, 1.5 for 1.5 liters). Combined with competitor_unit_of_measure to normalize prices to a common unit for accurate like-for-like competitive comparisons.',
+    `competitor_price` DECIMAL(18,2) COMMENT 'The retail selling price observed at the competitor for the matched product, expressed in the local currency. This is the primary competitive intelligence data point used for price gap analysis, competitive index calculation, and pricing response recommendations.',
+    `competitor_product_name` STRING COMMENT 'Product name or description as listed by the competitor for the observed item. Used for like-for-like and comparable match validation, especially when GTIN-based exact matching is not available.',
+    `competitor_promo_end_date` DATE COMMENT 'Date on which the competitors promotional price is expected to expire, if known. Enables time-sensitive pricing response planning and markdown optimization scheduling.',
+    `competitor_promo_flag` BOOLEAN COMMENT 'Indicates whether the observed competitor price is a promotional or temporary price (True) rather than the regular everyday price (False). Critical for distinguishing Hi-Lo promotional pricing from EDLP baseline prices in competitive analysis.',
+    `competitor_promo_type` STRING COMMENT 'Type of promotional pricing mechanism observed at the competitor when competitor_promo_flag is True. Includes Temporary Price Reduction (TPR), clearance markdown, loyalty card price, bundle deal, coupon redemption, or rollback. Supports Hi-Lo strategy calibration and promotional response planning. [ENUM-REF-CANDIDATE: tpr|clearance|loyalty_price|bundle|coupon|rollback — promote to reference product if additional types are needed]',
+    `competitor_sku_code` STRING COMMENT 'The competitors own SKU or item code for the observed product. Supports cross-reference mapping between own assortment and competitor assortment for comparable product matching.',
+    `competitor_unit_of_measure` STRING COMMENT 'Unit of measure for the competitors observed price (e.g., each, lb, kg, liter). Required for unit-price normalization when comparing products sold in different pack sizes or weights to ensure valid price-per-unit competitive comparisons. [ENUM-REF-CANDIDATE: each|lb|kg|oz|liter|ml|pack|case — promote to reference product if additional UOMs are needed]',
+    `competitor_url` STRING COMMENT 'Web URL of the competitors product listing page where the price was observed for online channel observations. Provides a direct audit trail link to the source of the competitive price data for web scrape and third-party feed validations.',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this competitive price observation record was first created in the Silver Layer data product. Supports audit trail, data lineage, and GDPR/CCPA data retention compliance. Format: yyyy-MM-ddTHH:mm:ss.SSSXXX.',
+    `currency_code` STRING COMMENT 'ISO 4217 three-letter currency code for the competitor observed price (e.g., USD, CAD, GBP). Required for multi-currency competitive analysis in cross-border retail operations.. Valid values are `^[A-Z]{3}$`',
+    `data_source_type` STRING COMMENT 'Method by which the competitor price was collected. Distinguishes between manual in-store surveys, automated third-party competitive intelligence feeds, web scraping, EDI (Electronic Data Interchange) feeds, and mystery shopping programs. Affects confidence scoring and data quality weighting.. Valid values are `manual_survey|third_party_feed|web_scrape|edi_feed|mystery_shop`',
+    `data_source_vendor` STRING COMMENT 'Name of the third-party competitive intelligence provider or data feed vendor supplying the price observation (e.g., Profitero, Nielsen, Numerator, Wiser). Null for internally collected observations (manual survey, mystery shop).',
+    `department_code` STRING COMMENT 'Merchandise department code for the observed SKU within the retailers organizational hierarchy. Supports department-level competitive pricing governance and GMROI (Gross Margin Return on Investment) impact analysis.',
+    `geographic_market` STRING COMMENT 'ISO 3166-1 alpha-2 or alpha-3 country/market code where the competitive observation was made. Supports multi-market competitive intelligence aggregation and cross-border pricing strategy governance.. Valid values are `^[A-Z]{2,3}$`',
+    `gtin` STRING COMMENT 'GS1-standard Global Trade Item Number (GTIN) used to uniquely identify the product observed at the competitor. Enables high-confidence exact-match comparisons across retailers using a universal product identifier. Includes UPC-A (12-digit), EAN-13 (13-digit), and GTIN-14 formats.. Valid values are `^[0-9]{8,14}$`',
+    `match_confidence_score` DECIMAL(18,2) COMMENT 'Numeric score (0.00–100.00) representing the confidence level that the competitor product is a true comparable match to the retailers own SKU. Derived from GTIN exact match, product attribute similarity, or algorithmic matching. Higher scores indicate stronger comparability for pricing decisions.',
+    `match_type` STRING COMMENT 'Classification of how the competitor product was matched to the retailers own SKU. Exact GTIN/UPC matches carry the highest confidence; like-for-like and comparable matches involve attribute-based similarity; private label equivalent matches compare store brand to national brand. Drives weighting in competitive index calculations.. Valid values are `exact_gtin|exact_upc|like_for_like|comparable|private_label_equivalent`',
+    `normalized_unit_price` DECIMAL(18,2) COMMENT 'Competitor price normalized to a standard unit of measure (e.g., price per kg, price per liter) to enable valid cross-pack-size competitive comparisons. Computed from competitor_price, competitor_pack_size, and competitor_unit_of_measure. Essential for grocery and FMCG category competitive analysis.',
+    `observation_date` DATE COMMENT 'Calendar date on which the competitor price was observed or collected. The principal business event date for this record. Used for time-series competitive trend analysis and markdown optimization timing.',
+    `observation_quality_flag` BOOLEAN COMMENT 'Data quality assessment status for the competitive price observation. Verified observations have been validated against a secondary source; unverified are raw inputs; suspect observations have anomalies flagged for review; rejected observations are excluded from competitive index calculations.',
+    `observation_timestamp` TIMESTAMP COMMENT 'Precise date and time at which the competitor price was captured, including timezone offset. Provides intraday granularity for dynamic pricing use cases and web-scrape frequency analysis. Format: yyyy-MM-ddTHH:mm:ss.SSSXXX.',
+    `previous_competitor_price` DECIMAL(18,2) COMMENT 'The competitors price from the immediately preceding observation for the same SKU and competitor. Enables point-in-time price change detection and price gap trend calculation without requiring a self-join on historical records.',
+    `previous_observation_date` DATE COMMENT 'Date of the immediately preceding competitive price observation for the same SKU and competitor. Used alongside previous_competitor_price to compute price gap trend direction and velocity.',
+    `price_gap` DECIMAL(18,2) COMMENT 'Absolute monetary difference between the retailers own retail price and the competitors observed price (own_retail_price minus competitor_price). A positive value indicates the retailer is priced higher; negative indicates the retailer is priced lower. Core metric for competitive index tracking and price war early warning.',
+    `price_gap_pct` DECIMAL(18,2) COMMENT 'Price gap expressed as a percentage of the retailers own retail price ((own_retail_price - competitor_price) / own_retail_price * 100). Enables normalized cross-category competitive index tracking and Hi-Lo / EDLP strategy calibration independent of absolute price levels.',
+    `price_gap_trend` STRING COMMENT 'Directional trend of the price gap compared to the previous observation for the same SKU and competitor. Indicates whether the competitive position is improving (narrowing), deteriorating (widening), stable, or has reversed polarity. Supports price war early warning detection.. Valid values are `widening|narrowing|stable|reversed`',
+    `price_index` DECIMAL(18,2) COMMENT 'Ratio of the retailers own retail price to the competitors observed price (own_retail_price / competitor_price). A value above 1.0 indicates the retailer is priced higher than the competitor; below 1.0 indicates a price advantage. Core KPI for competitive pricing governance and EDLP positioning.',
+    `response_action` STRING COMMENT 'System-recommended or analyst-assigned pricing response action based on the competitive observation. Options include: match competitor price, undercut competitor price, hold current price, continue monitoring, or escalate to pricing manager. Feeds competitive pricing rules in the retail merchandising system Price Management (RPM).. Valid values are `match|undercut|hold|monitor|escalate`',
+    `response_implemented_date` DATE COMMENT 'Date on which the recommended pricing response action was implemented in the retailers own pricing system. Used for measuring response latency and audit trail completeness.',
+    `response_status` STRING COMMENT 'Current workflow status of the recommended pricing response action. Tracks whether the response has been reviewed, approved, rejected, implemented in the retail merchandising system Price Management (RPM), or has expired without action. Supports price change audit trail requirements.. Valid values are `pending|approved|rejected|implemented|expired`',
+    `updated_timestamp` TIMESTAMP COMMENT 'Timestamp when this competitive price observation record was last modified, such as when the response_status was updated or observation_quality_flag was revised. Supports audit trail and data lineage requirements. Format: yyyy-MM-ddTHH:mm:ss.SSSXXX.',
+    CONSTRAINT pk_competitive_price PRIMARY KEY(`competitive_price_id`)
+) COMMENT 'Observed competitor retail prices for matching SKUs or comparable products. Captures competitor name, store or URL, observed price, observation date, data source (manual survey, third-party feed, web scrape), match confidence score, price gap versus own retail price, price gap trend over time, and recommended response action. Feeds competitive pricing rules and supports Hi-Lo and EDLP strategy calibration, competitive index tracking, and price war early warning.';
+
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`price_approval` (
     `price_approval_id` BIGINT COMMENT 'Unique system-generated identifier for each price approval workflow record. Primary key for the price_approval data product.',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Price approvals are routed to and actioned by buyers for their categories. Buyers are primary approvers in the price change workflow. Linking enables buyer workload tracking, approval SLA reporting, a',
     `cost_price_id` BIGINT COMMENT 'Foreign key linking to pricing.cost_price. Business justification: Approval workflow needs to verify margin against cost. Adding cost_price_id FK links to authoritative cost record. Removes cost_price DECIMAL as redundant with cost_price.landed_cost.',
-    `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Price approvals route through cost center hierarchies for budget authority validation. Business process: pricing approval workflow by department, financial authority limits, and SOX compliance for pri',
     `department_id` BIGINT COMMENT 'Reference to the merchandise department or category associated with the price change request. Used for routing approvals to the correct category manager or merchandise director.',
-    `location_id` BIGINT COMMENT 'Identifier of the employee currently assigned or who last acted on this approval request. Represents the active approver in the approval hierarchy at the current tier.',
     `markdown_id` BIGINT COMMENT 'Foreign key linking to pricing.markdown. Business justification: Price approval workflow often specifically approves markdown events. Adding markdown_id FK links approval records to the markdown being approved. Removes markdown_reason_code as it can be retrieved fr',
     `price_change_id` BIGINT COMMENT 'Reference to the governed price change request, markdown event, or price list activation that this approval record governs. Links the approval workflow to the underlying pricing action in the retail merchandising system Price Management (RPM).',
-    `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: A price approval workflow can be triggered directly for price list activations, deactivations, or version changes — not only for individual price change events. price_approval already links to price_c',
+    `price_zone_id` BIGINT COMMENT 'Foreign key linking to pricing.price_zone. Business justification: price_approval currently stores price_zone_code as a denormalized STRING column. Replacing this with a proper FK price_approval.price_zone_id → price_zone.price_zone_id normalizes the relationship to ',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Promotional price approvals require campaign context for compliance validation, margin threshold enforcement, and vendor funding verification. Approval workflows differ for promotional vs. permanent p',
-    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Price approval workflows in retail are often triggered at the offer level, not just campaign level — a specific SKU discount within a campaign requires its own approval. Linking price_approval to prom',
-    `rule_id` BIGINT COMMENT 'Foreign key linking to pricing.rule. Business justification: The rule table has an override_approval_required flag, indicating that certain rule overrides must go through an approval workflow. price_approval currently has no direct FK to rule, meaning rule-over',
-    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: price_approval tracks the approval lifecycle for price change requests. While price_change_id links to the change event, the sku_price record represents the authoritative resolved price that is being ',
+    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Price approvals are scoped to specific promotional offers (e.g., approving a price reduction for a particular offer). This offer-level link enables offer-level approval audit trails required for compl',
+    `rule_id` BIGINT COMMENT 'Foreign key linking to pricing.rule. Business justification: Price approvals are frequently triggered when a proposed price change violates or overrides a pricing rule (rule.override_approval_required = true). Linking price_approval.rule_id → rule.rule_id captu',
+    `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: A price approval record governs the approval of a specific SKU price record (the proposed new price). Linking price_approval.sku_price_id → sku_price.sku_price_id connects the approval workflow to the',
+    `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: MAP (minimum advertised price) compliance approvals and vendor contract price constraint enforcement require price_approval to reference the governing vendor_contract. Retail compliance teams must val',
     `approval_channel` STRING COMMENT 'The channel or interface through which the approver submitted their decision. Supports audit trail completeness and governance reporting on approval workflow efficiency.. Valid values are `web_portal|mobile_app|email|api|system_auto`',
     `approval_notes` STRING COMMENT 'Free-text notes or comments entered by the requestor or approver to provide additional business context for the price change request. May include competitive intelligence, promotional rationale, or supplier negotiation context.',
     `approval_number` STRING COMMENT 'Externally-known, human-readable reference number for the price approval workflow record. Used in communications, audit reports, and cross-system references. Format: PA-{YYYY}-{NNNNNN}.. Valid values are `^PA-[0-9]{4}-[0-9]{6}$`',
@@ -347,7 +414,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`price_approval` (
     `is_auto_approved` BOOLEAN COMMENT 'Indicates whether this price change was automatically approved by the system based on pre-configured rules (e.g., price change below threshold, EDLP adjustment within margin floor). True = system auto-approved; False = requires human approval.',
     `is_escalated` BOOLEAN COMMENT 'Indicates whether this approval request has been escalated to a higher approval tier. True = escalated; False = not escalated. Complements approval_status to enable efficient filtering of escalated approvals for management review.',
     `price_change_pct` DECIMAL(18,2) COMMENT 'The percentage change between the current price and the proposed price. Calculated as ((proposed_price - current_price) / current_price) * 100. Used to determine approval tier routing thresholds — larger percentage changes require higher-tier approval.',
-    `price_zone_code` STRING COMMENT 'The price zone identifier to which this approval applies. Price zones group stores or regions with the same pricing strategy in the retail merchandising system Price Management (RPM). A single approval may govern pricing across all stores within a zone.',
     `pricing_strategy` STRING COMMENT 'The pricing strategy governing the requested price change. EDLP (Everyday Low Price) indicates a stable low-price approach; Hi-Lo (High-Low) indicates promotional cycling; competitive pricing is driven by market benchmarks; cost-plus is margin-based; dynamic pricing is algorithm-driven. Aligns with the retail merchandising system Price Management (RPM) strategy configuration.. Valid values are `EDLP|hi_lo|competitive|cost_plus|dynamic|clearance`',
     `proposed_price` DECIMAL(18,2) COMMENT 'The new retail selling price being requested for approval. Compared against current_price to determine the magnitude of the price change and route to the appropriate approval tier.',
     `rejection_reason` STRING COMMENT 'Free-text or coded explanation provided by the approver when rejecting a price change request. Captures the business rationale for rejection (e.g., margin floor breach, insufficient competitive justification, incorrect price zone). Required when approval_status = rejected.',
@@ -364,25 +430,26 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`price_approval` (
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ADD CONSTRAINT `fk_pricing_price_list_price_zone_id` FOREIGN KEY (`price_zone_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_zone`(`price_zone_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ADD CONSTRAINT `fk_pricing_price_zone_parent_zone_price_zone_id` FOREIGN KEY (`parent_zone_price_zone_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_zone`(`price_zone_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ADD CONSTRAINT `fk_pricing_sku_price_cost_price_id` FOREIGN KEY (`cost_price_id`) REFERENCES `vibe_retail_v1`.`pricing`.`cost_price`(`cost_price_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ADD CONSTRAINT `fk_pricing_sku_price_markdown_id` FOREIGN KEY (`markdown_id`) REFERENCES `vibe_retail_v1`.`pricing`.`markdown`(`markdown_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ADD CONSTRAINT `fk_pricing_sku_price_price_list_id` FOREIGN KEY (`price_list_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_list`(`price_list_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ADD CONSTRAINT `fk_pricing_sku_price_price_zone_id` FOREIGN KEY (`price_zone_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_zone`(`price_zone_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ADD CONSTRAINT `fk_pricing_sku_price_rule_id` FOREIGN KEY (`rule_id`) REFERENCES `vibe_retail_v1`.`pricing`.`rule`(`rule_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing_price_change_cost_price_id` FOREIGN KEY (`cost_price_id`) REFERENCES `vibe_retail_v1`.`pricing`.`cost_price`(`cost_price_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing_price_change_markdown_id` FOREIGN KEY (`markdown_id`) REFERENCES `vibe_retail_v1`.`pricing`.`markdown`(`markdown_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing_price_change_price_list_id` FOREIGN KEY (`price_list_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_list`(`price_list_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing_price_change_rule_id` FOREIGN KEY (`rule_id`) REFERENCES `vibe_retail_v1`.`pricing`.`rule`(`rule_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing_price_change_price_zone_id` FOREIGN KEY (`price_zone_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_zone`(`price_zone_id`);
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing_price_change_sku_price_id` FOREIGN KEY (`sku_price_id`) REFERENCES `vibe_retail_v1`.`pricing`.`sku_price`(`sku_price_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ADD CONSTRAINT `fk_pricing_markdown_cost_price_id` FOREIGN KEY (`cost_price_id`) REFERENCES `vibe_retail_v1`.`pricing`.`cost_price`(`cost_price_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ADD CONSTRAINT `fk_pricing_markdown_price_list_id` FOREIGN KEY (`price_list_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_list`(`price_list_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ADD CONSTRAINT `fk_pricing_markdown_price_zone_id` FOREIGN KEY (`price_zone_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_zone`(`price_zone_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ADD CONSTRAINT `fk_pricing_markdown_rule_id` FOREIGN KEY (`rule_id`) REFERENCES `vibe_retail_v1`.`pricing`.`rule`(`rule_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ADD CONSTRAINT `fk_pricing_rule_price_list_id` FOREIGN KEY (`price_list_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_list`(`price_list_id`);
+ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ADD CONSTRAINT `fk_pricing_markdown_sku_price_id` FOREIGN KEY (`sku_price_id`) REFERENCES `vibe_retail_v1`.`pricing`.`sku_price`(`sku_price_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ADD CONSTRAINT `fk_pricing_rule_price_zone_id` FOREIGN KEY (`price_zone_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_zone`(`price_zone_id`);
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ADD CONSTRAINT `fk_pricing_competitive_price_price_zone_id` FOREIGN KEY (`price_zone_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_zone`(`price_zone_id`);
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ADD CONSTRAINT `fk_pricing_competitive_price_sku_price_id` FOREIGN KEY (`sku_price_id`) REFERENCES `vibe_retail_v1`.`pricing`.`sku_price`(`sku_price_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ADD CONSTRAINT `fk_pricing_price_approval_cost_price_id` FOREIGN KEY (`cost_price_id`) REFERENCES `vibe_retail_v1`.`pricing`.`cost_price`(`cost_price_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ADD CONSTRAINT `fk_pricing_price_approval_markdown_id` FOREIGN KEY (`markdown_id`) REFERENCES `vibe_retail_v1`.`pricing`.`markdown`(`markdown_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ADD CONSTRAINT `fk_pricing_price_approval_price_change_id` FOREIGN KEY (`price_change_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_change`(`price_change_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ADD CONSTRAINT `fk_pricing_price_approval_price_list_id` FOREIGN KEY (`price_list_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_list`(`price_list_id`);
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ADD CONSTRAINT `fk_pricing_price_approval_price_zone_id` FOREIGN KEY (`price_zone_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_zone`(`price_zone_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ADD CONSTRAINT `fk_pricing_price_approval_rule_id` FOREIGN KEY (`rule_id`) REFERENCES `vibe_retail_v1`.`pricing`.`rule`(`rule_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ADD CONSTRAINT `fk_pricing_price_approval_sku_price_id` FOREIGN KEY (`sku_price_id`) REFERENCES `vibe_retail_v1`.`pricing`.`sku_price`(`sku_price_id`);
 
@@ -391,18 +458,19 @@ ALTER SCHEMA `vibe_retail_v1`.`pricing` SET TAGS ('dbx_division' = 'business');
 ALTER SCHEMA `vibe_retail_v1`.`pricing` SET TAGS ('dbx_domain' = 'pricing');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` SET TAGS ('dbx_subdomain' = 'price_administration');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `price_zone_id` SET TAGS ('dbx_business_glossary_term' = 'Price Strategy Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `program_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Program Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'PENDING|APPROVED|REJECTED|UNDER_REVIEW');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `base_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Base Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `base_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Applicable Channel');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'IN_STORE|ECOMMERCE|MOBILE|BOPIS|CATALOG|ALL');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `price_list_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,30}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `competitive_index` SET TAGS ('dbx_business_glossary_term' = 'Competitive Price Index');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `competitive_index` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -412,11 +480,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `is_default` SE
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `list_type` SET TAGS ('dbx_business_glossary_term' = 'Price List Type');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `loyalty_tier_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,20}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `markdown_pct` SET TAGS ('dbx_business_glossary_term' = 'Markdown Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `markdown_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `max_selling_price` SET TAGS ('dbx_business_glossary_term' = 'Maximum Selling Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `max_selling_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `min_selling_price` SET TAGS ('dbx_business_glossary_term' = 'Minimum Selling Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `min_selling_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Price List Notes');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `price_list_status` SET TAGS ('dbx_value_regex' = 'DRAFT|ACTIVE|SUSPENDED|EXPIRED|ARCHIVED');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `priority_rank` SET TAGS ('dbx_business_glossary_term' = 'Price List Priority Rank');
@@ -428,10 +493,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `updated_timest
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` SET TAGS ('dbx_subdomain' = 'price_administration');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `parent_zone_price_zone_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Price Zone ID');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `base_price_multiplier` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `channel_applicability` SET TAGS ('dbx_value_regex' = 'in_store|ecommerce|omnichannel|wholesale');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `competitive_index` SET TAGS ('dbx_business_glossary_term' = 'Competitive Price Index');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `competitive_index` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -441,9 +504,7 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `is_ecommerce_e
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Zone Review Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `market_tier` SET TAGS ('dbx_value_regex' = 'tier_1|tier_2|tier_3|tier_4');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `max_markdown_pct` SET TAGS ('dbx_business_glossary_term' = 'Maximum Markdown Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `max_markdown_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `min_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Minimum Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `min_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `next_review_date` SET TAGS ('dbx_business_glossary_term' = 'Next Zone Review Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `override_allowed` SET TAGS ('dbx_business_glossary_term' = 'Override Allowed Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `price_approval_required` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Required Flag');
@@ -452,7 +513,7 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `pricing_strate
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `region_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,15}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `review_frequency` SET TAGS ('dbx_business_glossary_term' = 'Zone Review Frequency');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `review_frequency` SET TAGS ('dbx_value_regex' = 'weekly|biweekly|monthly|quarterly|annual');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `rpm_zone_code` SET TAGS ('dbx_business_glossary_term' = 'Oracle Retail Price Management (RPM) Zone ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `rpm_zone_code` SET TAGS ('dbx_business_glossary_term' = 'the retail merchandising system Price Management (RPM) Zone ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `rpm_zone_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,30}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `sap_pricing_condition_group` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,10}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `tax_jurisdiction_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
@@ -468,57 +529,52 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `zone_type` SET
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` SET TAGS ('dbx_subdomain' = 'price_administration');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) Price ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'License Permit Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `markdown_id` SET TAGS ('dbx_business_glossary_term' = 'Markdown Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `rule_id` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Status');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'draft|pending_approval|approved|rejected|expired|cancelled');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Price Approved By');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Timestamp');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `channel_price_variance` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `channel_price_variance_reason` SET TAGS ('dbx_business_glossary_term' = 'Channel Price Variance Justification');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `channel_type` SET TAGS ('dbx_value_regex' = 'in_store|ecommerce|mobile_app|marketplace|bopis');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `competitive_price_ref` SET TAGS ('dbx_business_glossary_term' = 'Competitive Reference Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `competitive_price_ref` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Price Effective Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Price Expiry Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `gross_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Gross Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `gross_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `initial_markup_pct` SET TAGS ('dbx_business_glossary_term' = 'Initial Markup (IMU) Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `initial_markup_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `is_dynamic_pricing_enabled` SET TAGS ('dbx_business_glossary_term' = 'Dynamic Pricing Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `is_price_locked` SET TAGS ('dbx_business_glossary_term' = 'Price Locked Flag');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `markdown_pct` SET TAGS ('dbx_business_glossary_term' = 'Markdown Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `min_advertised_price` SET TAGS ('dbx_business_glossary_term' = 'Minimum Advertised Price (MAP)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `min_advertised_price` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `original_retail_price` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `price_ceiling` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `price_floor` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `price_per_unit_uom` SET TAGS ('dbx_business_glossary_term' = 'Price Per Unit Unit of Measure');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `price_per_unit_uom` SET TAGS ('dbx_value_regex' = '^[A-Z0-9/]{2,15}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `retail_price` SET TAGS ('dbx_business_glossary_term' = 'Average Unit Retail (AUR) Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `retail_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `source_system_code` SET TAGS ('dbx_value_regex' = 'RPM|SAP|ORMS|SFCC|CAR');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `source_system_price_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Price Record ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `tax_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{2,20}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `uom_code` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` SET TAGS ('dbx_subdomain' = 'markdown_management');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` SET TAGS ('dbx_subdomain' = 'change_management');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `assortment_item_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Item Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `markdown_id` SET TAGS ('dbx_business_glossary_term' = 'Markdown Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `inbound_shipment_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Shipment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `promo_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Calendar Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion ID');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `replenishment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Oracle Retail Price Management (RPM) Event ID');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `stock_position_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Position Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `replenishment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Plan Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Price Change Approval Status');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected|cancelled|superseded');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Price Change Approved Timestamp');
@@ -528,7 +584,6 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `change_type`
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `change_type` SET TAGS ('dbx_value_regex' = 'permanent|temporary|markdown|automated');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Pricing Channel');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'in_store|online|omnichannel|wholesale');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `competitive_reference_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `cost_change_pct` SET TAGS ('dbx_business_glossary_term' = 'Cost Change Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -539,36 +594,34 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `execution_mo
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Price Change Expiry Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `is_cost_change` SET TAGS ('dbx_business_glossary_term' = 'Is Cost Change Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `is_margin_breach` SET TAGS ('dbx_business_glossary_term' = 'Is Margin Breach Flag');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `new_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `new_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'New Gross Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `new_margin_pct` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `new_retail_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Price Change Notes');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `pricing_strategy` SET TAGS ('dbx_value_regex' = 'EDLP|hi_lo|cost_plus|competitive|dynamic|clearance');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `prior_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `prior_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Prior Gross Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `prior_margin_pct` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `prior_retail_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `reason_code` SET TAGS ('dbx_business_glossary_term' = 'Price Change Reason Code');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `retail_price_change_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `retail_price_change_pct` SET TAGS ('dbx_business_glossary_term' = 'Retail Price Change Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `trigger_signal` SET TAGS ('dbx_business_glossary_term' = 'Price Change Trigger Signal');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` SET TAGS ('dbx_subdomain' = 'markdown_management');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` SET TAGS ('dbx_subdomain' = 'change_management');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `assortment_item_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Item Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `assortment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Plan Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Finding Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `demand_forecast_id` SET TAGS ('dbx_business_glossary_term' = 'Demand Forecast Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Price Strategy Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'License Permit Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `promo_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Calendar Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `replenishment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Plan Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `rule_id` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Price Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `vendor_allowance_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Allowance Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `amount` SET TAGS ('dbx_business_glossary_term' = 'Markdown Amount');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Markdown Approved By');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Markdown Approval Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Markdown Channel');
@@ -586,10 +639,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `markdown_number`
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `markdown_status` SET TAGS ('dbx_value_regex' = 'draft|approved|active|completed|cancelled');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `markdown_type` SET TAGS ('dbx_value_regex' = 'permanent|pos|clearance|end_of_season|end_of_life|dead_stock');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `marked_down_price` SET TAGS ('dbx_business_glossary_term' = 'Marked-Down Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `marked_down_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Markdown Notes');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `on_hand_units_at_initiation` SET TAGS ('dbx_business_glossary_term' = 'On-Hand Units at Markdown Initiation');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `original_retail_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `percent` SET TAGS ('dbx_business_glossary_term' = 'Markdown Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `reason_code` SET TAGS ('dbx_business_glossary_term' = 'Markdown Reason Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `sell_through_actual_pct` SET TAGS ('dbx_business_glossary_term' = 'Sell-Through Actual Percentage');
@@ -599,17 +650,20 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `units_sold` SET 
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `weeks_of_supply` SET TAGS ('dbx_business_glossary_term' = 'Weeks of Supply (WOS)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` SET TAGS ('dbx_subdomain' = 'markdown_management');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Food Safety Plan Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` SET TAGS ('dbx_subdomain' = 'cost_intelligence');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `po_line_id` SET TAGS ('dbx_business_glossary_term' = 'Po Line Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order (PO) ID');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `vendor_item_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Item Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `base_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_change_pct` SET TAGS ('dbx_business_glossary_term' = 'Cost Change Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_currency` SET TAGS ('dbx_business_glossary_term' = 'Cost Currency Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_currency` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_per_inner_pack` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_status` SET TAGS ('dbx_value_regex' = 'active|pending|expired|superseded|cancelled');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_type` SET TAGS ('dbx_value_regex' = 'standard|contract|promotional|spot|transfer');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_uom` SET TAGS ('dbx_business_glossary_term' = 'Cost Unit of Measure (UOM)');
@@ -617,37 +671,31 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `country_of_ori
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `country_of_origin` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `duty_amount` SET TAGS ('dbx_business_glossary_term' = 'Duty and Tariff Amount');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `duty_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `duty_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Duty Rate Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Cost Effective Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `end_date` SET TAGS ('dbx_business_glossary_term' = 'Cost End Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `exchange_rate` SET TAGS ('dbx_business_glossary_term' = 'Foreign Exchange (FX) Rate');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `freight_cost` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `handling_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `hts_code` SET TAGS ('dbx_business_glossary_term' = 'Harmonized Tariff Schedule (HTS) Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `hts_code` SET TAGS ('dbx_value_regex' = '^[0-9]{4}(.[0-9]{2}){0,3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `incoterm` SET TAGS ('dbx_business_glossary_term' = 'International Commercial Terms (Incoterm)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `is_current` SET TAGS ('dbx_business_glossary_term' = 'Is Current Cost Record Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `landed_cost` SET TAGS ('dbx_business_glossary_term' = 'Total Landed Cost');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `landed_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `landed_cost_local` SET TAGS ('dbx_business_glossary_term' = 'Total Landed Cost (Local Currency)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `landed_cost_local` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `prior_landed_cost` SET TAGS ('dbx_business_glossary_term' = 'Prior Total Landed Cost');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `prior_landed_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `source_system_cost_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Cost Record ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `supplier_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{3,20}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` SET TAGS ('dbx_data_type' = 'reference_data');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` SET TAGS ('dbx_subdomain' = 'price_administration');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `rule_id` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Merchandise Category ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `tier_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Tier Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `adjustment_method` SET TAGS ('dbx_business_glossary_term' = 'Price Adjustment Method');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `adjustment_method` SET TAGS ('dbx_value_regex' = 'percentage|absolute|index_based');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `adjustment_value` SET TAGS ('dbx_business_glossary_term' = 'Price Adjustment Value');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `adjustment_value` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `algorithm_version` SET TAGS ('dbx_business_glossary_term' = 'Pricing Algorithm Version');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `algorithm_version` SET TAGS ('dbx_value_regex' = '^vd+.d+(.d+)?$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Rule Approved By');
@@ -656,9 +704,7 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `channel` SET TAGS ('
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'in_store|ecommerce|mobile_app|all_channels');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `rule_code` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `rule_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{3,30}$');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `competitor_price_index` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `cost_plus_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Cost-Plus Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `cost_plus_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `rule_description` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Description');
@@ -669,11 +715,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `execution_mode` SET 
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `loyalty_exclusive` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Program Exclusive Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `markdown_depth_pct` SET TAGS ('dbx_business_glossary_term' = 'Markdown Depth Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `markdown_depth_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `max_price` SET TAGS ('dbx_business_glossary_term' = 'Maximum Price Guardrail');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `max_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `min_price` SET TAGS ('dbx_business_glossary_term' = 'Minimum Price Guardrail');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `min_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `rule_name` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Name');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `override_approval_required` SET TAGS ('dbx_business_glossary_term' = 'Override Approval Required Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `override_permitted` SET TAGS ('dbx_business_glossary_term' = 'Manual Override Permitted Flag');
@@ -694,17 +737,47 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `time_of_day_start` S
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `time_of_day_start` SET TAGS ('dbx_value_regex' = '^([01]d|2[0-3]):[0-5]d$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `trigger_threshold_value` SET TAGS ('dbx_business_glossary_term' = 'Rule Trigger Threshold Value');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `trigger_type` SET TAGS ('dbx_business_glossary_term' = 'Rule Trigger Type');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` SET TAGS ('dbx_subdomain' = 'cost_intelligence');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `assortment_item_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Item Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Price Strategy Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Price Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_channel` SET TAGS ('dbx_value_regex' = 'in_store|online|mobile_app|marketplace|catalog');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_in_stock_flag` SET TAGS ('dbx_business_glossary_term' = 'Competitor In-Stock Flag');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_price` SET TAGS ('dbx_business_glossary_term' = 'Competitor Observed Price');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_promo_end_date` SET TAGS ('dbx_business_glossary_term' = 'Competitor Promotional End Date');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_promo_flag` SET TAGS ('dbx_business_glossary_term' = 'Competitor Promotional Price Flag');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_promo_type` SET TAGS ('dbx_business_glossary_term' = 'Competitor Promotional Price Type');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_sku_code` SET TAGS ('dbx_business_glossary_term' = 'Competitor Stock Keeping Unit (SKU) Code');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_url` SET TAGS ('dbx_business_glossary_term' = 'Competitor Product URL');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `data_source_type` SET TAGS ('dbx_value_regex' = 'manual_survey|third_party_feed|web_scrape|edi_feed|mystery_shop');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `geographic_market` SET TAGS ('dbx_business_glossary_term' = 'Geographic Market Code');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `geographic_market` SET TAGS ('dbx_value_regex' = '^[A-Z]{2,3}$');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `gtin` SET TAGS ('dbx_business_glossary_term' = 'Global Trade Item Number (GTIN)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{8,14}$');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `match_type` SET TAGS ('dbx_value_regex' = 'exact_gtin|exact_upc|like_for_like|comparable|private_label_equivalent');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `price_gap_pct` SET TAGS ('dbx_business_glossary_term' = 'Price Gap Percentage');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `price_gap_trend` SET TAGS ('dbx_value_regex' = 'widening|narrowing|stable|reversed');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `price_index` SET TAGS ('dbx_business_glossary_term' = 'Competitive Price Index');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `response_action` SET TAGS ('dbx_business_glossary_term' = 'Recommended Response Action');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `response_action` SET TAGS ('dbx_value_regex' = 'match|undercut|hold|monitor|escalate');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `response_status` SET TAGS ('dbx_business_glossary_term' = 'Response Action Status');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `response_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected|implemented|expired');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` SET TAGS ('dbx_subdomain' = 'markdown_management');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` SET TAGS ('dbx_subdomain' = 'change_management');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Approver ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `markdown_id` SET TAGS ('dbx_business_glossary_term' = 'Markdown Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `price_zone_id` SET TAGS ('dbx_business_glossary_term' = 'Price Zone Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `rule_id` SET TAGS ('dbx_business_glossary_term' = 'Rule Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Price Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `approval_channel` SET TAGS ('dbx_value_regex' = 'web_portal|mobile_app|email|api|system_auto');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `approval_notes` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Notes');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `approval_number` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Number');
@@ -713,11 +786,9 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `approval_s
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `approval_tier` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Tier');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `approval_type` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Type');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `competitive_price_ref` SET TAGS ('dbx_business_glossary_term' = 'Competitive Reference Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `competitive_price_ref` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `current_price` SET TAGS ('dbx_business_glossary_term' = 'Current Retail Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `current_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `decision_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Decision Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Price Effective Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `end_date` SET TAGS ('dbx_business_glossary_term' = 'Price End Date');
@@ -725,16 +796,13 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `escalation
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `escalation_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Escalation Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Expiry Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `gross_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Gross Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `gross_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `is_auto_approved` SET TAGS ('dbx_business_glossary_term' = 'Auto-Approved Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `is_escalated` SET TAGS ('dbx_business_glossary_term' = 'Escalated Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `price_change_pct` SET TAGS ('dbx_business_glossary_term' = 'Price Change Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `price_change_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `pricing_strategy` SET TAGS ('dbx_value_regex' = 'EDLP|hi_lo|competitive|cost_plus|dynamic|clearance');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `proposed_price` SET TAGS ('dbx_business_glossary_term' = 'Proposed Retail Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `proposed_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `requested_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Requested Timestamp');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `rpm_event_code` SET TAGS ('dbx_business_glossary_term' = 'Oracle Retail Price Management (RPM) Event ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `rpm_event_code` SET TAGS ('dbx_business_glossary_term' = 'the retail merchandising system Price Management (RPM) Event ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `sap_change_doc_number` SET TAGS ('dbx_business_glossary_term' = 'SAP Change Document Number');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `sla_response_hours` SET TAGS ('dbx_business_glossary_term' = 'Service Level Agreement (SLA) Response Hours');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');

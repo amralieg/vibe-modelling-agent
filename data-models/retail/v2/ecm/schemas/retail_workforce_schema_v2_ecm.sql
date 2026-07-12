@@ -1,5 +1,5 @@
 -- Schema for Domain: workforce | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:27
+-- Generated on: 2026-07-12 13:53:27
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`workforce` COMMENT 'Manages retail workforce including store associates, distribution center staff, and corporate employees. Owns employee master records, scheduling, time and attendance, payroll, benefits, talent acquisition, performance management, training programs, labor cost allocation, OSHA compliance records, and headcount planning. Integrates with Workday HCM for unified human capital management across all retail locations.';
@@ -52,7 +52,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`workforce`.`associate` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`workforce`.`job_profile` (
     `job_profile_id` BIGINT COMMENT 'Unique identifier for the job profile. Primary key for the job profile reference catalog. Sourced from Workday HCM job catalog.',
     `org_unit_id` BIGINT COMMENT 'add column org_unit_id (BIGINT) with FK to workforce.org_unit.org_unit_id - job profiles are defined within organizational units for headcount planning',
-    `semantic_layer_entity_id` BIGINT COMMENT 'Foreign key linking to analytics.semantic_layer_entity. Business justification: Job profiles are dimensional entities in workforce analytics semantic models. BI tools expose job_profile as a certified dimension for slicing labor metrics by role, level, and job family in retail wo',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this job profile record was first created in the system. Used for audit trail and data lineage tracking.',
     `currency_code` STRING COMMENT 'Three-letter ISO 4217 currency code for the pay range (e.g., USD, CAD, MXN). Used for multi-currency compensation management in global retail operations.. Valid values are `^[A-Z]{3}$`',
     `department` STRING COMMENT 'Primary department or functional area where this job profile is typically assigned (e.g., Store Operations, Distribution Center, Merchandising, Finance, Human Resources).',
@@ -105,6 +104,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` (
     `location_id` BIGINT COMMENT 'Identifier of the store, distribution center, or corporate office where the shift is scheduled. Links to the location master.',
     `associate_id` BIGINT COMMENT 'Unique identifier of the associate or employee assigned to this shift. Links to the employee master record in Workday HCM.',
     `shift_associate_id` BIGINT COMMENT 'The user ID or system account that last modified the shift schedule record. Used for audit trail and accountability.',
+    `shift_swap_request_id` BIGINT COMMENT 'Identifier of the shift swap request if this schedule resulted from an approved swap between two associates. Null if the shift was not swapped.',
     `break_duration_minutes` STRING COMMENT 'Total duration of unpaid breaks in minutes scheduled during the shift. Required for compliance with state labor laws regarding meal and rest breaks.',
     `cancellation_reason` STRING COMMENT 'The reason why the shift schedule was cancelled. Low traffic indicates reduced customer demand, weather indicates store closure or reduced operations, employee absence indicates the associate called out, operational change indicates business need adjustment, employee request indicates the associate requested cancellation, and other captures miscellaneous reasons.. Valid values are `low_traffic|weather|employee_absence|operational_change|employee_request|other`',
     `cancelled_timestamp` TIMESTAMP COMMENT 'The date and time when the shift schedule was cancelled. Used to track last-minute cancellations and compliance with predictive scheduling laws that require reporting pay for cancelled shifts.',
@@ -127,7 +127,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` (
     `scheduled_start_time` TIMESTAMP COMMENT 'The planned start date and time for the shift, including time zone information.',
     `shift_date` DATE COMMENT 'The calendar date on which the shift is scheduled to occur.',
     `shift_priority` STRING COMMENT 'Business priority level of the shift. Critical shifts are essential for operations (e.g., opening manager, security), high priority shifts support peak traffic, normal shifts are standard coverage, and low priority shifts are optional or training.. Valid values are `critical|high|normal|low`',
-    `shift_swap_request_id` BIGINT COMMENT 'Identifier of the shift swap request if this schedule resulted from an approved swap between two associates. Null if the shift was not swapped.',
     `shift_type` STRING COMMENT 'Classification of the shift based on time of day and operational role. Opening shifts start early morning, mid shifts cover midday, closing shifts end at store close, overnight shifts cover restocking and maintenance, split shifts have a break in the middle, and on-call shifts are standby assignments.. Valid values are `opening|mid|closing|overnight|split|on_call`',
     CONSTRAINT pk_shift_schedule PRIMARY KEY(`shift_schedule_id`)
 ) COMMENT 'Planned work schedules for store associates and DC staff generated through Workday HCM workforce scheduling. Captures schedule week start date, store or DC location, department, shift type (opening, mid, closing, overnight), scheduled start time, scheduled end time, scheduled hours, break duration, assigned associate, scheduling status (draft, published, confirmed), schedule source (auto-generated, manager-assigned), and employee availability/preference indicators. Also encompasses shift swap requests, coverage requests, and open shift postings including swap request status, requesting associate, covering associate, and manager approval. Supports labor cost planning, SLA compliance for store coverage, and associate schedule flexibility.';
@@ -486,7 +485,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`workforce`.`labor_budget` (
     `financial_period_id` BIGINT COMMENT 'Reference to the fiscal period for which this labor budget applies. Links to the financial calendar structure.',
     `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Labor budget planning maps to GL salary/wage expense accounts for budget vs actual variance reporting. Required for departmental budget planning, labor cost forecasting, and financial planning integra',
     `job_profile_id` BIGINT COMMENT 'Foreign key linking to workforce.job_profile. Business justification: Labor budgets are planned by job profile (FTE counts and labor costs by role). Workforce planning requires budgeting headcount separately for store managers, cashiers, stockers, DC operators, etc. Lin',
-    `kpi_value_id` BIGINT COMMENT 'Foreign key linking to analytics.kpi_value. Business justification: Labor budget variance KPIs (labor cost variance %, FTE variance, budget utilization) are measured against budget plans. Finance and operations analytics track these metrics per budget period for cost',
     `location_id` BIGINT COMMENT 'Reference to the store, distribution center (DC), or corporate office location for which this labor budget is planned. Enables location-level workforce capacity planning.',
     `org_unit_id` BIGINT COMMENT 'Reference to the department or functional area for which this labor budget is planned. Supports departmental workforce planning and staffing models.',
     `associate_id` BIGINT COMMENT 'Reference to the employee responsible for creating and maintaining this labor budget plan. Establishes accountability for workforce planning.',
@@ -730,11 +728,11 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agre
     `bargaining_unit_id` BIGINT COMMENT 'Reference to the specific bargaining unit covered by this agreement, representing a group of employees with shared interests.',
     `superseded_collective_bargaining_agreement_id` BIGINT COMMENT 'Self-referencing FK on collective_bargaining_agreement (superseded_collective_bargaining_agreement_id)',
     `union_id` BIGINT COMMENT 'Reference to the labor union or employee organization that is party to this collective bargaining agreement.',
+    `associate_id` BIGINT COMMENT 'Reference to the company employee who served as lead negotiator for management during bargaining.',
     `agreement_name` STRING COMMENT 'Human-readable name or title of the collective bargaining agreement, often including the union name and bargaining unit.',
     `agreement_number` STRING COMMENT 'Externally-known unique business identifier for the collective bargaining agreement, typically used in legal documents and union communications.',
     `agreement_type` STRING COMMENT 'Classification of the collective bargaining agreement based on scope and purpose. Master agreements cover multiple locations, local agreements are site-specific, supplemental agreements modify existing CBAs, interim agreements are temporary, memorandums of understanding document mutual understandings, and side letters address specific issues.',
     `arbitration_required_flag` BOOLEAN COMMENT 'Indicates whether binding arbitration is required for unresolved grievances under this agreement.',
-    `associate_id` BIGINT COMMENT 'Reference to the company employee who served as lead negotiator for management during bargaining.',
     `covered_employee_count` STRING COMMENT 'Total number of employees covered under this collective bargaining agreement at the time of ratification or most recent count.',
     `covered_job_classifications` STRING COMMENT 'Description or list of job titles, roles, and classifications included in the bargaining unit covered by this agreement.',
     `covered_locations` STRING COMMENT 'Comma-separated list or description of specific retail locations, distribution centers, or facilities covered by this agreement.',
@@ -939,6 +937,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`workforce`.`coverage_request` (
     `department_id` BIGINT COMMENT 'Identifier of the department within the store where coverage is required.',
     `location_id` BIGINT COMMENT 'Identifier of the retail store location where coverage is needed.',
     `superseded_coverage_request_id` BIGINT COMMENT 'Self-referencing FK on coverage_request (superseded_coverage_request_id)',
+    `shift_schedule_id` BIGINT COMMENT 'Identifier of the specific shift that requires coverage.',
     `approval_date` DATE COMMENT 'Date when the coverage request was approved or rejected by the manager.',
     `approval_notes` STRING COMMENT 'Comments or notes provided by the approver explaining the approval or rejection decision.',
     `approval_required` BOOLEAN COMMENT 'Indicates whether managerial approval is required before coverage can be assigned.',
@@ -968,7 +967,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`workforce`.`coverage_request` (
     `request_timestamp` TIMESTAMP COMMENT 'Precise date and time when the coverage request was created in the system.',
     `request_type` STRING COMMENT 'Classification of the coverage request indicating the reason for coverage need.',
     `response_count` STRING COMMENT 'Number of employees who responded to the coverage request notification.',
-    `shift_schedule_id` BIGINT COMMENT 'Identifier of the specific shift that requires coverage.',
     `source_system_code` STRING COMMENT 'Unique identifier of this coverage request in the originating source system.',
     `coverage_request_status` STRING COMMENT 'Current lifecycle status of the coverage request in the approval and fulfillment workflow.',
     CONSTRAINT pk_coverage_request PRIMARY KEY(`coverage_request_id`)
@@ -1139,6 +1137,7 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ADD CONSTRAINT `fk_wor
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ADD CONSTRAINT `fk_workforce_shift_schedule_job_profile_id` FOREIGN KEY (`job_profile_id`) REFERENCES `vibe_retail_v1`.`workforce`.`job_profile`(`job_profile_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ADD CONSTRAINT `fk_workforce_shift_schedule_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ADD CONSTRAINT `fk_workforce_shift_schedule_shift_associate_id` FOREIGN KEY (`shift_associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
+ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ADD CONSTRAINT `fk_workforce_shift_schedule_shift_swap_request_id` FOREIGN KEY (`shift_swap_request_id`) REFERENCES `vibe_retail_v1`.`workforce`.`shift_swap_request`(`shift_swap_request_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ADD CONSTRAINT `fk_workforce_time_entry_job_profile_id` FOREIGN KEY (`job_profile_id`) REFERENCES `vibe_retail_v1`.`workforce`.`job_profile`(`job_profile_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ADD CONSTRAINT `fk_workforce_time_entry_pay_period_id` FOREIGN KEY (`pay_period_id`) REFERENCES `vibe_retail_v1`.`workforce`.`pay_period`(`pay_period_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ADD CONSTRAINT `fk_workforce_time_entry_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
@@ -1194,6 +1193,7 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit_compliance_scope` ADD CONSTRA
 ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ADD CONSTRAINT `fk_workforce_collective_bargaining_agreement_bargaining_unit_id` FOREIGN KEY (`bargaining_unit_id`) REFERENCES `vibe_retail_v1`.`workforce`.`bargaining_unit`(`bargaining_unit_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ADD CONSTRAINT `fk_workforce_collective_bargaining_agreement_superseded_collective_bargaining_agreement_id` FOREIGN KEY (`superseded_collective_bargaining_agreement_id`) REFERENCES `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement`(`collective_bargaining_agreement_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ADD CONSTRAINT `fk_workforce_collective_bargaining_agreement_union_id` FOREIGN KEY (`union_id`) REFERENCES `vibe_retail_v1`.`workforce`.`union`(`union_id`);
+ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ADD CONSTRAINT `fk_workforce_collective_bargaining_agreement_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`merit_cycle` ADD CONSTRAINT `fk_workforce_merit_cycle_prior_merit_cycle_id` FOREIGN KEY (`prior_merit_cycle_id`) REFERENCES `vibe_retail_v1`.`workforce`.`merit_cycle`(`merit_cycle_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ADD CONSTRAINT `fk_workforce_candidate_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ADD CONSTRAINT `fk_workforce_candidate_requisition_id` FOREIGN KEY (`requisition_id`) REFERENCES `vibe_retail_v1`.`workforce`.`requisition`(`requisition_id`);
@@ -1213,6 +1213,7 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`coverage_request` ADD CONSTRAINT `fk_w
 ALTER TABLE `vibe_retail_v1`.`workforce`.`coverage_request` ADD CONSTRAINT `fk_workforce_coverage_request_coverage_covering_employee_associate_id` FOREIGN KEY (`coverage_covering_employee_associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`coverage_request` ADD CONSTRAINT `fk_workforce_coverage_request_coverage_requesting_employee_associate_id` FOREIGN KEY (`coverage_requesting_employee_associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`coverage_request` ADD CONSTRAINT `fk_workforce_coverage_request_superseded_coverage_request_id` FOREIGN KEY (`superseded_coverage_request_id`) REFERENCES `vibe_retail_v1`.`workforce`.`coverage_request`(`coverage_request_id`);
+ALTER TABLE `vibe_retail_v1`.`workforce`.`coverage_request` ADD CONSTRAINT `fk_workforce_coverage_request_shift_schedule_id` FOREIGN KEY (`shift_schedule_id`) REFERENCES `vibe_retail_v1`.`workforce`.`shift_schedule`(`shift_schedule_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`pay_period` ADD CONSTRAINT `fk_workforce_pay_period_payroll_calendar_id` FOREIGN KEY (`payroll_calendar_id`) REFERENCES `vibe_retail_v1`.`workforce`.`payroll_calendar`(`payroll_calendar_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`pay_period` ADD CONSTRAINT `fk_workforce_pay_period_prior_pay_period_id` FOREIGN KEY (`prior_pay_period_id`) REFERENCES `vibe_retail_v1`.`workforce`.`pay_period`(`pay_period_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ADD CONSTRAINT `fk_workforce_union_parent_union_id` FOREIGN KEY (`parent_union_id`) REFERENCES `vibe_retail_v1`.`workforce`.`union`(`union_id`);
@@ -1227,7 +1228,7 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_calendar` ADD CONSTRAINT `fk_w
 ALTER SCHEMA `vibe_retail_v1`.`workforce` SET TAGS ('dbx_division' = 'corporate');
 ALTER SCHEMA `vibe_retail_v1`.`workforce` SET TAGS ('dbx_domain' = 'workforce');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` SET TAGS ('dbx_subdomain' = 'employee_records');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` SET TAGS ('dbx_subdomain' = 'employee_master');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Identifier');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `collective_bargaining_agreement_id` SET TAGS ('dbx_business_glossary_term' = 'Collective Bargaining Agreement (CBA) Identifier');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Distribution Center (DC) Identifier');
@@ -1237,50 +1238,23 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `badge_number`
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `email_address` SET TAGS ('dbx_business_glossary_term' = 'Work Email Address');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `email_address` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `email_address` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `email_address` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `emergency_contact_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `emergency_contact_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `emergency_contact_phone` SET TAGS ('dbx_business_glossary_term' = 'Emergency Contact Phone Number');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `emergency_contact_phone` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `emergency_contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `employment_status` SET TAGS ('dbx_value_regex' = 'active|leave-of-absence|suspended|terminated');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `employment_type` SET TAGS ('dbx_value_regex' = 'full-time|part-time|seasonal|temporary|contractor|intern');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `flsa_status` SET TAGS ('dbx_business_glossary_term' = 'Fair Labor Standards Act (FLSA) Status');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `flsa_status` SET TAGS ('dbx_value_regex' = 'exempt|non-exempt');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `hr_business_partner_name` SET TAGS ('dbx_business_glossary_term' = 'Human Resources (HR) Business Partner Name');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `i9_document_type` SET TAGS ('dbx_business_glossary_term' = 'Form I-9 Document Type');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `i9_document_type` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `i9_document_type` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `i9_verification_date` SET TAGS ('dbx_business_glossary_term' = 'Form I-9 Verification Date');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `i9_verification_date` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `i9_verification_date` SET TAGS ('dbx_pii_identifier' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `legal_first_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `legal_first_name` SET TAGS ('dbx_pii_name' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `legal_last_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `legal_last_name` SET TAGS ('dbx_pii_name' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `legal_middle_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `legal_middle_name` SET TAGS ('dbx_pii_name' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `pay_grade` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `pay_type` SET TAGS ('dbx_value_regex' = 'hourly|salaried');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `phone_number` SET TAGS ('dbx_business_glossary_term' = 'Work Phone Number');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `phone_number` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `preferred_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `preferred_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `primary_work_location_type` SET TAGS ('dbx_value_regex' = 'store|distribution-center|corporate-office|regional-office|remote');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `termination_reason` SET TAGS ('dbx_value_regex' = 'voluntary|involuntary|retirement|layoff|end-of-season|end-of-contract');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `termination_reason` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `work_authorization_expiration_date` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `work_authorization_expiration_date` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `work_authorization_status` SET TAGS ('dbx_value_regex' = 'citizen|permanent-resident|work-visa|employment-authorization');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `work_authorization_status` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `work_authorization_status` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`associate` ALTER COLUMN `workday_worker_code` SET TAGS ('dbx_business_glossary_term' = 'Workday Worker Identifier');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` SET TAGS ('dbx_data_type' = 'reference_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` SET TAGS ('dbx_subdomain' = 'employee_records');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `semantic_layer_entity_id` SET TAGS ('dbx_business_glossary_term' = 'Semantic Layer Entity Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` SET TAGS ('dbx_subdomain' = 'employee_master');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `eeoc_job_category` SET TAGS ('dbx_business_glossary_term' = 'Equal Employment Opportunity Commission (EEOC) Job Category');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `employment_type` SET TAGS ('dbx_value_regex' = 'full-time|part-time|seasonal|temporary|contractor');
@@ -1290,8 +1264,6 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `is_dc_facin
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `job_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,12}$');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `job_profile_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending|obsolete');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `location_type` SET TAGS ('dbx_value_regex' = 'store|distribution-center|corporate-office|remote|field');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `maximum_pay_range` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `minimum_pay_range` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `onet_code` SET TAGS ('dbx_business_glossary_term' = 'Occupational Information Network (O*NET) Code');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `onet_code` SET TAGS ('dbx_value_regex' = '^[0-9]{2}-[0-9]{4}.[0-9]{2}$');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ALTER COLUMN `pay_frequency` SET TAGS ('dbx_value_regex' = 'hourly|salary|commission');
@@ -1305,11 +1277,8 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `dc_facil
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `job_profile_id` SET TAGS ('dbx_business_glossary_term' = 'Job Profile Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Employee ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `shift_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `shift_associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `shift_associate_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `cancellation_reason` SET TAGS ('dbx_value_regex' = 'low_traffic|weather|employee_absence|operational_change|employee_request|other');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `employee_availability_match` SET TAGS ('dbx_value_regex' = 'full_match|partial_match|no_match|not_specified');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `estimated_labor_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `schedule_source` SET TAGS ('dbx_value_regex' = 'auto_generated|manager_assigned|employee_requested|shift_swap|coverage_request');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `schedule_status` SET TAGS ('dbx_value_regex' = 'draft|published|confirmed|cancelled|completed');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_schedule` ALTER COLUMN `shift_priority` SET TAGS ('dbx_value_regex' = 'critical|high|normal|low');
@@ -1322,21 +1291,13 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `associate_id
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `shift_schedule_id` SET TAGS ('dbx_business_glossary_term' = 'Shift ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `time_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `time_associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `time_associate_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected|auto_approved|under_review');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `exception_type` SET TAGS ('dbx_value_regex' = 'missed_punch|early_departure|late_arrival|unscheduled_overtime|no_break_taken|extended_break');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `geolocation_latitude` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `geolocation_longitude` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `labor_cost_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `overtime_hours` SET TAGS ('dbx_business_glossary_term' = 'Overtime (OT) Hours');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `pay_rate` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `payroll_batch_code` SET TAGS ('dbx_business_glossary_term' = 'Payroll Batch ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `shift_differential_type` SET TAGS ('dbx_value_regex' = 'night_shift|weekend|holiday|closing_shift|opening_shift');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `source` SET TAGS ('dbx_value_regex' = 'time_clock|mobile_app|manual_entry|workday_hcm|pos_terminal|biometric_scanner');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `time_clock_device_code` SET TAGS ('dbx_business_glossary_term' = 'Time Clock Device ID');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `time_clock_device_code` SET TAGS ('dbx_internal' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`time_entry` ALTER COLUMN `time_clock_device_code` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` SET TAGS ('dbx_subdomain' = 'payroll_benefits');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
@@ -1344,17 +1305,7 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `associat
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `shift_schedule_id` SET TAGS ('dbx_business_glossary_term' = 'Shift Schedule Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `bank_account_last_four_digits` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `bank_account_last_four_digits` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `bank_account_last_four_digits` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `fica_social_security_withheld_amount` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `fica_social_security_withheld_amount` SET TAGS ('dbx_pii_identifier' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `gross_pay_amount` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `gross_pay_amount` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `health_insurance_deduction_amount` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `health_insurance_deduction_amount` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `net_pay_amount` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `net_pay_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `overtime_hours_worked` SET TAGS ('dbx_business_glossary_term' = 'Overtime (OT) Hours Worked');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `overtime_pay_amount` SET TAGS ('dbx_business_glossary_term' = 'Overtime (OT) Pay Amount');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `pay_frequency` SET TAGS ('dbx_value_regex' = 'weekly|biweekly|semimonthly|monthly');
@@ -1362,8 +1313,6 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `payment_
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `payroll_status` SET TAGS ('dbx_value_regex' = 'calculated|approved|paid|voided|pending|error');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `year_to_date_federal_tax_withheld_amount` SET TAGS ('dbx_business_glossary_term' = 'Year-to-Date (YTD) Federal Tax Withheld Amount');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `year_to_date_gross_pay_amount` SET TAGS ('dbx_business_glossary_term' = 'Year-to-Date (YTD) Gross Pay Amount');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `year_to_date_gross_pay_amount` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_record` ALTER COLUMN `year_to_date_gross_pay_amount` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` SET TAGS ('dbx_subdomain' = 'scheduling_operations');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
@@ -1377,16 +1326,8 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `fmla_desi
 ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `fmla_eligible_flag` SET TAGS ('dbx_business_glossary_term' = 'Family and Medical Leave Act (FMLA) Eligible Flag');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `hr_review_date` SET TAGS ('dbx_business_glossary_term' = 'Human Resources (HR) Review Date');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `hr_review_notes` SET TAGS ('dbx_business_glossary_term' = 'Human Resources (HR) Review Notes');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `hr_review_notes` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `hr_review_status` SET TAGS ('dbx_business_glossary_term' = 'Human Resources (HR) Review Status');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `hr_review_status` SET TAGS ('dbx_value_regex' = 'Not Required|Pending|Reviewed|Escalated');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `leave_reason` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `medical_certification_due_date` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `medical_certification_due_date` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `medical_certification_received_flag` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `medical_certification_received_flag` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `medical_certification_required_flag` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `medical_certification_required_flag` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`leave_request` ALTER COLUMN `source_system_record_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Record ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` SET TAGS ('dbx_subdomain' = 'payroll_benefits');
@@ -1401,8 +1342,6 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` ALTER COLUMN `aca_
 ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` ALTER COLUMN `aca_measurement_period_start` SET TAGS ('dbx_business_glossary_term' = 'Affordable Care Act (ACA) Measurement Period Start Date');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` ALTER COLUMN `aca_stability_period_end` SET TAGS ('dbx_business_glossary_term' = 'Affordable Care Act (ACA) Stability Period End Date');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` ALTER COLUMN `aca_stability_period_start` SET TAGS ('dbx_business_glossary_term' = 'Affordable Care Act (ACA) Stability Period Start Date');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` ALTER COLUMN `beneficiary_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` ALTER COLUMN `beneficiary_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` ALTER COLUMN `cobra_eligible_flag` SET TAGS ('dbx_business_glossary_term' = 'Consolidated Omnibus Budget Reconciliation Act (COBRA) Eligible Flag');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` ALTER COLUMN `coverage_tier` SET TAGS ('dbx_value_regex' = 'employee_only|employee_spouse|employee_children|employee_family|not_applicable');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`benefit_enrollment` ALTER COLUMN `employee_contribution_frequency` SET TAGS ('dbx_value_regex' = 'weekly|biweekly|semimonthly|monthly|annual|per_pay_period');
@@ -1429,9 +1368,6 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `comp
 ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `goal_achievement_rating` SET TAGS ('dbx_value_regex' = 'exceeded|achieved|partially_achieved|not_achieved');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `hr_review_status` SET TAGS ('dbx_business_glossary_term' = 'Human Resources (HR) Review Status');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `hr_review_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected|under_review');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `incident_description` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `manager_comments` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `merit_increase_percentage` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `overall_rating` SET TAGS ('dbx_business_glossary_term' = 'Overall Performance Rating');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `overall_rating` SET TAGS ('dbx_value_regex' = 'exceeds_expectations|meets_expectations|needs_improvement|unsatisfactory');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `performance_review_status` SET TAGS ('dbx_business_glossary_term' = 'Review Status');
@@ -1442,14 +1378,12 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `pip_
 ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `policy_violation_category` SET TAGS ('dbx_value_regex' = 'attendance|conduct|safety|theft|harassment|insubordination');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `review_type` SET TAGS ('dbx_value_regex' = 'annual|mid_year|probationary|90_day|project_based|pip');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `self_assessment_comments` SET TAGS ('dbx_business_glossary_term' = 'Self-Assessment Comments');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ALTER COLUMN `self_assessment_comments` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` SET TAGS ('dbx_subdomain' = 'talent_acquisition');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Employee ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` ALTER COLUMN `job_profile_id` SET TAGS ('dbx_business_glossary_term' = 'Job Profile Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` ALTER COLUMN `kpi_value_id` SET TAGS ('dbx_business_glossary_term' = 'Kpi Value Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` ALTER COLUMN `cost_amount` SET TAGS ('dbx_business_glossary_term' = 'Training Cost Amount');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` ALTER COLUMN `cost_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` ALTER COLUMN `delivery_method` SET TAGS ('dbx_value_regex' = 'in_store|e_learning|classroom|on_the_job|virtual_instructor_led|blended');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` ALTER COLUMN `due_date` SET TAGS ('dbx_business_glossary_term' = 'Training Due Date');
@@ -1467,9 +1401,7 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `org_unit_id
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Hiring Manager ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `budgeted_salary_max` SET TAGS ('dbx_business_glossary_term' = 'Budgeted Salary Maximum');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `budgeted_salary_max` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `budgeted_salary_min` SET TAGS ('dbx_business_glossary_term' = 'Budgeted Salary Minimum');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `budgeted_salary_min` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `close_date` SET TAGS ('dbx_business_glossary_term' = 'Requisition Close Date');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `eeo_job_category` SET TAGS ('dbx_business_glossary_term' = 'Equal Employment Opportunity (EEO) Job Category');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `employment_type` SET TAGS ('dbx_value_regex' = 'full_time|part_time|seasonal|temporary|contractor');
@@ -1483,8 +1415,6 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `priority_le
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `requisition_number` SET TAGS ('dbx_value_regex' = '^REQ-[0-9]{6,10}$');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `requisition_type` SET TAGS ('dbx_value_regex' = 'backfill|new_headcount|seasonal|temporary|contractor|intern');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `salary_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `salary_currency_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `salary_currency_code` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `time_to_fill_sla_days` SET TAGS ('dbx_business_glossary_term' = 'Time-to-Fill Service Level Agreement (SLA) Days');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ALTER COLUMN `travel_requirement_pct` SET TAGS ('dbx_business_glossary_term' = 'Travel Requirement Percentage');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` SET TAGS ('dbx_data_type' = 'transactional_data');
@@ -1496,30 +1426,25 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `tertiar
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `application_number` SET TAGS ('dbx_value_regex' = '^APP-[0-9]{8}$');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `background_check_status` SET TAGS ('dbx_value_regex' = 'not_started|in_progress|clear|flagged|failed');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `disability_status` SET TAGS ('dbx_value_regex' = 'not_disclosed|yes|no');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `disability_status` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `drug_screen_status` SET TAGS ('dbx_value_regex' = 'not_required|scheduled|completed|passed|failed');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `is_internal_candidate` SET TAGS ('dbx_business_glossary_term' = 'Internal Candidate Flag');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `is_rehire` SET TAGS ('dbx_business_glossary_term' = 'Rehire Flag');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `offer_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `offer_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `source_channel` SET TAGS ('dbx_value_regex' = 'career_site|referral|job_board|agency|walk_in|social_media');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `time_to_hire_days` SET TAGS ('dbx_business_glossary_term' = 'Time to Hire (Days)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`job_application` ALTER COLUMN `veteran_status` SET TAGS ('dbx_value_regex' = 'not_disclosed|veteran|non_veteran|protected_veteran');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` SET TAGS ('dbx_subdomain' = 'labor_planning');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` SET TAGS ('dbx_subdomain' = 'payroll_benefits');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `financial_period_id` SET TAGS ('dbx_business_glossary_term' = 'Fiscal Period ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `job_profile_id` SET TAGS ('dbx_business_glossary_term' = 'Job Profile Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `kpi_value_id` SET TAGS ('dbx_business_glossary_term' = 'Kpi Value Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Department ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Plan Owner Employee ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `tertiary_labor_modified_by_user_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `budget_version_code` SET TAGS ('dbx_value_regex' = 'baseline|initial|revised|approved|final');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `budgeted_labor_cost_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `budgeted_labor_cost_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `budgeted_labor_cost_percent_of_sales` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `budgeted_overtime_hours` SET TAGS ('dbx_business_glossary_term' = 'Budgeted Overtime (OT) Hours');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `planned_fte_count` SET TAGS ('dbx_business_glossary_term' = 'Planned Full-Time Equivalent (FTE) Count');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `planned_full_time_headcount` SET TAGS ('dbx_business_glossary_term' = 'Planned Full-Time Headcount');
@@ -1527,27 +1452,18 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `planned_pa
 ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ALTER COLUMN `planning_period_type` SET TAGS ('dbx_value_regex' = 'week|month|quarter|fiscal_year');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` SET TAGS ('dbx_subdomain' = 'payroll_benefits');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `compensation_change_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `compensation_change_id` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Department ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `performance_review_id` SET TAGS ('dbx_business_glossary_term' = 'Performance Review Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Employee ID');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `associate_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `associate_id` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `tertiary_compensation_hr_approver_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Human Resources (HR) Approver ID');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `tertiary_compensation_hr_approver_associate_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `tertiary_compensation_hr_approver_associate_id` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Compensation Change Approved Timestamp');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `budget_impact_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `change_reason` SET TAGS ('dbx_business_glossary_term' = 'Compensation Change Reason');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `change_type` SET TAGS ('dbx_business_glossary_term' = 'Compensation Change Type');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `change_type` SET TAGS ('dbx_value_regex' = 'merit|promotion|equity|market_adjustment|cola|demotion');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `compa_ratio_after` SET TAGS ('dbx_business_glossary_term' = 'Compa-Ratio After Change');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `compa_ratio_after` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `compa_ratio_before` SET TAGS ('dbx_business_glossary_term' = 'Compa-Ratio Before Change');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `compa_ratio_before` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `hr_approval_status` SET TAGS ('dbx_business_glossary_term' = 'Human Resources (HR) Approval Status');
@@ -1556,21 +1472,15 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `is_
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `is_retroactive` SET TAGS ('dbx_business_glossary_term' = 'Is Retroactive Payment');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `lump_sum_amount` SET TAGS ('dbx_business_glossary_term' = 'Lump Sum Payment Amount');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `lump_sum_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `new_pay_rate` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Compensation Change Notes');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `pay_frequency` SET TAGS ('dbx_value_regex' = 'hourly|weekly|biweekly|semimonthly|monthly|annual');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `pay_rate_change_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `pay_rate_change_percentage` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `previous_pay_rate` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `processed_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Compensation Change Processed Timestamp');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `rejection_reason` SET TAGS ('dbx_business_glossary_term' = 'Compensation Change Rejection Reason');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `retroactive_amount` SET TAGS ('dbx_business_glossary_term' = 'Retroactive Payment Amount');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `retroactive_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `retroactive_start_date` SET TAGS ('dbx_business_glossary_term' = 'Retroactive Payment Start Date');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`compensation_change` ALTER COLUMN `submitted_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Compensation Change Submitted Timestamp');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit` SET TAGS ('dbx_subdomain' = 'employee_records');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit` SET TAGS ('dbx_subdomain' = 'employee_master');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Organizational Unit ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Physical Location ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit` ALTER COLUMN `parent_org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Organizational Unit ID');
@@ -1604,17 +1514,14 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit` ALTER COLUMN `store_format` 
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit` ALTER COLUMN `union_representation` SET TAGS ('dbx_business_glossary_term' = 'Union Representation Status');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit` ALTER COLUMN `union_representation` SET TAGS ('dbx_value_regex' = 'none|represented|mixed');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` SET TAGS ('dbx_subdomain' = 'talent_acquisition');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` SET TAGS ('dbx_subdomain' = 'employee_master');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `wf_certification_id` SET TAGS ('dbx_business_glossary_term' = 'Workforce Certification ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `job_profile_id` SET TAGS ('dbx_business_glossary_term' = 'Job Profile Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Department ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Employee ID');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `renewed_from_wf_certification_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `tertiary_wf_modified_by_user_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `attachment_url` SET TAGS ('dbx_business_glossary_term' = 'Attachment Uniform Resource Locator (URL)');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `certification_number` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `certification_number` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `certification_status` SET TAGS ('dbx_value_regex' = 'active|expired|suspended|revoked|pending_renewal|in_progress');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `certification_type` SET TAGS ('dbx_value_regex' = 'food_handler|forklift_operator|pharmacy_technician|management_training|safety_certification|first_aid_cpr');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`wf_certification` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -1631,7 +1538,6 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `associate
 ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `job_profile_id` SET TAGS ('dbx_business_glossary_term' = 'Job Profile Identifier');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Organizational Unit Identifier');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `annual_labor_budget` SET TAGS ('dbx_business_glossary_term' = 'Annual Labor Budget Amount');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `annual_labor_budget` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `approved_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `headcount_actual` SET TAGS ('dbx_business_glossary_term' = 'Actual Headcount');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `headcount_allocated` SET TAGS ('dbx_business_glossary_term' = 'Allocated Headcount');
@@ -1639,13 +1545,13 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `headcount
 ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Staffing Plan Notes');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`staffing_plan` ALTER COLUMN `variance_fte` SET TAGS ('dbx_business_glossary_term' = 'FTE Variance');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`dashboard_access` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`dashboard_access` SET TAGS ('dbx_subdomain' = 'labor_planning');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`dashboard_access` SET TAGS ('dbx_subdomain' = 'labor_relations');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`dashboard_access` SET TAGS ('dbx_association_edges' = 'workforce.associate,analytics.dashboard_config');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`dashboard_access` ALTER COLUMN `dashboard_access_id` SET TAGS ('dbx_business_glossary_term' = 'Dashboard Access Identifier');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`dashboard_access` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Dashboard Access - Associate Id');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`dashboard_access` ALTER COLUMN `dashboard_config_id` SET TAGS ('dbx_business_glossary_term' = 'Dashboard Access - Dashboard Config Id');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`workforce_kpi_target` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`workforce_kpi_target` SET TAGS ('dbx_subdomain' = 'labor_planning');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`workforce_kpi_target` SET TAGS ('dbx_subdomain' = 'scheduling_operations');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`workforce_kpi_target` SET TAGS ('dbx_association_edges' = 'workforce.org_unit,analytics.kpi_definition');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`workforce_kpi_target` ALTER COLUMN `workforce_kpi_target_id` SET TAGS ('dbx_business_glossary_term' = 'workforce_kpi_target Identifier');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`workforce_kpi_target` ALTER COLUMN `analytics_kpi_target_id` SET TAGS ('dbx_business_glossary_term' = 'KPI Target Identifier');
@@ -1662,7 +1568,7 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`workforce_kpi_target` ALTER COLUMN `th
 ALTER TABLE `vibe_retail_v1`.`workforce`.`workforce_kpi_target` ALTER COLUMN `weight_percentage` SET TAGS ('dbx_business_glossary_term' = 'KPI Weight Percentage');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`workforce_kpi_target` ALTER COLUMN `workforce_kpi_target_status` SET TAGS ('dbx_business_glossary_term' = 'Target Status');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit_compliance_scope` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit_compliance_scope` SET TAGS ('dbx_subdomain' = 'labor_planning');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit_compliance_scope` SET TAGS ('dbx_subdomain' = 'labor_relations');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit_compliance_scope` SET TAGS ('dbx_association_edges' = 'workforce.org_unit,compliance.compliance_program');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit_compliance_scope` ALTER COLUMN `org_unit_compliance_scope_id` SET TAGS ('dbx_business_glossary_term' = 'Org Unit Compliance Scope Identifier');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit_compliance_scope` ALTER COLUMN `compliance_program_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Program Identifier');
@@ -1673,115 +1579,42 @@ ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit_compliance_scope` ALTER COLUM
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit_compliance_scope` ALTER COLUMN `incident_count_ytd` SET TAGS ('dbx_business_glossary_term' = 'Incident Count Year-to-Date');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit_compliance_scope` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Scope Notes');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` SET TAGS ('dbx_subdomain' = 'union_relations');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` SET TAGS ('dbx_subdomain' = 'labor_relations');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ALTER COLUMN `collective_bargaining_agreement_id` SET TAGS ('dbx_business_glossary_term' = 'Collective Bargaining Agreement Identifier');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ALTER COLUMN `superseded_collective_bargaining_agreement_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ALTER COLUMN `healthcare_contribution_employer_percentage` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ALTER COLUMN `minimum_wage_rate` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ALTER COLUMN `pension_contribution_rate` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ALTER COLUMN `wage_increase_percentage` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ALTER COLUMN `wage_increase_percentage` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ALTER COLUMN `wage_increase_percentage` SET TAGS ('dbx_classification' = 'confidential');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`collective_bargaining_agreement` ALTER COLUMN `wage_increase_percentage` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`merit_cycle` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`merit_cycle` SET TAGS ('dbx_subdomain' = 'union_relations');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`merit_cycle` SET TAGS ('dbx_subdomain' = 'payroll_benefits');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`merit_cycle` ALTER COLUMN `merit_cycle_id` SET TAGS ('dbx_business_glossary_term' = 'Merit Cycle Identifier');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`merit_cycle` ALTER COLUMN `prior_merit_cycle_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`merit_cycle` ALTER COLUMN `budget_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`merit_cycle` ALTER COLUMN `budget_percentage` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` SET TAGS ('dbx_subdomain' = 'employee_records');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` SET TAGS ('dbx_subdomain' = 'employee_master');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `candidate_id` SET TAGS ('dbx_business_glossary_term' = 'Candidate Identifier');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `referred_by_candidate_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `address_line_1` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `address_line_1` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `address_line_2` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `address_line_2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `alternate_phone_number` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `alternate_phone_number` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `city` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `city` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `country_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `country_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `cover_letter_file_path` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `desired_salary` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `desired_salary` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `email_address` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `email_address` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `first_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `first_name` SET TAGS ('dbx_pii_name' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `last_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `last_name` SET TAGS ('dbx_pii_name' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `middle_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `middle_name` SET TAGS ('dbx_pii_name' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `phone_number` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `postal_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `resume_file_path` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `salary_currency_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `salary_currency_code` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `state_province` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `state_province` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `salary_currency_code` SET TAGS ('dbx_classification' = 'confidential');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`candidate` ALTER COLUMN `salary_currency_code` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` SET TAGS ('dbx_subdomain' = 'payroll_benefits');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` ALTER COLUMN `payroll_run_id` SET TAGS ('dbx_business_glossary_term' = 'Payroll Run Identifier');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` ALTER COLUMN `primary_reversal_payroll_run_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` ALTER COLUMN `gross_pay_amount` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` ALTER COLUMN `gross_pay_amount` SET TAGS ('dbx_pii_financial' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` ALTER COLUMN `net_pay_amount` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` ALTER COLUMN `net_pay_amount` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` ALTER COLUMN `gross_pay_amount` SET TAGS ('dbx_classification' = 'confidential');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` ALTER COLUMN `gross_pay_amount` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` ALTER COLUMN `net_pay_amount` SET TAGS ('dbx_classification' = 'confidential');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_run` ALTER COLUMN `net_pay_amount` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_swap_request` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_swap_request` SET TAGS ('dbx_subdomain' = 'scheduling_operations');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_swap_request` ALTER COLUMN `shift_swap_request_id` SET TAGS ('dbx_business_glossary_term' = 'Shift Swap Request Identifier');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`shift_swap_request` ALTER COLUMN `counterpart_shift_swap_request_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`coverage_request` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`coverage_request` SET TAGS ('dbx_subdomain' = 'scheduling_operations');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`coverage_request` ALTER COLUMN `coverage_request_id` SET TAGS ('dbx_business_glossary_term' = 'Coverage Request Identifier');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`coverage_request` ALTER COLUMN `superseded_coverage_request_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`pay_period` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`pay_period` SET TAGS ('dbx_subdomain' = 'payroll_benefits');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`pay_period` ALTER COLUMN `pay_period_id` SET TAGS ('dbx_business_glossary_term' = 'Pay Period Identifier');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`pay_period` ALTER COLUMN `prior_pay_period_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`union` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` SET TAGS ('dbx_subdomain' = 'union_relations');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`union` SET TAGS ('dbx_subdomain' = 'labor_relations');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `union_id` SET TAGS ('dbx_business_glossary_term' = 'Union Identifier');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `parent_union_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `contact_email` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `contact_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `contact_person_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `contact_person_name` SET TAGS ('dbx_pii_name' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `contact_phone` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `dues_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `initiation_fee_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `office_address_line1` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `office_address_line1` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `office_address_line2` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `office_address_line2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `office_city` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `office_city` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `office_postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `office_postal_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `office_state_province` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`union` ALTER COLUMN `office_state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` SET TAGS ('dbx_subdomain' = 'union_relations');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` SET TAGS ('dbx_subdomain' = 'labor_relations');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `bargaining_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Bargaining Unit Identifier');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `parent_bargaining_unit_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `health_benefits_plan_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `health_benefits_plan_code` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `primary_contact_email` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `primary_contact_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `primary_contact_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `primary_contact_name` SET TAGS ('dbx_pii_name' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `primary_contact_phone` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `primary_contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `wage_scale_reference` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `wage_scale_reference` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `wage_scale_reference` SET TAGS ('dbx_classification' = 'confidential');
+ALTER TABLE `vibe_retail_v1`.`workforce`.`bargaining_unit` ALTER COLUMN `wage_scale_reference` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_calendar` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_calendar` SET TAGS ('dbx_subdomain' = 'payroll_benefits');
 ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_calendar` ALTER COLUMN `payroll_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Payroll Calendar Identifier');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_calendar` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_calendar` ALTER COLUMN `associate_id` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_calendar` ALTER COLUMN `last_modified_by_user_associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_calendar` ALTER COLUMN `last_modified_by_user_associate_id` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_retail_v1`.`workforce`.`payroll_calendar` ALTER COLUMN `prior_payroll_calendar_id` SET TAGS ('dbx_self_ref_fk' = 'true');

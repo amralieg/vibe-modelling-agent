@@ -1,5 +1,5 @@
 -- Schema for Domain: pricing | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:25
+-- Generated on: 2026-07-12 13:53:24
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`pricing` COMMENT 'SSOT for all pricing strategies including EDLP (Everyday Low Price), Hi-Lo pricing, competitive pricing, markdowns, ASP (Average Selling Price), AUR (Average Unit Retail), dynamic pricing rules, price zones, and cost-plus margins. Tracks GMROI (Gross Margin Return on Investment), price change audit trails, and markdown optimization. Integrates with Oracle Retail Price Management (RPM) for enterprise-wide pricing governance.';
@@ -150,7 +150,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`price_change` (
     `price_zone_id` BIGINT COMMENT 'Reference to the geographic or competitive price zone to which this price change applies. Price zones group stores with similar competitive environments for unified pricing governance.',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Price changes are frequently triggered by promotional campaigns (weekly ads, seasonal events). Linking campaign to price change enables promotional effectiveness analysis, margin impact tracking, vend',
     `promo_offer_id` BIGINT COMMENT 'Reference to the promotion or promotional event that triggered this temporary price change. Null for non-promotional price changes. Links the price change audit trail to the promotions management domain.',
-    `replenishment_plan_id` BIGINT COMMENT 'The externally-known price event identifier assigned by the retail merchandising system Price Management (RPM). Used for cross-system reconciliation and audit traceability back to the source pricing system.',
     `sku_id` BIGINT COMMENT 'Reference to the specific SKU (Stock Keeping Unit) for which the price or cost change is being recorded. Links to the product master.',
     `vendor_id` BIGINT COMMENT 'Reference to the supplier associated with a cost-side change event (e.g., supplier cost increase, contract renegotiation, tariff change). Null for retail-only price changes with no supplier involvement.',
     `violation_notice_id` BIGINT COMMENT 'Foreign key linking to compliance.violation_notice. Business justification: Regulatory price violations (unit pricing laws, MAP violations, predatory pricing below cost) trigger violation notices citing specific price change events. Common in alcohol/tobacco retail enforcemen',
@@ -241,7 +240,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`cost_price` (
     `cost_price_id` BIGINT COMMENT 'Unique surrogate identifier for each cost price record in the pricing domain. Primary key for the cost_price data product.',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Cost prices are managed by buying departments (cost centers) for procurement budget tracking. Business process: purchasing department cost management, vendor negotiation accountability, and department',
     `cost_zone_id` BIGINT COMMENT 'Reference to the geographic or operational cost zone for which this cost applies. Cost zones allow differentiated landed costs by region, distribution center, or market.',
-    `food_safety_plan_id` BIGINT COMMENT 'Foreign key linking to compliance.food_safety_plan. Business justification: Landed costs for food products include food safety compliance costs (cold chain, HACCP controls, testing). Cost records reference applicable food safety plan driving cost components.',
     `purchase_order_id` BIGINT COMMENT 'Reference to the purchase order associated with this cost record, if the cost was established or confirmed via a specific PO. Supports cost traceability to procurement events.',
     `sku_id` BIGINT COMMENT 'Reference to the product SKU for which this cost record applies. Links to the product master to identify the specific item being costed.',
     `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: Cost negotiations are contract-specific. Buyers trace landed costs to contract terms, pricing tiers, payment terms, and volume commitments for vendor negotiations, cost variance analysis, and contract',
@@ -290,6 +288,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`rule` (
     `tier_id` BIGINT COMMENT 'Foreign key linking to loyalty.tier. Business justification: Pricing rules frequently target specific loyalty tiers (e.g., Platinum: 20% off electronics, Gold: 10% off apparel). Replaces denormalized text-based tier references with proper FK for tier-based',
     `price_strategy_id` BIGINT COMMENT 'Foreign key linking to pricing.price_strategy. Business justification: Pricing rules implement the pricing strategy defined at category/department level. Adding price_strategy_id FK links rule to strategy. Removes pricing_strategy STRING column as redundant with price_st',
     `price_zone_id` BIGINT COMMENT 'Reference to the geographic or market-based price zone to which this rule applies. Price zones allow differentiated pricing across store clusters, regions, or markets. Null if the rule applies uniformly across all zones. Managed in the retail merchandising system Price Management (RPM) zone configuration.',
+    `risk_register_id` BIGINT COMMENT 'Foreign key linking to compliance.risk_register. Business justification: Pricing rule risks (rule conflicts, regulatory non-compliance, system failures) documented in risk registers as operational/compliance risks. Risk assessments evaluate rule effectiveness/compliance.',
     `adjustment_method` STRING COMMENT 'Specifies the mathematical method used to compute the price adjustment. percentage = apply a % change to the base price (e.g., 15% markdown); absolute = apply a fixed monetary amount change (e.g., reduce by $5.00); index_based = adjust relative to a reference index (e.g., competitor price index, CPI).. Valid values are `percentage|absolute|index_based`',
     `adjustment_value` DECIMAL(18,2) COMMENT 'The numeric magnitude of the price adjustment as defined by the adjustment_method. For percentage, this is the rate (e.g., 15.00 = 15%); for absolute, this is the currency amount (e.g., 5.0000 = $5.00); for index_based, this is the index multiplier. Negative values represent price reductions (markdowns); positive values represent increases.',
     `algorithm_version` STRING COMMENT 'Version identifier of the dynamic pricing algorithm or rule engine logic applied by this rule. Used for reproducibility, audit, and A/B testing of pricing models. Example: v2.1.0, v3.0. Applicable for rule_type = dynamic_trigger, demand_based, or inventory_based. Null for static manual rules.. Valid values are `^vd+.d+(.d+)?$`',
@@ -331,10 +330,8 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`rule` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`competitive_price` (
     `competitive_price_id` BIGINT COMMENT 'Unique surrogate identifier for each competitive price observation record in the pricing domain. Primary key for the competitive_price data product.',
-    `location_id` BIGINT COMMENT 'Identifier for the specific competitor store location or online channel URL where the price was observed. Enables store-level competitive analysis and geographic price gap tracking.',
     `price_strategy_id` BIGINT COMMENT 'Foreign key linking to pricing.price_strategy. Business justification: Competitive price observations inform pricing strategy decisions. Adding price_strategy_id FK links observations to the strategy they inform. Removes pricing_strategy_type STRING as redundant.',
     `price_zone_id` BIGINT COMMENT 'Reference to the price zone in which the competitive observation was made. Price zones define geographic or market segments used in the retail merchandising system Price Management (RPM) for zone-based pricing governance.',
-    `privacy_assessment_id` BIGINT COMMENT 'Foreign key linking to compliance.privacy_assessment. Business justification: Competitive price intelligence systems collecting/processing customer data (loyalty card prices, personalized offers) require privacy assessments under GDPR/CCPA. Assessments govern data collection/us',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Competitive price monitoring triggers promotional responses. Retailers must track which campaigns were launched in response to competitor pricing moves for competitive intelligence, promotional ROI an',
     `sku_id` BIGINT COMMENT 'Reference to the internal SKU (Stock Keeping Unit) for which the competitive price observation was captured. Links the observation to the retailers own product master.',
     `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Competitive price observations compare competitor prices against our own retail price. Adding sku_price_id FK links to authoritative retail price record. Removes own_retail_price DECIMAL as redundant',
@@ -428,13 +425,11 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`margin_target` (
     `margin_target_id` BIGINT COMMENT 'Unique surrogate identifier for each margin target record in the pricing domain. Primary key for the margin_target data product.',
     `buyer_id` BIGINT COMMENT 'Reference to the merchandise buyer responsible for the category or department covered by this margin target. Enables accountability tracking and buyer-level margin performance reporting.',
     `category_id` BIGINT COMMENT 'Reference to the product subcategory within the category (e.g., Jackets within Mens Outerwear) for which this margin target is set. Enables granular margin guardrail enforcement at the subcategory level.',
-    `department_id` BIGINT COMMENT 'Reference to the merchandise department (e.g., Grocery, Apparel, Electronics) to which this margin target applies. Aligns with the retail merchandising system Merchandising System (ORMS) department hierarchy.',
     `margin_category_id` BIGINT COMMENT 'Reference to the product category within the department (e.g., Mens Outerwear, Fresh Produce, Laptops) for which this margin target is defined. Supports category management and assortment planning.',
+    `obligation_id` BIGINT COMMENT 'Foreign key linking to compliance.obligation. Business justification: Margin targets for regulated categories (pharmacy, alcohol) are driven by regulatory obligations (minimum markup laws, fair pricing requirements). Targets implement obligation requirements.',
     `price_strategy_id` BIGINT COMMENT 'Foreign key linking to pricing.price_strategy. Business justification: Margin targets are set according to pricing strategy (e.g., Hi-Lo strategy has different margin targets than EDLP). Links margin planning to strategy.',
     `price_zone_id` BIGINT COMMENT 'Reference to the price zone for which this margin target applies. Price zones group stores or regions with similar competitive pricing environments. Enables zone-level margin governance in the retail merchandising system Price Management (RPM).',
     `profit_center_id` BIGINT COMMENT 'Foreign key linking to finance.profit_center. Business justification: Margin targets are set at profit center level for financial planning and performance tracking. Core retail process: profit center margin planning, budget setting, and actual-to-target variance analysi',
-    `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Promotional campaigns must respect departmental margin targets. Retailers link margin targets to campaigns for pre-campaign margin impact analysis, promotional budget allocation, and post-campaign per',
-    `risk_register_id` BIGINT COMMENT 'Foreign key linking to compliance.risk_register. Business justification: Margin target risks (inability to achieve targets due to regulatory constraints, competitive pressure, cost inflation) tracked in compliance risk registers. Risk owners monitor target achievement.',
     `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Margin targets are set by planning season because seasonal merchandise has different cost structures and markdown expectations (Spring/Fall apparel, holiday electronics). Season-specific margin target',
     `approval_date` DATE COMMENT 'The calendar date on which this margin target was formally approved by the authorized merchandise planning or finance leader. Required for audit trail and governance documentation.',
     `approved_by` STRING COMMENT 'Name or employee identifier of the merchandise planning or finance leader who formally approved this margin target. Supports governance, accountability, and audit trail requirements.',
@@ -487,8 +482,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`pricing`.`price_override` (
     `profile_id` BIGINT COMMENT 'Identifier of the customer who received the price override benefit, if applicable. Populated for loyalty benefit overrides, price match requests, and personalized discount events. May be null for anonymous transactions.',
     `promo_offer_id` BIGINT COMMENT 'Identifier of the promotional event or campaign that authorized or triggered the price override, if applicable. Links to the promotion master for markdown optimization and promotional Return on Investment (ROI) analysis.',
     `sku_id` BIGINT COMMENT 'Identifier of the product (Stock Keeping Unit / SKU) whose price was overridden. Links to the product master in the retail merchandising system Merchandising System (ORMS) or the customer master data system.',
-    `training_completion_id` BIGINT COMMENT 'Foreign key linking to compliance.training_completion. Business justification: Associates authorized to override prices must complete POS compliance training. System checks training completion status before granting override privileges; expired training blocks overrides.',
-    `violation_notice_id` BIGINT COMMENT 'Foreign key linking to compliance.violation_notice. Business justification: POS price overrides violating regulatory pricing rules (below-cost laws, MAP enforcement, alcohol minimum pricing) generate violation notices. Enforcement agencies cite specific override transactions.',
     `approval_required` BOOLEAN COMMENT 'Indicates whether this override type or amount threshold required explicit manager authorization before being applied at the Point of Sale (POS). Drives workflow routing in the retail merchandising system Price Management (RPM) and supports discount abuse detection controls.',
     `approval_timestamp` TIMESTAMP COMMENT 'The date and time when the authorizing employee approved the price override. Null if approval was not required or if the override is still pending. Used for approval latency analysis and audit trail compliance.',
     `channel` STRING COMMENT 'The retail channel through which the price override was applied. Supports omnichannel override analysis across physical stores, e-commerce (the e-commerce platform), mobile, Buy Online Pick Up In Store (BOPIS), and other touchpoints.. Valid values are `in_store|ecommerce|mobile_app|call_center|bopis|kiosk`',
@@ -801,12 +794,10 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `price_strategy
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'PENDING|APPROVED|REJECTED|UNDER_REVIEW');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `base_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Base Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `base_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Applicable Channel');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'IN_STORE|ECOMMERCE|MOBILE|BOPIS|CATALOG|ALL');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `price_list_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,30}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `competitive_index` SET TAGS ('dbx_business_glossary_term' = 'Competitive Price Index');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `competitive_index` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -816,11 +807,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `is_default` SE
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `list_type` SET TAGS ('dbx_business_glossary_term' = 'Price List Type');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `loyalty_tier_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,20}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `markdown_pct` SET TAGS ('dbx_business_glossary_term' = 'Markdown Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `markdown_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `max_selling_price` SET TAGS ('dbx_business_glossary_term' = 'Maximum Selling Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `max_selling_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `min_selling_price` SET TAGS ('dbx_business_glossary_term' = 'Minimum Selling Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `min_selling_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Price List Notes');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `price_list_status` SET TAGS ('dbx_value_regex' = 'DRAFT|ACTIVE|SUSPENDED|EXPIRED|ARCHIVED');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_list` ALTER COLUMN `priority_rank` SET TAGS ('dbx_business_glossary_term' = 'Price List Priority Rank');
@@ -833,10 +821,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` SET TAGS ('dbx_data_type' = 
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` SET TAGS ('dbx_subdomain' = 'price_management');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `parent_zone_price_zone_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Price Zone ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `base_price_multiplier` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `channel_applicability` SET TAGS ('dbx_value_regex' = 'in_store|ecommerce|omnichannel|wholesale');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `competitive_index` SET TAGS ('dbx_business_glossary_term' = 'Competitive Price Index');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `competitive_index` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -846,9 +832,7 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `is_ecommerce_e
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Zone Review Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `market_tier` SET TAGS ('dbx_value_regex' = 'tier_1|tier_2|tier_3|tier_4');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `max_markdown_pct` SET TAGS ('dbx_business_glossary_term' = 'Maximum Markdown Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `max_markdown_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `min_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Minimum Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `min_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `next_review_date` SET TAGS ('dbx_business_glossary_term' = 'Next Zone Review Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `override_allowed` SET TAGS ('dbx_business_glossary_term' = 'Override Allowed Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `price_approval_required` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Required Flag');
@@ -857,7 +841,7 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `pricing_strate
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `region_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,15}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `review_frequency` SET TAGS ('dbx_business_glossary_term' = 'Zone Review Frequency');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `review_frequency` SET TAGS ('dbx_value_regex' = 'weekly|biweekly|monthly|quarterly|annual');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `rpm_zone_code` SET TAGS ('dbx_business_glossary_term' = 'Oracle Retail Price Management (RPM) Zone ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `rpm_zone_code` SET TAGS ('dbx_business_glossary_term' = 'the retail merchandising system Price Management (RPM) Zone ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `rpm_zone_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,30}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `sap_pricing_condition_group` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,10}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_zone` ALTER COLUMN `tax_jurisdiction_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
@@ -884,40 +868,29 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `approval_status
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'draft|pending_approval|approved|rejected|expired|cancelled');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Price Approved By');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Timestamp');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `channel_price_variance` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `channel_price_variance_reason` SET TAGS ('dbx_business_glossary_term' = 'Channel Price Variance Justification');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `channel_type` SET TAGS ('dbx_value_regex' = 'in_store|ecommerce|mobile_app|marketplace|bopis');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `competitive_price_ref` SET TAGS ('dbx_business_glossary_term' = 'Competitive Reference Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `competitive_price_ref` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Price Effective Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Price Expiry Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `gross_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Gross Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `gross_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `initial_markup_pct` SET TAGS ('dbx_business_glossary_term' = 'Initial Markup (IMU) Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `initial_markup_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `is_dynamic_pricing_enabled` SET TAGS ('dbx_business_glossary_term' = 'Dynamic Pricing Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `is_price_locked` SET TAGS ('dbx_business_glossary_term' = 'Price Locked Flag');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `markdown_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `markdown_pct` SET TAGS ('dbx_business_glossary_term' = 'Markdown Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `markdown_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `min_advertised_price` SET TAGS ('dbx_business_glossary_term' = 'Minimum Advertised Price (MAP)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `min_advertised_price` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `original_retail_price` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `price_ceiling` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `price_floor` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `price_per_unit_uom` SET TAGS ('dbx_business_glossary_term' = 'Price Per Unit Unit of Measure');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `price_per_unit_uom` SET TAGS ('dbx_value_regex' = '^[A-Z0-9/]{2,15}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `retail_price` SET TAGS ('dbx_business_glossary_term' = 'Average Unit Retail (AUR) Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `retail_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `source_system_code` SET TAGS ('dbx_value_regex' = 'RPM|SAP|ORMS|SFCC|CAR');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `source_system_price_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Price Record ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `tax_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{2,20}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `uom_code` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` SET TAGS ('dbx_subdomain' = 'markdown_governance');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` SET TAGS ('dbx_subdomain' = 'markdown_control');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Approver Employee ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `audit_finding_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Finding Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
@@ -929,7 +902,6 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `policy_id` S
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion ID');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `replenishment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Oracle Retail Price Management (RPM) Event ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `violation_notice_id` SET TAGS ('dbx_business_glossary_term' = 'Violation Notice Id (Foreign Key)');
@@ -942,7 +914,6 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `change_type`
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `change_type` SET TAGS ('dbx_value_regex' = 'permanent|temporary|markdown|automated');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Pricing Channel');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'in_store|online|omnichannel|wholesale');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `competitive_reference_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `cost_change_pct` SET TAGS ('dbx_business_glossary_term' = 'Cost Change Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -953,23 +924,16 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `execution_mo
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Price Change Expiry Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `is_cost_change` SET TAGS ('dbx_business_glossary_term' = 'Is Cost Change Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `is_margin_breach` SET TAGS ('dbx_business_glossary_term' = 'Is Margin Breach Flag');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `new_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `new_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'New Gross Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `new_margin_pct` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `new_retail_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Price Change Notes');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `pricing_strategy` SET TAGS ('dbx_value_regex' = 'EDLP|hi_lo|cost_plus|competitive|dynamic|clearance');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `prior_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `prior_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Prior Gross Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `prior_margin_pct` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `prior_retail_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `reason_code` SET TAGS ('dbx_business_glossary_term' = 'Price Change Reason Code');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `retail_price_change_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `retail_price_change_pct` SET TAGS ('dbx_business_glossary_term' = 'Retail Price Change Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `trigger_signal` SET TAGS ('dbx_business_glossary_term' = 'Price Change Trigger Signal');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` SET TAGS ('dbx_subdomain' = 'markdown_governance');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` SET TAGS ('dbx_subdomain' = 'markdown_control');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `audit_finding_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Finding Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
@@ -981,7 +945,6 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `rule_id` SET TAG
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `amount` SET TAGS ('dbx_business_glossary_term' = 'Markdown Amount');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Markdown Approved By');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Markdown Approval Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Markdown Channel');
@@ -999,10 +962,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `markdown_number`
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `markdown_status` SET TAGS ('dbx_value_regex' = 'draft|approved|active|completed|cancelled');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `markdown_type` SET TAGS ('dbx_value_regex' = 'permanent|pos|clearance|end_of_season|end_of_life|dead_stock');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `marked_down_price` SET TAGS ('dbx_business_glossary_term' = 'Marked-Down Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `marked_down_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Markdown Notes');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `on_hand_units_at_initiation` SET TAGS ('dbx_business_glossary_term' = 'On-Hand Units at Markdown Initiation');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `original_retail_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `percent` SET TAGS ('dbx_business_glossary_term' = 'Markdown Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `reason_code` SET TAGS ('dbx_business_glossary_term' = 'Markdown Reason Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `sell_through_actual_pct` SET TAGS ('dbx_business_glossary_term' = 'Sell-Through Actual Percentage');
@@ -1014,17 +975,14 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ALTER COLUMN `weeks_of_supply`
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` SET TAGS ('dbx_subdomain' = 'price_management');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `food_safety_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Food Safety Plan Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order (PO) ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `base_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_change_pct` SET TAGS ('dbx_business_glossary_term' = 'Cost Change Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_currency` SET TAGS ('dbx_business_glossary_term' = 'Cost Currency Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_currency` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_per_inner_pack` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_status` SET TAGS ('dbx_value_regex' = 'active|pending|expired|superseded|cancelled');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_type` SET TAGS ('dbx_value_regex' = 'standard|contract|promotional|spot|transfer');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `cost_uom` SET TAGS ('dbx_business_glossary_term' = 'Cost Unit of Measure (UOM)');
@@ -1032,29 +990,22 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `country_of_ori
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `country_of_origin` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `duty_amount` SET TAGS ('dbx_business_glossary_term' = 'Duty and Tariff Amount');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `duty_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `duty_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Duty Rate Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Cost Effective Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `end_date` SET TAGS ('dbx_business_glossary_term' = 'Cost End Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `exchange_rate` SET TAGS ('dbx_business_glossary_term' = 'Foreign Exchange (FX) Rate');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `freight_cost` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `handling_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `hts_code` SET TAGS ('dbx_business_glossary_term' = 'Harmonized Tariff Schedule (HTS) Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `hts_code` SET TAGS ('dbx_value_regex' = '^[0-9]{4}(.[0-9]{2}){0,3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `incoterm` SET TAGS ('dbx_business_glossary_term' = 'International Commercial Terms (Incoterm)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `is_current` SET TAGS ('dbx_business_glossary_term' = 'Is Current Cost Record Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `landed_cost` SET TAGS ('dbx_business_glossary_term' = 'Total Landed Cost');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `landed_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `landed_cost_local` SET TAGS ('dbx_business_glossary_term' = 'Total Landed Cost (Local Currency)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `landed_cost_local` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `other_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `prior_landed_cost` SET TAGS ('dbx_business_glossary_term' = 'Prior Total Landed Cost');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `prior_landed_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `source_system_cost_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Cost Record ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `supplier_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{3,20}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` SET TAGS ('dbx_data_type' = 'reference_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` SET TAGS ('dbx_subdomain' = 'strategy_rules');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` SET TAGS ('dbx_subdomain' = 'strategy_analytics');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `rule_id` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Merchandise Category ID');
@@ -1062,10 +1013,10 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `compliance_program_i
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `tier_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Tier Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `price_strategy_id` SET TAGS ('dbx_business_glossary_term' = 'Price Strategy Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `risk_register_id` SET TAGS ('dbx_business_glossary_term' = 'Risk Register Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `adjustment_method` SET TAGS ('dbx_business_glossary_term' = 'Price Adjustment Method');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `adjustment_method` SET TAGS ('dbx_value_regex' = 'percentage|absolute|index_based');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `adjustment_value` SET TAGS ('dbx_business_glossary_term' = 'Price Adjustment Value');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `adjustment_value` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `algorithm_version` SET TAGS ('dbx_business_glossary_term' = 'Pricing Algorithm Version');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `algorithm_version` SET TAGS ('dbx_value_regex' = '^vd+.d+(.d+)?$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Rule Approved By');
@@ -1074,9 +1025,7 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `channel` SET TAGS ('
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'in_store|ecommerce|mobile_app|all_channels');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `rule_code` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `rule_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{3,30}$');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `competitor_price_index` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `cost_plus_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Cost-Plus Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `cost_plus_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `rule_description` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Description');
@@ -1087,11 +1036,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `execution_mode` SET 
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `loyalty_exclusive` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Program Exclusive Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `markdown_depth_pct` SET TAGS ('dbx_business_glossary_term' = 'Markdown Depth Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `markdown_depth_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `max_price` SET TAGS ('dbx_business_glossary_term' = 'Maximum Price Guardrail');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `max_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `min_price` SET TAGS ('dbx_business_glossary_term' = 'Minimum Price Guardrail');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `min_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `rule_name` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Name');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `override_approval_required` SET TAGS ('dbx_business_glossary_term' = 'Override Approval Required Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `override_permitted` SET TAGS ('dbx_business_glossary_term' = 'Manual Override Permitted Flag');
@@ -1113,10 +1059,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `time_of_day_start` S
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `trigger_threshold_value` SET TAGS ('dbx_business_glossary_term' = 'Rule Trigger Threshold Value');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ALTER COLUMN `trigger_type` SET TAGS ('dbx_business_glossary_term' = 'Rule Trigger Type');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` SET TAGS ('dbx_subdomain' = 'strategy_rules');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Competitor Store ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` SET TAGS ('dbx_subdomain' = 'strategy_analytics');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `price_strategy_id` SET TAGS ('dbx_business_glossary_term' = 'Price Strategy Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `privacy_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Privacy Assessment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Price Id (Foreign Key)');
@@ -1124,7 +1068,6 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `categor
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_channel` SET TAGS ('dbx_value_regex' = 'in_store|online|mobile_app|marketplace|catalog');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_in_stock_flag` SET TAGS ('dbx_business_glossary_term' = 'Competitor In-Stock Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_price` SET TAGS ('dbx_business_glossary_term' = 'Competitor Observed Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_promo_end_date` SET TAGS ('dbx_business_glossary_term' = 'Competitor Promotional End Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_promo_flag` SET TAGS ('dbx_business_glossary_term' = 'Competitor Promotional Price Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `competitor_promo_type` SET TAGS ('dbx_business_glossary_term' = 'Competitor Promotional Price Type');
@@ -1138,21 +1081,16 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `geograp
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `gtin` SET TAGS ('dbx_business_glossary_term' = 'Global Trade Item Number (GTIN)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{8,14}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `match_type` SET TAGS ('dbx_value_regex' = 'exact_gtin|exact_upc|like_for_like|comparable|private_label_equivalent');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `normalized_unit_price` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `previous_competitor_price` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `price_gap` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `price_gap_pct` SET TAGS ('dbx_business_glossary_term' = 'Price Gap Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `price_gap_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `price_gap_trend` SET TAGS ('dbx_value_regex' = 'widening|narrowing|stable|reversed');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `price_index` SET TAGS ('dbx_business_glossary_term' = 'Competitive Price Index');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `price_index` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `response_action` SET TAGS ('dbx_business_glossary_term' = 'Recommended Response Action');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `response_action` SET TAGS ('dbx_value_regex' = 'match|undercut|hold|monitor|escalate');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `response_status` SET TAGS ('dbx_business_glossary_term' = 'Response Action Status');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `response_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected|implemented|expired');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` SET TAGS ('dbx_subdomain' = 'markdown_governance');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` SET TAGS ('dbx_subdomain' = 'markdown_control');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Approver ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
@@ -1168,11 +1106,9 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `approval_s
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `approval_tier` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Tier');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `approval_type` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Type');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `competitive_price_ref` SET TAGS ('dbx_business_glossary_term' = 'Competitive Reference Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `competitive_price_ref` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `current_price` SET TAGS ('dbx_business_glossary_term' = 'Current Retail Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `current_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `decision_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Decision Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Price Effective Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `end_date` SET TAGS ('dbx_business_glossary_term' = 'Price End Date');
@@ -1180,57 +1116,43 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `escalation
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `escalation_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Escalation Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Expiry Date');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `gross_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Gross Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `gross_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `is_auto_approved` SET TAGS ('dbx_business_glossary_term' = 'Auto-Approved Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `is_escalated` SET TAGS ('dbx_business_glossary_term' = 'Escalated Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `price_change_pct` SET TAGS ('dbx_business_glossary_term' = 'Price Change Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `price_change_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `pricing_strategy` SET TAGS ('dbx_value_regex' = 'EDLP|hi_lo|competitive|cost_plus|dynamic|clearance');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `proposed_price` SET TAGS ('dbx_business_glossary_term' = 'Proposed Retail Price');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `proposed_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `requested_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Price Approval Requested Timestamp');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `rpm_event_code` SET TAGS ('dbx_business_glossary_term' = 'Oracle Retail Price Management (RPM) Event ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `rpm_event_code` SET TAGS ('dbx_business_glossary_term' = 'the retail merchandising system Price Management (RPM) Event ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `sap_change_doc_number` SET TAGS ('dbx_business_glossary_term' = 'SAP Change Document Number');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `sla_response_hours` SET TAGS ('dbx_business_glossary_term' = 'Service Level Agreement (SLA) Response Hours');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Approval Version Number');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` SET TAGS ('dbx_data_type' = 'reference_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` SET TAGS ('dbx_subdomain' = 'strategy_rules');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` SET TAGS ('dbx_subdomain' = 'strategy_analytics');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `obligation_id` SET TAGS ('dbx_business_glossary_term' = 'Obligation Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `price_strategy_id` SET TAGS ('dbx_business_glossary_term' = 'Price Strategy Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `risk_register_id` SET TAGS ('dbx_business_glossary_term' = 'Risk Register Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `asp_target` SET TAGS ('dbx_business_glossary_term' = 'Average Selling Price (ASP) Target');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `asp_target` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `aur_target` SET TAGS ('dbx_business_glossary_term' = 'Average Unit Retail (AUR) Target');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `aur_target` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `brand_classification` SET TAGS ('dbx_value_regex' = 'private_label|national_brand|exclusive_brand|licensed_brand');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `budget_utilization_pct` SET TAGS ('dbx_business_glossary_term' = 'Markdown Budget Utilization Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `budget_utilization_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Retail Channel');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'all|store|ecommerce|bopis|wholesale');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `cogs_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Cost of Goods Sold (COGS) Rate Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `cogs_rate_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `gmroi_target` SET TAGS ('dbx_business_glossary_term' = 'Gross Margin Return on Investment (GMROI) Target');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `gmroi_target` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `is_locked` SET TAGS ('dbx_business_glossary_term' = 'Is Locked Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `markdown_budget_consumed` SET TAGS ('dbx_business_glossary_term' = 'Consumed Markdown Budget');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `markdown_budget_consumed` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `markdown_budget_remaining` SET TAGS ('dbx_business_glossary_term' = 'Remaining Markdown Budget');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `markdown_budget_remaining` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `markdown_budget_total` SET TAGS ('dbx_business_glossary_term' = 'Total Markdown Budget (Open-to-Buy Markdown Dollars)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `markdown_budget_total` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `markdown_optimization_strategy` SET TAGS ('dbx_value_regex' = 'edlp|hi_lo|clearance|dynamic|cost_plus');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `minimum_margin_floor_pct` SET TAGS ('dbx_business_glossary_term' = 'Minimum Margin Floor Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `minimum_margin_floor_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Planner Notes');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `planning_period_type` SET TAGS ('dbx_value_regex' = 'season|quarter|month|week|annual');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `private_label_margin_premium_pct` SET TAGS ('dbx_business_glossary_term' = 'Private Label Margin Premium Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `private_label_margin_premium_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `revision_number` SET TAGS ('dbx_business_glossary_term' = 'Budget Revision Number');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `revision_reason` SET TAGS ('dbx_business_glossary_term' = 'Budget Revision Reason');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `source_system_code` SET TAGS ('dbx_value_regex' = 'RPM|ORMS|SAP|MANUAL');
@@ -1238,14 +1160,13 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `source_syst
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `target_code` SET TAGS ('dbx_business_glossary_term' = 'Margin Target Code');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `target_code` SET TAGS ('dbx_value_regex' = '^MT-[A-Z0-9]{4,20}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `target_gross_margin_pct` SET TAGS ('dbx_business_glossary_term' = 'Target Gross Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `target_gross_margin_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `target_name` SET TAGS ('dbx_business_glossary_term' = 'Margin Target Name');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `target_sell_through_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Target Sell-Through Rate Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `target_status` SET TAGS ('dbx_business_glossary_term' = 'Margin Target Status');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `target_status` SET TAGS ('dbx_value_regex' = 'draft|active|approved|superseded|closed|cancelled');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ALTER COLUMN `target_weeks_of_supply` SET TAGS ('dbx_business_glossary_term' = 'Target Weeks of Supply (WOS)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` SET TAGS ('dbx_subdomain' = 'markdown_governance');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` SET TAGS ('dbx_subdomain' = 'markdown_control');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Authorizing Employee ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `audit_finding_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Finding Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
@@ -1256,20 +1177,12 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `pos_transa
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Product ID');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `training_completion_id` SET TAGS ('dbx_business_glossary_term' = 'Training Completion Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `violation_notice_id` SET TAGS ('dbx_business_glossary_term' = 'Violation Notice Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `approval_required` SET TAGS ('dbx_business_glossary_term' = 'Approval Required Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Sales Channel');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'in_store|ecommerce|mobile_app|call_center|bopis|kiosk');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `competitor_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `exceeds_threshold` SET TAGS ('dbx_business_glossary_term' = 'Exceeds Threshold Flag');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `original_price` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `override_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `override_limit_threshold` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `override_percentage` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `override_price` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `override_status` SET TAGS ('dbx_value_regex' = 'applied|pending_approval|approved|rejected|voided|reversed');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `override_type` SET TAGS ('dbx_value_regex' = 'manager_discount|price_match|damaged_goods|loyalty_benefit|error_correction');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `quantity` SET TAGS ('dbx_business_glossary_term' = 'Override Quantity');
@@ -1279,32 +1192,25 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `shrinkage_
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `source_system_override_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Override ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `total_override_impact` SET TAGS ('dbx_business_glossary_term' = 'Total Override Impact Amount');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `total_override_impact` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `upc` SET TAGS ('dbx_business_glossary_term' = 'Universal Product Code (UPC)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `upc` SET TAGS ('dbx_value_regex' = '^[0-9]{12}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` SET TAGS ('dbx_data_type' = 'reference_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` SET TAGS ('dbx_subdomain' = 'strategy_rules');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` SET TAGS ('dbx_subdomain' = 'strategy_analytics');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Strategy Owner User ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `approval_threshold_pct` SET TAGS ('dbx_business_glossary_term' = 'Price Change Approval Threshold Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `aur_floor` SET TAGS ('dbx_business_glossary_term' = 'Average Unit Retail (AUR) Floor');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `aur_floor` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `channel_scope` SET TAGS ('dbx_value_regex' = 'ALL|IN_STORE|ECOMMERCE|BOPIS|MARKETPLACE');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `competitive_index_target` SET TAGS ('dbx_business_glossary_term' = 'Competitive Price Index Target');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `competitive_index_target` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `competitor_benchmark_set` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `cost_plus_markup_pct` SET TAGS ('dbx_business_glossary_term' = 'Cost-Plus Markup Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `cost_plus_markup_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `dynamic_pricing_enabled` SET TAGS ('dbx_business_glossary_term' = 'Dynamic Pricing Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `gmroi_target` SET TAGS ('dbx_business_glossary_term' = 'Gross Margin Return on Investment (GMROI) Target');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `gmroi_target` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `hilo_promo_depth_pct` SET TAGS ('dbx_business_glossary_term' = 'Hi-Lo (High-Low) Promotional Depth Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `hilo_promo_depth_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `hilo_swing_frequency_days` SET TAGS ('dbx_business_glossary_term' = 'Hi-Lo (High-Low) Swing Frequency Days');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `map_enforcement_enabled` SET TAGS ('dbx_business_glossary_term' = 'Minimum Advertised Price (MAP) Enforcement Enabled Flag');
@@ -1314,8 +1220,7 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `price_chan
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `price_review_frequency` SET TAGS ('dbx_value_regex' = 'DAILY|WEEKLY|BIWEEKLY|MONTHLY|QUARTERLY|EVENT_DRIVEN');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `price_strategy_status` SET TAGS ('dbx_value_regex' = 'DRAFT|ACTIVE|SUSPENDED|EXPIRED|ARCHIVED');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `private_label_differential_pct` SET TAGS ('dbx_business_glossary_term' = 'Private Label Price Differential Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `private_label_differential_pct` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `rpm_strategy_code` SET TAGS ('dbx_business_glossary_term' = 'Oracle Retail Price Management (RPM) Strategy ID');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `rpm_strategy_code` SET TAGS ('dbx_business_glossary_term' = 'the retail merchandising system Price Management (RPM) Strategy ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `rpm_strategy_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,50}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `season_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,20}$');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `sell_through_rate_target_pct` SET TAGS ('dbx_business_glossary_term' = 'Sell-Through Rate Target Percentage');
@@ -1326,16 +1231,13 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `strategy_n
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `strategy_type` SET TAGS ('dbx_business_glossary_term' = 'Price Strategy Type');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `strategy_type` SET TAGS ('dbx_value_regex' = 'EDLP|HI_LO|COST_PLUS|COMPETITIVE_INDEX|VALUE_BASED|DYNAMIC');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `target_margin_max_pct` SET TAGS ('dbx_business_glossary_term' = 'Target Margin Maximum Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `target_margin_max_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `target_margin_min_pct` SET TAGS ('dbx_business_glossary_term' = 'Target Margin Minimum Percentage');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ALTER COLUMN `target_margin_min_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` SET TAGS ('dbx_data_type' = 'Master');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` SET TAGS ('dbx_subdomain' = 'price_management');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` SET TAGS ('dbx_subdomain' = 'strategy_analytics');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Approved By User ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `tier_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Tier Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `price_strategy_id` SET TAGS ('dbx_business_glossary_term' = 'Price Strategy Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `prior_price_sensitivity_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `analysis_status` SET TAGS ('dbx_value_regex' = 'draft|validated|approved|active|archived');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Sales Channel');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'store|ecommerce|mobile|marketplace|omnichannel');
@@ -1348,10 +1250,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `model_t
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `price_change_threshold_pct` SET TAGS ('dbx_business_glossary_term' = 'Price Change Threshold Percentage');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ALTER COLUMN `r_squared` SET TAGS ('dbx_business_glossary_term' = 'R-Squared Coefficient');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` SET TAGS ('dbx_data_type' = 'Master');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` SET TAGS ('dbx_subdomain' = 'markdown_governance');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` SET TAGS ('dbx_subdomain' = 'markdown_control');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Approver User ID');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `associate_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `associate_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `audit_event_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Event Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
@@ -1361,23 +1261,15 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `price_app
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `price_associate_id` SET TAGS ('dbx_business_glossary_term' = 'Actor User ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `reversal_price_audit_log_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `rule_id` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `actor_type` SET TAGS ('dbx_value_regex' = 'user|system|api|batch_process|automated_rule|external_integration');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `actor_username` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `approval_tier` SET TAGS ('dbx_value_regex' = 'tier_1|tier_2|tier_3|executive|auto_approved|no_approval_required');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `approver_username` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `audit_status` SET TAGS ('dbx_value_regex' = 'logged|pending_review|reviewed|closed|escalated|voided');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `margin_impact` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `new_cost_price` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `new_margin_percent` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `prior_cost_price` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `prior_margin_percent` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ALTER COLUMN `source_system_event_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Event ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule_application` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`rule_application` SET TAGS ('dbx_subdomain' = 'strategy_rules');
+ALTER TABLE `vibe_retail_v1`.`pricing`.`rule_application` SET TAGS ('dbx_subdomain' = 'strategy_analytics');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule_application` SET TAGS ('dbx_association_edges' = 'pricing.pricing_rule,promotion.promo_offer');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule_application` ALTER COLUMN `rule_application_id` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Application ID');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule_application` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Pricing Rule Application - Promo Offer Id');
@@ -1414,4 +1306,3 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`zone_price_list_assignment` ALTER COLUMN
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_zone` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_zone` SET TAGS ('dbx_subdomain' = 'price_management');
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_zone` ALTER COLUMN `cost_zone_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Zone Identifier');
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_zone` ALTER COLUMN `annual_revenue_amount` SET TAGS ('dbx_confidential' = 'true');

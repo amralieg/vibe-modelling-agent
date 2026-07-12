@@ -1,5 +1,5 @@
 -- Schema for Domain: fulfillment | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:23
+-- Generated on: 2026-07-12 13:53:22
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`fulfillment` COMMENT 'Manages order picking, packing, ship-from-store, BOPIS/ROPIS processing, dark store fulfillment, last-mile delivery execution, carrier selection, route optimization, and fulfillment KPI tracking. Owns the operational execution layer between order capture and customer delivery, including transportation planning and last-mile logistics.';
@@ -59,6 +59,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` (
     `fulfillment_line_id` BIGINT COMMENT 'Unique identifier for the fulfillment line item. Primary key for this entity.',
     `fulfillment_node_id` BIGINT COMMENT 'Identifier of the specific fulfillment location (DC number, store number, vendor ID, etc.). Links to the physical location that executed fulfillment.',
     `fulfillment_order_id` BIGINT COMMENT 'Reference to the parent fulfillment order header. Links this line to the overall fulfillment order.',
+    `haccp_control_point_id` BIGINT COMMENT 'Foreign key linking to compliance.haccp_control_point. Business justification: Perishable/food SKUs must reference HACCP critical control points for temperature monitoring, lot traceability, and recall management. Required for FDA compliance and food safety audits in grocery ful',
     `handling_unit_id` BIGINT COMMENT 'Identifier of the shipping carton or container into which this line was packed. Links line items to physical shipment packages.',
     `order_line_id` BIGINT COMMENT 'Reference to the original sales order line that this fulfillment line is satisfying. Links fulfillment execution back to customer order.',
     `outbound_order_line_id` BIGINT COMMENT 'Foreign key linking to supplychain.outbound_order_line. Business justification: Line-level linkage for DC-to-store replenishment. Each fulfillment_line executing store replenishment corresponds to outbound_order_line in DC system. Critical for SKU-level reconciliation and invento',
@@ -108,7 +109,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`fulfillment`.`shipment` (
     `fulfillment_node_id` BIGINT COMMENT 'Reference to the fulfillment node (distribution center, store, dark store, or micro-fulfillment center) from which the shipment originated.',
     `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: shipment is the physical dispatch output of a fulfillment_order (the operational work order). Currently shipment only links to order_header, missing the operational lineage. Adding fulfillment_order_i',
     `header_id` BIGINT COMMENT 'Reference to the parent order that this shipment fulfills. Links shipment to the originating customer order.',
-    `outbound_shipment_id` BIGINT COMMENT 'Foreign key linking to supplychain.outbound_shipment. Business justification: Same physical shipment tracked in both domains. Fulfillment.shipment is customer-facing view; outbound_shipment is DC logistics view. Essential for unified shipment visibility, freight reconciliation,',
+    `outbound_shipment_id` BIGINT COMMENT 'Foreign key linking to supplychain.outbound_shipment. Business justification: Same physical shipment tracked in both domains. Fulfillment.shipment is customer-facing view; outbound_shipment is DC logistics view. Essential for unified shipment visibility, freight reconciliation',
     `profile_id` BIGINT COMMENT 'Reference to the customer receiving the shipment. Primary party reference for the transaction.',
     `actual_delivery_date` DATE COMMENT 'Actual date when the shipment was successfully delivered to the recipient. Used for on-time delivery performance measurement.',
     `carrier_charge_amount` DECIMAL(18,2) COMMENT 'Actual cost charged by the carrier for transporting this shipment. Used for freight cost accounting and margin analysis.',
@@ -472,7 +473,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` (
     `fulfillment_node_id` BIGINT COMMENT 'Unique identifier for the node data product.',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Each fulfillment node (DC, store fulfillment center, dark store) operates as a cost center for expense allocation, budget management, headcount planning, and operational cost reporting required for re',
     `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Fulfillment nodes include DCs. When node is a DC, linking to dc_facility provides full facility details (dock doors, capacity, WMS, zones). Essential for DC-based fulfillment operations, capacity plan',
-    `food_safety_plan_id` BIGINT COMMENT 'Foreign key linking to compliance.food_safety_plan. Business justification: Fulfillment nodes (DCs, micro-fulfillment centers) handling food products require FDA-registered food safety plans under FSMA. Direct regulatory requirement for grocery distribution facilities; suppor',
     `profit_center_id` BIGINT COMMENT 'Foreign key linking to finance.profit_center. Business justification: Fulfillment nodes operating as ship-from-store or BOPIS locations generate attributed revenue and operate as profit centers for segment reporting, channel profitability analysis, and omnichannel finan',
     `activation_date` DATE COMMENT 'Date when the fulfillment node became operational and available for order fulfillment.',
     `address_line_1` STRING COMMENT 'Primary street address of the fulfillment node (street number, street name). Organizational contact data classified as confidential per business policy.',
@@ -518,7 +518,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` (
     `bopis_appointment_id` BIGINT COMMENT 'Unique identifier for the BOPIS or ROPIS pickup appointment record.',
-    `ar_invoice_id` BIGINT COMMENT 'Foreign key linking to finance.ar_invoice. Business justification: BOPIS orders invoiced upon pickup require linkage for revenue recognition timing (ASC 606 performance obligation satisfaction), accounts receivable management, and payment reconciliation when payment',
     `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: bopis_appointment tracks BOPIS/ROPIS customer pickup appointments. It links to order_header but not to the operational fulfillment_order that picks and stages the items. Adding fulfillment_order_id FK',
     `header_id` BIGINT COMMENT 'Reference to the e-commerce or omnichannel order associated with this pickup appointment.',
     `location_id` BIGINT COMMENT 'Reference to the store or fulfillment node where the customer will pick up the order.',
@@ -718,14 +717,13 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` (
     `drop_ship_order_id` BIGINT COMMENT 'Primary key for drop_ship_order',
-    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Buyers negotiate drop-ship agreements with vendors, approve drop-ship SKUs, and own vendor performance. Retail operations track which buyer authorized each drop-ship arrangement for vendor management,',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Buyers negotiate drop-ship agreements with vendors, approve drop-ship SKUs, and own vendor performance. Retail operations track which buyer authorized each drop-ship arrangement for vendor management',
     `carrier_id` BIGINT COMMENT 'Reference to the shipping carrier used by the vendor for drop ship delivery.',
     `carrier_service_id` BIGINT COMMENT 'Foreign key linking to fulfillment.carrier_service. Business justification: drop_ship_order has carrier_id FK and denormalized carrier_service_level column, but no FK to carrier_service. Business reality: a drop-ship order is fulfilled by the vendor using a specific carrier s',
     `cost_price_id` BIGINT COMMENT 'Foreign key linking to pricing.cost_price. Business justification: Drop ship orders track vendor cost for margin analysis, profitability reporting, and vendor performance evaluation. Currently has denormalized unit_cost/extended_cost; linking to cost_price provides f',
     `header_id` BIGINT COMMENT 'Reference to the parent customer order that this drop ship fulfillment is executing against.',
     `order_line_id` BIGINT COMMENT 'Reference to the specific order line item being fulfilled via drop ship.',
     `profile_id` BIGINT COMMENT 'Reference to the customer who will receive the drop ship delivery.',
-    `third_party_assessment_id` BIGINT COMMENT 'Foreign key linking to compliance.third_party_assessment. Business justification: Drop-ship vendors undergo compliance assessments (data security, labor practices, product safety) before approval and periodically thereafter. Links orders to vendor assessment records for risk manage',
     `vendor_contact_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contact. Business justification: Drop ship operations require designated vendor contact for order transmission, shipment coordination, exception resolution, and SLA escalation. Retail drop ship systems maintain contact assignments pe',
     `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: Drop ship orders execute under specific vendor contracts defining pricing, terms, SLAs, and chargeback provisions. Contract reference required for compliance verification, SLA monitoring, dispute reso',
     `vendor_id` BIGINT COMMENT 'Reference to the supplier or vendor who will ship directly to the customer on behalf of the retailer.',
@@ -896,8 +894,6 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ALTER COLUMN `pri
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Picker Employee ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ALTER COLUMN `fulfillment_method` SET TAGS ('dbx_value_regex' = 'ship_from_store|dark_store|distribution_center|bopis|ropis|drop_ship');
@@ -911,12 +907,12 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ALTER COLUMN `tra
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` SET TAGS ('dbx_subdomain' = 'order_execution');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `fulfillment_node_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Source ID');
+ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `haccp_control_point_id` SET TAGS ('dbx_business_glossary_term' = 'Haccp Control Point Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `handling_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Carton ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `outbound_order_line_id` SET TAGS ('dbx_business_glossary_term' = 'Outbound Order Line Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Picker ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `vendor_item_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Item Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `extended_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `fulfillment_source_type` SET TAGS ('dbx_value_regex' = 'dc|store|dark_store|vendor|3pl');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `gtin` SET TAGS ('dbx_business_glossary_term' = 'Global Trade Item Number (GTIN)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{14}$');
@@ -924,7 +920,6 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `orig
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,20}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `substitution_reason_code` SET TAGS ('dbx_value_regex' = 'out_of_stock|discontinued|damaged|customer_request|upgrade|downgrade');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `unit_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'each|case|pallet|box|pack|unit');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ALTER COLUMN `upc` SET TAGS ('dbx_business_glossary_term' = 'Universal Product Code (UPC)');
@@ -942,9 +937,7 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `fulfillment_
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `outbound_shipment_id` SET TAGS ('dbx_business_glossary_term' = 'Distribution Shipment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Ship-To Customer ID');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `carrier_charge_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `carrier_charge_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `declared_value_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `declared_value_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `fulfillment_type` SET TAGS ('dbx_value_regex' = 'standard|bopis|ropis|ship_from_store|drop_ship|curbside');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `hazmat_flag` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Materials (HAZMAT) Flag');
@@ -953,37 +946,18 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `length_cm` S
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_from_location_type` SET TAGS ('dbx_business_glossary_term' = 'Ship-From Location Type');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_from_location_type` SET TAGS ('dbx_value_regex' = 'distribution_center|store|dark_store|micro_fulfillment_center|vendor');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_address_line1` SET TAGS ('dbx_business_glossary_term' = 'Ship-To Address Line 1');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_address_line1` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_address_line1` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_address_line2` SET TAGS ('dbx_business_glossary_term' = 'Ship-To Address Line 2');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_address_line2` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_address_line2` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_city` SET TAGS ('dbx_business_glossary_term' = 'Ship-To City');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_city` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_city` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_contact_name` SET TAGS ('dbx_business_glossary_term' = 'Ship-To Contact Name');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_contact_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_contact_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_country_code` SET TAGS ('dbx_business_glossary_term' = 'Ship-To Country Code');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_email_address` SET TAGS ('dbx_business_glossary_term' = 'Ship-To Email Address');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_email_address` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_email_address` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_email_address` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_phone_number` SET TAGS ('dbx_business_glossary_term' = 'Ship-To Phone Number');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_phone_number` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_phone_number` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_postal_code` SET TAGS ('dbx_business_glossary_term' = 'Ship-To Postal Code');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_state_province` SET TAGS ('dbx_business_glossary_term' = 'Ship-To State or Province');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_state_province` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `ship_to_state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `shipment_number` SET TAGS ('dbx_value_regex' = '^SHP[0-9]{10}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `shipping_cost_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `shipping_cost_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `signature_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `signature_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `total_volume_cubic_meters` SET TAGS ('dbx_business_glossary_term' = 'Total Volume in Cubic Meters');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `total_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Total Weight in Kilograms (KG)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ALTER COLUMN `width_cm` SET TAGS ('dbx_business_glossary_term' = 'Width in Centimeters (CM)');
@@ -1104,44 +1078,21 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `outboun
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `actual_service_time_minutes` SET TAGS ('dbx_business_glossary_term' = 'Actual Service Time in Minutes');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_address_line1` SET TAGS ('dbx_business_glossary_term' = 'Delivery Address Line 1');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_address_line1` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_address_line1` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_address_line2` SET TAGS ('dbx_business_glossary_term' = 'Delivery Address Line 2');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_address_line2` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_address_line2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_city` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_city` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_latitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_latitude` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_longitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_longitude` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_postal_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_state_province` SET TAGS ('dbx_business_glossary_term' = 'Delivery State or Province');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_state_province` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `delivery_state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `estimated_service_time_minutes` SET TAGS ('dbx_business_glossary_term' = 'Estimated Service Time in Minutes');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_capture_method` SET TAGS ('dbx_business_glossary_term' = 'Proof of Delivery (POD) Capture Method');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_capture_method` SET TAGS ('dbx_value_regex' = 'mobile_app|handheld_scanner|kiosk|web_portal|automated_system');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_capture_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Proof of Delivery (POD) Capture Timestamp');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_gps_latitude` SET TAGS ('dbx_business_glossary_term' = 'Proof of Delivery (POD) GPS Latitude');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_gps_latitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_gps_latitude` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_gps_longitude` SET TAGS ('dbx_business_glossary_term' = 'Proof of Delivery (POD) GPS Longitude');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_gps_longitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_gps_longitude` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_photo_image_url` SET TAGS ('dbx_business_glossary_term' = 'Proof of Delivery (POD) Photo Image URL');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_pin_code` SET TAGS ('dbx_business_glossary_term' = 'Proof of Delivery (POD) PIN Code');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_pin_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_signature_image_url` SET TAGS ('dbx_business_glossary_term' = 'Proof of Delivery (POD) Signature Image URL');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_verification_status` SET TAGS ('dbx_business_glossary_term' = 'Proof of Delivery (POD) Verification Status');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `pod_verification_status` SET TAGS ('dbx_value_regex' = 'verified|pending_verification|verification_failed|disputed|not_required');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `recipient_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `recipient_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `recipient_phone` SET TAGS ('dbx_business_glossary_term' = 'Recipient Phone Number');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `recipient_phone` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `recipient_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `stop_type` SET TAGS ('dbx_value_regex' = 'customer_delivery|bopis_pickup|ropis_pickup|return_pickup|dark_store_transfer');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ALTER COLUMN `vehicle_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` SET TAGS ('dbx_data_type' = 'master_data');
@@ -1150,25 +1101,17 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `carrier_id` S
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `certification_id` SET TAGS ('dbx_business_glossary_term' = 'Certification Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `api_integration_flag` SET TAGS ('dbx_business_glossary_term' = 'Application Programming Interface (API) Integration Flag');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `base_rate_per_lb` SET TAGS ('dbx_business_glossary_term' = 'Base Rate Per Pound');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `base_rate_per_lb` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `bopis_ready_flag` SET TAGS ('dbx_business_glossary_term' = 'Buy Online Pick Up In Store (BOPIS) Ready Flag');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `carrier_status` SET TAGS ('dbx_value_regex' = 'active|inactive|suspended|pending_approval');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `carrier_type` SET TAGS ('dbx_value_regex' = 'parcel|ltl|ftl|last_mile|same_day|3pl');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `carrier_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `contact_email` SET TAGS ('dbx_business_glossary_term' = 'Primary Contact Email Address');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `contact_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `contact_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `contact_name` SET TAGS ('dbx_business_glossary_term' = 'Primary Contact Name');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `contact_name` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `contact_phone` SET TAGS ('dbx_business_glossary_term' = 'Primary Contact Phone Number');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `contact_phone` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `cutoff_time_local` SET TAGS ('dbx_value_regex' = '^([01]?[0-9]|2[0-3]):[0-5][0-9]$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `edi_capable_flag` SET TAGS ('dbx_business_glossary_term' = 'Electronic Data Interchange (EDI) Capable Flag');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `extended_area_surcharge` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `fuel_surcharge_percentage` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `hazmat_certified_flag` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Materials (HAZMAT) Certified Flag');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `insurance_coverage_flag` SET TAGS ('dbx_business_glossary_term' = 'Insurance Coverage Available Flag');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `max_height_inches` SET TAGS ('dbx_business_glossary_term' = 'Maximum Height in Inches');
@@ -1176,8 +1119,6 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `max_length_in
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `max_weight_lbs` SET TAGS ('dbx_business_glossary_term' = 'Maximum Weight in Pounds (lbs)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `max_width_inches` SET TAGS ('dbx_business_glossary_term' = 'Maximum Width in Inches');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `carrier_name` SET TAGS ('dbx_business_glossary_term' = 'Carrier Legal Name');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `negotiated_discount_percentage` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `residential_delivery_surcharge` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `scac_code` SET TAGS ('dbx_business_glossary_term' = 'Standard Carrier Alpha Code (SCAC)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `scac_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{2,4}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `service_level_ground` SET TAGS ('dbx_business_glossary_term' = 'Ground Service Level Available');
@@ -1190,7 +1131,6 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `transit_days_
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_service` SET TAGS ('dbx_data_type' = 'reference_data');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_service` SET TAGS ('dbx_subdomain' = 'carrier_management');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_service` ALTER COLUMN `base_rate` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_service` ALTER COLUMN `bopis_eligible_flag` SET TAGS ('dbx_business_glossary_term' = 'Buy Online Pick Up In Store (BOPIS) Eligible Flag');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_service` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_service` ALTER COLUMN `cutoff_timezone` SET TAGS ('dbx_value_regex' = '^[A-Z]{3,5}$');
@@ -1216,49 +1156,27 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` SET TAGS ('dbx_sub
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `fulfillment_node_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Key for node');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `food_safety_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Food Safety Plan Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `address_line_1` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `address_line_1` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `address_line_2` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `address_line_2` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `automation_level` SET TAGS ('dbx_value_regex' = 'manual|semi_automated|fully_automated');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `bopis_enabled` SET TAGS ('dbx_business_glossary_term' = 'Buy Online Pick Up In Store (BOPIS) Enabled');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `city` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `city` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `email_address` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `email_address` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `email_address` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `hazmat_certified` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Materials (HAZMAT) Certified');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `latitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `longitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `node_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,12}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `node_status` SET TAGS ('dbx_value_regex' = 'active|inactive|planned|under_construction|temporarily_closed|decommissioned');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `node_type` SET TAGS ('dbx_value_regex' = 'distribution_center|store|dark_store|micro_fulfillment_center|cross_dock|returns_center');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `phone_number` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `ropis_enabled` SET TAGS ('dbx_business_glossary_term' = 'Reserve Online Pick Up In Store (ROPIS) Enabled');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `ship_from_store_enabled` SET TAGS ('dbx_business_glossary_term' = 'Ship From Store (SFS) Enabled');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `state_province` SET TAGS ('dbx_business_glossary_term' = 'State or Province');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `state_province` SET TAGS ('dbx_value_regex' = '^[A-Z]{2}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `state_province` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ALTER COLUMN `wms_system_code` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Management System (WMS) System ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` SET TAGS ('dbx_subdomain' = 'order_execution');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `bopis_appointment_id` SET TAGS ('dbx_business_glossary_term' = 'BOPIS (Buy Online Pick Up In Store) Appointment ID');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `ar_invoice_id` SET TAGS ('dbx_business_glossary_term' = 'Ar Invoice Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `alternate_pickup_person_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `alternate_pickup_person_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `appointment_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,20}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `appointment_status` SET TAGS ('dbx_value_regex' = 'scheduled|ready|picked_up|expired|cancelled|no_show');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `appointment_type` SET TAGS ('dbx_value_regex' = 'BOPIS|ROPIS');
@@ -1268,13 +1186,7 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `che
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `check_in_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Check-In Timestamp');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `customer_email` SET TAGS ('dbx_business_glossary_term' = 'Customer Email Address');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `customer_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `customer_email` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `customer_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `customer_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `customer_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `customer_phone` SET TAGS ('dbx_business_glossary_term' = 'Customer Phone Number');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `customer_phone` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `customer_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `id_verification_method` SET TAGS ('dbx_value_regex' = 'drivers_license|passport|order_confirmation|photo_id|none');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `parking_spot_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,10}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ALTER COLUMN `pickup_location_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
@@ -1292,7 +1204,6 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ALTER COLUMN `loyalty_mem
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ALTER COLUMN `service_case_id` SET TAGS ('dbx_business_glossary_term' = 'Service Case Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ALTER COLUMN `exception_status` SET TAGS ('dbx_value_regex' = 'open|in_progress|resolved|escalated|cancelled');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ALTER COLUMN `financial_impact_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ALTER COLUMN `owner_type` SET TAGS ('dbx_business_glossary_term' = 'Exception Owner Type');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ALTER COLUMN `priority` SET TAGS ('dbx_value_regex' = 'critical|high|medium|low');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
@@ -1303,19 +1214,11 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` SET TAGS ('
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `carrier_service_id` SET TAGS ('dbx_business_glossary_term' = 'Carrier Service Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `shipment_package_id` SET TAGS ('dbx_business_glossary_term' = 'Package ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `data_source_type` SET TAGS ('dbx_value_regex' = 'carrier_api|edi_214|webhook|manual_entry|scrape');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `delivery_signature_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `delivery_signature_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `event_location_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `event_location_postal_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `event_location_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `event_location_state` SET TAGS ('dbx_business_glossary_term' = 'Event Location State or Province');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `event_type` SET TAGS ('dbx_business_glossary_term' = 'Tracking Event Type');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `latitude` SET TAGS ('dbx_business_glossary_term' = 'Event Location Latitude');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `latitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `longitude` SET TAGS ('dbx_business_glossary_term' = 'Event Location Longitude');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `longitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `notification_sent_flag` SET TAGS ('dbx_business_glossary_term' = 'Customer Notification Sent Flag');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `received_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Data Received Timestamp');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment_tracking_event` ALTER COLUMN `scan_type` SET TAGS ('dbx_value_regex' = 'automated|manual|mobile|rfid');
@@ -1341,24 +1244,16 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`sla` ALTER COLUMN `node_type` SET TA
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`sla` ALTER COLUMN `order_channel` SET TAGS ('dbx_value_regex' = 'WEB|MOBILE_APP|IN_STORE|CALL_CENTER|MARKETPLACE|SOCIAL_COMMERCE');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`sla` ALTER COLUMN `order_value_max` SET TAGS ('dbx_business_glossary_term' = 'Maximum Order Value');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`sla` ALTER COLUMN `order_value_min` SET TAGS ('dbx_business_glossary_term' = 'Minimum Order Value');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`sla` ALTER COLUMN `postal_code_pattern` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`sla` ALTER COLUMN `postal_code_pattern` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`sla` ALTER COLUMN `priority_level` SET TAGS ('dbx_value_regex' = 'CRITICAL|HIGH|MEDIUM|LOW');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`sla` ALTER COLUMN `sla_type` SET TAGS ('dbx_business_glossary_term' = 'Service Level Agreement (SLA) Type');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`sla` ALTER COLUMN `updated_by` SET TAGS ('dbx_business_glossary_term' = 'Updated By User');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` SET TAGS ('dbx_data_type' = 'reference_data');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` SET TAGS ('dbx_subdomain' = 'carrier_management');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `carrier_service_id` SET TAGS ('dbx_business_glossary_term' = 'Carrier Service Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `contract_number` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `destination_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `destination_postal_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `destination_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `is_hazmat_eligible` SET TAGS ('dbx_business_glossary_term' = 'Is Hazardous Materials (HAZMAT) Eligible');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `negotiated_discount_percentage` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `origin_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `origin_postal_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `origin_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `rate_per_kg` SET TAGS ('dbx_business_glossary_term' = 'Rate Per Kilogram');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `rate_source` SET TAGS ('dbx_value_regex' = 'carrier_api|manual_entry|contract_upload|rate_shop|third_party');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier_rate` ALTER COLUMN `rate_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending|expired|suspended');
@@ -1373,35 +1268,18 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `carri
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `third_party_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Third Party Assessment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `vendor_contact_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contact Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `vendor_item_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Item Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `gtin` SET TAGS ('dbx_business_glossary_term' = 'Global Trade Item Number (GTIN)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_address_line1` SET TAGS ('dbx_business_glossary_term' = 'Ship To Address Line 1');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_address_line1` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_address_line1` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_address_line2` SET TAGS ('dbx_business_glossary_term' = 'Ship To Address Line 2');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_address_line2` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_address_line2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_city` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_city` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_email` SET TAGS ('dbx_business_glossary_term' = 'Ship To Email Address');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_email` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_phone` SET TAGS ('dbx_business_glossary_term' = 'Ship To Phone Number');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_phone` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_phone` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_postal_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_state_province` SET TAGS ('dbx_business_glossary_term' = 'Ship To State or Province');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_state_province` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `ship_to_state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'each|case|pallet|box|pair|set');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ALTER COLUMN `upc` SET TAGS ('dbx_business_glossary_term' = 'Universal Product Code (UPC)');
@@ -1415,12 +1293,7 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `hea
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `outbound_shipment_id` SET TAGS ('dbx_business_glossary_term' = 'Distribution Shipment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `delivery_latitude` SET TAGS ('dbx_business_glossary_term' = 'Delivery Location Latitude');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `delivery_latitude` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `delivery_latitude` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `delivery_longitude` SET TAGS ('dbx_business_glossary_term' = 'Delivery Location Longitude');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `delivery_longitude` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `delivery_longitude` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `delivery_photo_url` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `delivery_status` SET TAGS ('dbx_value_regex' = 'delivered|partial_delivery|refused|undeliverable|returned|damaged');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `delivery_stop_reference` SET TAGS ('dbx_business_glossary_term' = 'Delivery Stop Reference Number');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `delivery_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Delivery Timestamp');
@@ -1434,14 +1307,10 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `not
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `notification_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Customer Notification Timestamp');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `package_condition` SET TAGS ('dbx_business_glossary_term' = 'Package Condition at Delivery');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `package_condition` SET TAGS ('dbx_value_regex' = 'intact|damaged|opened|wet|crushed|other');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `pin_confirmation_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `pod_capture_method` SET TAGS ('dbx_business_glossary_term' = 'Proof of Delivery (POD) Capture Method');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `pod_capture_method` SET TAGS ('dbx_value_regex' = 'mobile_app|handheld_scanner|tablet|kiosk|web_portal|manual_entry');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `recipient_name` SET TAGS ('dbx_business_glossary_term' = 'Recipient Full Name');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `recipient_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `recipient_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `recipient_relationship` SET TAGS ('dbx_business_glossary_term' = 'Recipient Relationship to Customer');
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `signature_image_url` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `sla_met_flag` SET TAGS ('dbx_business_glossary_term' = 'Service Level Agreement (SLA) Met Flag');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `temperature_at_delivery_celsius` SET TAGS ('dbx_business_glossary_term' = 'Temperature at Delivery in Celsius');
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ALTER COLUMN `temperature_compliant_flag` SET TAGS ('dbx_business_glossary_term' = 'Temperature Compliance Flag');

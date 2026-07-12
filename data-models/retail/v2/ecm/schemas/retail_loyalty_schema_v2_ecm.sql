@@ -1,5 +1,5 @@
 -- Schema for Domain: loyalty | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:24
+-- Generated on: 2026-07-12 13:53:23
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`loyalty` COMMENT 'Manages customer loyalty programs, membership tiers, points accrual and redemption, rewards catalogs, personalized offers, tier qualification rules, clienteling interaction records, and engagement campaigns. Tracks program enrollment, active members, points liability, and program ROI. Integrates with customer domain for unified customer view and supports omnichannel loyalty recognition across all touchpoints.';
@@ -265,7 +265,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`loyalty`.`redemption_rule` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`loyalty`.`reward` (
     `reward_id` BIGINT COMMENT 'Unique identifier for the reward in the loyalty program catalog. Primary key.',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Reward fulfillment costs (cost_to_business field) are tracked by cost center for budgeting, variance analysis, and P&L reporting. Different reward types (merchandise, discounts, partner rewards) may b',
-    `format_id` BIGINT COMMENT 'Foreign key linking to store.store_format. Business justification: Reward eligibility restricted by format (experiential rewards only at flagship, bulk discounts only at warehouse). Retail loyalty catalogs curated per format to match inventory, service capabilities,',
+    `format_id` BIGINT COMMENT 'Foreign key linking to store.store_format. Business justification: Reward eligibility restricted by format (experiential rewards only at flagship, bulk discounts only at warehouse). Retail loyalty catalogs curated per format to match inventory, service capabilities',
     `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.item_hierarchy. Business justification: Rewards frequently target categories (e.g., $5 off grocery, 10% off apparel). Category-scoped rewards are a fundamental loyalty reward type requiring this link for reward catalog management and re',
     `vendor_id` BIGINT COMMENT 'External identifier for the partner vendor in the vendor management system. Null for internally-fulfilled rewards.',
     `product_brand_id` BIGINT COMMENT 'Foreign key linking to product.product_brand. Business justification: Brand-specific rewards are common (e.g., $10 off , 20% off private label). Brand-targeted rewards support vendor partnerships and private label strategy requiring this link for brand-scoped re',
@@ -404,7 +404,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` (
     `loyalty_program_id` BIGINT COMMENT 'Reference to the loyalty program under which this campaign operates. Links campaign to program-level rules and membership base.',
     `campaign_id` BIGINT COMMENT 'Foreign key linking to marketing.campaign. Business justification: Loyalty engagement campaigns are often sub-campaigns within broader marketing campaigns in retail operations. Linking enables unified campaign performance reporting, consolidated budget tracking, and',
     `member_segment_id` BIGINT COMMENT 'Reference to the target member segment for this campaign. Defines the audience eligible to participate based on RFM, tier, behavior, or demographic criteria.',
-    `privacy_assessment_id` BIGINT COMMENT 'Foreign key linking to compliance.privacy_assessment. Business justification: Retail loyalty engagement campaigns processing member personal data require GDPR/CCPA privacy impact assessments. Privacy teams must evaluate campaign data flows, retention, and consent mechanisms bef',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Loyalty engagement campaigns frequently promote specific retail promotional campaigns to members (e.g., Members: early access to Summer Sale) - strategic coordination requires linking engagement cam',
     `cluster_id` BIGINT COMMENT 'Foreign key linking to store.store_cluster. Business justification: Campaigns target member segments within specific store clusters (urban vs suburban, high-income vs value) to align offers with cluster demographics and shopping behaviors. Standard retail loyalty prac',
     `location_id` BIGINT COMMENT 'Foreign key linking to store.store_location. Business justification: Campaigns target members by preferred/enrollment store for in-store activation events, localized offers, store-specific promotions. Retail loyalty operations execute geo-targeted campaigns tied to spe',
@@ -719,19 +718,13 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `created_t
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `customer_service_email` SET TAGS ('dbx_business_glossary_term' = 'Customer Service Email Address');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `customer_service_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `customer_service_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `customer_service_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `customer_service_phone` SET TAGS ('dbx_business_glossary_term' = 'Customer Service Phone Number');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `customer_service_phone` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `customer_service_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `ecommerce_integration_enabled` SET TAGS ('dbx_business_glossary_term' = 'E-Commerce Integration Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `end_date` SET TAGS ('dbx_business_glossary_term' = 'Program End Date');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `gamification_enabled` SET TAGS ('dbx_business_glossary_term' = 'Gamification Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `launch_date` SET TAGS ('dbx_business_glossary_term' = 'Program Launch Date');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `mobile_app_enabled` SET TAGS ('dbx_business_glossary_term' = 'Mobile App Enabled Flag');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `mobile_app_enabled` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `mobile_app_enabled` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `omnichannel_recognition_enabled` SET TAGS ('dbx_business_glossary_term' = 'Omnichannel Recognition Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `partner_coalition_enabled` SET TAGS ('dbx_business_glossary_term' = 'Partner Coalition Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ALTER COLUMN `personalization_engine_enabled` SET TAGS ('dbx_business_glossary_term' = 'Personalization Engine Enabled Flag');
@@ -760,20 +753,14 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `locati
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Storefront Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `referred_by_member_loyalty_membership_id` SET TAGS ('dbx_business_glossary_term' = 'Referred By Member ID');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `referred_by_member_loyalty_membership_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `referred_by_member_loyalty_membership_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `anniversary_date` SET TAGS ('dbx_business_glossary_term' = 'Membership Anniversary Date');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `closed_date` SET TAGS ('dbx_business_glossary_term' = 'Membership Closed Date');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `closed_reason` SET TAGS ('dbx_business_glossary_term' = 'Membership Closed Reason');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `member_number` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `member_number` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `membership_status` SET TAGS ('dbx_value_regex' = 'active|suspended|lapsed|closed|pending');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `next_expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Next Points Expiry Date');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `opt_in_direct_mail` SET TAGS ('dbx_business_glossary_term' = 'Direct Mail Opt-In');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `opt_in_email` SET TAGS ('dbx_business_glossary_term' = 'Email Marketing Opt-In');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `opt_in_email` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `opt_in_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `opt_in_push` SET TAGS ('dbx_business_glossary_term' = 'Push Notification Opt-In');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `opt_in_sms` SET TAGS ('dbx_business_glossary_term' = 'SMS (Short Message Service) Marketing Opt-In');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_membership` ALTER COLUMN `referral_code` SET TAGS ('dbx_business_glossary_term' = 'Member Referral Code');
@@ -885,7 +872,6 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `product_brand_id` 
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Product Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `channel_availability` SET TAGS ('dbx_value_regex' = 'in_store|online|mobile_app|call_center|all_channels');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `reward_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,20}$');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `cost_to_business` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `description_long` SET TAGS ('dbx_business_glossary_term' = 'Long Description');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `description_short` SET TAGS ('dbx_business_glossary_term' = 'Short Description');
@@ -894,7 +880,6 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `image_url` SET TAG
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `image_url` SET TAGS ('dbx_value_regex' = '^https?://.*.(jpg|jpeg|png|gif|webp)$');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `is_combinable` SET TAGS ('dbx_business_glossary_term' = 'Is Combinable Flag');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `is_featured` SET TAGS ('dbx_business_glossary_term' = 'Is Featured Flag');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `margin_percentage` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `monetary_value` SET TAGS ('dbx_business_glossary_term' = 'Monetary Value Equivalent');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `product_sku_restriction` SET TAGS ('dbx_business_glossary_term' = 'Product Stock Keeping Unit (SKU) Restriction');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`reward` ALTER COLUMN `reward_status` SET TAGS ('dbx_value_regex' = 'active|inactive|sold_out|discontinued|pending_approval');
@@ -942,7 +927,6 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`redemption` ALTER COLUMN `updated_timest
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`redemption` ALTER COLUMN `usage_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Redemption Usage Timestamp');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`redemption` ALTER COLUMN `voucher_code` SET TAGS ('dbx_business_glossary_term' = 'Voucher or Coupon Code');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`redemption` ALTER COLUMN `voucher_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{12,16}$');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`redemption` ALTER COLUMN `voucher_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` SET TAGS ('dbx_subdomain' = 'member_engagement');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Item Hierarchy Id (Foreign Key)');
@@ -957,7 +941,6 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` ALTER COLUMN `cluster_id` 
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` ALTER COLUMN `channel_applicability` SET TAGS ('dbx_value_regex' = 'all|in_store|online|mobile_app|call_center');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` ALTER COLUMN `discount_type` SET TAGS ('dbx_value_regex' = 'percentage|fixed_amount');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` ALTER COLUMN `end_date` SET TAGS ('dbx_business_glossary_term' = 'Offer End Date');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` ALTER COLUMN `estimated_liability_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` ALTER COLUMN `max_redemptions` SET TAGS ('dbx_business_glossary_term' = 'Maximum Redemptions');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` ALTER COLUMN `offer_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,20}$');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_offer` ALTER COLUMN `offer_source` SET TAGS ('dbx_value_regex' = 'automated|manual|campaign|clienteling|tier_benefit');
@@ -968,19 +951,15 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` SET TAGS ('dbx_subd
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Owner Associate Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `finance_budget_id` SET TAGS ('dbx_business_glossary_term' = 'Budget Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Marketing Campaign Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `privacy_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Privacy Assessment Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `cluster_id` SET TAGS ('dbx_business_glossary_term' = 'Target Store Cluster Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Target Store Location Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `actual_incremental_spend_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `actual_participation_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Actual Participation Rate Percentage');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Campaign Approval Date');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `campaign_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{4,20}$');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `channel_app_notification_flag` SET TAGS ('dbx_business_glossary_term' = 'App Notification Channel Flag');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `channel_direct_mail_flag` SET TAGS ('dbx_business_glossary_term' = 'Direct Mail Channel Flag');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `channel_email_flag` SET TAGS ('dbx_business_glossary_term' = 'Email Channel Flag');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `channel_email_flag` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `channel_email_flag` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `channel_in_store_flag` SET TAGS ('dbx_business_glossary_term' = 'In-Store Channel Flag');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `channel_push_flag` SET TAGS ('dbx_business_glossary_term' = 'Push Notification Channel Flag');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `channel_sms_flag` SET TAGS ('dbx_business_glossary_term' = 'SMS (Short Message Service) Channel Flag');
@@ -989,7 +968,6 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `end_d
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `opt_in_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Opt-In Required Flag');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `start_date` SET TAGS ('dbx_business_glossary_term' = 'Campaign Start Date');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `target_incremental_spend_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ALTER COLUMN `target_participation_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Target Participation Rate Percentage');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` SET TAGS ('dbx_subdomain' = 'member_engagement');
@@ -1010,10 +988,8 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` ALTER COLUMN `f
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` ALTER COLUMN `follow_up_due_date` SET TAGS ('dbx_business_glossary_term' = 'Follow-Up Due Date');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` ALTER COLUMN `interaction_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Interaction Duration (Minutes)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` ALTER COLUMN `interaction_initiated_by` SET TAGS ('dbx_value_regex' = 'associate|customer|system_triggered|event_invitation|campaign');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` ALTER COLUMN `interaction_notes` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` ALTER COLUMN `interaction_number` SET TAGS ('dbx_value_regex' = '^CI-[0-9]{10}$');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` ALTER COLUMN `interaction_status` SET TAGS ('dbx_value_regex' = 'scheduled|in_progress|completed|cancelled|no_show|rescheduled');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` ALTER COLUMN `member_preferences_discussed` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`clienteling_interaction` ALTER COLUMN `nps_score` SET TAGS ('dbx_business_glossary_term' = 'Net Promoter Score (NPS)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_segment` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_segment` SET TAGS ('dbx_subdomain' = 'member_engagement');
@@ -1035,24 +1011,14 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`member_segment` ALTER COLUMN `created_by
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` SET TAGS ('dbx_subdomain' = 'program_management');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `third_party_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Third Party Assessment Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `api_endpoint_url` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `cost_per_point_earned` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `data_sharing_agreement_reference` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `earn_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `integration_method` SET TAGS ('dbx_value_regex' = 'api_realtime|batch_edi|file_transfer|manual|pos_integration|web_service');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_code` SET TAGS ('dbx_business_glossary_term' = 'Partner Program Code');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{3,20}$');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_contact_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_contact_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_contact_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_contact_name` SET TAGS ('dbx_pii_identifier' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_contact_phone` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_status` SET TAGS ('dbx_business_glossary_term' = 'Partner Program Status');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `partner_status` SET TAGS ('dbx_value_regex' = 'active|inactive|suspended|pending_approval|terminated|pilot');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `redeem_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `revenue_per_point_redeemed` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `settlement_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ALTER COLUMN `settlement_frequency` SET TAGS ('dbx_value_regex' = 'daily|weekly|biweekly|monthly|quarterly|on_demand');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_transaction` SET TAGS ('dbx_data_type' = 'transactional_data');
@@ -1064,7 +1030,6 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_transaction` ALTER COLUMN `amoun
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_transaction` ALTER COLUMN `commission_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_transaction` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_transaction` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Transaction Notes');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_transaction` ALTER COLUMN `partner_commission_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_transaction` ALTER COLUMN `partner_file_batch_number` SET TAGS ('dbx_business_glossary_term' = 'Partner File Batch ID');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_transaction` ALTER COLUMN `partner_merchant_code` SET TAGS ('dbx_business_glossary_term' = 'Partner Merchant ID');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_transaction` ALTER COLUMN `reconciliation_status` SET TAGS ('dbx_value_regex' = 'matched|unmatched|disputed|resolved');
@@ -1083,7 +1048,6 @@ ALTER TABLE `vibe_retail_v1`.`loyalty`.`referral` ALTER COLUMN `associate_id` SE
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`referral` ALTER COLUMN `campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Campaign Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`referral` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'First Purchase Order Header Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`referral` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store Identifier (ID)');
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`referral` ALTER COLUMN `originating_referral_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`referral` ALTER COLUMN `loyalty_membership_id` SET TAGS ('dbx_business_glossary_term' = 'Referring Member Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`referral` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Referred Customer Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`referral` ALTER COLUMN `web_session_id` SET TAGS ('dbx_business_glossary_term' = 'Web Session Id (Foreign Key)');

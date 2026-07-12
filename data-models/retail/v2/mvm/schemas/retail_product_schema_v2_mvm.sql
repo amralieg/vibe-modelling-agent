@@ -1,5 +1,5 @@
 -- Schema for Domain: product | Business: Retail | Version: v2_mvm
--- Generated on: 2026-07-12 10:43:58
+-- Generated on: 2026-07-12 15:26:00
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`product` COMMENT 'Authoritative catalog of all merchandise including SKUs, UPCs, GTINs, EANs, product hierarchies (department, category, subcategory), attributes, descriptions, images, private label vs. national brands, and assortment depth and breadth classifications. Managed via PIM (Product Information Management) and MDM systems. Supports category management, new item setup, and product lifecycle from introduction to discontinuation.';
@@ -9,7 +9,8 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`sku` (
     `sku_id` BIGINT COMMENT 'Unique identifier for the Stock Keeping Unit. Primary key for the SKU master record.',
     `brand_id` BIGINT COMMENT 'add column product_brand_id (BIGINT) with FK to product.product_brand.product_brand_id - SKUs belong to brands and this relationship is fundamental for brand-level reporting and assortment planning',
     `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.item_hierarchy. Business justification: sku has department_code, category_code, subcategory_code (all STRING) which should be normalized to a single FK to item_hierarchy. The hierarchy table is the authoritative source for merchandise taxon',
-    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: sku.unit_of_measure (STRING) should be normalized to a proper FK to uom reference table. UOM is the authoritative master for all units of measure with conversion factors and standards compliance (GS1,',
+    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: sku.unit_of_measure (STRING) should be normalized to a proper FK to uom reference table. UOM is the authoritative master for all units of measure with conversion factors and standards compliance (GS1',
+    `vendor_id` BIGINT COMMENT 'Identifier of the primary supplier or vendor who provides this SKU to the retailer. Links to the supplier master data.',
     `age_restriction_flag` BOOLEAN COMMENT 'Indicates whether this SKU has age restrictions for purchase (e.g., alcohol, tobacco, mature-rated products). True if age-restricted, False if not.',
     `country_of_origin` STRING COMMENT 'Three-letter ISO 3166-1 alpha-3 country code indicating where the product was manufactured or produced. Required for customs and regulatory compliance.. Valid values are `^[A-Z]{3}$`',
     `created_timestamp` TIMESTAMP COMMENT 'Date and time when this SKU record was first created in the master data system. Follows format yyyy-MM-ddTHH:mm:ss.SSSXXX.',
@@ -88,7 +89,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`item_hierarchy` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`attribute` (
     `attribute_id` BIGINT COMMENT 'Unique identifier for the product attribute record. Primary key for the product_attribute entity.',
     `sku_id` BIGINT COMMENT 'Foreign key reference to the parent product (SKU) to which this attribute belongs. Links to the product master catalog.',
-    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: product_attribute stores a free-text unit_of_measure STRING column for the attribute_value (e.g., kg, cm, oz). The uom table is the authoritative UOM master in this domain. Normalizing this to a',
+    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: product_attribute.unit_of_measure is a STRING column storing a denormalized unit of measure reference. The uom table is the authoritative UOM master in this domain. Normalizing this to a FK attribute_',
     `approved_by` STRING COMMENT 'The username or identifier of the person who approved this product attribute value for publication. Supports accountability and audit trails in PIM workflows.',
     `approved_timestamp` TIMESTAMP COMMENT 'The date and time when this product attribute value was approved for publication or use in operational systems. Supports PIM workflow and governance processes.',
     `attribute_group` STRING COMMENT 'Logical grouping or category of the attribute (e.g., physical, technical, descriptive, nutritional, environmental, regulatory, marketing, quality, packaging, pricing). Enables faceted search and attribute organization in PIM systems. [ENUM-REF-CANDIDATE: physical|technical|descriptive|nutritional|environmental|regulatory|marketing|quality|packaging|pricing — 10 candidates stripped; promote to reference product]',
@@ -121,6 +122,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`attribute` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`brand` (
     `brand_id` BIGINT COMMENT 'Unique identifier for the product brand record. Primary key.',
     `item_hierarchy_id` BIGINT COMMENT 'add column item_hierarchy_id (BIGINT) with FK to product.item_hierarchy.item_hierarchy_id - brands operate within product hierarchy categories for category management',
+    `vendor_id` BIGINT COMMENT 'Reference to the primary supplier or vendor who provides products under this brand. Links to the supplier master data for vendor negotiations, chargeback processing, and Vendor Managed Inventory (VMI) programs.',
     `average_margin_percent` DECIMAL(18,2) COMMENT 'Average gross margin percentage achieved across all SKUs (Stock Keeping Units) under this brand. Calculated as (Average Unit Retail - Cost of Goods Sold) / Average Unit Retail * 100. Critical for brand profitability analysis and private label vs. national brand comparison.',
     `brand_status` STRING COMMENT 'Current lifecycle status of the brand in the retail assortment. Active brands are available for new item setup and replenishment; inactive brands are temporarily suspended; discontinued brands are permanently removed; pending approval brands are under review for introduction.. Valid values are `active|inactive|discontinued|pending_approval`',
     `brand_type` STRING COMMENT 'Classification of brand ownership and distribution model. National brands are manufacturer-owned and widely distributed; private label are retailer-owned store brands; exclusive brands are sold only through specific retail partnerships; licensed brands use third-party intellectual property.. Valid values are `national|private_label|exclusive|licensed`',
@@ -182,12 +184,56 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`item_variant` (
     CONSTRAINT pk_item_variant PRIMARY KEY(`item_variant_id`)
 ) COMMENT 'Captures all SKU-to-SKU relationships including variant relationships (parent style/base item to child SKUs across size, color, flavor, scent, pack configuration) and approved substitution relationships (equivalent, upgrade, downgrade, cross-sell for fulfillment and out-of-stock scenarios). This is the SSOT for all inter-SKU relationships within the product domain. Stores source SKU reference, target SKU reference, relationship type (variant, substitution), dimension type (size, color, flavor, etc.), dimension value, substitution priority rank, channel applicability (in-store, online, BOPIS), customer consent required flag, variant-level UPC, and effective dates. Critical for apparel size-color grids, grocery flavor/size variants, omnichannel fulfillment substitution, BOPIS/ROPIS picking, and reducing lost sales from stockouts. Enables parent-child item navigation in PIM and e-commerce.';
 
+CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`image` (
+    `image_id` BIGINT COMMENT 'Unique identifier for the product image asset record.',
+    `location_id` BIGINT COMMENT 'Foreign key linking to store.associate. Business justification: Retail digital asset management requires tracking which associate uploaded/approved each product image for content workflow, quality control, audit trails, and accountability. Critical for e-commerce',
+    `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: product_image.sku (STRING) should be normalized to a proper FK. Images are assets associated with specific SKUs. This is a standard 1:N relationship (one SKU has many images).',
+    `vendor_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor. Business justification: Product images are often vendor-supplied assets. Retailers track image source vendor for copyright management, quality disputes, and vendor scorecard metrics on marketing asset delivery. vendor_image_',
+    `approval_status` STRING COMMENT 'The current approval state of the image asset in the content workflow: draft (initial upload), pending_review (awaiting approval), approved (ready for publication), rejected (failed quality check), archived (no longer active).. Valid values are `draft|pending_review|approved|rejected|archived`',
+    `approved_by` STRING COMMENT 'The username or identifier of the merchandising or marketing user who approved this image for publication.',
+    `approved_timestamp` TIMESTAMP COMMENT 'The date and time when this image was approved for publication.',
+    `aspect_ratio` STRING COMMENT 'The proportional relationship between width and height (e.g., 1:1, 4:3, 16:9). Used for responsive design and layout planning.',
+    `background_color` STRING COMMENT 'The hexadecimal color code of the image background (e.g., #FFFFFF for white). Used for consistent product presentation and dynamic background replacement.. Valid values are `^#[0-9A-Fa-f]{6}$`',
+    `caption` STRING COMMENT 'Optional marketing or descriptive caption displayed alongside the image in certain contexts (e.g., lifestyle images with usage tips).',
+    `cdn_asset_reference` STRING COMMENT 'The unique identifier or key used by the Content Delivery Network to cache and serve this image asset globally.',
+    `channel_applicability` STRING COMMENT 'Comma-separated list of channels where this image is approved for use (web, mobile, print, in-store, social, marketplace). Supports omnichannel merchandising.',
+    `color_profile` STRING COMMENT 'The color space or profile used in the image (sRGB, Adobe RGB, ProPhoto RGB, CMYK). Critical for color accuracy across web, print, and in-store displays.. Valid values are `sRGB|Adobe_RGB|ProPhoto_RGB|CMYK`',
+    `copyright_holder` STRING COMMENT 'The legal entity or individual who holds the copyright to this image asset. Critical for rights management and legal compliance.',
+    `dpi` STRING COMMENT 'The resolution of the image in dots per inch. Typically 72 DPI for web and 300 DPI for print. Used to determine print quality suitability.',
+    `expiration_date` DATE COMMENT 'The date when the license to use this image expires. Null for perpetual licenses. Used to manage rights and prevent unauthorized use.',
+    `file_format` STRING COMMENT 'The digital file format of the image asset (JPEG, PNG, GIF, WEBP, SVG, TIFF).. Valid values are `JPEG|PNG|GIF|WEBP|SVG|TIFF`',
+    `file_size_kb` DECIMAL(18,2) COMMENT 'The file size of the image asset in kilobytes. Used for performance optimization and bandwidth management.',
+    `has_transparency` BOOLEAN COMMENT 'Boolean flag indicating whether the image contains transparent pixels (alpha channel). Relevant for PNG and GIF formats used in layered designs.',
+    `image_type` STRING COMMENT 'Classification of the image purpose: hero (primary product shot), alternate (additional angles), swatch (color/material sample), lifestyle (in-use context), packaging (box/container), detail (close-up feature).. Valid values are `hero|alternate|swatch|lifestyle|packaging|detail`',
+    `is_active` BOOLEAN COMMENT 'Boolean flag indicating whether this image is currently active and available for display. Inactive images are retained for historical reference but not shown to customers.',
+    `is_primary` BOOLEAN COMMENT 'Boolean flag indicating whether this is the primary/hero image for the SKU. Only one image per SKU should be marked as primary.',
+    `last_modified_timestamp` TIMESTAMP COMMENT 'The date and time when this image record or the image file itself was last updated or modified.',
+    `license_type` STRING COMMENT 'The licensing model under which the retailer has rights to use this image: owned (created in-house), licensed (paid third-party), royalty_free (unlimited use), creative_commons (open license), vendor_supplied (provided by supplier).. Valid values are `owned|licensed|royalty_free|creative_commons|vendor_supplied`',
+    `locale` STRING COMMENT 'The language and region code (e.g., en_US, fr_FR, es_MX) indicating which market or locale this image is intended for. Supports localized product imagery.. Valid values are `^[a-z]{2}_[A-Z]{2}$`',
+    `mobile_optimized` BOOLEAN COMMENT 'Boolean flag indicating whether this image has been optimized for mobile device display (compressed, resized, or formatted for mobile bandwidth and screen size).',
+    `photographer_credit` STRING COMMENT 'Attribution to the photographer or content creator who produced the image. Used for rights management and licensing compliance.',
+    `planogram_eligible` BOOLEAN COMMENT 'Boolean flag indicating whether this image is suitable for use in planogram design and shelf layout planning. Typically requires consistent background and perspective.',
+    `print_ready` BOOLEAN COMMENT 'Boolean flag indicating whether this image meets the resolution and color profile requirements for print media (catalogs, circulars, in-store signage).',
+    `quality_score` DECIMAL(18,2) COMMENT 'A computed or manually assigned quality score (0.00 to 5.00) representing the technical and aesthetic quality of the image. Used for quality control and merchandising decisions.',
+    `resolution_height` STRING COMMENT 'The height of the image in pixels. Used to determine image quality and suitability for different channels (web, mobile, print).',
+    `resolution_width` STRING COMMENT 'The width of the image in pixels. Used to determine image quality and suitability for different channels (web, mobile, print).',
+    `seo_keywords` STRING COMMENT 'Comma-separated list of keywords associated with this image for search engine optimization and internal search relevance.',
+    `sequence_number` STRING COMMENT 'The display order of this image within the products image gallery. Lower numbers appear first in the carousel or gallery view.',
+    `upload_timestamp` TIMESTAMP COMMENT 'The date and time when this image was first uploaded to the digital asset management system.',
+    `url` STRING COMMENT 'The full URL path to the digital image asset, typically hosted on a Content Delivery Network (CDN) or digital asset management system.. Valid values are `^https?://.*.(jpg|jpeg|png|gif|webp|svg)$`',
+    `usage_rights_notes` STRING COMMENT 'Free-text field capturing any special terms, restrictions, or notes regarding the usage rights of this image (e.g., geographic restrictions, channel limitations, attribution requirements).',
+    `vendor_image_code` STRING COMMENT 'The unique identifier assigned to this image by the vendor or supplier who provided it. Used for cross-reference and vendor collaboration.',
+    `view_angle` STRING COMMENT 'The perspective or angle from which the product is photographed (front, back, left, right, top, bottom, angle). Helps customers understand product dimensions and features. [ENUM-REF-CANDIDATE: front|back|left|right|top|bottom|angle — 7 candidates stripped; promote to reference product]',
+    `zoom_enabled` BOOLEAN COMMENT 'Boolean flag indicating whether this image supports zoom functionality on the e-commerce platform. High-resolution images typically enable zoom for detailed product inspection.',
+    CONSTRAINT pk_image PRIMARY KEY(`image_id`)
+) COMMENT 'Manages digital image assets associated with each SKU including primary product images, alternate angles, lifestyle images, and swatch images. Captures image URL, image type (hero, alternate, swatch, lifestyle, packaging), resolution, file format, locale, channel applicability (web, mobile, print, in-store), CDN asset reference, and approval status. Sourced from the e-commerce platform and PIM digital asset management. Supports e-commerce product display and planogram design.';
+
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`compliance` (
     `compliance_id` BIGINT COMMENT 'Unique identifier for the product compliance record. Primary key.',
     `carrier_service_id` BIGINT COMMENT 'Foreign key linking to fulfillment.carrier_service. Business justification: Specific carrier service levels have distinct compliance capabilities (e.g., ground hazmat vs air hazmat, refrigerated vs ambient). Retail compliance teams pre-approve specific carrier services for re',
     `carrier_id` BIGINT COMMENT 'Foreign key linking to fulfillment.carrier. Business justification: Retail operations require matching product compliance requirements (hazmat certification, temperature control, age-restricted handling) to carrier capabilities. Hazmat-certified products can only ship',
-    `recall_id` BIGINT COMMENT 'Foreign key linking to product.recall. Business justification: product_compliance contains four denormalized recall-specific columns: recall_date, recall_reason, recall_severity_level, and recall_status. These fields duplicate data that belongs in the authoritati',
     `sku_id` BIGINT COMMENT 'Reference to the product (SKU) that this compliance record applies to.',
+    `vendor_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor. Business justification: Regulatory traceability requires tracking which vendor supplied products for compliance records. Critical for recall management, country-of-origin verification, and audit trails. Retail compliance tea',
     `age_restriction_required` BOOLEAN COMMENT 'Indicates whether the product requires age verification at point of sale due to regulatory restrictions (e.g., alcohol, tobacco, certain chemicals).',
     `allergen_declaration_compliant` BOOLEAN COMMENT 'Indicates whether the product labeling complies with allergen disclosure requirements (e.g., contains milk, eggs, peanuts, tree nuts, fish, shellfish, soy, wheat).',
     `certification_number` STRING COMMENT 'Unique certification or approval number issued by the certifying body for this compliance record.',
@@ -212,6 +258,10 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`compliance` (
     `organic_certification` STRING COMMENT 'Organic certification number or designation (e.g., USDA Organic, EU Organic). Null if product is not certified organic.',
     `prop_65_chemical_list` STRING COMMENT 'Comma-separated list of Prop 65 chemicals present in the product that trigger warning requirements. Null if no Prop 65 warning required.',
     `prop_65_warning_required` BOOLEAN COMMENT 'Indicates whether the product requires a California Prop 65 warning label due to presence of chemicals known to cause cancer, birth defects, or reproductive harm.',
+    `recall_date` DATE COMMENT 'Date when the product recall was initiated. Null if no recall has been issued.',
+    `recall_reason` STRING COMMENT 'Detailed explanation of the reason for the product recall (e.g., contamination, safety hazard, labeling error). Null if no recall.',
+    `recall_severity_level` STRING COMMENT 'FDA classification of recall severity: Class 1 (serious health hazard or death), Class 2 (temporary health problem), Class 3 (unlikely to cause adverse health effects). Null if no recall.. Valid values are `class_1|class_2|class_3`',
+    `recall_status` STRING COMMENT 'Current recall status of the product indicating whether it is subject to a safety or quality recall.. Valid values are `no_recall|active_recall|recall_completed|recall_pending`',
     `region_code` STRING COMMENT 'Sub-national region or state code where specific compliance requirements apply (e.g., CA for California Prop 65, NY for New York regulations).',
     `responsible_party_contact` STRING COMMENT 'Contact information (phone or email) for the responsible party. Used for regulatory inquiries and recall coordination.',
     `sustainability_certification` STRING COMMENT 'Sustainability or environmental certification (e.g., Fair Trade, Rainforest Alliance, Marine Stewardship Council, Forest Stewardship Council). Null if not certified.',
@@ -221,51 +271,80 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`compliance` (
     CONSTRAINT pk_compliance PRIMARY KEY(`compliance_id`)
 ) COMMENT 'Tracks regulatory and safety compliance attributes for each SKU including FDA food labeling compliance, CPSC safety certifications, FTC advertising standards, hazardous material classification, age restriction requirements, country-specific import compliance, and recall status. Captures compliance type, certifying body, certification number, effective date, expiry date, compliance status, and last audit date. Supports regulatory reporting and product recall management.';
 
-CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`recall` (
-    `recall_id` BIGINT COMMENT 'Unique identifier for the product recall event. Primary key for the product recall record.',
-    `brand_id` BIGINT COMMENT 'Foreign key linking to product.product_brand. Business justification: recall has a manufacturer_name STRING column but no structured reference to the product_brand master. In retail, recalls are frequently brand-scoped (e.g., all units of a private label brand, or a nat',
-    `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Product recall management requires designated recall coordinators to manage regulatory notifications, customer communications, and recovery operations. Critical for FDA/CPSC compliance and liability m',
-    `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.item_hierarchy. Business justification: Product recalls frequently target entire categories or subcategories (e.g., all romaine lettuce, all toys from specific supplier). Recall management requires hierarchy-level scope definition for affec',
-    `location_id` BIGINT COMMENT 'Foreign key linking to store.store_location. Business justification: Product recalls must identify which stores received affected lots for customer notification, product removal from shelves, and recovery tracking. Recall execution systems require store-level tracking',
-    `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: product_recall.sku (STRING) should be normalized to a proper FK. Recalls are initiated for specific SKUs. The upc and gtin columns are redundant - they can be retrieved via sku → gtin_registry join.',
-    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: recall tracks three unit-count fields: units_affected (BIGINT), units_in_customer_hands (BIGINT), and units_recovered (BIGINT). Without a UOM reference, these counts are ambiguous — are they individua',
-    `affected_date_range_end` DATE COMMENT 'End date of the production or distribution period for affected products. Used to identify inventory within the recall scope.',
-    `affected_date_range_start` DATE COMMENT 'Start date of the production or distribution period for affected products. Used to identify inventory within the recall scope.',
-    `affected_lot_numbers` STRING COMMENT 'Comma-separated list of production lot numbers or batch codes affected by the recall. Used to identify specific inventory units.',
-    `chargeback_amount` DECIMAL(18,2) COMMENT 'Total chargeback amount assessed to the supplier or vendor for recall-related costs, including recovery, disposal, and customer remedies.',
-    `class` STRING COMMENT 'FDA recall classification indicating severity: Class I (serious health hazard or death), Class II (temporary health problem), Class III (unlikely to cause adverse health reaction).. Valid values are `class_i|class_ii|class_iii`',
-    `completion_date` DATE COMMENT 'Date when the recall was officially closed or completed, indicating all recovery and remediation actions have been finalized.',
-    `coordinator_email` STRING COMMENT 'Email address of the recall coordinator for internal and external communication regarding the recall event.. Valid values are `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$`',
-    `coordinator_phone` STRING COMMENT 'Phone number of the recall coordinator for urgent communication and escalation regarding the recall event.. Valid values are `^+?[0-9]{10,15}$`',
-    `corrective_action_plan` STRING COMMENT 'Description of corrective actions implemented to prevent recurrence of the issue, including process changes, supplier audits, or quality control enhancements.',
-    `country_of_origin_code` STRING COMMENT 'Three-letter ISO country code indicating where the recalled product was manufactured or produced.. Valid values are `^[A-Z]{3}$`',
-    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the product recall record was first created in the system. Used for audit trail and data lineage tracking.',
-    `customer_notification_method` STRING COMMENT 'Comma-separated list of methods used to notify customers of the recall: email, direct mail, phone, in-store signage, website, social media, press release.',
-    `estimated_financial_impact_amount` DECIMAL(18,2) COMMENT 'Estimated total financial impact of the recall in USD, including product costs, logistics, customer remedies, and regulatory penalties.',
-    `hazard_description` STRING COMMENT 'Description of the specific hazard or risk posed by the recalled product to consumers, including potential injuries or health impacts.',
-    `initiation_date` DATE COMMENT 'Date when the recall was officially initiated and communicated to internal teams and external stakeholders.',
-    `is_private_label` BOOLEAN COMMENT 'Boolean flag indicating whether the recalled product is a private label (store brand) product. True if private label, False if national brand.',
-    `last_modified_timestamp` TIMESTAMP COMMENT 'Timestamp when the product recall record was last updated or modified. Used for audit trail and change tracking.',
-    `manufacturer_name` STRING COMMENT 'Name of the manufacturer or producer of the recalled product. May differ from the supplier if using third-party manufacturing.',
-    `modified_by_user` STRING COMMENT 'Username or employee identifier of the user who last modified the product recall record. Used for audit trail and accountability.',
-    `press_release_url` STRING COMMENT 'URL link to the official press release or public announcement document for the recall event, hosted on company or regulatory body website.. Valid values are `^https?://.*$`',
-    `public_announcement_date` DATE COMMENT 'Date when the recall was publicly announced through press releases, website postings, or regulatory body publications.',
-    `reason` STRING COMMENT 'Detailed description of the reason for the recall, including safety hazard, contamination, labeling error, or quality defect.',
-    `recall_status` STRING COMMENT 'Current status of the recall event: open (initiated), in-progress (recovery underway), closed (completed), or terminated (discontinued).. Valid values are `open|in_progress|closed|terminated`',
-    `recall_type` STRING COMMENT 'Classification of the recall action: mandatory (regulatory-mandated), voluntary (company-initiated), or market withdrawal (removal without regulatory involvement).. Valid values are `mandatory|voluntary|market_withdrawal`',
-    `recovery_rate_percent` DECIMAL(18,2) COMMENT 'Percentage of affected units successfully recovered, calculated as (units_recovered / units_affected) * 100. Key performance indicator for recall effectiveness.',
-    `reference_number` STRING COMMENT 'External recall reference number assigned by regulatory body or internal quality team. Used for tracking and reporting to CPSC, FDA, or other governing bodies.. Valid values are `^[A-Z0-9]{8,20}$`',
-    `regulatory_body` STRING COMMENT 'Governing body that mandated or was notified of the recall: CPSC (Consumer Product Safety Commission), FDA (Food and Drug Administration), FTC (Federal Trade Commission), internal (company-initiated), or other.. Valid values are `cpsc|fda|ftc|internal|other`',
-    `regulatory_case_number` STRING COMMENT 'Case or docket number assigned by the regulatory body (CPSC, FDA) for tracking and official correspondence related to the recall.. Valid values are `^[A-Z0-9-]{8,30}$`',
-    `regulatory_notification_date` DATE COMMENT 'Date when the regulatory body (CPSC, FDA, etc.) was officially notified of the recall event. Required for compliance reporting.',
-    `remedy_type` STRING COMMENT 'Type of remedy offered to customers for the recalled product: refund (money back), replacement (new product), repair (fix defect), or disposal (safe destruction).. Valid values are `refund|replacement|repair|disposal`',
-    `root_cause_analysis` STRING COMMENT 'Summary of the root cause analysis findings identifying the underlying cause of the product defect or safety issue that triggered the recall.',
-    `scope` STRING COMMENT 'Geographic scope of the recall: national (all locations), regional (specific regions or states), or store-specific (individual store locations).. Valid values are `national|regional|store_specific`',
-    `units_affected` BIGINT COMMENT 'Total number of product units subject to the recall across all channels (stores, distribution centers, customer hands).',
-    `units_in_customer_hands` BIGINT COMMENT 'Estimated number of recalled units that were sold to customers and remain outstanding (not yet returned or recovered).',
-    `units_recovered` BIGINT COMMENT 'Number of recalled product units successfully recovered from stores, distribution centers, and customers through return or disposal.',
-    CONSTRAINT pk_recall PRIMARY KEY(`recall_id`)
-) COMMENT 'Operational record of product safety recalls and withdrawal events initiated by CPSC, FDA, or internal quality teams. Captures recall reference number, SKU reference, recall type (mandatory, voluntary, market withdrawal), recall reason, affected lot numbers, affected date range, recall scope (national, regional, store-specific), recall status (open, in-progress, closed), units affected, units recovered, and regulatory body notification date. Supports compliance reporting and reverse logistics coordination.';
+CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`item_bundle` (
+    `item_bundle_id` BIGINT COMMENT 'Unique identifier for the item bundle configuration. Primary key.',
+    `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: item_bundle.bundle_sku (STRING) should be normalized to a proper FK. The bundle itself is a SKU in the catalog. This links the bundle definition to its SKU master record. bundle_gtin can be retrieved',
+    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: item_bundle.component_quantity (DECIMAL) represents the quantity of a component SKU within a bundle, but without a unit of measure reference this quantity is ambiguous (is it 2 each? 2 kg? 2 liters?).',
+    `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Merchandising associates create promotional bundles and multi-packs. Tracking creator enables workflow management, approval routing, performance measurement, and audit trails for promotional planning',
+    `location_id` BIGINT COMMENT 'Foreign key linking to store.store_location. Business justification: Promotional bundles are often authorized only for specific stores or store clusters (e.g., seasonal bundles in tourist locations, regional promotions). Bundle authorization by store is required for pr',
+    `vendor_id` BIGINT COMMENT 'Reference to the primary vendor or supplier responsible for providing the bundle or its components. Used for vendor managed inventory and procurement.',
+    `assortment_category` STRING COMMENT 'The merchandising category or department this bundle belongs to for assortment planning and category management (e.g., Grocery, Apparel, Electronics).',
+    `bundle_description` STRING COMMENT 'Detailed description of the bundle contents and value proposition for merchandising and marketing purposes.',
+    `bundle_name` STRING COMMENT 'The customer-facing name of the bundle (e.g., Summer BBQ Pack, Family Meal Deal, Holiday Gift Set).',
+    `bundle_price_amount` DECIMAL(18,2) COMMENT 'The selling price of the bundle when pricing_method is bundle_price. Represents the total customer-facing price.',
+    `bundle_status` STRING COMMENT 'Current lifecycle status of the bundle: active (available for sale), inactive (temporarily unavailable), pending (awaiting approval), discontinued (permanently removed), seasonal (available during specific periods).. Valid values are `active|inactive|pending|discontinued|seasonal`',
+    `bundle_type` STRING COMMENT 'Classification of the bundle configuration: fixed_bundle (pre-defined components), mix_and_match (customer selects from options), gift_set (curated gift collection), kit (assembly required), variety_pack (multiple flavors/variants), multi_pack (quantity of same item).. Valid values are `fixed_bundle|mix_and_match|gift_set|kit|variety_pack|multi_pack`',
+    `channel_availability` STRING COMMENT 'Defines which sales channels can sell this bundle: all_channels, store_only, online_only, bopis_eligible (Buy Online Pick Up In Store), ship_from_store (fulfillment from store inventory).. Valid values are `all_channels|store_only|online_only|bopis_eligible|ship_from_store`',
+    `component_quantity` DECIMAL(18,2) COMMENT 'The quantity of the component SKU included in one unit of the bundle. Supports fractional quantities for weight-based items.',
+    `component_sequence` STRING COMMENT 'The display order or assembly sequence of this component within the bundle. Used for kit assembly instructions and merchandising display.',
+    `component_sku` STRING COMMENT 'The SKU of an individual component item included in this bundle. References the product master catalog.. Valid values are `^[A-Z0-9]{8,14}$`',
+    `component_substitution_allowed` BOOLEAN COMMENT 'Indicates whether this component can be substituted with an equivalent item during fulfillment (e.g., out-of-stock scenarios, mix-and-match bundles).',
+    `created_timestamp` TIMESTAMP COMMENT 'The date and time when this bundle configuration record was first created in the system.',
+    `currency_code` STRING COMMENT 'ISO 4217 three-letter currency code for bundle pricing (e.g., USD, EUR, GBP).. Valid values are `^[A-Z]{3}$`',
+    `discount_amount` DECIMAL(18,2) COMMENT 'The fixed dollar discount applied to the component sum when pricing_method is discount_amount.',
+    `discount_percentage` DECIMAL(18,2) COMMENT 'The percentage discount applied to the component sum when pricing_method is discount_percentage (e.g., 15.00 for 15% off).',
+    `effective_end_date` DATE COMMENT 'The date when this bundle configuration expires or is discontinued. Null indicates no planned end date.',
+    `effective_start_date` DATE COMMENT 'The date when this bundle configuration becomes active and available for sale across all channels.',
+    `inventory_deduction_method` STRING COMMENT 'Defines how inventory is tracked and decremented: component_level (deduct each component SKU), bundle_level (track bundle as single inventory unit), hybrid (track both bundle and components).. Valid values are `component_level|bundle_level|hybrid`',
+    `last_modified_timestamp` TIMESTAMP COMMENT 'The date and time when this bundle configuration record was last updated.',
+    `loyalty_points_eligible` BOOLEAN COMMENT 'Indicates whether customers can earn loyalty program points on bundle purchases.',
+    `maximum_purchase_quantity` STRING COMMENT 'The maximum number of bundle units a customer can purchase in a single transaction. Used to prevent stockouts and ensure fair distribution of limited-time offers.',
+    `minimum_purchase_quantity` STRING COMMENT 'The minimum number of bundle units a customer must purchase in a single transaction. Typically 1, but may be higher for wholesale or bulk bundles.',
+    `modified_by_user` STRING COMMENT 'The user ID or username of the person who last modified this bundle configuration. Used for audit trail and change management.',
+    `pricing_method` STRING COMMENT 'Defines how the bundle price is calculated: bundle_price (fixed price for entire bundle), component_sum (sum of individual component prices), discount_percentage (percentage off component sum), discount_amount (fixed dollar discount off component sum).. Valid values are `bundle_price|component_sum|discount_percentage|discount_amount`',
+    `promotion_eligible` BOOLEAN COMMENT 'Indicates whether this bundle can be included in additional promotional offers or discounts beyond its configured bundle pricing.',
+    `return_policy_code` STRING COMMENT 'Reference code to the specific return policy applicable to this bundle (e.g., standard 30-day, final sale, exchange only).. Valid values are `^[A-Z0-9]{2,10}$`',
+    `returnable` BOOLEAN COMMENT 'Indicates whether the bundle can be returned. Some bundles (e.g., opened gift sets, perishable meal kits) may not be returnable.',
+    CONSTRAINT pk_item_bundle PRIMARY KEY(`item_bundle_id`)
+) COMMENT 'Defines product bundle and kit configurations where multiple component SKUs are sold together as a single sellable unit. Captures bundle SKU reference (the parent sellable unit), component SKU references, component quantity, component sequence, bundle type (fixed bundle, mix-and-match, gift set, kit, variety pack, multi-pack), pricing method (bundle price, component sum, discount percentage), component substitution allowed flag, and effective dates. Supports promotional bundling, gift set creation, variety packs, multi-pack configurations, and meal deal combos across all channels. Critical for POS scanning (bundle has its own GTIN), inventory component deduction, and promotional planning.';
+
+CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`gtin_registry` (
+    `gtin_registry_id` BIGINT COMMENT 'Unique identifier for the GTIN registry record. Primary key for the GTIN registry product.',
+    `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: gtin_registry.sku_code (STRING) should be normalized to a proper FK. GTINs are registered for specific SKUs - this is the authoritative link between global trade item numbers and internal SKU master.',
+    `uom_id` BIGINT COMMENT 'Foreign key linking to product.uom. Business justification: gtin_registry.net_content_unit is a STRING column storing a denormalized unit of measure for net content (e.g., oz, ml, g). The uom table contains gs1_uom_code which directly maps to GS1 standar',
+    `barcode_image_url` STRING COMMENT 'URL reference to the digital barcode image asset (PNG, SVG, or EPS format). Used for printing labels, packaging artwork, and digital commerce applications. Points to asset management system or CDN location.',
+    `barcode_symbology` STRING COMMENT 'The barcode encoding standard used to represent this GTIN. EAN (European Article Number bars), UPC (Universal Product Code bars), ITF-14 (Interleaved 2 of 5 for cases), GS1-128 (application identifier barcodes), QR (2D matrix code). Determines scanner compatibility.. Valid values are `EAN|UPC|ITF-14|GS1-128|QR`',
+    `check_digit` STRING COMMENT 'The final digit of the GTIN calculated using GS1 check digit algorithm (modulo 10). Used to validate GTIN integrity during scanning and data entry. Automatically calculated but stored for validation purposes.. Valid values are `^[0-9]{1}$`',
+    `child_gtin_quantity` STRING COMMENT 'Number of child GTINs (next lower packaging level) contained within this GTIN. For example, a case GTIN with child_gtin_quantity=24 contains 24 unit GTINs. Null for unit-level GTINs. Used to calculate inventory at different packaging levels.',
+    `country_of_sale` STRING COMMENT 'ISO 3166-1 alpha-3 country code where this GTIN is authorized for sale. A single SKU may have different GTINs for different countries due to regulatory labeling requirements. For example, USA, CAN, MEX, GBR, DEU, FRA.. Valid values are `^[A-Z]{3}$`',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this GTIN registry record was first created in the system. Used for audit trail and data lineage tracking. Immutable after initial creation.',
+    `discontinuation_date` DATE COMMENT 'Date when this GTIN is retired and should no longer be used in new transactions. Null for active GTINs. Used for product lifecycle management and to prevent ordering of discontinued items. Historical transactions retain the GTIN for audit purposes.',
+    `effective_date` DATE COMMENT 'Date when this GTIN becomes active and can be used in transactions. For new product launches, this is the go-live date. For packaging changes, this is when the new GTIN replaces the old one. Critical for supply chain cutover planning.',
+    `gdsn_last_sync_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent successful synchronization of this GTIN data to the GDSN data pool. Used to track data freshness and identify GTINs requiring re-publication after attribute changes.',
+    `gdsn_publication_status` STRING COMMENT 'Status of this GTIN in the GS1 Global Data Synchronization Network. Published (live in GDSN data pool), unpublished (not yet shared), pending (awaiting data pool validation), synchronized (confirmed by trading partners), rejected (validation errors). Required for supplier collaboration and EDI.. Valid values are `published|unpublished|pending|synchronized|rejected`',
+    `gross_weight_unit` STRING COMMENT 'Unit of measure for gross_weight_value. Typically g (gram), kg (kilogram), oz (ounce), or lb (pound). Must be consistent across supply chain for accurate logistics planning.. Valid values are `g|kg|oz|lb`',
+    `gross_weight_value` DECIMAL(18,2) COMMENT 'Total weight of the packaged item including product and packaging materials. Used for shipping calculations, freight costing, and warehouse capacity planning. Measured in gross_weight_unit.',
+    `gs1_company_prefix` STRING COMMENT 'The GS1-issued company prefix portion of the GTIN. Identifies the brand owner or manufacturer who registered this GTIN with GS1. Typically 6-12 digits depending on the company size and GS1 member organization.. Valid values are `^[0-9]{6,12}$`',
+    `gtin` STRING COMMENT 'The actual GTIN barcode value. Can be 8-digit (EAN-8, UPC-E), 12-digit (UPC-A), 13-digit (EAN-13), or 14-digit (GTIN-14/ITF-14) format. This is the scannable barcode number used at POS, warehouse receiving, and throughout the supply chain.. Valid values are `^[0-9]{8}$|^[0-9]{12}$|^[0-9]{13}$|^[0-9]{14}$`',
+    `gtin_type` STRING COMMENT 'The specific GTIN format type. UPC-A (12-digit North America standard), UPC-E (8-digit compressed UPC), EAN-13 (13-digit international standard), EAN-8 (8-digit short EAN), GTIN-14 (14-digit case/pallet level), ITF-14 (Interleaved 2 of 5 barcode for GTIN-14).. Valid values are `UPC-A|UPC-E|EAN-13|EAN-8|GTIN-14|ITF-14`',
+    `is_base_unit` BOOLEAN COMMENT 'Indicates whether this GTIN is the base unit of measure for inventory tracking. Typically true for the smallest sellable unit (each). All other packaging levels are multiples of the base unit. Used for inventory conversion calculations.',
+    `is_consumer_unit` BOOLEAN COMMENT 'Indicates whether this GTIN represents a consumer-facing unit sold at POS. True for retail each units. False for case/pallet GTINs used only in supply chain. Determines whether GTIN should appear in e-commerce catalog and POS systems.',
+    `is_orderable_unit` BOOLEAN COMMENT 'Indicates whether this GTIN can be ordered directly via EDI purchase orders. True for case and pallet GTINs typically ordered from suppliers. False for unit GTINs that are only sold at retail. Controls EDI transaction validation.',
+    `is_variable_measure` BOOLEAN COMMENT 'Indicates whether this GTIN represents a variable measure item (e.g., meat, produce, cheese sold by weight). True for items where price varies by weight/quantity. Affects POS scanning behavior and pricing logic.',
+    `last_modified_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to this GTIN registry record. Updated whenever any attribute changes. Used to track data freshness and trigger downstream synchronization processes.',
+    `modified_by_user` STRING COMMENT 'User ID or system account that last modified this GTIN registry record. Used for audit trail and accountability. Links to identity management system for user details.',
+    `net_content_value` DECIMAL(18,2) COMMENT 'The numeric quantity of product contained in this GTIN package. For example, 500 (when unit is mL), 12 (when unit is oz), 1.5 (when unit is kg). Used with net_content_unit to describe package size. Required for GDSN synchronization.',
+    `package_depth_value` DECIMAL(18,2) COMMENT 'Depth dimension of the package. Used with height and width for cubic volume calculations. Essential for warehouse bin sizing and transportation load planning. Measured in package_dimension_unit.',
+    `package_dimension_unit` STRING COMMENT 'Unit of measure for package dimensions (height, width, depth). Standard units: mm (millimeter), cm (centimeter), m (meter), in (inch), ft (foot). Must be consistent for all three dimensions.. Valid values are `mm|cm|m|in|ft`',
+    `package_height_value` DECIMAL(18,2) COMMENT 'Height dimension of the package. Used with package_width_value and package_depth_value to calculate cubic volume for warehouse slotting, transportation planning, and shelf space allocation. Measured in package_dimension_unit.',
+    `package_width_value` DECIMAL(18,2) COMMENT 'Width dimension of the package. Critical for planogram design, shelf allocation, and transportation cube optimization. Measured in package_dimension_unit.',
+    `packaging_level` STRING COMMENT 'The packaging hierarchy level this GTIN represents. Unit (each/consumer unit), inner pack (multi-pack sold as one), case (shipping carton), pallet (full pallet load), display (retail display shipper). Critical for warehouse receiving and inventory management.. Valid values are `unit|inner_pack|case|pallet|display`',
+    `parent_gtin` STRING COMMENT 'Self-referencing GTIN that represents the next higher packaging level in the hierarchy. For example, a unit GTINs parent would be the case GTIN. Null for the highest packaging level (typically pallet). Enables resolution of case receipts to constituent unit GTINs.. Valid values are `^[0-9]{8}$|^[0-9]{12}$|^[0-9]{13}$|^[0-9]{14}$`',
+    `registration_status` STRING COMMENT 'Current lifecycle status of this GTIN registration. Active (in use), inactive (temporarily disabled), pending (awaiting approval), suspended (compliance issue), retired (permanently discontinued). Controls whether the GTIN can be used in transactions.. Valid values are `active|inactive|pending|suspended|retired`',
+    `regulatory_compliance_status` STRING COMMENT 'Indicates whether this GTIN meets all applicable regulatory requirements for its country of sale. Compliant (approved for sale), non_compliant (blocked), pending_review (under evaluation), exempt (not subject to specific regulations). Enforced by quality assurance and legal teams.. Valid values are `compliant|non_compliant|pending_review|exempt`',
+    `replacement_gtin` STRING COMMENT 'The new GTIN that supersedes this one when discontinued. Used for packaging changes, reformulations, or product transitions. Enables automatic substitution in ordering systems and maintains continuity in assortment planning.. Valid values are `^[0-9]{8}$|^[0-9]{12}$|^[0-9]{13}$|^[0-9]{14}$`',
+    CONSTRAINT pk_gtin_registry PRIMARY KEY(`gtin_registry_id`)
+) COMMENT 'Authoritative registry of all Global Trade Item Numbers (GTINs) including UPC-A, UPC-E, EAN-13, EAN-8, and ITF-14 barcodes associated with each SKU. Captures GTIN value, GTIN type (UPC, EAN, GTIN-14), SKU reference, issuing GS1 company prefix, barcode image reference, packaging level (unit, inner pack, case, pallet), parent GTIN reference (self-referencing for packaging hierarchy — e.g., case GTIN contains N unit GTINs), child GTIN count per parent, and registration status. Models the full GS1 packaging hierarchy enabling warehouse receiving at case level to resolve to constituent unit GTINs. Aligned with GS1 global standards. Supports EDI transactions (ASN, PO, invoice), warehouse receiving, POS scanning, and GDSN data synchronization.';
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`uom` (
     `uom_id` BIGINT COMMENT 'Unique identifier for the unit of measure. Primary key for the UOM reference master.',
@@ -301,6 +380,28 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`uom` (
     CONSTRAINT pk_uom PRIMARY KEY(`uom_id`)
 ) COMMENT 'Unit of measure reference master defining all valid units (each, case, pallet, pound, kilogram, liter, ounce) and conversion factors used across ordering, inventory, pricing, and distribution. Captures UOM code, description, UOM class (weight, volume, count, length), base UOM conversion factor, and GS1 standard mapping.';
 
+CREATE OR REPLACE TABLE `vibe_retail_v1`.`product`.`assortment` (
+    `assortment_id` BIGINT COMMENT 'Unique identifier for this SKU-to-node assortment assignment record. Primary key.',
+    `cluster_id` BIGINT COMMENT 'Foreign key linking to store.cluster. Business justification: Retail clusters group stores with similar assortment strategies (urban vs suburban, high-income vs value-oriented). Assortment plans are built at cluster level then deployed to member locations. Enabl',
+    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Department managers plan and execute assortments within their departments for space allocation, fixture planning, and merchandising standards. Assortment at department level drives planogram creation,',
+    `format_id` BIGINT COMMENT 'Foreign key linking to store.format. Business justification: Store formats (hypermarket, supermarket, convenience, discount) have fundamentally different assortment strategies driven by space, target customer, and operating model. Assortment plans are designed ',
+    `fulfillment_node_id` BIGINT COMMENT 'Foreign key linking to the fulfillment node master record. Identifies which location is authorized to stock this SKU.',
+    `location_id` BIGINT COMMENT 'Foreign key linking to store.location. Business justification: Retail assortment planning assigns specific SKUs to specific store locations based on format, demographics, and space. Assortment.assortment_sku_id defines WHAT is carried; assortment_location_id defi',
+    `vendor_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor. Business justification: Location-SKU assortment planning requires preferred vendor designation for direct-store-delivery (DSD) routing, vendor-managed inventory (VMI) programs, and multi-source replenishment decisions. Criti',
+    `sku_id` BIGINT COMMENT 'Foreign key linking to the SKU master record. Identifies which product is assigned to this fulfillment node.',
+    `allocation_priority` STRING COMMENT 'Priority ranking for inventory allocation when supply is constrained. Lower numbers indicate higher priority (1 = highest priority). Used by allocation engines to determine which nodes receive inventory first during shortages. Typically based on sales velocity, strategic importance, or customer service level agreements.',
+    `assignment_effective_date` DATE COMMENT 'Date when this SKU was first authorized to be stocked at this node. Marks the beginning of the assortment assignment. Used for assortment history tracking and performance analysis.',
+    `assignment_end_date` DATE COMMENT 'Date when this SKU was removed from the authorized assortment at this node. Null for currently active assignments. Used for assortment history and discontinued product tracking.',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this assortment assignment record was created in the system.',
+    `last_modified_timestamp` TIMESTAMP COMMENT 'Timestamp when this assortment assignment record was last updated. Tracks changes to stocking status, min/max quantities, or other assignment parameters.',
+    `last_received_date` DATE COMMENT 'Date when this SKU was last received into inventory at this node. Used to identify slow-moving or stale inventory, support FIFO/FEFO rotation, and flag potential obsolescence. Updated by warehouse management system upon receipt confirmation.',
+    `max_stock_quantity` STRING COMMENT 'Maximum inventory quantity that should be stocked at this node for this SKU. Prevents overstocking and ensures efficient use of storage capacity. Set based on storage constraints, demand forecasts, and inventory turn targets. Node-specific based on storage capacity and sales velocity.',
+    `min_stock_quantity` STRING COMMENT 'Minimum inventory quantity that should be maintained at this node for this SKU. Triggers replenishment when on-hand inventory falls below this threshold. Set based on lead time demand, safety stock calculations, and service level targets. Node-specific based on local demand patterns.',
+    `replenishment_lead_time_days` STRING COMMENT 'Number of days required to replenish this SKU at this specific node from the time a replenishment order is placed. Includes order processing, picking, packing, transit, and receiving time. Node-specific based on distance from supply source, transportation mode, and receiving capacity.',
+    `stocking_status` STRING COMMENT 'Current stocking status of this SKU at this specific node. ACTIVE (currently stocked and replenished), DISCONTINUED (no longer carried at this location), SEASONAL (stocked only during specific seasons), CLEARANCE (final inventory selldown), PENDING_SETUP (authorized but not yet received), TEMPORARY_OUT (temporarily not stocked). This is node-specific and can differ from the SKUs global lifecycle_status.',
+    CONSTRAINT pk_assortment PRIMARY KEY(`assortment_id`)
+) COMMENT 'This association product represents the operational assignment of SKUs to fulfillment nodes in the retail network. It captures which products are authorized to be stocked at which locations, along with node-specific inventory policies, allocation rules, and stocking parameters. Each record links one SKU to one fulfillment node with attributes that govern how that SKU is managed at that specific location. This is the authoritative source for product assortment decisions and location-specific inventory control parameters.. Existence Justification: In retail omnichannel operations, a single SKU is stocked across multiple fulfillment nodes (distribution centers, stores acting as ship-from-store locations, micro-fulfillment centers, dark stores), and each node carries thousands of different SKUs. The business actively manages these SKU-to-node assignments through assortment planning processes, setting node-specific inventory policies, allocation priorities, and stocking parameters for each SKU at each location. This is a core operational relationship managed by merchandising and supply chain teams.';
+
 -- ========= FOREIGN KEYS =========
 ALTER TABLE `vibe_retail_v1`.`product`.`sku` ADD CONSTRAINT `fk_product_sku_brand_id` FOREIGN KEY (`brand_id`) REFERENCES `vibe_retail_v1`.`product`.`brand`(`brand_id`);
 ALTER TABLE `vibe_retail_v1`.`product`.`sku` ADD CONSTRAINT `fk_product_sku_item_hierarchy_id` FOREIGN KEY (`item_hierarchy_id`) REFERENCES `vibe_retail_v1`.`product`.`item_hierarchy`(`item_hierarchy_id`);
@@ -311,19 +412,20 @@ ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ADD CONSTRAINT `fk_product_at
 ALTER TABLE `vibe_retail_v1`.`product`.`brand` ADD CONSTRAINT `fk_product_brand_item_hierarchy_id` FOREIGN KEY (`item_hierarchy_id`) REFERENCES `vibe_retail_v1`.`product`.`item_hierarchy`(`item_hierarchy_id`);
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ADD CONSTRAINT `fk_product_item_variant_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ADD CONSTRAINT `fk_product_item_variant_target_item_sku_id` FOREIGN KEY (`target_item_sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
-ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ADD CONSTRAINT `fk_product_compliance_recall_id` FOREIGN KEY (`recall_id`) REFERENCES `vibe_retail_v1`.`product`.`recall`(`recall_id`);
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ADD CONSTRAINT `fk_product_image_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ADD CONSTRAINT `fk_product_compliance_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ADD CONSTRAINT `fk_product_recall_brand_id` FOREIGN KEY (`brand_id`) REFERENCES `vibe_retail_v1`.`product`.`brand`(`brand_id`);
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ADD CONSTRAINT `fk_product_recall_item_hierarchy_id` FOREIGN KEY (`item_hierarchy_id`) REFERENCES `vibe_retail_v1`.`product`.`item_hierarchy`(`item_hierarchy_id`);
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ADD CONSTRAINT `fk_product_recall_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ADD CONSTRAINT `fk_product_recall_uom_id` FOREIGN KEY (`uom_id`) REFERENCES `vibe_retail_v1`.`product`.`uom`(`uom_id`);
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ADD CONSTRAINT `fk_product_item_bundle_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ADD CONSTRAINT `fk_product_item_bundle_uom_id` FOREIGN KEY (`uom_id`) REFERENCES `vibe_retail_v1`.`product`.`uom`(`uom_id`);
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ADD CONSTRAINT `fk_product_gtin_registry_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ADD CONSTRAINT `fk_product_gtin_registry_uom_id` FOREIGN KEY (`uom_id`) REFERENCES `vibe_retail_v1`.`product`.`uom`(`uom_id`);
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ADD CONSTRAINT `fk_product_uom_base_uom_id` FOREIGN KEY (`base_uom_id`) REFERENCES `vibe_retail_v1`.`product`.`uom`(`uom_id`);
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ADD CONSTRAINT `fk_product_assortment_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 
 -- ========= TAGS =========
 ALTER SCHEMA `vibe_retail_v1`.`product` SET TAGS ('dbx_division' = 'business');
 ALTER SCHEMA `vibe_retail_v1`.`product` SET TAGS ('dbx_domain' = 'product');
 ALTER TABLE `vibe_retail_v1`.`product`.`sku` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`sku` SET TAGS ('dbx_subdomain' = 'catalog_management');
+ALTER TABLE `vibe_retail_v1`.`product`.`sku` SET TAGS ('dbx_subdomain' = 'item_identity');
 ALTER TABLE `vibe_retail_v1`.`product`.`sku` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
 ALTER TABLE `vibe_retail_v1`.`product`.`sku` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Item Hierarchy Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`sku` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Uom Id (Foreign Key)');
@@ -344,7 +446,7 @@ ALTER TABLE `vibe_retail_v1`.`product`.`sku` ALTER COLUMN `upc` SET TAGS ('dbx_v
 ALTER TABLE `vibe_retail_v1`.`product`.`sku` ALTER COLUMN `volume_unit_of_measure` SET TAGS ('dbx_value_regex' = 'GAL|LTR|ML|OZ|QT');
 ALTER TABLE `vibe_retail_v1`.`product`.`sku` ALTER COLUMN `weight_unit_of_measure` SET TAGS ('dbx_value_regex' = 'LB|KG|OZ|G');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` SET TAGS ('dbx_subdomain' = 'catalog_management');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` SET TAGS ('dbx_subdomain' = 'item_identity');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `parent_hierarchy_node_item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Hierarchy Node ID');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `allows_direct_sku_assignment` SET TAGS ('dbx_business_glossary_term' = 'Allows Direct SKU (Stock Keeping Unit) Assignment Flag');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `external_reference_code` SET TAGS ('dbx_business_glossary_term' = 'External Reference ID');
@@ -361,10 +463,10 @@ ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `pricing_st
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `replenishment_method` SET TAGS ('dbx_value_regex' = 'auto|manual|vendor_managed|cross_dock|drop_ship');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_hierarchy` ALTER COLUMN `strategic_classification` SET TAGS ('dbx_value_regex' = 'destination|routine|convenience|seasonal|private_label|national_brand');
 ALTER TABLE `vibe_retail_v1`.`product`.`attribute` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`attribute` SET TAGS ('dbx_subdomain' = 'catalog_management');
+ALTER TABLE `vibe_retail_v1`.`product`.`attribute` SET TAGS ('dbx_subdomain' = 'item_identity');
 ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ALTER COLUMN `attribute_id` SET TAGS ('dbx_business_glossary_term' = 'Product Attribute Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Product Identifier (ID)');
-ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Uom Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Attribute Uom Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By User');
 ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ALTER COLUMN `attribute_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending_approval|deprecated|archived');
 ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ALTER COLUMN `conversion_factor` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) Conversion Factor');
@@ -381,10 +483,10 @@ ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ALTER COLUMN `notes` SET TAGS
 ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ALTER COLUMN `source_system_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`product`.`attribute` ALTER COLUMN `validation_rule` SET TAGS ('dbx_business_glossary_term' = 'Attribute Validation Rule');
 ALTER TABLE `vibe_retail_v1`.`product`.`brand` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`brand` SET TAGS ('dbx_subdomain' = 'catalog_management');
+ALTER TABLE `vibe_retail_v1`.`product`.`brand` SET TAGS ('dbx_subdomain' = 'item_identity');
 ALTER TABLE `vibe_retail_v1`.`product`.`brand` ALTER COLUMN `brand_id` SET TAGS ('dbx_business_glossary_term' = 'Product Brand Identifier (ID)');
+ALTER TABLE `vibe_retail_v1`.`product`.`brand` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`product`.`brand` ALTER COLUMN `average_margin_percent` SET TAGS ('dbx_business_glossary_term' = 'Average Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`product`.`brand` ALTER COLUMN `average_margin_percent` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`brand` ALTER COLUMN `brand_status` SET TAGS ('dbx_value_regex' = 'active|inactive|discontinued|pending_approval');
 ALTER TABLE `vibe_retail_v1`.`product`.`brand` ALTER COLUMN `brand_type` SET TAGS ('dbx_value_regex' = 'national|private_label|exclusive|licensed');
 ALTER TABLE `vibe_retail_v1`.`product`.`brand` ALTER COLUMN `brand_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{3,20}$');
@@ -408,7 +510,7 @@ ALTER TABLE `vibe_retail_v1`.`product`.`brand` ALTER COLUMN `return_rate_percent
 ALTER TABLE `vibe_retail_v1`.`product`.`brand` ALTER COLUMN `tier` SET TAGS ('dbx_value_regex' = 'premium|standard|value|economy');
 ALTER TABLE `vibe_retail_v1`.`product`.`brand` ALTER COLUMN `website_url` SET TAGS ('dbx_business_glossary_term' = 'Brand Website Uniform Resource Locator (URL)');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` SET TAGS ('dbx_subdomain' = 'catalog_management');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` SET TAGS ('dbx_subdomain' = 'item_identity');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ALTER COLUMN `item_variant_id` SET TAGS ('dbx_business_glossary_term' = 'Item Variant Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Source Item Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ALTER COLUMN `target_item_sku_id` SET TAGS ('dbx_business_glossary_term' = 'Target Item Identifier (ID)');
@@ -422,12 +524,56 @@ ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ALTER COLUMN `variant_gtin
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ALTER COLUMN `variant_gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{8,14}$');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ALTER COLUMN `variant_upc` SET TAGS ('dbx_business_glossary_term' = 'Variant Universal Product Code (UPC)');
 ALTER TABLE `vibe_retail_v1`.`product`.`item_variant` ALTER COLUMN `variant_upc` SET TAGS ('dbx_value_regex' = '^[0-9]{12}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` SET TAGS ('dbx_subdomain' = 'item_identity');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `image_id` SET TAGS ('dbx_business_glossary_term' = 'Product Image ID');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Uploaded By Associate Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Source Vendor Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Image Approval Status');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'draft|pending_review|approved|rejected|archived');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By User');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `aspect_ratio` SET TAGS ('dbx_business_glossary_term' = 'Image Aspect Ratio');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `background_color` SET TAGS ('dbx_business_glossary_term' = 'Image Background Color');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `background_color` SET TAGS ('dbx_value_regex' = '^#[0-9A-Fa-f]{6}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `caption` SET TAGS ('dbx_business_glossary_term' = 'Image Caption');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `cdn_asset_reference` SET TAGS ('dbx_business_glossary_term' = 'Content Delivery Network (CDN) Asset Reference');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `color_profile` SET TAGS ('dbx_value_regex' = 'sRGB|Adobe_RGB|ProPhoto_RGB|CMYK');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `dpi` SET TAGS ('dbx_business_glossary_term' = 'Dots Per Inch (DPI)');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Image License Expiration Date');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `file_format` SET TAGS ('dbx_business_glossary_term' = 'Image File Format');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `file_format` SET TAGS ('dbx_value_regex' = 'JPEG|PNG|GIF|WEBP|SVG|TIFF');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `file_size_kb` SET TAGS ('dbx_business_glossary_term' = 'Image File Size in Kilobytes (KB)');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `has_transparency` SET TAGS ('dbx_business_glossary_term' = 'Has Transparency Flag');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `image_type` SET TAGS ('dbx_value_regex' = 'hero|alternate|swatch|lifestyle|packaging|detail');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `is_active` SET TAGS ('dbx_business_glossary_term' = 'Is Active Flag');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `is_primary` SET TAGS ('dbx_business_glossary_term' = 'Is Primary Image Flag');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `license_type` SET TAGS ('dbx_business_glossary_term' = 'Image License Type');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `license_type` SET TAGS ('dbx_value_regex' = 'owned|licensed|royalty_free|creative_commons|vendor_supplied');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `locale` SET TAGS ('dbx_business_glossary_term' = 'Locale Code');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `locale` SET TAGS ('dbx_value_regex' = '^[a-z]{2}_[A-Z]{2}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `mobile_optimized` SET TAGS ('dbx_business_glossary_term' = 'Mobile Optimized Flag');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `mobile_optimized` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `mobile_optimized` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `planogram_eligible` SET TAGS ('dbx_business_glossary_term' = 'Planogram (POG) Eligible Flag');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `print_ready` SET TAGS ('dbx_business_glossary_term' = 'Print Ready Flag');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `quality_score` SET TAGS ('dbx_business_glossary_term' = 'Image Quality Score');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `resolution_height` SET TAGS ('dbx_business_glossary_term' = 'Image Resolution Height');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `resolution_width` SET TAGS ('dbx_business_glossary_term' = 'Image Resolution Width');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `seo_keywords` SET TAGS ('dbx_business_glossary_term' = 'Search Engine Optimization (SEO) Keywords');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `sequence_number` SET TAGS ('dbx_business_glossary_term' = 'Image Sequence Number');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `url` SET TAGS ('dbx_business_glossary_term' = 'Image Uniform Resource Locator (URL)');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `url` SET TAGS ('dbx_value_regex' = '^https?://.*.(jpg|jpeg|png|gif|webp|svg)$');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `vendor_image_code` SET TAGS ('dbx_business_glossary_term' = 'Vendor Image Identifier');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `view_angle` SET TAGS ('dbx_business_glossary_term' = 'Product View Angle');
+ALTER TABLE `vibe_retail_v1`.`product`.`image` ALTER COLUMN `zoom_enabled` SET TAGS ('dbx_business_glossary_term' = 'Zoom Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`compliance` SET TAGS ('dbx_subdomain' = 'regulatory_safety');
+ALTER TABLE `vibe_retail_v1`.`product`.`compliance` SET TAGS ('dbx_subdomain' = 'regulatory_standards');
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `carrier_service_id` SET TAGS ('dbx_business_glossary_term' = 'Approved Carrier Service Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `carrier_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Carrier Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `recall_id` SET TAGS ('dbx_business_glossary_term' = 'Recall Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Product ID');
+ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Vendor Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending_review|expired|suspended|recalled');
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `fda_food_facility_registration` SET TAGS ('dbx_business_glossary_term' = 'Food and Drug Administration (FDA) Food Facility Registration');
@@ -435,45 +581,65 @@ ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `hazmat_classif
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Compliance Notes');
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `prop_65_chemical_list` SET TAGS ('dbx_business_glossary_term' = 'California Proposition 65 (Prop 65) Chemical List');
 ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `prop_65_warning_required` SET TAGS ('dbx_business_glossary_term' = 'California Proposition 65 (Prop 65) Warning Required');
-ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `responsible_party_contact` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `responsible_party_contact` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` SET TAGS ('dbx_subdomain' = 'regulatory_safety');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `recall_id` SET TAGS ('dbx_business_glossary_term' = 'Product Recall ID');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `brand_id` SET TAGS ('dbx_business_glossary_term' = 'Product Brand Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Recall Coordinator Associate Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Item Hierarchy Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Location Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Uom Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `chargeback_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `class` SET TAGS ('dbx_value_regex' = 'class_i|class_ii|class_iii');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `completion_date` SET TAGS ('dbx_business_glossary_term' = 'Recall Completion Date');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_email` SET TAGS ('dbx_business_glossary_term' = 'Recall Coordinator Email');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_phone` SET TAGS ('dbx_business_glossary_term' = 'Recall Coordinator Phone');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_phone` SET TAGS ('dbx_value_regex' = '^+?[0-9]{10,15}$');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_phone` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `coordinator_phone` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `country_of_origin_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `estimated_financial_impact_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `initiation_date` SET TAGS ('dbx_business_glossary_term' = 'Recall Initiation Date');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `press_release_url` SET TAGS ('dbx_value_regex' = '^https?://.*$');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `reason` SET TAGS ('dbx_business_glossary_term' = 'Recall Reason');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `recall_status` SET TAGS ('dbx_value_regex' = 'open|in_progress|closed|terminated');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `recall_type` SET TAGS ('dbx_value_regex' = 'mandatory|voluntary|market_withdrawal');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `reference_number` SET TAGS ('dbx_business_glossary_term' = 'Recall Reference Number');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `reference_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,20}$');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `regulatory_body` SET TAGS ('dbx_value_regex' = 'cpsc|fda|ftc|internal|other');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `regulatory_case_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{8,30}$');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `remedy_type` SET TAGS ('dbx_value_regex' = 'refund|replacement|repair|disposal');
-ALTER TABLE `vibe_retail_v1`.`product`.`recall` ALTER COLUMN `scope` SET TAGS ('dbx_value_regex' = 'national|regional|store_specific');
+ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `recall_severity_level` SET TAGS ('dbx_value_regex' = 'class_1|class_2|class_3');
+ALTER TABLE `vibe_retail_v1`.`product`.`compliance` ALTER COLUMN `recall_status` SET TAGS ('dbx_value_regex' = 'no_recall|active_recall|recall_completed|recall_pending');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` SET TAGS ('dbx_subdomain' = 'regulatory_standards');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `item_bundle_id` SET TAGS ('dbx_business_glossary_term' = 'Item Bundle Identifier (ID)');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Bundle Sku Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Component Uom Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Created By Associate Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Location Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Identifier (ID)');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `bundle_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending|discontinued|seasonal');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `bundle_type` SET TAGS ('dbx_value_regex' = 'fixed_bundle|mix_and_match|gift_set|kit|variety_pack|multi_pack');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `channel_availability` SET TAGS ('dbx_value_regex' = 'all_channels|store_only|online_only|bopis_eligible|ship_from_store');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `component_sequence` SET TAGS ('dbx_business_glossary_term' = 'Component Sequence Number');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `component_sku` SET TAGS ('dbx_business_glossary_term' = 'Component Stock Keeping Unit (SKU)');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `component_sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,14}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `component_substitution_allowed` SET TAGS ('dbx_business_glossary_term' = 'Component Substitution Allowed Flag');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `inventory_deduction_method` SET TAGS ('dbx_value_regex' = 'component_level|bundle_level|hybrid');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `loyalty_points_eligible` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Points Eligible Flag');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `pricing_method` SET TAGS ('dbx_value_regex' = 'bundle_price|component_sum|discount_percentage|discount_amount');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `promotion_eligible` SET TAGS ('dbx_business_glossary_term' = 'Promotion Eligible Flag');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `return_policy_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`item_bundle` ALTER COLUMN `returnable` SET TAGS ('dbx_business_glossary_term' = 'Returnable Flag');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` SET TAGS ('dbx_subdomain' = 'item_identity');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `gtin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Global Trade Item Number (GTIN) Registry ID');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Net Content Uom Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `barcode_symbology` SET TAGS ('dbx_value_regex' = 'EAN|UPC|ITF-14|GS1-128|QR');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `check_digit` SET TAGS ('dbx_business_glossary_term' = 'GTIN Check Digit');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `check_digit` SET TAGS ('dbx_value_regex' = '^[0-9]{1}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `country_of_sale` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `discontinuation_date` SET TAGS ('dbx_business_glossary_term' = 'GTIN Discontinuation Date');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'GTIN Effective Date');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `gdsn_last_sync_timestamp` SET TAGS ('dbx_business_glossary_term' = 'GDSN Last Synchronization Timestamp');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `gdsn_publication_status` SET TAGS ('dbx_business_glossary_term' = 'Global Data Synchronization Network (GDSN) Publication Status');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `gdsn_publication_status` SET TAGS ('dbx_value_regex' = 'published|unpublished|pending|synchronized|rejected');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `gross_weight_unit` SET TAGS ('dbx_business_glossary_term' = 'Gross Weight Unit of Measure');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `gross_weight_unit` SET TAGS ('dbx_value_regex' = 'g|kg|oz|lb');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `gs1_company_prefix` SET TAGS ('dbx_value_regex' = '^[0-9]{6,12}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `gtin` SET TAGS ('dbx_business_glossary_term' = 'Global Trade Item Number (GTIN)');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{8}$|^[0-9]{12}$|^[0-9]{13}$|^[0-9]{14}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `gtin_type` SET TAGS ('dbx_value_regex' = 'UPC-A|UPC-E|EAN-13|EAN-8|GTIN-14|ITF-14');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `is_variable_measure` SET TAGS ('dbx_business_glossary_term' = 'Is Variable Measure Item');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `modified_by_user` SET TAGS ('dbx_business_glossary_term' = 'Modified By User ID');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `package_dimension_unit` SET TAGS ('dbx_business_glossary_term' = 'Package Dimension Unit of Measure');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `package_dimension_unit` SET TAGS ('dbx_value_regex' = 'mm|cm|m|in|ft');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `packaging_level` SET TAGS ('dbx_value_regex' = 'unit|inner_pack|case|pallet|display');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `parent_gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{8}$|^[0-9]{12}$|^[0-9]{13}$|^[0-9]{14}$');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `registration_status` SET TAGS ('dbx_business_glossary_term' = 'GTIN Registration Status');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `registration_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending|suspended|retired');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `regulatory_compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending_review|exempt');
+ALTER TABLE `vibe_retail_v1`.`product`.`gtin_registry` ALTER COLUMN `replacement_gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{8}$|^[0-9]{12}$|^[0-9]{13}$|^[0-9]{14}$');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` SET TAGS ('dbx_data_type' = 'reference_data');
-ALTER TABLE `vibe_retail_v1`.`product`.`uom` SET TAGS ('dbx_subdomain' = 'catalog_management');
+ALTER TABLE `vibe_retail_v1`.`product`.`uom` SET TAGS ('dbx_subdomain' = 'regulatory_standards');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `uom_id` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) ID');
-ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `base_uom_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `class` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) Class');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `class` SET TAGS ('dbx_value_regex' = 'weight|volume|count|length|area|time');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `uom_code` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) Code');
@@ -493,3 +659,23 @@ ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `superseded_by_uom_cod
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `symbol` SET TAGS ('dbx_business_glossary_term' = 'Unit Symbol');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `unece_code` SET TAGS ('dbx_business_glossary_term' = 'UN/ECE Recommendation 20 Code');
 ALTER TABLE `vibe_retail_v1`.`product`.`uom` ALTER COLUMN `uom_type` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM) Type');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` SET TAGS ('dbx_data_type' = 'association_data');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` SET TAGS ('dbx_subdomain' = 'regulatory_standards');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `assortment_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Assignment Identifier');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `cluster_id` SET TAGS ('dbx_business_glossary_term' = 'Cluster Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Department Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Format Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `fulfillment_node_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment - Fulfillment Node Id');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Location Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Preferred Vendor Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment - Sku Id');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `allocation_priority` SET TAGS ('dbx_business_glossary_term' = 'Inventory Allocation Priority Rank');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `assignment_effective_date` SET TAGS ('dbx_business_glossary_term' = 'Assortment Assignment Effective Date');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `assignment_end_date` SET TAGS ('dbx_business_glossary_term' = 'Assortment Assignment End Date');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `last_received_date` SET TAGS ('dbx_business_glossary_term' = 'Last Inventory Receipt Date');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `max_stock_quantity` SET TAGS ('dbx_business_glossary_term' = 'Maximum Stock Quantity Ceiling');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `min_stock_quantity` SET TAGS ('dbx_business_glossary_term' = 'Minimum Stock Quantity Threshold');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `replenishment_lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Node-Specific Replenishment Lead Time');
+ALTER TABLE `vibe_retail_v1`.`product`.`assortment` ALTER COLUMN `stocking_status` SET TAGS ('dbx_business_glossary_term' = 'Node-Specific Stocking Status');

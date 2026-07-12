@@ -1,5 +1,5 @@
 -- Schema for Domain: returns | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:26
+-- Generated on: 2026-07-12 13:53:25
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`returns` COMMENT 'Manages reverse logistics, RMA/RTV processing, restocking workflows, disposition of returned merchandise, refund processing, and return reason analytics. Owns the complete returns lifecycle from customer initiation through final disposition including vendor returns and liquidation.';
@@ -51,7 +51,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`rma` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`rma_line` (
     `rma_line_id` BIGINT COMMENT 'Primary key for rma_line',
     `associate_id` BIGINT COMMENT 'Employee identifier for the warehouse associate who inspected and assessed the condition of the returned item.',
-    `buying_order_line_id` BIGINT COMMENT 'Foreign key linking to merchandising.buying_order_line. Business justification: Enables vendor quality scorecarding and defect-driven cost recovery. Retail operations track defective returns back to the original buying order (not just customer order) to support vendor chargebacks',
     `cost_price_id` BIGINT COMMENT 'Foreign key linking to pricing.cost_price. Business justification: Returns processing requires original landed cost for refund calculations, margin impact analysis, vendor credit determination (RTV), and financial reconciliation. Core operational link between returns',
     `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Returns processing at DC facilities requires tracking which DC received and inspected returned items for disposition routing, inventory restocking, and warehouse operations. Essential for RTV shipment',
     `expiry_tracking_id` BIGINT COMMENT 'Foreign key linking to inventory.expiry_tracking. Business justification: Returns of perishable/dated goods must link to expiry records for shelf-life validation, markdown policy enforcement, and vendor return eligibility determination. Critical for food, pharma, cosmetics',
@@ -179,6 +178,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`return_receipt` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`disposition` (
     `disposition_id` BIGINT COMMENT 'Unique identifier for the disposition record. Primary key for the disposition entity.',
+    `corrective_action_id` BIGINT COMMENT 'Foreign key linking to compliance.corrective_action. Business justification: Audit findings identifying improper disposition practices (hazmat disposal violations, vendor return processing errors) generate corrective actions that mandate disposition procedure changes. Real bus',
     `cost_price_id` BIGINT COMMENT 'Foreign key linking to pricing.cost_price. Business justification: Disposition decisions (restock vs liquidate vs RTV) require comparing estimated recovery value to original landed cost. Drives financial optimization of returned inventory. Removes denormalized origin',
     `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Disposition decisions (restock/liquidate/RTV/scrap) execute at specific DC facilities. Tracking the facility is required for inventory movements, warehouse task generation, and GL posting. Replaces de',
     `vendor_id` BIGINT COMMENT 'Identifier of the third-party liquidation partner if disposition type is liquidation. Tracks which liquidator handled the item for recovery value reconciliation.',
@@ -273,6 +273,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`exchange_order` (
     `profile_id` BIGINT COMMENT 'Reference to the customer who initiated the exchange.',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Exchange fulfillment requires direct replacement SKU reference for inventory allocation, ATP (available-to-promise) checking, and like-for-like exchange policy enforcement. Essential for retail exchan',
     `address_id` BIGINT COMMENT 'Foreign key linking to customer.address. Business justification: Exchange orders require a shipping address for replacement item delivery. Fulfillment operations depend on this link to route exchange shipments correctly. While exchange_order.profile_id provides ind',
+    `rma_id` BIGINT COMMENT 'Reference to the originating RMA that triggered this exchange order.',
     `additional_payment_method` STRING COMMENT 'Payment method used by the customer to cover any price differential for an upgrade exchange.. Valid values are `original_payment_method|credit_card|debit_card|gift_card|store_credit|other`',
     `additional_payment_required_flag` BOOLEAN COMMENT 'Indicates whether the customer must provide additional payment due to a price differential (upgrade scenario).',
     `created_timestamp` TIMESTAMP COMMENT 'Date and time when the exchange order record was first created in the system.',
@@ -297,7 +298,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`exchange_order` (
     `replacement_quantity` STRING COMMENT 'Number of units of the replacement SKU being sent to the customer.',
     `returned_quantity` STRING COMMENT 'Number of units of the returned SKU being sent back by the customer.',
     `returned_sku` STRING COMMENT 'SKU of the product being returned by the customer as part of the exchange.. Valid values are `^[A-Z0-9]{8,14}$`',
-    `rma_id` BIGINT COMMENT 'Reference to the originating RMA that triggered this exchange order.',
     `shipping_cost_waived_flag` BOOLEAN COMMENT 'Indicates whether shipping costs for the replacement item have been waived as a customer service gesture.',
     `special_instructions` STRING COMMENT 'Free-text field for any special handling instructions or notes related to the exchange order.',
     CONSTRAINT pk_exchange_order PRIMARY KEY(`exchange_order_id`)
@@ -438,7 +438,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` (
     `environmental_event_id` BIGINT COMMENT 'Foreign key linking to compliance.environmental_event. Business justification: Liquidation batches containing hazmat, electronics, or regulated materials trigger environmental compliance obligations (manifest tracking, disposal documentation, EPA reporting). Required for regulat',
     `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Liquidation batches require GL postings for inventory write-offs, loss recognition, and recovery proceeds. The existing gl_posting_reference indicates financial posting but lacks proper FK. Essential',
     `associate_id` BIGINT COMMENT 'Reference to the user who created the liquidation batch record, supporting audit trail and accountability requirements.',
-    `regulatory_filing_id` BIGINT COMMENT 'Foreign key linking to compliance.regulatory_filing. Business justification: Large-scale liquidation of regulated products (electronics with WEEE obligations, hazmat, recalled items) triggers regulatory filings (EPA manifests, state environmental reports). Real business proces',
     `vendor_id` BIGINT COMMENT 'Reference to the third-party liquidation partner, bulk buyer, auction house, or marketplace handling the sale of this batch.',
     `batch_approval_date` DATE COMMENT 'Date when the liquidation batch was approved for release to the liquidation partner, marking the transition from internal review to external sale process.',
     `batch_creation_date` DATE COMMENT 'Date when the liquidation batch record was initially created in the system and merchandise consolidation began.',
@@ -621,7 +620,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` (
     `audit_finding_id` BIGINT COMMENT 'Foreign key linking to compliance.audit_finding. Business justification: Compliance audits discovering patterns of fraudulent returns generate audit findings that spawn fraud investigations. Real business process: audit-driven fraud detection where findings trigger case cr',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Fraud investigation costs (labor, third-party services, legal fees) and civil recovery proceeds allocated to loss prevention cost center. Required for shrink expense tracking, ROI analysis on fraud pr',
     `location_id` BIGINT COMMENT 'Store or fulfillment center where the suspected fraud was detected or where the fraudulent return was attempted.',
-    `pos_transaction_id` BIGINT COMMENT 'Foreign key linking to order.pos_transaction. Business justification: Retail fraud investigation teams analyze receipt-based return fraud (wardrobing, receipt fraud, serial returners) requiring direct access to original POS transaction details - tender type, associate,',
+    `pos_transaction_id` BIGINT COMMENT 'Foreign key linking to order.pos_transaction. Business justification: Retail fraud investigation teams analyze receipt-based return fraud (wardrobing, receipt fraud, serial returners) requiring direct access to original POS transaction details - tender type, associate',
     `associate_id` BIGINT COMMENT 'Identifier of the loss prevention or fraud investigation employee assigned to this case.',
     `profile_id` BIGINT COMMENT 'Identifier of the customer associated with the suspected fraudulent return activity.',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Fraud investigations track promotion abuse patterns including serial returners exploiting promotional pricing, coupon fraud rings, and policy violations. Critical for fraud pattern analysis, promotion',
@@ -667,6 +666,7 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ADD CONSTRAINT `fk_returns_
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ADD CONSTRAINT `fk_returns_disposition_rma_line_id` FOREIGN KEY (`rma_line_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma_line`(`rma_line_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ADD CONSTRAINT `fk_returns_refund_return_request_id` FOREIGN KEY (`return_request_id`) REFERENCES `vibe_retail_v1`.`returns`.`return_request`(`return_request_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ADD CONSTRAINT `fk_returns_refund_rma_id` FOREIGN KEY (`rma_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma`(`rma_id`);
+ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ADD CONSTRAINT `fk_returns_exchange_order_rma_id` FOREIGN KEY (`rma_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma`(`rma_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`restock_event` ADD CONSTRAINT `fk_returns_restock_event_disposition_id` FOREIGN KEY (`disposition_id`) REFERENCES `vibe_retail_v1`.`returns`.`disposition`(`disposition_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`restock_event` ADD CONSTRAINT `fk_returns_restock_event_rma_id` FOREIGN KEY (`rma_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma`(`rma_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_item` ADD CONSTRAINT `fk_returns_liquidation_item_liquidation_batch_id` FOREIGN KEY (`liquidation_batch_id`) REFERENCES `vibe_retail_v1`.`returns`.`liquidation_batch`(`liquidation_batch_id`);
@@ -704,7 +704,6 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` SET TAGS ('dbx_data_type' = 't
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` SET TAGS ('dbx_subdomain' = 'authorization_management');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `rma_line_id` SET TAGS ('dbx_business_glossary_term' = 'Rma Line Identifier');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Inspector Employee ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `buying_order_line_id` SET TAGS ('dbx_business_glossary_term' = 'Buying Order Line Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `expiry_tracking_id` SET TAGS ('dbx_business_glossary_term' = 'Expiry Tracking Id (Foreign Key)');
@@ -717,26 +716,20 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `sku_id` SET TAGS
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `condition_code` SET TAGS ('dbx_value_regex' = 'NEW|OPENED|DAMAGED|DEFECTIVE|MISSING_PARTS|EXPIRED');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `disposition_code` SET TAGS ('dbx_value_regex' = 'RESTOCK|RTV|LIQUIDATE|DESTROY|REPAIR|DONATE');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `extended_cost_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `gtin` SET TAGS ('dbx_business_glossary_term' = 'Global Trade Item Number (GTIN)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `gtin` SET TAGS ('dbx_value_regex' = '^[0-9]{14}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `liquidation_sale_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `rtv_authorization_number` SET TAGS ('dbx_business_glossary_term' = 'Return to Vendor (RTV) Authorization Number');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `rtv_authorization_number` SET TAGS ('dbx_value_regex' = '^RTV[0-9]{8,12}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,20}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `unit_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `upc` SET TAGS ('dbx_business_glossary_term' = 'Universal Product Code (UPC)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `upc` SET TAGS ('dbx_value_regex' = '^[0-9]{12}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `vendor_credit_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ALTER COLUMN `warehouse_location_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{3,10}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` SET TAGS ('dbx_subdomain' = 'authorization_management');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Review Assigned To User ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Rma Id (Foreign Key)');
@@ -744,14 +737,8 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `created_ti
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `customer_contact_email` SET TAGS ('dbx_business_glossary_term' = 'Customer Contact Email Address');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `customer_contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `customer_contact_email` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `customer_contact_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `customer_contact_phone` SET TAGS ('dbx_business_glossary_term' = 'Customer Contact Phone Number');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `customer_contact_phone` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `customer_contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `denial_reason_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `fraud_flag` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `fraud_risk_score` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `is_within_return_window` SET TAGS ('dbx_business_glossary_term' = 'Is Within Return Window Flag');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_request` ALTER COLUMN `preferred_resolution_type` SET TAGS ('dbx_value_regex' = 'refund|exchange|store_credit|replacement');
@@ -783,7 +770,6 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `authorized
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `condition_assessment` SET TAGS ('dbx_business_glossary_term' = 'Merchandise Condition Assessment');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `discrepancy_type` SET TAGS ('dbx_value_regex' = 'over_return|under_return|wrong_item|damaged_in_transit|missing_components|no_discrepancy');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `estimated_recovery_value` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `packaging_condition` SET TAGS ('dbx_value_regex' = 'original_sealed|original_opened|repackaged|damaged|missing');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `quantity_unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Quantity Unit of Measure (UOM)');
@@ -800,6 +786,7 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `refund_hol
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_receipt` ALTER COLUMN `return_method` SET TAGS ('dbx_value_regex' = 'in_store|mail_in|drop_off|carrier_pickup|vendor_direct');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` SET TAGS ('dbx_subdomain' = 'merchandise_recovery');
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `corrective_action_id` SET TAGS ('dbx_business_glossary_term' = 'Corrective Action Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Dc Facility Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Liquidation Partner ID');
@@ -835,7 +822,7 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `sku` SET TAGS
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|CS|PK|BX');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`returns`.`refund` SET TAGS ('dbx_subdomain' = 'financial_resolution');
+ALTER TABLE `vibe_retail_v1`.`returns`.`refund` SET TAGS ('dbx_subdomain' = 'financial_settlement');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `refund_id` SET TAGS ('dbx_business_glossary_term' = 'Refund Identifier');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Refund Gl Account Id (Foreign Key)');
@@ -847,7 +834,6 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `profit_center_id` 
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `promo_redemption_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Redemption Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `return_request_id` SET TAGS ('dbx_business_glossary_term' = 'Return ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Refund Approved Timestamp');
-ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `authorization_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Refund Channel');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'store|online|mobile_app|call_center|kiosk');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `completed_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Refund Completed Timestamp');
@@ -863,18 +849,16 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `reason_code` SET T
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `reason_description` SET TAGS ('dbx_business_glossary_term' = 'Refund Reason Description');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `refund_number` SET TAGS ('dbx_value_regex' = '^RFN-[0-9]{10}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `refund_type` SET TAGS ('dbx_value_regex' = 'full|partial|restocking_adjusted|exchange_credit');
-ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `transaction_reference` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`refund` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` SET TAGS ('dbx_subdomain' = 'financial_resolution');
+ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` SET TAGS ('dbx_subdomain' = 'financial_settlement');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Customer Service Representative (CSR) ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Original Order ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Replacement Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `address_id` SET TAGS ('dbx_business_glossary_term' = 'Shipping Address Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Return Merchandise Authorization (RMA) ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `additional_payment_method` SET TAGS ('dbx_value_regex' = 'original_payment_method|credit_card|debit_card|gift_card|store_credit|other');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `exchange_order_number` SET TAGS ('dbx_value_regex' = '^EXO-[0-9]{10}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `exchange_reason_code` SET TAGS ('dbx_value_regex' = 'wrong_size|wrong_color|defective|damaged|preference_change|other');
@@ -885,7 +869,6 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `price_diff
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `refund_method` SET TAGS ('dbx_value_regex' = 'original_payment_method|store_credit|gift_card|check|bank_transfer');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `returned_sku` SET TAGS ('dbx_business_glossary_term' = 'Returned Stock Keeping Unit (SKU)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `returned_sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,14}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`exchange_order` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Return Merchandise Authorization (RMA) ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` SET TAGS ('dbx_subdomain' = 'merchandise_recovery');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `rtv_line_id` SET TAGS ('dbx_business_glossary_term' = 'Return to Vendor (RTV) Line ID');
@@ -893,19 +876,11 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `dc_facility_id` 
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Product ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `rtv_request_id` SET TAGS ('dbx_business_glossary_term' = 'Return to Vendor (RTV) Header ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `rtv_sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `chargeback_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `condition_code` SET TAGS ('dbx_value_regex' = 'new|damaged|defective|expired|obsolete|overstock');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `credit_variance_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `extended_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `original_po_number` SET TAGS ('dbx_business_glossary_term' = 'Original Purchase Order (PO) Number');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `unit_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'each|case|pallet|carton|box|pack');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `vendor_credit_actual_per_unit` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `vendor_credit_actual_total` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `vendor_credit_expected_per_unit` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`rtv_line` ALTER COLUMN `vendor_credit_expected_total` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` SET TAGS ('dbx_subdomain' = 'authorization_management');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ALTER COLUMN `policy_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Policy Id (Foreign Key)');
@@ -981,7 +956,6 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` ALTER COLUMN `dc_faci
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` ALTER COLUMN `environmental_event_id` SET TAGS ('dbx_business_glossary_term' = 'Environmental Event Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Liquidation Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Created By User ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` ALTER COLUMN `regulatory_filing_id` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Filing Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Liquidation Partner ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Liquidation Batch Number');
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` ALTER COLUMN `batch_number` SET TAGS ('dbx_value_regex' = '^LIQ-[0-9]{8}-[A-Z0-9]{6}$');
@@ -1012,11 +986,9 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_item` ALTER COLUMN `rma_numb
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_item` ALTER COLUMN `rma_number` SET TAGS ('dbx_value_regex' = '^RMA[0-9]{8,12}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_item` ALTER COLUMN `weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Weight in Kilograms (KG)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` SET TAGS ('dbx_subdomain' = 'merchandise_recovery');
+ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` SET TAGS ('dbx_subdomain' = 'authorization_management');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` ALTER COLUMN `carrier_service_id` SET TAGS ('dbx_business_glossary_term' = 'Carrier Service Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` ALTER COLUMN `address_id` SET TAGS ('dbx_business_glossary_term' = 'Origin Address Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` ALTER COLUMN `return_request_id` SET TAGS ('dbx_business_glossary_term' = 'Return Order ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` ALTER COLUMN `delivery_signature_required` SET TAGS ('dbx_business_glossary_term' = 'Delivery Signature Required Flag');
@@ -1044,7 +1016,7 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` ALTER COLUMN `total_wei
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` ALTER COLUMN `tracking_number` SET TAGS ('dbx_business_glossary_term' = 'Carrier Tracking Number');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_shipment` ALTER COLUMN `tracking_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{10,35}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` SET TAGS ('dbx_subdomain' = 'financial_resolution');
+ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` SET TAGS ('dbx_subdomain' = 'financial_settlement');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Original Order ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Liability Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Issuing Store ID');
@@ -1059,11 +1031,10 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `currency_cod
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `issuing_channel` SET TAGS ('dbx_value_regex' = 'store|ecommerce|call_center|mobile_app|kiosk');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `pin_code` SET TAGS ('dbx_business_glossary_term' = 'Personal Identification Number (PIN) Code');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `pin_code` SET TAGS ('dbx_value_regex' = '^[0-9]{4,8}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `pin_code` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `redemption_channel_restriction` SET TAGS ('dbx_value_regex' = 'any|store_only|online_only|issuing_store_only');
 ALTER TABLE `vibe_retail_v1`.`returns`.`store_credit` ALTER COLUMN `void_reason_code` SET TAGS ('dbx_value_regex' = 'fraud|duplicate_issuance|customer_request|system_error|policy_violation|expired_unused');
 ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` SET TAGS ('dbx_subdomain' = 'financial_resolution');
+ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` SET TAGS ('dbx_subdomain' = 'financial_settlement');
 ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Credit Gl Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Employee ID');
@@ -1075,33 +1046,22 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `credit_type
 ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `original_po_number` SET TAGS ('dbx_business_glossary_term' = 'Original Purchase Order (PO) Number');
 ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `vendor_contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `vendor_contact_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `vendor_contact_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `vendor_contact_name` SET TAGS ('dbx_pii_identifier' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`vendor_credit` ALTER COLUMN `vendor_contact_phone` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` SET TAGS ('dbx_subdomain' = 'financial_resolution');
+ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` SET TAGS ('dbx_subdomain' = 'financial_settlement');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `audit_finding_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Finding Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `pos_transaction_id` SET TAGS ('dbx_business_glossary_term' = 'Pos Transaction Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned Investigator Employee ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `profile_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `profile_id` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Return Merchandise Authorization (RMA) ID');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `violation_notice_id` SET TAGS ('dbx_business_glossary_term' = 'Violation Notice Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `civil_recovery_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `customer_return_count_90d` SET TAGS ('dbx_business_glossary_term' = 'Customer Return Count 90 Days');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `customer_return_value_90d` SET TAGS ('dbx_business_glossary_term' = 'Customer Return Value 90 Days');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `detection_method` SET TAGS ('dbx_value_regex' = 'associate_flag|automated_rule|loss_prevention_review|customer_service_escalation|analytics_model|third_party_alert');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `estimated_fraud_value_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `evidence_description` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `investigation_outcome` SET TAGS ('dbx_value_regex' = 'fraud_confirmed|fraud_unsubstantiated|customer_error|policy_misunderstanding|system_error|pending');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `investigation_priority` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `investigator_notes` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `law_enforcement_case_number` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `linked_rma_count` SET TAGS ('dbx_business_glossary_term' = 'Linked Return Merchandise Authorization (RMA) Count');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `recovery_status` SET TAGS ('dbx_value_regex' = 'not_applicable|demand_sent|partial_recovery|full_recovery|uncollectible');
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ALTER COLUMN `third_party_fraud_service_code` SET TAGS ('dbx_business_glossary_term' = 'Third Party Fraud Service ID');

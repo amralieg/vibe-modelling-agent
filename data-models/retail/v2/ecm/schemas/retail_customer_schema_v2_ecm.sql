@@ -1,5 +1,5 @@
 -- Schema for Domain: customer | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:22
+-- Generated on: 2026-07-12 13:53:21
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`customer` COMMENT 'Single source of truth for all customer identity, profiles, households, segments (B2C and B2B), contact information, preferences, and RFM (Recency Frequency Monetary) analytics. Manages customer lifecycle, NPS scores, CLTV (Customer Lifetime Value), CAC (Customer Acquisition Cost), consent/privacy preferences, and omnichannel interaction history. Supports personalized clienteling and customer recognition across POS, e-commerce, and mobile.';
@@ -13,7 +13,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`profile` (
     `acquisition_date` DATE COMMENT 'Date when the customer first engaged with the business, marking the start of the customer lifecycle.',
     `ccpa_opt_out_date` TIMESTAMP COMMENT 'Timestamp when CCPA opt-out request was processed, required for compliance audit trails.',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the customer profile record was first created in the master data management system.',
-    `customer_type` STRING COMMENT 'Classification of customer as individual consumer (B2C) or corporate buyer (B2B), including special categories such as employee or VIP.. Valid values are `individual|corporate|employee|vip|wholesale`',
+    `customer_type` STRING COMMENT 'Legal entity type: individual or organization (not role/classification). Valid values are `individual|corporate|employee|vip|wholesale`',
     `date_of_birth` DATE COMMENT 'Date of birth of the customer, used for age verification, lifecycle marketing, and personalized birthday promotions.',
     `effective_from` TIMESTAMP COMMENT 'SCD2 row effective start date',
     `effective_to` TIMESTAMP COMMENT 'SCD2 row effective end date',
@@ -38,6 +38,8 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`profile` (
     `preferred_language` STRING COMMENT 'ISO 639-2 three-letter language code representing the customers preferred language for communication and marketing materials.. Valid values are `^[A-Z]{3}$`',
     `profile_status` STRING COMMENT 'Current operational status of the customer profile, controlling access to services and transactions across all channels.. Valid values are `active|inactive|suspended|blocked|closed`',
     `row_hash` STRING COMMENT 'Hash of tracked columns for change detection',
+    `effective_start_date` TIMESTAMP COMMENT '',
+    `effective_end_date` TIMESTAMP COMMENT '',
     CONSTRAINT pk_profile PRIMARY KEY(`profile_id`)
 ) COMMENT 'Golden record for every customer (B2C and B2B) served by Retail. Stores core identity attributes sourced from the customer master data system including full legal name, date of birth, gender, preferred language, nationality, customer type (individual/corporate), acquisition channel, CAC, CLTV score, NPS score, lifecycle stage, privacy consent flags (GDPR/CCPA), and golden-record confidence score. This is the single authoritative master entity for all customer identity data across POS, e-commerce, and mobile channels.';
 
@@ -49,6 +51,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`account` (
     `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: B2B and corporate accounts require contract-specific pricing (volume discounts, negotiated rates, special terms). Account managers assign custom price lists during contract setup. Essential for wholes',
     `profile_id` BIGINT COMMENT 'Reference to the customer profile who owns this account. One customer may have multiple accounts (e.g., personal and business).',
     `shipping_address_id` BIGINT COMMENT 'Reference to the default shipping address for this account. Used for order fulfillment and delivery. Null if no default shipping address set.',
+    `payment_method_id` BIGINT COMMENT 'Reference to the customers default payment method for this account (e.g., credit card on file, bank account). Null if no default set. Used for one-click checkout and recurring billing.',
     `account_number` STRING COMMENT 'Externally-visible unique account number used for customer communication, statements, and customer service lookup. Distinct from internal account_id.. Valid values are `^[A-Z0-9]{8,20}$`',
     `account_status` STRING COMMENT 'Current lifecycle state of the account. Active accounts can transact; suspended accounts are temporarily blocked; closed accounts are permanently terminated; pending_activation awaits customer verification; frozen accounts are under investigation; dormant accounts have no recent activity.. Valid values are `active|suspended|closed|pending_activation|frozen|dormant`',
     `account_type` STRING COMMENT 'Classification of the account indicating the nature of the commercial relationship: personal (B2C consumer), business (B2B corporate), employee (staff discount account), or wholesale (bulk buyer).. Valid values are `personal|business|employee|wholesale`',
@@ -57,7 +60,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`account` (
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this account record was first created in the system. Used for audit trail and data lineage tracking.',
     `credit_limit` DECIMAL(18,2) COMMENT 'Maximum credit amount (in base currency) extended to this account for deferred payment or credit purchases. Null for cash-only accounts. Used for credit management and risk assessment.',
     `currency_code` STRING COMMENT 'Three-letter ISO 4217 currency code for the accounts base currency (e.g., USD, EUR, GBP). All monetary transactions and balances for this account are denominated in this currency.. Valid values are `^[A-Z]{3}$`',
-    `default_payment_method_id` BIGINT COMMENT 'Reference to the customers default payment method for this account (e.g., credit card on file, bank account). Null if no default set. Used for one-click checkout and recurring billing.',
     `effective_from` TIMESTAMP COMMENT 'SCD2 row effective start date',
     `effective_to` TIMESTAMP COMMENT 'SCD2 row effective end date',
     `employee_discount_eligible` BOOLEAN COMMENT 'Indicates whether this account is eligible for employee discount pricing. True for employee accounts and authorized family members; false otherwise.',
@@ -74,12 +76,15 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`account` (
     `tax_exempt_flag` BOOLEAN COMMENT 'Indicates whether this account is exempt from sales tax (e.g., non-profit organizations, government entities, resellers with valid tax exemption certificates). True if exempt; false otherwise.',
     `tier` STRING COMMENT 'Service tier or membership level of the account, determining benefits, discounts, and service priority. Standard is base tier; premium, VIP, and platinum offer escalating benefits.. Valid values are `standard|premium|vip|platinum`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp when this account record was last modified. Used for audit trail, change tracking, and data synchronization.',
+    `effective_start_date` TIMESTAMP COMMENT '',
+    `effective_end_date` TIMESTAMP COMMENT '',
     CONSTRAINT pk_account PRIMARY KEY(`account_id`)
 ) COMMENT 'Commercial relationship record between a customer and Retail, distinct from profile (identity). Tracks account number, status (active/suspended/closed), open date, tier (standard/premium/VIP), credit limit, preferred store, preferred channel (in-store/online/mobile), default payment method reference, and account-level flags (employee discount eligibility, tax-exempt status, B2B pricing flag). One profile may have multiple accounts (e.g., personal + business). Supports account-level reporting, credit management, and omnichannel preference routing.';
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`household` (
     `household_id` BIGINT COMMENT 'Unique identifier for the household unit. Primary key for the household entity.',
     `location_id` BIGINT COMMENT 'Reference to the store location most frequently visited by household members. Used for localized promotions and inventory planning.',
+    `profile_id` BIGINT COMMENT 'Reference to the primary customer profile within the household. This member typically represents the household in loyalty programs and receives primary communications.',
     `address_line_1` STRING COMMENT 'Primary street address of the household. Used for delivery, geo-targeting, and household matching.',
     `address_line_2` STRING COMMENT 'Secondary address information (apartment, suite, unit number). Optional field for household address.',
     `average_basket_value` DECIMAL(18,2) COMMENT 'Average transaction value (ATV) across all household purchases. Used for household-level pricing and promotion strategies.',
@@ -100,7 +105,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`household` (
     `postal_code` STRING COMMENT 'Postal or ZIP code of the household address. Critical for delivery routing, geo-analytics, and demographic segmentation.',
     `preferred_channel` STRING COMMENT 'Primary shopping channel used by the household. Supports omnichannel personalization and channel-specific promotions.. Valid values are `in_store|online|mobile_app|call_center`',
     `primary_language` STRING COMMENT 'Two-letter ISO language code representing the households preferred language for communications (e.g., en, es, fr). Used for localized marketing and customer service.. Valid values are `^[a-z]{2}$`',
-    `profile_id` BIGINT COMMENT 'Reference to the primary customer profile within the household. This member typically represents the household in loyalty programs and receives primary communications.',
     `segment` STRING COMMENT 'Marketing or behavioral segment assigned to the household based on RFM (Recency Frequency Monetary) analysis, purchase patterns, and demographics. Used for targeted campaigns.',
     `size` STRING COMMENT 'Number of individual members in the household. Used for basket size prediction and household-level promotions.',
     `state_province` STRING COMMENT 'State, province, or region of the household address. Used for tax calculation and regional compliance.',
@@ -206,38 +210,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`preference` (
     CONSTRAINT pk_preference PRIMARY KEY(`preference_id`)
 ) COMMENT 'Captures customer-declared and inferred preferences for personalization across all Retail channels. Stores preference category (communication channel, product category affinity, dietary restriction, brand preference, store preference, language, notification frequency), preference value, preference source (self-declared/behavioral/inferred), confidence level, and last updated timestamp. Feeds the e-commerce platform personalization engine and in-store clienteling tools.';
 
-CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`consent` (
-    `consent_id` BIGINT COMMENT 'Primary key for consent',
-    `profile_id` BIGINT COMMENT 'Reference to the customer who provided or withdrew consent. Links to the customer master record.',
-    `collection_channel` STRING COMMENT 'The channel through which the consent was collected: web (e-commerce site), mobile app, POS (point of sale terminal), paper form (in-store signup), call center, email campaign, or in-store kiosk. [ENUM-REF-CANDIDATE: web|mobile_app|pos|paper_form|call_center|email|in_store_kiosk — 7 candidates stripped; promote to reference product]',
-    `consent_status` STRING COMMENT 'Current status of the consent: granted (customer opted in), withdrawn (customer opted out), pending (awaiting customer action), expired (consent period ended), or revoked (administratively cancelled).. Valid values are `granted|withdrawn|pending|expired|revoked`',
-    `consent_timestamp` TIMESTAMP COMMENT 'The exact date and time when the consent decision was captured. Critical for audit trails and regulatory proof of consent timing.',
-    `consent_type` STRING COMMENT 'The specific type of consent being recorded: marketing email, SMS, push notifications, data sharing with partners, profiling for personalization, cookie tracking, or third-party data sharing. [ENUM-REF-CANDIDATE: marketing_email|marketing_sms|marketing_push|data_sharing|profiling|cookies|third_party_sharing — 7 candidates stripped; promote to reference product]',
-    `data_subject_rights_notice` BOOLEAN COMMENT 'Boolean flag indicating whether the customer was informed of their data subject rights (right to access, rectification, erasure, restriction, portability, objection) at the time of consent collection.',
-    `double_opt_in_confirmed` BOOLEAN COMMENT 'Boolean flag indicating whether the customer confirmed their consent via a double opt-in process (e.g., email confirmation link). Best practice for email marketing consent.',
-    `double_opt_in_timestamp` TIMESTAMP COMMENT 'The date and time when the customer confirmed their consent via double opt-in. Null if double opt-in was not used or not yet confirmed.',
-    `expiration_date` DATE COMMENT 'The date on which this consent expires and must be re-obtained. Null if consent does not expire. Used for consent refresh workflows.',
-    `granularity` STRING COMMENT 'The level of granularity at which consent was obtained: global (all purposes), channel-specific (email vs SMS), purpose-specific (marketing vs analytics), or brand-specific (for multi-brand retailers).. Valid values are `global|channel_specific|purpose_specific|brand_specific`',
-    `ip_address` STRING COMMENT 'The IP address from which the consent was submitted. Used as proof of consent origin for regulatory compliance and fraud detection.',
-    `jurisdiction` STRING COMMENT 'The legal jurisdiction (country or state code) under which this consent was collected and is governed. Determines applicable privacy regulations (GDPR, CCPA, etc.).',
-    `language` STRING COMMENT 'The language in which the consent form was presented to the customer (ISO 639-1 two-letter code, e.g., EN, ES, FR). Required for multi-lingual compliance.',
-    `legal_basis` STRING COMMENT 'The legal basis under GDPR for processing this data: consent, contract fulfillment, legal obligation, vital interest, public task, or legitimate interest. Required for GDPR Article 6 compliance.. Valid values are `consent|contract|legal_obligation|vital_interest|public_task|legitimate_interest`',
-    `method` STRING COMMENT 'The method by which consent was obtained: explicit opt-in (customer actively checked box), implicit opt-in (inferred from action), pre-checked box (legacy, non-compliant), verbal (phone), or written signature (paper form).. Valid values are `explicit_opt_in|implicit_opt_in|pre_checked_box|verbal|written_signature`',
-    `minor_consent_flag` BOOLEAN COMMENT 'Boolean flag indicating whether this consent record pertains to a minor (under age of digital consent in jurisdiction). Triggers additional parental consent requirements under GDPR Article 8 and COPPA.',
-    `parental_consent_verified` BOOLEAN COMMENT 'Boolean flag indicating whether parental or guardian consent has been verified for a minor. Required for COPPA and GDPR Article 8 compliance.',
-    `privacy_policy_version` STRING COMMENT 'The specific version of the privacy policy document that was in effect and accepted by the customer at the time of consent. Required for regulatory audit trails.',
-    `proof_document_url` STRING COMMENT 'URL or storage path to the digitally signed or archived copy of the consent form as presented to the customer. Used for audit and regulatory inspection.',
-    `record_created_timestamp` TIMESTAMP COMMENT 'System timestamp when this consent record was first created in the data platform. Immutable. Used for audit trail and data lineage.',
-    `record_source_system` STRING COMMENT 'The name or identifier of the source system that originated this consent record (e.g., the e-commerce platform, POS system, call center CRM). Used for data lineage and troubleshooting.',
-    `scope` STRING COMMENT 'Detailed description of the scope and purpose of the consent. Explains what data will be used for and how, ensuring transparency and specificity required by privacy regulations.',
-    `third_party_recipient` STRING COMMENT 'Name or identifier of the third party with whom data may be shared under this consent. Null if no third-party sharing is involved. Required for transparency under GDPR Article 13.',
-    `user_agent` STRING COMMENT 'The browser or application user agent string captured at the time of consent. Provides additional context for consent collection environment.',
-    `version` STRING COMMENT 'Version identifier of the consent form or privacy policy that was presented to the customer at the time of consent. Enables tracking of which policy version the customer agreed to.',
-    `withdrawal_reason` STRING COMMENT 'Optional free-text reason provided by the customer for withdrawing consent. Used for customer experience analysis and compliance documentation.',
-    `withdrawal_timestamp` TIMESTAMP COMMENT 'The exact date and time when the customer withdrew their consent. Null if consent has not been withdrawn. Critical for right-to-erasure workflows.',
-    CONSTRAINT pk_consent PRIMARY KEY(`consent_id`)
-) COMMENT 'Authoritative audit trail of customer privacy consent decisions required for GDPR and CCPA compliance. Each row captures consent type (marketing email, SMS, data sharing, profiling, cookies), consent status (granted/withdrawn/pending), consent version, collection channel (web/POS/mobile/paper), collection timestamp, IP address at time of consent, the specific privacy policy version accepted, and the profile reference for the consenting customer. Immutable append-only records supporting regulatory reporting, right-to-erasure workflows, and consent proof during audits.';
-
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`identity_link` (
     `identity_link_id` BIGINT COMMENT 'Unique identifier for the identity link record. Primary key for the identity resolution table.',
     `profile_id` BIGINT COMMENT 'Reference to the golden customer record (master profile) in the Customer domain that this identifier is linked to. This is the single source of truth customer identity.',
@@ -316,7 +288,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`wishlist` (
     `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Wishlists often organized by category ("Wedding Registry - Home Goods", "Holiday - Toys") for customer convenience and retailer assortment gap analysis. Enables category-level demand forecasting from',
     `location_id` BIGINT COMMENT 'Identifier of the physical store location associated with this wishlist (e.g., for BOPIS preferences, in-store registry creation, or store-specific wishlists). Nullable for online-only wishlists.',
     `profile_id` BIGINT COMMENT 'Identifier of the customer who owns this wishlist. Links to the customer master record.',
-    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Retailers track which promotional offers drive wishlist conversions and target wishlist items with specific promotions. Links wishlist to the offer that triggered conversion or was applied at purchase',
     `associate_id` BIGINT COMMENT 'Foreign key linking to workforce.associate. Business justification: Wedding and baby registry wishlists are managed by dedicated in-store registry consultants who assist customers with product selection, registry setup, gift tracking, and completion discounts. Support',
     `address_id` BIGINT COMMENT 'Identifier of the preferred shipping address for gift registry items. Links to customer address records. Nullable for non-registry wishlists.',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Wishlists contain specific SKUs customers intend to purchase. Core e-commerce and registry functionality requires linking wishlist items to product catalog. Drives conversion tracking, inventory plann',
@@ -561,7 +532,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`communication_preference` (
     `preference_status` STRING COMMENT 'Current lifecycle status of the preference. Active indicates currently in use; inactive indicates temporarily disabled; expired indicates no longer valid due to time constraints; superseded indicates replaced by a newer preference.. Valid values are `active|inactive|expired|superseded`',
     `preference_value` DECIMAL(18,2) COMMENT 'The specific value or selection for the preference category (e.g., email, organic produce, , Store #1234, Spanish, weekly). Free-text or structured value depending on category.',
     CONSTRAINT pk_communication_preference PRIMARY KEY(`communication_preference_id`)
-) COMMENT '';
+) COMMENT 'Stores customer communication preferences including channel preferences, frequency settings, and opt-in/opt-out status for various communication types.';
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`customer_attribute` (
     `customer_attribute_id` BIGINT COMMENT 'Unique identifier for the customer preference record. Primary key.',
@@ -586,20 +557,20 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`customer`.`customer_attribute` (
     `version` STRING COMMENT 'Version number of this preference record, incremented each time the preference is updated. Supports preference history tracking and change management. Initial version is 1.',
     `weight` DECIMAL(18,2) COMMENT 'Numeric weight (0.00 to 100.00) assigned to this preference for use in recommendation algorithms and personalization scoring. Higher weights indicate stronger influence on recommendations. Used by AI/ML models for CLTV (Customer Lifetime Value) and next-best-action predictions.',
     CONSTRAINT pk_customer_attribute PRIMARY KEY(`customer_attribute_id`)
-) COMMENT '';
+) COMMENT 'Stores custom attributes and metadata for customer profiles';
 
 -- ========= FOREIGN KEYS =========
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ADD CONSTRAINT `fk_customer_profile_household_id` FOREIGN KEY (`household_id`) REFERENCES `vibe_retail_v1`.`customer`.`household`(`household_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ADD CONSTRAINT `fk_customer_account_address_id` FOREIGN KEY (`address_id`) REFERENCES `vibe_retail_v1`.`customer`.`address`(`address_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ADD CONSTRAINT `fk_customer_account_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ADD CONSTRAINT `fk_customer_account_shipping_address_id` FOREIGN KEY (`shipping_address_id`) REFERENCES `vibe_retail_v1`.`customer`.`address`(`address_id`);
+ALTER TABLE `vibe_retail_v1`.`customer`.`household` ADD CONSTRAINT `fk_customer_household_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ADD CONSTRAINT `fk_customer_corporate_account_address_id` FOREIGN KEY (`address_id`) REFERENCES `vibe_retail_v1`.`customer`.`address`(`address_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ADD CONSTRAINT `fk_customer_corporate_account_account_id` FOREIGN KEY (`account_id`) REFERENCES `vibe_retail_v1`.`customer`.`account`(`account_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ADD CONSTRAINT `fk_customer_corporate_account_contact_id` FOREIGN KEY (`contact_id`) REFERENCES `vibe_retail_v1`.`customer`.`contact`(`contact_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ADD CONSTRAINT `fk_customer_corporate_account_shipping_address_id` FOREIGN KEY (`shipping_address_id`) REFERENCES `vibe_retail_v1`.`customer`.`address`(`address_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`contact` ADD CONSTRAINT `fk_customer_contact_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ADD CONSTRAINT `fk_customer_address_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ADD CONSTRAINT `fk_customer_consent_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` ADD CONSTRAINT `fk_customer_identity_link_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ADD CONSTRAINT `fk_customer_interaction_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ADD CONSTRAINT `fk_customer_wishlist_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
@@ -628,31 +599,17 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `ccpa_opt_out_dat
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Profile Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `customer_type` SET TAGS ('dbx_business_glossary_term' = 'Customer Type Classification');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `customer_type` SET TAGS ('dbx_value_regex' = 'individual|corporate|employee|vip|wholesale');
+ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `customer_type` SET TAGS ('dbx_legal_entity_type_only' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `date_of_birth` SET TAGS ('dbx_business_glossary_term' = 'Customer Date of Birth');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `date_of_birth` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `date_of_birth` SET TAGS ('dbx_pii_dob' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `effective_from` SET TAGS ('dbx_scd2' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `effective_to` SET TAGS ('dbx_scd2' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `email_address` SET TAGS ('dbx_business_glossary_term' = 'Customer Email Address');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `email_address` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `email_address` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `email_address` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `first_name` SET TAGS ('dbx_business_glossary_term' = 'Customer First Name');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `first_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `first_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `full_name` SET TAGS ('dbx_business_glossary_term' = 'Customer Full Legal Name');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `full_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `full_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `gdpr_consent_date` SET TAGS ('dbx_business_glossary_term' = 'General Data Protection Regulation (GDPR) Consent Date');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `gender` SET TAGS ('dbx_business_glossary_term' = 'Customer Gender');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `gender` SET TAGS ('dbx_value_regex' = 'male|female|non_binary|prefer_not_to_say|other|unknown');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `gender` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `gender` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `is_current` SET TAGS ('dbx_scd2' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Profile Last Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `last_name` SET TAGS ('dbx_business_glossary_term' = 'Customer Last Name');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `last_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `last_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `lifecycle_stage` SET TAGS ('dbx_business_glossary_term' = 'Customer Lifecycle Stage');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `loyalty_tier` SET TAGS ('dbx_business_glossary_term' = 'Customer Loyalty Tier');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `loyalty_tier` SET TAGS ('dbx_value_regex' = 'bronze|silver|gold|platinum|diamond');
@@ -660,109 +617,71 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `mdm_confidence_s
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `mdm_last_match_date` SET TAGS ('dbx_business_glossary_term' = 'Master Data Management (MDM) Last Match Date');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `mdm_source_system` SET TAGS ('dbx_business_glossary_term' = 'Master Data Management (MDM) Source System');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `middle_name` SET TAGS ('dbx_business_glossary_term' = 'Customer Middle Name');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `middle_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `middle_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `mobile_number` SET TAGS ('dbx_business_glossary_term' = 'Customer Mobile Phone Number');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `mobile_number` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `mobile_number` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `nationality` SET TAGS ('dbx_business_glossary_term' = 'Customer Nationality');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `nationality` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `nationality` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `nationality` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `phone_number` SET TAGS ('dbx_business_glossary_term' = 'Customer Phone Number');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `phone_number` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `preferred_contact_method` SET TAGS ('dbx_value_regex' = 'email|phone|sms|mail|none');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `preferred_language` SET TAGS ('dbx_business_glossary_term' = 'Customer Preferred Language');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `preferred_language` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `profile_status` SET TAGS ('dbx_business_glossary_term' = 'Customer Profile Status');
 ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `profile_status` SET TAGS ('dbx_value_regex' = 'active|inactive|suspended|blocked|closed');
-ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `row_hash` SET TAGS ('dbx_scd2' = 'true');
+ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_scd2' = 'true');
+ALTER TABLE `vibe_retail_v1`.`customer`.`profile` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_scd2' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` SET TAGS ('dbx_subdomain' = 'identity_master');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Account Manager ID');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Preferred Store ID');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `shipping_address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `shipping_address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `account_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,20}$');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `account_number` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `account_number` SET TAGS ('dbx_pii_financial' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `account_status` SET TAGS ('dbx_value_regex' = 'active|suspended|closed|pending_activation|frozen|dormant');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `account_type` SET TAGS ('dbx_value_regex' = 'personal|business|employee|wholesale');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `b2b_pricing_flag` SET TAGS ('dbx_business_glossary_term' = 'Business-to-Business (B2B) Pricing Flag');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `close_date` SET TAGS ('dbx_business_glossary_term' = 'Account Close Date');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `credit_limit` SET TAGS ('dbx_business_glossary_term' = 'Account Credit Limit');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `credit_limit` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `effective_from` SET TAGS ('dbx_scd2' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `effective_to` SET TAGS ('dbx_scd2' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `employee_discount_eligible` SET TAGS ('dbx_business_glossary_term' = 'Employee Discount Eligible Flag');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `is_current` SET TAGS ('dbx_scd2' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `loyalty_program_enrolled` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Program Enrolled Flag');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Account Notes');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `open_date` SET TAGS ('dbx_business_glossary_term' = 'Account Open Date');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `preferred_channel` SET TAGS ('dbx_value_regex' = 'in_store|online|mobile_app|call_center');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `row_hash` SET TAGS ('dbx_scd2' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `suspension_date` SET TAGS ('dbx_business_glossary_term' = 'Account Suspension Date');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `suspension_reason` SET TAGS ('dbx_business_glossary_term' = 'Account Suspension Reason');
-ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `tax_exempt_certificate_number` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `tax_exempt_expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Tax Exempt Certificate Expiry Date');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `tier` SET TAGS ('dbx_value_regex' = 'standard|premium|vip|platinum');
 ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_scd2' = 'true');
+ALTER TABLE `vibe_retail_v1`.`customer`.`account` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_scd2' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` SET TAGS ('dbx_subdomain' = 'identity_master');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `household_id` SET TAGS ('dbx_business_glossary_term' = 'Household Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Preferred Store Identifier (ID)');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `address_line_1` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `address_line_1` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `address_line_2` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `address_line_2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `city` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `city` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Member Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `combined_cltv` SET TAGS ('dbx_business_glossary_term' = 'Combined Customer Lifetime Value (CLTV)');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `combined_cltv` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `communication_preference` SET TAGS ('dbx_value_regex' = 'email|sms|mail|phone|none');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `data_sharing_consent` SET TAGS ('dbx_business_glossary_term' = 'Data Sharing Consent Flag');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `estimated_income_band` SET TAGS ('dbx_value_regex' = 'under_25k|25k_50k|50k_75k|75k_100k|100k_150k|over_150k');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `estimated_income_band` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `external_household_code` SET TAGS ('dbx_business_glossary_term' = 'External Household Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `household_status` SET TAGS ('dbx_value_regex' = 'active|inactive|merged|split|pending');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `household_type` SET TAGS ('dbx_value_regex' = 'single_person|nuclear_family|extended_family|multi_generational|shared_residence|other');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `loyalty_tier` SET TAGS ('dbx_value_regex' = 'bronze|silver|gold|platinum|vip');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `marketing_opt_in` SET TAGS ('dbx_business_glossary_term' = 'Marketing Opt-In Flag');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `preferred_channel` SET TAGS ('dbx_value_regex' = 'in_store|online|mobile_app|call_center');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `primary_language` SET TAGS ('dbx_value_regex' = '^[a-z]{2}$');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Member Identifier (ID)');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `profile_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `profile_id` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `segment` SET TAGS ('dbx_business_glossary_term' = 'Household Segment');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `size` SET TAGS ('dbx_business_glossary_term' = 'Household Size');
 ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `state_province` SET TAGS ('dbx_business_glossary_term' = 'State or Province');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `state_province` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`household` ALTER COLUMN `state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` SET TAGS ('dbx_subdomain' = 'identity_master');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Account Manager Associate Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `address_id` SET TAGS ('dbx_internal' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `account_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Corporate Account ID');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `contact_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Contact Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `shipping_address_id` SET TAGS ('dbx_internal' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `shipping_address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `shipping_address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `annual_spend_tier` SET TAGS ('dbx_value_regex' = 'tier_1|tier_2|tier_3|tier_4|tier_5');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `credit_limit` SET TAGS ('dbx_business_glossary_term' = 'Credit Limit Amount');
-ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `credit_limit` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `credit_status` SET TAGS ('dbx_value_regex' = 'approved|pending|declined|under_review|suspended');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `dba_name` SET TAGS ('dbx_business_glossary_term' = 'Doing Business As (DBA) Name');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `duns_number` SET TAGS ('dbx_business_glossary_term' = 'Data Universal Numbering System (DUNS) Number');
@@ -772,11 +691,8 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `indust
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `industry_classification_sic` SET TAGS ('dbx_business_glossary_term' = 'Standard Industrial Classification (SIC) Code');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `industry_classification_sic` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `preferred_delivery_method` SET TAGS ('dbx_value_regex' = 'standard_ground|expedited|next_day|freight|customer_pickup');
-ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `tax_exempt_certificate_number` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `tax_identifier` SET TAGS ('dbx_business_glossary_term' = 'Tax Identification Number (TIN) / Employer Identification Number (EIN)');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `tax_identifier` SET TAGS ('dbx_value_regex' = '^[0-9]{2}-[0-9]{7}$');
-ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `tax_identifier` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `tax_identifier` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`corporate_account` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`customer`.`contact` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`customer`.`contact` SET TAGS ('dbx_subdomain' = 'identity_master');
@@ -786,77 +702,31 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`contact` ALTER COLUMN `country_code` SE
 ALTER TABLE `vibe_retail_v1`.`customer`.`contact` ALTER COLUMN `is_primary` SET TAGS ('dbx_business_glossary_term' = 'Is Primary Contact');
 ALTER TABLE `vibe_retail_v1`.`customer`.`contact` ALTER COLUMN `language_preference` SET TAGS ('dbx_value_regex' = '^[a-z]{2}$');
 ALTER TABLE `vibe_retail_v1`.`customer`.`contact` ALTER COLUMN `source_system_code` SET TAGS ('dbx_business_glossary_term' = 'Source System ID');
-ALTER TABLE `vibe_retail_v1`.`customer`.`contact` ALTER COLUMN `value` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`contact` ALTER COLUMN `value` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` SET TAGS ('dbx_subdomain' = 'identity_master');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `address_status` SET TAGS ('dbx_value_regex' = 'active|inactive|archived|pending_verification');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `address_status` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `address_status` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `address_type` SET TAGS ('dbx_value_regex' = 'billing|shipping|home|work|store_pickup|mailing');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `city` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `city` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `is_default_billing` SET TAGS ('dbx_business_glossary_term' = 'Is Default Billing Address');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `is_default_shipping` SET TAGS ('dbx_business_glossary_term' = 'Is Default Shipping Address');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `latitude` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `line_1` SET TAGS ('dbx_business_glossary_term' = 'Address Line 1');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `line_1` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `line_1` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `line_2` SET TAGS ('dbx_business_glossary_term' = 'Address Line 2');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `line_2` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `line_2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `longitude` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `military_address_flag` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `military_address_flag` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `nickname` SET TAGS ('dbx_business_glossary_term' = 'Address Nickname');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `po_box_flag` SET TAGS ('dbx_business_glossary_term' = 'Post Office (PO) Box Flag');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `po_box_flag` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `po_box_flag` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `postal_code` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `residential_flag` SET TAGS ('dbx_business_glossary_term' = 'Residential Address Flag');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `standardization_flag` SET TAGS ('dbx_business_glossary_term' = 'Postal Standardization Flag');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `state_province` SET TAGS ('dbx_business_glossary_term' = 'State or Province');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `state_province` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `validation_status` SET TAGS ('dbx_business_glossary_term' = 'Address Validation Status');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `validation_status` SET TAGS ('dbx_value_regex' = 'validated|unvalidated|invalid|pending');
 ALTER TABLE `vibe_retail_v1`.`customer`.`address` ALTER COLUMN `verification_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Address Verification Timestamp');
 ALTER TABLE `vibe_retail_v1`.`customer`.`preference` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`customer`.`preference` SET TAGS ('dbx_subdomain' = 'engagement_preferences');
-ALTER TABLE `vibe_retail_v1`.`customer`.`preference` ALTER COLUMN `effective_from` SET TAGS ('dbx_scd2' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`preference` ALTER COLUMN `effective_to` SET TAGS ('dbx_scd2' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`preference` ALTER COLUMN `is_current` SET TAGS ('dbx_scd2' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`preference` ALTER COLUMN `row_hash` SET TAGS ('dbx_scd2' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` SET TAGS ('dbx_subdomain' = 'privacy_compliance');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `consent_id` SET TAGS ('dbx_business_glossary_term' = 'Consent Identifier');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `consent_status` SET TAGS ('dbx_value_regex' = 'granted|withdrawn|pending|expired|revoked');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `double_opt_in_confirmed` SET TAGS ('dbx_business_glossary_term' = 'Double Opt-In Confirmed');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `double_opt_in_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Double Opt-In Timestamp');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `granularity` SET TAGS ('dbx_business_glossary_term' = 'Consent Granularity');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `granularity` SET TAGS ('dbx_value_regex' = 'global|channel_specific|purpose_specific|brand_specific');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `ip_address` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `ip_address` SET TAGS ('dbx_pii_ip' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `language` SET TAGS ('dbx_business_glossary_term' = 'Consent Language');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `legal_basis` SET TAGS ('dbx_value_regex' = 'consent|contract|legal_obligation|vital_interest|public_task|legitimate_interest');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `method` SET TAGS ('dbx_value_regex' = 'explicit_opt_in|implicit_opt_in|pre_checked_box|verbal|written_signature');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `proof_document_url` SET TAGS ('dbx_business_glossary_term' = 'Consent Proof Document URL');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `user_agent` SET TAGS ('dbx_internal' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `user_agent` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`consent` ALTER COLUMN `version` SET TAGS ('dbx_business_glossary_term' = 'Consent Version');
 ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` SET TAGS ('dbx_subdomain' = 'identity_master');
 ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'in_store|online|mobile|call_center|social_media');
 ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` ALTER COLUMN `consent_status` SET TAGS ('dbx_value_regex' = 'granted|denied|pending|withdrawn|expired');
-ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` ALTER COLUMN `identifier_value` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` ALTER COLUMN `identifier_value` SET TAGS ('dbx_pii_identifier' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` ALTER COLUMN `is_primary_identifier` SET TAGS ('dbx_business_glossary_term' = 'Is Primary Identifier Flag');
 ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` ALTER COLUMN `link_method` SET TAGS ('dbx_value_regex' = 'deterministic|probabilistic|manual|third_party');
 ALTER TABLE `vibe_retail_v1`.`customer`.`identity_link` ALTER COLUMN `link_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending_review|rejected|superseded');
@@ -865,8 +735,6 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` SET TAGS ('dbx_data_type' 
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` SET TAGS ('dbx_subdomain' = 'engagement_preferences');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `email_send_id` SET TAGS ('dbx_business_glossary_term' = 'Email Send Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `email_send_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `email_send_id` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `pos_transaction_id` SET TAGS ('dbx_business_glossary_term' = 'Transaction ID');
@@ -885,17 +753,7 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `device_type`
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `direction` SET TAGS ('dbx_business_glossary_term' = 'Interaction Direction');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `direction` SET TAGS ('dbx_value_regex' = 'inbound|outbound');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `duration_seconds` SET TAGS ('dbx_business_glossary_term' = 'Interaction Duration (Seconds)');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `email_clicked_flag` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `email_clicked_flag` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `email_opened_flag` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `email_opened_flag` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `geolocation_latitude` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `geolocation_latitude` SET TAGS ('dbx_pii_location' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `geolocation_longitude` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `geolocation_longitude` SET TAGS ('dbx_pii_location' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `ip_address` SET TAGS ('dbx_business_glossary_term' = 'IP (Internet Protocol) Address');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `ip_address` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `ip_address` SET TAGS ('dbx_pii_ip' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `landing_page_url` SET TAGS ('dbx_business_glossary_term' = 'Landing Page URL (Uniform Resource Locator)');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Interaction Notes');
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ALTER COLUMN `nps_score` SET TAGS ('dbx_business_glossary_term' = 'Net Promoter Score (NPS)');
@@ -910,19 +768,12 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `wishlist_id` SE
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Registry Consultant Associate Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `address_id` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `address_id` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Wishlist Creation Channel');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'web|mobile_app|mobile_web|in_store_kiosk|call_center');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `co_registrant_first_name` SET TAGS ('dbx_business_glossary_term' = 'Co-Registrant First Name');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `co_registrant_first_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `co_registrant_first_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `co_registrant_last_name` SET TAGS ('dbx_business_glossary_term' = 'Co-Registrant Last Name');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `co_registrant_last_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `co_registrant_last_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `conversion_rate_percentage` SET TAGS ('dbx_business_glossary_term' = 'Wishlist Conversion Rate Percentage');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `conversion_status` SET TAGS ('dbx_business_glossary_term' = 'Wishlist Conversion Status');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `conversion_status` SET TAGS ('dbx_value_regex' = 'unconverted|partially_converted|fully_converted');
@@ -934,10 +785,6 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `external_wishli
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `is_default_flag` SET TAGS ('dbx_business_glossary_term' = 'Is Default Wishlist Flag');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Wishlist Last Modified Timestamp');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `notification_frequency` SET TAGS ('dbx_value_regex' = 'immediate|daily|weekly|event_based|disabled');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `registrant_first_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `registrant_first_name` SET TAGS ('dbx_pii_name' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `registrant_last_name` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `registrant_last_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `registry_number` SET TAGS ('dbx_business_glossary_term' = 'Gift Registry Number');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `share_count` SET TAGS ('dbx_business_glossary_term' = 'Wishlist Share Count');
 ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ALTER COLUMN `share_url` SET TAGS ('dbx_business_glossary_term' = 'Wishlist Share URL (Uniform Resource Locator)');
@@ -954,10 +801,8 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `loyalty_
 ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `appeal_outcome` SET TAGS ('dbx_value_regex' = 'upheld|overturned|pending|withdrawn');
 ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `data_export_format` SET TAGS ('dbx_value_regex' = 'JSON|CSV|PDF|XML');
-ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `data_export_url` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `outcome` SET TAGS ('dbx_business_glossary_term' = 'Request Outcome');
 ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `outcome` SET TAGS ('dbx_value_regex' = 'fulfilled|partially_fulfilled|denied|withdrawn');
-ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `processing_notes` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `regulatory_framework` SET TAGS ('dbx_value_regex' = 'GDPR|CCPA|LGPD|PIPEDA|APPI|POPIA');
 ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `request_number` SET TAGS ('dbx_business_glossary_term' = 'Privacy Request Number');
 ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ALTER COLUMN `request_number` SET TAGS ('dbx_value_regex' = '^PR-[0-9]{10}$');
@@ -1010,22 +855,9 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`client_relationship` ALTER COLUMN `upda
 ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` SET TAGS ('dbx_subdomain' = 'commercial_relationships');
 ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `b2b_contract_id` SET TAGS ('dbx_business_glossary_term' = 'B2B Contract Identifier');
-ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `master_b2b_contract_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `contract_document_url` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `contract_value` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `credit_limit` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `discount_percentage` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `minimum_order_value` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `payment_terms` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `penalty_terms` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `pricing_tier` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ALTER COLUMN `volume_commitment` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`contract_template` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_retail_v1`.`customer`.`contract_template` SET TAGS ('dbx_subdomain' = 'commercial_relationships');
 ALTER TABLE `vibe_retail_v1`.`customer`.`contract_template` ALTER COLUMN `contract_template_id` SET TAGS ('dbx_business_glossary_term' = 'Contract Template Identifier');
-ALTER TABLE `vibe_retail_v1`.`customer`.`contract_template` ALTER COLUMN `parent_contract_template_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`contract_template` ALTER COLUMN `liability_cap_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`customer`.`contract_template` ALTER COLUMN `template_content` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`customer`.`communication_preference` SET TAGS ('dbx_data_type' = 'reference_data');
 ALTER TABLE `vibe_retail_v1`.`customer`.`communication_preference` SET TAGS ('dbx_subdomain' = 'engagement_preferences');
 ALTER TABLE `vibe_retail_v1`.`customer`.`communication_preference` ALTER COLUMN `language` SET TAGS ('dbx_business_glossary_term' = 'Preference Language');

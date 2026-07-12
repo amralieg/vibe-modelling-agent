@@ -1,5 +1,5 @@
 -- Schema for Domain: promotion | Business: Retail | Version: v2_mvm
--- Generated on: 2026-07-12 10:43:58
+-- Generated on: 2026-07-12 15:26:01
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`promotion` COMMENT 'Manages promotional campaigns, deals, coupons, rebates, BOGO offers, seasonal sales events, circular ads, and digital promotions across channels. Tracks promotion effectiveness, redemption rates, incremental lift, promotional ROI, and vendor-funded promotion agreements. Distinct from pricing — promotions are time-bound, event-driven incentives. Supports omnichannel promotion execution across POS, e-commerce, and mobile apps.';
@@ -7,16 +7,19 @@ CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`promotion` COMMENT 'Manages prom
 -- ========= TABLES =========
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` (
     `promo_campaign_id` BIGINT COMMENT 'Unique identifier for the promotional campaign. Primary key.',
-    `account_id` BIGINT COMMENT 'Foreign key linking to customer.account. Business justification: B2B retail campaigns frequently target specific corporate accounts with exclusive pricing, volume discounts, or contract-based promotions. Account managers need to track which campaigns are assigned t',
-    `brand_id` BIGINT COMMENT 'Foreign key linking to product.product_brand. Business justification: Retail campaigns frequently target specific brands for brand-funded promotions, exclusive launches, and co-marketing. Brand managers require visibility into all campaigns affecting their portfolio for',
-    `cluster_id` BIGINT COMMENT 'Foreign key linking to store.cluster. Business justification: Cluster-targeted campaign planning is standard retail practice — merchants design campaigns for store clusters sharing demographics or format mix (e.g., urban cluster back-to-school campaign). No exis',
+    `brand_id` BIGINT COMMENT 'Foreign key linking to product.product_brand. Business justification: Retail campaigns frequently target specific brands (vendor-funded brand promotions, brand exclusives, seasonal brand pushes). Business tracks brand-level campaign performance and vendor funding agreem',
+    `buyer_id` BIGINT COMMENT 'Foreign key linking to merchandising.buyer. Business justification: Promotional campaigns are owned and approved by the merchandising buyer responsible for the category. owner_name and owner_email on promo_campaign are denormalized buyer attributes. A proper FK enforc',
     `format_id` BIGINT COMMENT 'Foreign key linking to store.format. Business justification: Campaigns are measured against specific KPIs (sales lift %, ROI, redemption rate). Campaign managers select target KPIs during planning; performance dashboards require this link to show actual vs targ',
     `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.item_hierarchy. Business justification: Campaigns target product categories/departments (e.g., Back to School - Electronics). Budget allocation, buyer approval workflows, and performance rollup all operate at hierarchy level. Enables cate',
     `parent_promo_campaign_id` BIGINT COMMENT 'Self-referencing FK on promo_campaign (parent_promo_campaign_id)',
-    `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: Promotional campaign planning requires knowing which price list governs base prices being discounted. Retail merchants explicitly tie campaigns to a price list (regular, sale, clearance) to calculate ',
-    `program_id` BIGINT COMMENT 'Foreign key linking to loyalty.program. Business justification: Campaigns are core analytical entities exposed in semantic layer for self-service reporting. BI teams certify campaign entity definitions (grain, attributes, business rules) for consistent analysis. T',
-    `promo_calendar_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_calendar. Business justification: Campaigns are planned and executed according to promotional calendar periods. The promo_campaign has start_date and end_date that should align with promotional periods defined in promo_calendar (e.g.,',
-    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: Regional campaign planning is a core retail process — merchants plan campaigns by region for market-specific pricing, competitive response, and regulatory compliance. A domain expert expects promo_cam',
+    `promo_calendar_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_calendar. Business justification: Campaigns are planned and executed according to promotional calendar periods. The promo_campaign has start_date and end_date that should align with promotional periods defined in promo_calendar (e.g.',
+    `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Promotional campaigns are planned and executed at category level. Category managers need visibility to all campaigns targeting their categories for assortment planning, inventory positioning, and perf',
+    `vendor_id` BIGINT COMMENT 'Identifier of the vendor providing funding or support for the campaign, if applicable.',
+    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: Regional campaign planning is a core retail process — regional directors approve and own campaigns scoped to their geography. promo_campaign.geographic_scope is a text field; a proper region_id FK ena',
+    `return_policy_id` BIGINT COMMENT 'Foreign key linking to returns.return_policy. Business justification: Retail campaigns (Black Friday, holiday sales) routinely mandate campaign-level return policy overrides. Linking promo_campaign to return_policy enables campaign planning teams to assign and enforce s',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Seasonal promotions (Back-to-School, Holiday, Spring clearance) are core retail planning. Campaigns must align with merchandising seasonal calendars for coordinated go-to-market execution. Critical fo',
+    `storefront_id` BIGINT COMMENT 'Foreign key linking to ecommerce.storefront. Business justification: Digital campaign storefront scoping: promotional campaigns targeting specific e-commerce storefronts (app launch campaigns, site-exclusive events) need a direct storefront reference for campaign execu',
+    `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: Promotional campaigns are authorized and funded under specific vendor contracts defining co-op advertising terms, funding percentages, and promotional obligations. Retail finance teams reconcile campa',
     `approval_status` STRING COMMENT 'Approval workflow status indicating whether the campaign has been reviewed and authorized for execution.. Valid values are `pending|approved|rejected`',
     `approved_by` STRING COMMENT 'Name or identifier of the business user who approved the campaign for execution.',
     `approved_timestamp` TIMESTAMP COMMENT 'Date and time when the campaign was approved for execution.',
@@ -39,8 +42,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` (
     `loyalty_exclusive_flag` BOOLEAN COMMENT 'Indicates whether the campaign offers are exclusive to loyalty program members.',
     `modified_by` STRING COMMENT 'Name or identifier of the user who last modified the campaign record.',
     `modified_timestamp` TIMESTAMP COMMENT 'Date and time when the campaign record was last updated.',
-    `owner_email` STRING COMMENT 'Email address of the campaign owner for communication and escalation.. Valid values are `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$`',
-    `owner_name` STRING COMMENT 'Name of the marketing manager or business owner responsible for the campaign execution and performance.',
     `priority_level` STRING COMMENT 'Business priority level of the campaign for resource allocation and conflict resolution.. Valid values are `critical|high|medium|low`',
     `promo_campaign_status` STRING COMMENT 'Current lifecycle status of the promotional campaign.. Valid values are `draft|scheduled|active|paused|completed|cancelled`',
     `stackable_flag` BOOLEAN COMMENT 'Indicates whether campaign offers can be combined with other promotions or coupons.',
@@ -55,13 +56,19 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`promo_offer` (
     `promo_offer_id` BIGINT COMMENT 'Unique identifier for the promotional offer. Primary key for this entity.',
-    `tier_id` BIGINT COMMENT 'Foreign key linking to loyalty.tier. Business justification: Tier-gated promotional offers (e.g., Gold-tier-only discount) are a standard retail loyalty mechanic. promo_offer.customer_segment_eligibility is plain text; a proper FK to loyalty.tier enables automa',
-    `format_id` BIGINT COMMENT 'Foreign key linking to store.format. Business justification: Offers are scoped by store format in retail (e.g., hypermarket-only BOGO deals vs. convenience store offers). Format-level offer targeting is a distinct granularity from campaign-level format scoping.',
-    `location_id` BIGINT COMMENT 'Foreign key linking to store.location. Business justification: Store-specific offer eligibility is a standard retail operation — certain offers are valid only at specific store locations (e.g., clearance offers at a single store). store_eligibility_scope is a tex',
-    `program_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_program. Business justification: Multi-program retailers scope individual offers to a specific loyalty program independently of the campaign (e.g., loyalty-exclusive SKU discounts). Offer-level loyalty program scoping drives eligibil',
+    `assortment_plan_id` BIGINT COMMENT 'Foreign key linking to merchandising.assortment_plan. Business justification: Promotional offers must be validated against the active assortment plan to ensure only assorted SKUs are promoted. Buyers use this link to enforce assortment eligibility rules during offer setup and t',
+    `brand_id` BIGINT COMMENT 'Foreign key linking to product.product_brand. Business justification: Offers commonly apply to entire brand portfolios ("20% off all Brand X products"). Retailers negotiate brand-level promotional pricing with vendors. Business needs brand-offer linkage for vendor charg',
+    `cluster_id` BIGINT COMMENT 'Foreign key linking to store.cluster. Business justification: Cluster-based offer targeting is standard retail practice — urban clusters receive different offers than suburban or rural clusters. promo_offer.store_eligibility_scope is a text field; a cluster_id F',
+    `format_id` BIGINT COMMENT 'Foreign key linking to store.format. Business justification: Individual offers tracked against specific KPIs (conversion rate, average basket lift, incremental margin). Offer optimization requires linking each offer to its primary performance KPI for A/B testin',
+    `otb_budget_id` BIGINT COMMENT 'Foreign key linking to merchandising.otb_budget. Business justification: Promotional offers consume open-to-buy budget — retailer-funded promotional costs must be tracked and approved against the OTB budget. Buyers approve offers within OTB constraints. This link enables t',
     `promo_campaign_id` BIGINT COMMENT 'Reference to the parent promotional campaign under which this offer is organized.',
-    `return_policy_id` BIGINT COMMENT 'Foreign key linking to returns.return_policy. Business justification: Promotional offers frequently carry modified return terms (e.g., final sale — no returns, or extended holiday return window). Linking promo_offer to return_policy enables offer-level return policy o',
+    `carrier_service_id` BIGINT COMMENT 'Foreign key linking to fulfillment.carrier_service. Business justification: Promotional free/discounted shipping offers (e.g., free 2-day delivery) are scoped to specific carrier services in retail operations. This link enables offer eligibility validation at checkout and c',
+    `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Offers target specific categories (e.g., 20% off Apparel). Merchandising needs category-level offer visibility for pricing decisions, margin analysis, and assortment adjustments. Essential for categor',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Promotional offers target specific SKUs for discount application. Essential for offer eligibility validation, POS redemption logic, inventory planning for promoted items, and promotional ROI analysis',
+    `vendor_id` BIGINT COMMENT 'Reference to the vendor/supplier funding or co-funding this promotional offer. Null if retailer-funded.',
+    `return_policy_id` BIGINT COMMENT 'Foreign key linking to returns.return_policy. Business justification: Promotional offers in retail frequently carry offer-specific return policies (e.g., final sale, extended window). Linking promo_offer to return_policy enables automated return eligibility enforcement ',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Seasonal offers (new season launch promotions, end-of-season clearance) require season context for merchandising coordination. Buyers need to see all offers planned for their seasons to coordinate inv',
+    `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: Individual promo offers (BOGO, % off) are governed by vendor contract terms specifying cost-sharing and funding eligibility. Offer management and vendor settlement processes require this link to valid',
     `activation_trigger` STRING COMMENT 'Event or condition that activates this offer for a customer. manual = customer enters code; cart_threshold = automatically applied when cart meets criteria; login = activated upon customer login; geofence = triggered by location; time_based = activated at specific time; event_based = triggered by business event.. Valid values are `manual|cart_threshold|login|geofence|time_based|event_based`',
     `approval_status` STRING COMMENT 'Approval workflow status for this promotional offer. pending = awaiting approval; approved = authorized for execution; rejected = not approved.. Valid values are `pending|approved|rejected`',
     `approved_by` STRING COMMENT 'Name or identifier of the business user who approved this promotional offer. Null if not yet approved.',
@@ -104,14 +111,16 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`promo_offer` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`coupon` (
     `coupon_id` BIGINT COMMENT 'Unique identifier for the coupon instrument. Primary key.',
-    `profile_id` BIGINT COMMENT 'Foreign key linking to customer.profile. Business justification: Personalized coupon issuance is core to modern retail CRM—loyalty programs, birthday offers, win-back campaigns all issue coupons to specific customers. Marketing teams track issuance-to-redemption co',
-    `location_id` BIGINT COMMENT 'Foreign key linking to store.location. Business justification: Store-specific coupon validity is a real retail requirement — coupons issued for a specific store location (grand opening, clearance). geographic_restriction is a text field; a location_id FK enables ',
-    `tier_id` BIGINT COMMENT 'Foreign key linking to loyalty.tier. Business justification: Coupons frequently tier-gated (e.g., Platinum members: extra 20% off) - requires tier validation at redemption, supports VIP member retention strategies, and enables tier-specific promotional ROI an',
-    `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: Coupons in retail are scoped to specific price lists — a coupon may be valid only against regular-price items (not already-marked-down items). Linking coupon to price_list enforces this business rule ',
-    `program_id` BIGINT COMMENT 'Foreign key linking to loyalty.program. Business justification: Coupons are analytical entities for redemption analysis and customer segmentation. BI teams certify coupon entity definitions (grain, redemption metrics, eligibility rules) for self-service reporting.',
+    `brand_id` BIGINT COMMENT 'Foreign key linking to product.product_brand. Business justification: Manufacturer coupons are brand-specific (vendor-funded). Retailers track brand-level coupon redemption for vendor settlement and chargeback. Business process requires linking coupon to brand for vendo',
+    `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Coupons are category-specific ("$5 off Grocery", "20% off Electronics"). Category managers track coupon redemption impact on sales velocity, margin, and inventory turn. Essential for category-level pr',
+    `profile_id` BIGINT COMMENT 'Foreign key linking to customer.profile. Business justification: Retail operations issue personalized coupons to specific customers for loyalty programs, birthday offers, and win-back campaigns. Tracking issued_to enables single-use enforcement, fraud detection, an',
     `promo_campaign_id` BIGINT COMMENT 'Reference to the parent promotional campaign under which this coupon was issued.',
     `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Coupons are instruments that implement specific promotional offers. While coupon already has promotion_campaign_id (linking to the campaign), it needs promo_offer_id to identify the exact offer the co',
+    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: Coupons carry geographic restrictions for regulatory compliance (e.g., alcohol promotions restricted by jurisdiction, regional pricing laws). coupon.geographic_restriction is a denormalized text field',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Coupons restrict redemption to qualifying SKUs. POS systems validate coupon eligibility against product attributes (brand, category, vendor). Inventory planning uses this to forecast demand spikes. Ve',
+    `storefront_id` BIGINT COMMENT 'Foreign key linking to ecommerce.storefront. Business justification: Digital coupon distribution scoping: coupons issued for specific digital storefronts (app-exclusive coupons, site-specific promo codes) must reference the storefront for redemption validation and chan',
+    `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: Vendor-funded coupons are issued under specific vendor contracts. The coupon redemption settlement and chargeback process requires tracing each coupon to its governing vendor_contract to validate fund',
+    `vendor_id` BIGINT COMMENT 'Reference to the supplier or manufacturer funding the coupon, if applicable. Null for retailer-funded coupons.',
     `barcode` STRING COMMENT 'UPC or EAN barcode number for physical coupon scanning at POS. May be 12-digit UPC-A or 13-digit EAN format.. Valid values are `^[0-9]{12,14}$`',
     `coupon_code` STRING COMMENT 'Alphanumeric code that customers enter or scan to redeem the coupon. Unique business identifier for the coupon across all channels.. Valid values are `^[A-Z0-9]{6,20}$`',
     `coupon_status` STRING COMMENT 'Current lifecycle state of the coupon. active means available for redemption, inactive means not yet released, expired means past expiration_date, suspended means temporarily disabled, redeemed means fully used (for single-use coupons).. Valid values are `active|inactive|expired|suspended|redeemed`',
@@ -126,7 +135,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`coupon` (
     `exclusion_list` STRING COMMENT 'Comma-separated list of product SKUs, categories, or brands explicitly excluded from coupon eligibility. Null if no exclusions apply.',
     `expiration_date` DATE COMMENT 'Last date on which the coupon can be redeemed. After this date, the coupon is no longer valid.',
     `face_value` DECIMAL(18,2) COMMENT 'Nominal discount value of the coupon. For fixed_amount coupons, this is the dollar discount. For percentage coupons, this is the percentage (e.g., 15.00 for 15% off). For BOGO, may represent the value of the free item.',
-    `geographic_restriction` STRING COMMENT 'Comma-separated list of geographic regions (states, provinces, countries) where the coupon is valid. Null if valid everywhere. Uses ISO 3166-1 alpha-3 country codes and ISO 3166-2 subdivision codes.',
     `issue_channel` STRING COMMENT 'Distribution channel through which the coupon was issued to customers. Circular refers to weekly print ads, mobile_app and email are digital channels, in_store_kiosk is physical print at store, website is online portal, social_media includes Facebook/Instagram ads, direct_mail is postal delivery, SMS is text message. [ENUM-REF-CANDIDATE: circular|mobile_app|email|in_store_kiosk|website|social_media|direct_mail|sms — 8 candidates stripped; promote to reference product]',
     `issue_date` DATE COMMENT 'Date on which the coupon was first made available to customers. Marks the start of the coupons validity window.',
     `issuing_authority` STRING COMMENT 'Entity responsible for funding and issuing the coupon. Retailer indicates store-funded, manufacturer indicates vendor-funded, vendor indicates supplier co-op, third_party indicates external promotion partner.. Valid values are `retailer|manufacturer|vendor|third_party`',
@@ -146,18 +154,19 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`coupon` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`circular_ad` (
     `circular_ad_id` BIGINT COMMENT 'Unique identifier for the circular advertisement. Primary key for the circular ad entity.',
-    `dc_facility_id` BIGINT COMMENT 'Foreign key linking to supplychain.dc_facility. Business justification: Circular production costs (printing, distribution) are charged to specific cost centers (marketing department, regional marketing). Required for budget tracking, variance analysis, and departmental P&',
+    `assortment_plan_id` BIGINT COMMENT 'Foreign key linking to merchandising.assortment_plan. Business justification: Circular ads feature products from specific assortment plans. Merchandising must coordinate featured items with inventory availability and ensure adequate stock depth for advertised items. Critical fo',
+    `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Circular ads have production costs (production_cost_amount, production_cost_currency_code) that are funded from promotional budgets. While circular_ad.promo_campaign_id links to campaign, the specific',
+    `vendor_id` BIGINT COMMENT 'Reference to the external vendor or agency responsible for circular design, production, or distribution services.',
+    `cluster_id` BIGINT COMMENT 'Foreign key linking to store.cluster. Business justification: Circular ad distribution is planned by store cluster — a circular edition targets stores with similar demographics and format mix. circular_ad.geographic_market is a text field; a cluster_id FK enable',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Circular ads feature specific hero SKUs on cover/pages. Production teams need product images, descriptions, compliance attributes. Inventory planning ensures featured items are in stock. Performance t',
-    `format_id` BIGINT COMMENT 'Foreign key linking to store.format. Business justification: Circular ads are format-specific in retail — hypermarket circulars differ from convenience store or discount outlet circulars in layout, SKU count, and distribution. A format_id FK enables format-spec',
-    `location_id` BIGINT COMMENT 'Foreign key linking to store.location. Business justification: Circular ads feature products from specific assortment plans. Merchandising must coordinate featured items with inventory availability and ensure adequate stock depth for advertised items. Critical fo',
-    `markdown_id` BIGINT COMMENT 'Foreign key linking to pricing.markdown. Business justification: Retail circular ads frequently feature clearance and markdown prices. Linking circular_ad to the markdown event that drives the advertised price enables circular production teams to pull accurate mark',
+    `location_id` BIGINT COMMENT 'Foreign key linking to store.location. Business justification: Circular production costs (printing, distribution) are charged to specific cost centers (marketing department, regional marketing). Required for budget tracking, variance analysis, and departmental P&',
+    `markdown_id` BIGINT COMMENT 'Foreign key linking to pricing.markdown. Business justification: Circular ads frequently feature markdown and clearance items. Linking circular_ad to markdown enables tracking which markdowns were advertised in circulars, supporting markdown effectiveness analysis ',
     `promo_calendar_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_calendar. Business justification: Circular ads are published according to promotional calendar periods. The circular_ad has effective_start_date and effective_end_date that align with promotional periods defined in promo_calendar (e.g',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Circular ads are marketing vehicles that promote specific promotional campaigns. While circular_ad already links to marketing.campaign (cross-domain for overall marketing campaign), it needs a link to',
-    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: A circular advertisement features specific promotional offers (e.g., BOGO on cereal, 20% off electronics) — not just campaigns. Linking circular_ad to promo_offer enables tracking which specific o',
-    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: Circular ads are distributed by geographic region in retail (regional newspaper inserts, regional digital circulars). geographic_market is a denormalized text representation of the region; a region_id',
-    `replenishment_plan_id` BIGINT COMMENT 'Reference to the parent promotional campaign that this circular supports. Links the circular to broader marketing initiatives and budget tracking.',
+    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: A circular advertisement (print or digital) typically features specific promotional offers — e.g., a weekly circular page highlights a BOGO offer or a price-cut offer for a featured SKU. While circula',
     `sku_price_id` BIGINT COMMENT 'Foreign key linking to pricing.sku_price. Business justification: Circular ads contain creative assets managed in marketing asset libraries. Retailers link circular ads to constituent creative assets for asset performance tracking, reuse optimization, and ensuring b',
-    `storefront_id` BIGINT COMMENT 'Foreign key linking to ecommerce.storefront. Business justification: Digital circular ads are published to specific storefronts; linking circular_ad to storefront enables digital circular distribution management, impression tracking per storefront, and digital circular',
+    `storefront_id` BIGINT COMMENT 'Foreign key linking to ecommerce.storefront. Business justification: Digital circular distribution to storefronts: digital circular ads (online weekly flyers, digital deal pages) are published to specific storefronts. Linking circular_ad to storefront enables digital i',
+    `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: Circular ads are co-funded by vendors under specific contract terms governing placement obligations and funding amounts. The circular production billing process requires linking each circular_ad to th',
     `approval_date` DATE COMMENT 'Date when the circular content and design were officially approved for production and distribution by marketing management.',
     `circular_name` STRING COMMENT 'Marketing name or title of the circular advertisement, such as Weekly Savings, Holiday Spectacular, or Back to School Event.',
     `circular_number` STRING COMMENT 'Business identifier for the circular advertisement, typically a human-readable code or number used for reference in marketing and merchandising operations.',
@@ -170,6 +179,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`circular_ad` (
     `edition_number` STRING COMMENT 'Edition or version number of the circular, used to track revisions and multiple releases within a campaign period.',
     `effective_end_date` DATE COMMENT 'Date when the promotional offers and pricing featured in the circular expire and are no longer valid for customer redemption.',
     `effective_start_date` DATE COMMENT 'Date when the promotional offers and pricing featured in the circular become valid and active for customer redemption.',
+    `geographic_market` STRING COMMENT 'Geographic market or region where the circular is distributed, such as specific metro areas, states, or national coverage. Supports localized promotional strategies.',
     `is_vendor_funded` BOOLEAN COMMENT 'Indicates whether the circular includes vendor-funded promotional offers or co-op advertising agreements. True if vendor funding is involved, false otherwise.',
     `language_code` STRING COMMENT 'Two-letter ISO 639-1 language code indicating the primary language of the circular content, such as en for English or es for Spanish.. Valid values are `^[a-z]{2}$`',
     `last_modified_timestamp` TIMESTAMP COMMENT 'Timestamp when the circular record was most recently updated, used for audit trail and change tracking.',
@@ -187,69 +197,67 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`circular_ad` (
     CONSTRAINT pk_circular_ad PRIMARY KEY(`circular_ad_id`)
 ) COMMENT 'Master record for a printed or digital weekly/seasonal circular advertisement, including both the circular header and its featured item lines. Header captures circular name, edition number, publication date, effective date range, distribution channel (print, digital, email, app), geographic market coverage, page count, and production status. Item lines capture featured SKU, advertised price, promotional price, page number, position on page, feature type (front page, endcap feature, in-book), ad copy headline, image reference, and loss-leader flag. The circular is a key promotional vehicle in retail that drives planned traffic and is directly linked to campaign offers. Supports circular effectiveness analysis by item and planogram alignment with advertised features.';
 
-CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`rebate` (
-    `rebate_id` BIGINT COMMENT 'Unique identifier for the rebate program. Primary key.',
-    `tier_id` BIGINT COMMENT 'Foreign key linking to loyalty.tier. Business justification: Tiered rebate structures (higher loyalty tier = higher rebate percentage) are a real retail loyalty mechanic. A FK to loyalty.tier enables automated tier-based rebate calculation and supports tier-dif',
-    `location_id` BIGINT COMMENT 'Identifier of the manager or finance user who approved the rebate program for activation. Null if not yet approved.',
-    `program_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_program. Business justification: Rebates in retail are frequently restricted to loyalty program members (e.g., member-only mail-in rebates). rebate.customer_segment_eligibility is plain text; a FK to loyalty_program enables automated',
-    `promo_campaign_id` BIGINT COMMENT 'Identifier of the parent promotional campaign or event to which this rebate belongs. Null if rebate is standalone.',
-    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: A rebate in retail is a specific deal mechanic (e.g., buy X, get $Y back) that is defined at the offer level, not just the campaign level. Linking rebate to promo_offer allows precise tracking of wh',
-    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: Rebate geographic eligibility is a regulatory and operational requirement in retail — rebates are restricted by state/region due to legal constraints or vendor agreements. geographic_eligibility is a ',
-    `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Rebates apply to specific qualifying products. Claim validation verifies purchased SKU matches rebate terms. Vendor chargeback reconciliation requires SKU-level tracking. Inventory planning adjusts fo',
-    `profile_id` BIGINT COMMENT 'Foreign key linking to customer.profile. Business justification: Rebate claim processing requires tracking which customer submitted each claim for fraud detection, payment fulfillment, and per-customer redemption limit enforcement. Finance and customer service team',
-    `amount` DECIMAL(18,2) COMMENT 'Fixed monetary value of the rebate in the transaction currency. Null if rebate is percentage-based.',
-    `approval_status` STRING COMMENT 'Workflow approval state for the rebate program before it can be activated. Ensures financial and legal review compliance.. Valid values are `pending_approval|approved|rejected`',
-    `approved_timestamp` TIMESTAMP COMMENT 'Date and time when the rebate program was approved. Null if not yet approved.',
-    `channel_eligibility` STRING COMMENT 'Sales channels where the rebate can be redeemed: all_channels (any touchpoint), pos_only (in-store Point of Sale only), ecommerce_only (online purchases), mobile_app_only (mobile app transactions), or omnichannel (integrated cross-channel).. Valid values are `all_channels|pos_only|ecommerce_only|mobile_app_only|omnichannel`',
-    `created_timestamp` TIMESTAMP COMMENT 'Date and time when the rebate program record was first created in the system.',
-    `currency_code` STRING COMMENT 'Three-letter ISO 4217 currency code for the rebate amount (e.g., USD, EUR, GBP).. Valid values are `^[A-Z]{3}$`',
-    `customer_segment_eligibility` STRING COMMENT 'Comma-separated list of customer segment codes eligible for the rebate (e.g., loyalty_member, employee, senior, student). Null if available to all customers.',
-    `rebate_description` STRING COMMENT 'Detailed internal description of the rebate program purpose, target audience, and business objectives. Used for internal planning and reporting.',
-    `effective_end_date` DATE COMMENT 'Date when the rebate program expires and is no longer available for new submissions. Null for open-ended programs.',
-    `effective_start_date` DATE COMMENT 'Date when the rebate program becomes active and eligible for customer redemption.',
-    `exclusion_product_list` STRING COMMENT 'Comma-separated list of Stock Keeping Unit (SKU) codes or product categories explicitly excluded from the rebate program.',
-    `geographic_eligibility` STRING COMMENT 'Comma-separated list of three-letter ISO country codes or region codes where the rebate is valid (e.g., USA, CAN, GBR). Null if available in all operating regions.',
-    `last_modified_timestamp` TIMESTAMP COMMENT 'Date and time when the rebate program record was last updated.',
-    `marketing_message` STRING COMMENT 'Customer-facing promotional message displayed in circulars, digital ads, and at Point of Sale to communicate the rebate offer.',
-    `maximum_rebate_amount` DECIMAL(18,2) COMMENT 'Cap on the total rebate value that can be claimed per transaction or per customer. Null if no cap applies.',
-    `minimum_purchase_amount` DECIMAL(18,2) COMMENT 'Minimum transaction value required to qualify for the rebate. Null if no minimum threshold applies.',
-    `minimum_purchase_quantity` STRING COMMENT 'Minimum number of qualifying units (Stock Keeping Units) that must be purchased to qualify for the rebate. Null if no quantity threshold applies.',
-    `rebate_name` STRING COMMENT 'Marketing name of the rebate program displayed to customers and used in promotional materials.',
-    `payment_method` STRING COMMENT 'Mechanism by which the rebate value is returned to the customer: check (mailed physical check), store_credit (loyalty account credit), digital_credit (e-wallet or app credit), prepaid_card (branded debit card), bank_transfer (direct deposit), or instant_discount (applied at Point of Sale).. Valid values are `check|store_credit|digital_credit|prepaid_card|bank_transfer|instant_discount`',
-    `payment_processing_days` STRING COMMENT 'Expected number of business days from rebate approval to payment issuance. Used for customer Service Level Agreement (SLA) communication.',
-    `percentage` DECIMAL(18,2) COMMENT 'Percentage discount applied as rebate (e.g., 10.00 for 10% off). Null if rebate is fixed-amount.',
-    `qualifying_product_list` STRING COMMENT 'Comma-separated list of Stock Keeping Unit (SKU) codes, Universal Product Code (UPC) numbers, or product category codes that qualify for the rebate. Null if rebate applies to all products.',
-    `rebate_number` STRING COMMENT 'Externally-visible unique business identifier for the rebate program, used in customer communications and vendor agreements.. Valid values are `^RBT-[A-Z0-9]{8,12}$`',
-    `rebate_status` STRING COMMENT 'Current lifecycle state of the rebate program: draft (being configured), active (live and accepting submissions), paused (temporarily suspended), expired (past end date), cancelled (terminated early), or completed (ended successfully).. Valid values are `draft|active|paused|expired|cancelled|completed`',
-    `rebate_type` STRING COMMENT 'Classification of the rebate mechanism: instant rebate (applied at Point of Sale), mail-in rebate (customer submits proof of purchase), vendor-funded rebate (supplier-sponsored), digital rebate (online redemption), promotional allowance (trade promotion), or volume rebate (quantity-based incentive).. Valid values are `instant_rebate|mail_in_rebate|vendor_funded_rebate|digital_rebate|promotional_allowance|volume_rebate`',
-    `redemption_limit_per_customer` STRING COMMENT 'Maximum number of times a single customer can claim this rebate during the program period. Null if no limit applies.',
-    `redemption_limit_per_transaction` STRING COMMENT 'Maximum number of rebate instances that can be applied in a single transaction. Null if no limit applies.',
-    `requires_proof_of_purchase` BOOLEAN COMMENT 'Indicates whether customers must submit receipt or purchase documentation to claim the rebate. True for mail-in rebates, false for instant rebates applied at Point of Sale.',
-    `stackable_with_other_promotions` BOOLEAN COMMENT 'Indicates whether this rebate can be combined with other promotional offers (coupons, markdowns, Buy One Get One (BOGO) deals) in the same transaction.',
-    `submission_deadline_date` DATE COMMENT 'Final date by which customers must submit rebate claims for purchases made during the effective period. Typically extends beyond the effective end date for mail-in rebates.',
-    `terms_and_conditions` STRING COMMENT 'Full legal text of the rebate program terms, conditions, restrictions, and disclaimers. Must comply with Federal Trade Commission (FTC) disclosure requirements.',
-    `total_budget_amount` DECIMAL(18,2) COMMENT 'Total financial budget allocated for the rebate program. Used for cost control and Return on Investment (ROI) tracking. Null if budget is uncapped.',
-    `vendor_funding_percentage` DECIMAL(18,2) COMMENT 'Percentage of the rebate cost funded by the vendor in co-op promotional agreements (e.g., 75.00 means vendor pays 75%, retailer pays 25%). Null for fully retailer-funded rebates.',
-    CONSTRAINT pk_rebate PRIMARY KEY(`rebate_id`)
-) COMMENT 'Master record for a rebate program offered to customers or funded by vendors. Captures rebate name, rebate type (instant rebate, mail-in rebate, vendor-funded rebate), rebate amount or percentage, qualifying purchase conditions, submission deadline, payment method (check, store credit, digital credit), sponsoring vendor, and rebate program status. Supports both consumer-facing rebates and vendor-funded promotional allowances.';
+CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` (
+    `vendor_promo_agreement_id` BIGINT COMMENT 'Unique identifier for the vendor-funded promotional agreement record. Primary key.',
+    `brand_id` BIGINT COMMENT 'Foreign key linking to product.product_brand. Business justification: Vendor promotional agreements often cover entire brand portfolios, not individual SKUs. Business tracks brand-level funding commitments, minimum purchase requirements, and performance obligations. Ess',
+    `buying_order_id` BIGINT COMMENT 'Foreign key linking to merchandising.buying_order. Business justification: Vendor promotional funding agreements are contingent on buying order commitments — vendors fund promotions tied to specific purchase volumes. Settlement, chargeback processing, and accrual reconciliat',
+    `cost_price_id` BIGINT COMMENT 'Foreign key linking to pricing.cost_price. Business justification: Vendor promo agreements establish the cost basis for vendor-funded promotions. Linking to cost_price enables accurate vendor chargeback calculation and deal cost reconciliation against the agreed cost',
+    `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Vendor promotional agreements (co-op advertising, promotional allowances) fund specific promotional campaigns. The vendor_promo_agreement table currently only links to vendor but needs promo_campaign_',
+    `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: A vendor-funded promotional agreement in retail is commonly tied to a specific promotional offer within the campaign (e.g., a vendor co-funds a BOGO offer or a percentage-off discount offer). While ve',
+    `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: A vendor_promo_agreement is a promotional-specific agreement subordinate to a master vendor_contract. Legal and finance teams link promo agreements to the governing master contract for compliance audi',
+    `vendor_id` BIGINT COMMENT 'Identifier of the vendor or supplier providing promotional funding for this agreement.',
+    `accrual_method` STRING COMMENT 'Method used to calculate promotional funding accrual. Purchase-based: accrues on retailer purchase volume. Sales-based: accrues on consumer sales (scan data). Display-based: accrues on compliance with display requirements. Hybrid: combination of methods.. Valid values are `purchase-based|sales-based|display-based|hybrid`',
+    `ad_placement_required` BOOLEAN COMMENT 'Indicates whether the retailer must feature the product in circular ads, digital promotions, or other marketing materials to qualify for co-op advertising funding.',
+    `agreement_name` STRING COMMENT 'Human-readable descriptive name for the promotional agreement, typically including campaign theme or product category.',
+    `agreement_number` STRING COMMENT 'Externally-known unique business identifier for the promotional agreement, used in vendor communications and settlement documents.',
+    `agreement_type` STRING COMMENT 'Classification of the vendor promotional funding mechanism. Co-op advertising: shared advertising cost. Off-invoice allowance: upfront discount on purchase invoice. Bill-back: post-event reimbursement. Scan allowance: per-unit sold rebate. New item allowance: slotting fee for new SKU introduction. Volume rebate: tiered discount based on purchase volume.. Valid values are `co-op advertising|off-invoice allowance|bill-back|scan allowance|new item allowance|volume rebate`',
+    `approval_date` DATE COMMENT 'Date when the promotional agreement was internally approved and authorized for execution.',
+    `chargeback_eligible` BOOLEAN COMMENT 'Indicates whether the retailer can issue chargebacks to the vendor for non-compliance with agreement terms (e.g., late delivery, incorrect pricing, missing promotional materials).',
+    `chargeback_penalty_amount` DECIMAL(18,2) COMMENT 'Fixed monetary penalty amount per chargeback incident for vendor non-compliance, in the agreement currency. Nullable if chargeback is not eligible or penalty is variable.',
+    `contract_document_reference` STRING COMMENT 'Reference identifier or file path to the signed legal contract or agreement document stored in the document management system.',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this promotional agreement record was first created in the system.',
+    `display_compliance_required` BOOLEAN COMMENT 'Indicates whether the retailer must meet specific in-store display requirements (endcap placement, planogram compliance, shelf positioning) to qualify for funding.',
+    `effective_end_date` DATE COMMENT 'Date when the promotional agreement expires and funding accrual ceases. Nullable for open-ended agreements.',
+    `effective_start_date` DATE COMMENT 'Date when the promotional agreement becomes active and funding accrual begins.',
+    `funding_amount` DECIMAL(18,2) COMMENT 'Total monetary value of vendor promotional funding committed under this agreement, in the agreement currency.',
+    `funding_currency_code` STRING COMMENT 'Three-letter ISO 4217 currency code for the funding amount (e.g., USD, EUR, GBP).. Valid values are `^[A-Z]{3}$`',
+    `funding_percentage` DECIMAL(18,2) COMMENT 'Percentage of qualifying costs or sales that the vendor will fund, expressed as a decimal (e.g., 15.00 for 15%). Used for co-op advertising and scan-based allowances.',
+    `last_modified_timestamp` TIMESTAMP COMMENT 'Timestamp when this promotional agreement record was most recently updated.',
+    `minimum_purchase_amount` DECIMAL(18,2) COMMENT 'Minimum monetary value of purchases required to qualify for the promotional funding, in the agreement currency. Nullable if no minimum applies.',
+    `minimum_purchase_quantity` DECIMAL(18,2) COMMENT 'Minimum quantity of product that must be purchased to qualify for the promotional funding. Nullable if no minimum applies.',
+    `notes` STRING COMMENT 'Free-text field for additional comments, special conditions, or internal notes related to the promotional agreement.',
+    `outstanding_balance` DECIMAL(18,2) COMMENT 'Difference between total accrued amount and total settled amount, representing funding owed by the vendor but not yet paid, in the agreement currency.',
+    `performance_obligation_description` STRING COMMENT 'Detailed narrative of the retailers obligations under this agreement, including display requirements, advertising commitments, volume targets, and reporting duties.',
+    `qualifying_product_scope` STRING COMMENT 'Defines which products are eligible for promotional funding under this agreement. Specific SKU: single item. Product category: all items in a category. Brand: all items of a vendor brand. Private label: retailer-branded items.. Valid values are `all products|specific SKU|product category|brand|private label`',
+    `settlement_frequency` STRING COMMENT 'Frequency at which funding settlements or accruals are processed under this agreement.. Valid values are `one-time|weekly|monthly|quarterly|annually|event-based`',
+    `settlement_terms` STRING COMMENT 'Defines how and when the vendor funding will be paid or credited. Upfront credit: applied at purchase. Monthly accrual: credited monthly. Quarterly settlement: paid quarterly. Post-event claim: retailer submits claim after promotion ends. Scan-based settlement: paid based on POS scan data.. Valid values are `upfront credit|monthly accrual|quarterly settlement|post-event claim|scan-based settlement`',
+    `termination_date` DATE COMMENT 'Date when the agreement was terminated early, if applicable. Nullable for agreements that completed normally or are still active.',
+    `termination_reason` STRING COMMENT 'Explanation for early termination of the agreement, such as vendor non-compliance, retailer strategic change, or mutual agreement. Nullable if not terminated.',
+    `total_accrued_amount` DECIMAL(18,2) COMMENT 'Cumulative amount of promotional funding accrued to date under this agreement, in the agreement currency. Updated as qualifying events occur.',
+    `total_settled_amount` DECIMAL(18,2) COMMENT 'Cumulative amount of promotional funding that has been paid or credited to the retailer to date, in the agreement currency.',
+    `vendor_promo_agreement_status` STRING COMMENT 'Current lifecycle state of the promotional agreement. Draft: under negotiation. Pending approval: awaiting internal sign-off. Active: in effect and accruing. Suspended: temporarily paused. Completed: ended normally. Terminated: ended early. Settled: financially reconciled. [ENUM-REF-CANDIDATE: draft|pending approval|active|suspended|completed|terminated|settled — 7 candidates stripped; promote to reference product]',
+    CONSTRAINT pk_vendor_promo_agreement PRIMARY KEY(`vendor_promo_agreement_id`)
+) COMMENT 'Master record for a vendor-funded promotional agreement (co-op advertising, promotional allowance, scan-based trading deal). Captures vendor identifier, agreement type (co-op ad, off-invoice allowance, bill-back, scan allowance, new item allowance), agreed funding amount, funding percentage, qualifying conditions (minimum volume, display compliance, ad placement), performance obligations, agreement start/end dates, settlement terms, and agreement status. Distinct from the supplier contract in the supplier domain — this is specifically the promotional funding arrangement that drives vendor chargeback and deduction management. Supports accounts receivable accrual and vendor compliance auditing.';
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` (
     `promo_redemption_id` BIGINT COMMENT 'Unique identifier for each promotional offer redemption instance. Primary key for the promo_redemption product.',
     `coupon_id` BIGINT COMMENT 'Foreign key linking to promotion.coupon. Business justification: When a redemption is triggered by a coupon, promo_redemption needs a structured FK to the coupon master record. Currently has coupon_code as STRING, which should be replaced with coupon_id FK. This en',
-    `fulfillment_line_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_line. Business justification: Vendor chargeback reconciliation in retail requires matching promotional discounts to specific fulfillment line items (SKU, quantity, unit cost). The existing fulfillment_order FK identifies the order',
-    `header_id` BIGINT COMMENT 'Foreign key linking to order.order_header. Business justification: Promotion redemptions in e-commerce/omnichannel orders need order-level context for multi-line promotion analysis, customer journey tracking, and cross-channel promotional effectiveness measurement. D',
-    `location_id` BIGINT COMMENT 'Reference to the physical store location where the redemption occurred. Populated for POS and BOPIS transactions. Null for pure e-commerce fulfillment.',
-    `membership_id` BIGINT COMMENT 'Foreign key linking to loyalty.membership. Business justification: Redemptions must track which loyalty member redeemed the promotion to accrue points, update tier qualification metrics, and reconcile promotional liability with loyalty liability - core operational re',
+    `fulfillment_node_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_node. Business justification: Promo performance reporting by fulfillment node (ship-from-store vs. DC) is a standard omnichannel retail KPI. Knowing which fulfillment node processed each promotional redemption enables node-level S',
     `fulfillment_order_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_order. Business justification: Retail operations measure promotional effectiveness by fulfillment method (BOPIS vs ship-from-store vs DC fulfillment). Links redemptions to fulfillment execution for channel-specific lift analysis, v',
+    `header_id` BIGINT COMMENT 'Foreign key linking to order.order_header. Business justification: Promotion redemptions in e-commerce/omnichannel orders need order-level context for multi-line promotion analysis, customer journey tracking, and cross-channel promotional effectiveness measurement. D',
+    `order_line_id` BIGINT COMMENT 'Foreign key linking to order.order_line. Business justification: A promotion redemption event is triggered by a specific order line (the item that qualified for the offer). Linking promo_redemption to order_line enables line-level vendor chargeback at SKU granulari',
     `pos_terminal_id` BIGINT COMMENT 'Identifier of the POS terminal or register where the redemption was processed. Used for audit trail and fraud detection. Null for e-commerce transactions.',
     `pos_transaction_id` BIGINT COMMENT 'Reference to the customer transaction (POS or e-commerce order) where this promotion was applied. Links to the sales transaction header.',
     `sku_id` BIGINT COMMENT 'add column product_sku_id (BIGINT) with FK to product.sku.sku_id - redemptions occur against specific SKUs and this is essential for promotion effectiveness analysis at item level',
     `profile_id` BIGINT COMMENT 'Reference to the customer who redeemed the promotion. May be null for anonymous transactions where no customer identification was captured.',
     `promo_campaign_id` BIGINT COMMENT 'Reference to the promotional offer that was redeemed. Links to the promotion master data defining the offer terms, discount rules, and eligibility criteria.',
+    `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Redemption analysis by category is essential for merchandising to assess promotional effectiveness, cannibalization, and incremental sales. Category managers use redemption data to adjust future assor',
+    `location_id` BIGINT COMMENT 'Reference to the physical store location where the redemption occurred. Populated for POS and BOPIS transactions. Null for pure e-commerce fulfillment.',
     `promo_offer_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_offer. Business justification: Promotional redemptions capture the application of a specific promotional offer to a transaction. While promo_redemption already has promo_campaign_id, it needs promo_offer_id to identify the exact of',
-    `rebate_id` BIGINT COMMENT 'Foreign key linking to promotion.rebate. Business justification: Redemptions can be for rebate offers specifically. A customer may redeem a rebate offer at transaction time (e.g., instant rebate applied at POS), and tracking which rebate was redeemed is essential f',
-    `reward_id` BIGINT COMMENT 'Foreign key linking to loyalty.reward. Business justification: A promotional redemption event may fulfill a specific loyalty reward (e.g., redeeming a reward voucher at POS). Linking promo_redemption to reward enables end-to-end reward fulfillment tracking, suppo',
-    `storefront_id` BIGINT COMMENT 'Foreign key linking to ecommerce.storefront. Business justification: Promotional redemptions must be attributed to marketing touchpoints for multi-touch attribution modeling. Retailers need to understand which marketing channels and tactics drove promotional engagement',
+    `vendor_id` BIGINT COMMENT 'Reference to the vendor or supplier funding the promotion. Populated only when vendor_funded_flag is true. Used for chargeback processing and vendor settlement.',
+    `rma_id` BIGINT COMMENT 'Foreign key linking to returns.rma. Business justification: Returns of promotional purchases require tracking original promotion for accurate refund calculation, vendor chargeback allocation, and fraud detection. Critical for partial refund logic when promotio',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Redemptions can be for rebate offers specifically. A customer may redeem a rebate offer at transaction time (e.g., instant rebate applied at POS), and tracking which rebate was redeemed is essential f',
+    `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: Vendor-funded redemptions must be settled against the governing vendor_contract. The chargeback and settlement process requires tracing each vendor_funded_flag=true redemption to its specific contract',
     `chargeback_amount` DECIMAL(18,2) COMMENT 'The amount claimed from or paid by the vendor for this promotion redemption. May differ from discount_amount due to negotiated funding rates or caps.',
     `chargeback_status` STRING COMMENT 'Status of the vendor chargeback claim for vendor-funded promotions. Tracks the lifecycle from pending submission through payment receipt.. Valid values are `pending|submitted|approved|rejected|paid`',
     `created_timestamp` TIMESTAMP COMMENT 'System timestamp when this redemption record was first created in the database. Used for audit trail and data lineage tracking.',
@@ -282,20 +290,24 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`promo_performance` (
     `promo_performance_id` BIGINT COMMENT 'Unique identifier for the promotion performance record. Primary key for this operational performance measurement entity.',
-    `cluster_id` BIGINT COMMENT 'Foreign key linking to store.cluster. Business justification: Cluster-level promotional performance reporting is a key retail analytics use case — merchants evaluate whether a promotion performed consistently across a store cluster. Not derivable from existing p',
-    `demand_forecast_id` BIGINT COMMENT 'Foreign key linking to supplychain.demand_forecast. Business justification: Post-promotion forecast accuracy review: promo_performance has `forecast_accuracy_percent` which requires knowing the source demand_forecast. Retail merchandising teams compare actual promotional resu',
-    `department_id` BIGINT COMMENT 'Foreign key linking to store.department. Business justification: Department-level promotional performance is a fundamental retail metric — category managers track how promotions perform within specific departments (electronics, apparel, grocery). Not derivable from',
+    `cluster_id` BIGINT COMMENT 'Foreign key linking to store.cluster. Business justification: Cluster-level promotional performance analysis is a standard retail analytics process — merchants compare how promotions perform across urban vs. suburban vs. rural store clusters to optimize future o',
+    `demand_forecast_id` BIGINT COMMENT 'Foreign key linking to supplychain.demand_forecast. Business justification: Promotional Forecast Accuracy Reporting: promo_performance actuals (units_sold, incremental_units) are compared against demand_forecast predicted promotional_lift_units and mape to measure forecast qu',
     `format_id` BIGINT COMMENT 'Foreign key linking to store.format. Business justification: Performance records explicitly measure campaigns against defined KPIs. Weekly performance snapshots calculate specific KPI values (sell-through rate, promotional ROI, incremental units). Merchandising',
-    `fulfillment_node_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_node. Business justification: Retail promotional performance reporting requires node-level granularity (store vs. DC vs. ship-from-store) to measure promotional lift by fulfillment channel. promo_performance already tracks locatio',
-    `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.assortment_plan. Business justification: Promotional performance directly impacts assortment decisions. Merchandising evaluates which promoted items to continue, expand, or discontinue based on promotional lift, margin impact, and sell-throu',
-    `location_id` BIGINT COMMENT 'Reference to the store location where this promotion performance was measured. Supports store-level promotion analysis.',
-    `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: Post-promotion performance analysis requires knowing which price list was active during the measurement period to calculate true margin impact and baseline price comparisons. Retail category managers ',
-    `program_id` BIGINT COMMENT 'Foreign key linking to loyalty.loyalty_program. Business justification: Standard retail promotional analytics segment performance by loyalty program membership (loyalty vs. non-loyalty lift). promo_performance tracks new_customer_count, repeat_customer_count, unique_custo',
+    `fulfillment_node_id` BIGINT COMMENT 'Foreign key linking to fulfillment.fulfillment_node. Business justification: Omnichannel promo performance reporting requires segmenting KPIs (units sold, ROI, sell-through) by fulfillment node. Retailers track whether ship-from-store vs. DC fulfillment affects promo effective',
+    `merch_plan_id` BIGINT COMMENT 'Foreign key linking to merchandising.merch_plan. Business justification: Promo performance is reconciled against the merchandise financial plan to measure actual vs. planned sales, margin, and sell-through. This is a core retail analytics process — merch_plan sets the base',
+    `price_list_id` BIGINT COMMENT 'Foreign key linking to pricing.price_list. Business justification: Promo performance measurement requires knowing which price list was active during the promotion to calculate baseline vs. promotional price lift and gross margin impact. This is a standard retail prom',
     `promo_calendar_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_calendar. Business justification: Performance is measured over promotional periods defined in the promotional calendar. The promo_performance has performance_week_start_date and performance_week_end_date that align with promotional ca',
     `promo_campaign_id` BIGINT COMMENT 'Foreign key linking to promotion.promo_campaign. Business justification: Promotional performance can be measured at both campaign level and offer level. While promo_performance already has promo_offer_id (offer-level measurement), adding promo_campaign_id enables direct ca',
+    `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Performance metrics must roll up to category level for merchandising review. Category managers evaluate promotional ROI, incremental margin, and sell-through rates to inform future assortment and prom',
+    `location_id` BIGINT COMMENT 'Reference to the store location where this promotion performance was measured. Supports store-level promotion analysis.',
     `promo_offer_id` BIGINT COMMENT 'Reference to the specific promotional offer or campaign being measured. Links to the promotion master definition.',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Performance tracking measures promotional lift by SKU. Required for calculating incremental units, ROI, cannibalization analysis, and feeding promotional forecasts. Unlinked sku column exists but need',
-    `storefront_id` BIGINT COMMENT 'Foreign key linking to ecommerce.storefront. Business justification: Promotional performance must be measured at the storefront level for e-commerce channel ROI reporting and storefront-specific campaign optimization. Storefront-level promo performance is a named retai',
+    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: Regional promotional performance reporting is a core retail management process — regional directors review campaign ROI, redemption rates, and incremental units by region. promo_performance has locati',
+    `rule_id` BIGINT COMMENT 'Foreign key linking to pricing.rule. Business justification: Promo performance analysis must attribute revenue lift to the specific pricing rule applied during the promotion. This link enables rule-level effectiveness reporting and supports pricing strategy opt',
+    `stock_ledger_id` BIGINT COMMENT 'Foreign key linking to inventory.stock_ledger. Business justification: Post-promotion ROI analysis requires matching promotional sales performance against actual inventory movements to calculate true incremental lift, validate COGS, identify shrinkage during events, and',
+    `storefront_id` BIGINT COMMENT 'Foreign key linking to ecommerce.storefront. Business justification: Digital channel promo performance reporting: retailers measure promotional ROI by storefront (mobile app vs. desktop site vs. marketplace storefront). This link enables storefront-level promo performa',
+    `vendor_contract_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_contract. Business justification: Promotional performance reporting validates vendor funding claims against contracted commitments. Finance teams join promo_performance to vendor_contract to reconcile vendor_funded_amount against cont',
+    `vendor_scorecard_id` BIGINT COMMENT 'Foreign key linking to supplier.vendor_scorecard. Business justification: Vendor scorecard evaluation incorporates promotional performance metrics including fill rate during promos, on-time delivery for promotional inventory, and promotional ROI. Linking promo_performance t',
     `average_transaction_value` DECIMAL(18,2) COMMENT 'Average basket value for transactions that included this promoted item. Measures promotion impact on overall basket size.',
     `baseline_units` DECIMAL(18,2) COMMENT 'Estimated units that would have sold without the promotion, based on historical trends. Used to calculate incremental lift.',
     `cannibalization_estimate` DECIMAL(18,2) COMMENT 'Estimated units of related non-promoted products that lost sales due to this promotion. Measures negative cross-product impact.',
@@ -334,10 +346,10 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`promo_performance` (
 
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` (
     `promo_calendar_id` BIGINT COMMENT 'Unique identifier for the promotional calendar period. Primary key for the promotional calendar master record.',
-    `item_hierarchy_id` BIGINT COMMENT 'Foreign key linking to product.item_hierarchy. Business justification: Promotional calendars are planned at category/department level to coordinate seasonal events (back-to-school, holiday), inventory builds, and assortment timing. Category managers need calendar visibil',
-    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: Promotional calendars are built per region/market in retail (different event timing, blackout periods, fiscal calendars by market). applicable_market_codes and market_applicability are denormalized te',
+    `region_id` BIGINT COMMENT 'Foreign key linking to store.region. Business justification: Promotional calendars are region-specific — different regions have distinct blackout periods, fiscal calendars, and promotional cadences. promo_calendar.applicable_market_codes is a denormalized text ',
+    `season_id` BIGINT COMMENT 'Foreign key linking to merchandising.season. Business justification: Promotional calendar periods align with merchandising seasons. Planning requires synchronized timing for new season launches, mid-season promotions, and end-of-season clearance. Critical for coordinat',
+    `storefront_id` BIGINT COMMENT 'Foreign key linking to ecommerce.storefront. Business justification: Digital promotional calendar scoping: promo calendars governing digital-only events (Cyber Monday, flash sales, app-exclusive sale windows) need storefront reference for digital planning, publication ',
     `applicable_banner_codes` STRING COMMENT 'Comma-separated list of banner codes to which this promotional period applies. Populated only when banner_applicability is banner_specific.',
-    `applicable_market_codes` STRING COMMENT 'Comma-separated list of market or region codes to which this promotional period applies. Populated when market_applicability is regional or local.',
     `approval_date` DATE COMMENT 'The date when this promotional calendar period was formally approved by management. Null if still pending approval.',
     `approval_required_flag` BOOLEAN COMMENT 'Indicates whether executive or senior management approval is required for promotions during this period (true) or standard approval workflows apply (false).',
     `approved_by_name` STRING COMMENT 'Name of the executive or manager who approved this promotional calendar period.',
@@ -387,12 +399,11 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ADD CONSTRAINT `fk_promotion_c
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ADD CONSTRAINT `fk_promotion_circular_ad_promo_calendar_id` FOREIGN KEY (`promo_calendar_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_calendar`(`promo_calendar_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ADD CONSTRAINT `fk_promotion_circular_ad_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ADD CONSTRAINT `fk_promotion_circular_ad_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ADD CONSTRAINT `fk_promotion_rebate_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ADD CONSTRAINT `fk_promotion_rebate_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ADD CONSTRAINT `fk_promotion_vendor_promo_agreement_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ADD CONSTRAINT `fk_promotion_vendor_promo_agreement_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ADD CONSTRAINT `fk_promotion_promo_redemption_coupon_id` FOREIGN KEY (`coupon_id`) REFERENCES `vibe_retail_v1`.`promotion`.`coupon`(`coupon_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ADD CONSTRAINT `fk_promotion_promo_redemption_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ADD CONSTRAINT `fk_promotion_promo_redemption_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ADD CONSTRAINT `fk_promotion_promo_redemption_rebate_id` FOREIGN KEY (`rebate_id`) REFERENCES `vibe_retail_v1`.`promotion`.`rebate`(`rebate_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ADD CONSTRAINT `fk_promotion_promo_performance_promo_calendar_id` FOREIGN KEY (`promo_calendar_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_calendar`(`promo_calendar_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ADD CONSTRAINT `fk_promotion_promo_performance_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ADD CONSTRAINT `fk_promotion_promo_performance_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
@@ -401,22 +412,22 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ADD CONSTRAINT `fk_
 ALTER SCHEMA `vibe_retail_v1`.`promotion` SET TAGS ('dbx_division' = 'business');
 ALTER SCHEMA `vibe_retail_v1`.`promotion` SET TAGS ('dbx_domain' = 'promotion');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` SET TAGS ('dbx_subdomain' = 'campaign_management');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` SET TAGS ('dbx_subdomain' = 'campaign_planning');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promotional Campaign ID');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `account_id` SET TAGS ('dbx_business_glossary_term' = 'Account Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `brand_id` SET TAGS ('dbx_business_glossary_term' = 'Product Brand Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `cluster_id` SET TAGS ('dbx_business_glossary_term' = 'Cluster Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Kpi Definition Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Target Product Hierarchy Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `parent_promo_campaign_id` SET TAGS ('dbx_self_ref_fk' = 'true');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `program_id` SET TAGS ('dbx_business_glossary_term' = 'Semantic Layer Entity Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `promo_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Calendar Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `region_id` SET TAGS ('dbx_business_glossary_term' = 'Region Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `return_policy_id` SET TAGS ('dbx_business_glossary_term' = 'Return Policy Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Storefront Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `budget_amount` SET TAGS ('dbx_business_glossary_term' = 'Campaign Budget Amount');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `budget_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `budget_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `campaign_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,20}$');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `campaign_type` SET TAGS ('dbx_value_regex' = 'seasonal|clearance|new_product_launch|loyalty|vendor_funded|flash_sale');
@@ -425,30 +436,28 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `cost_cen
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `discount_strategy` SET TAGS ('dbx_value_regex' = 'percentage_off|fixed_amount_off|bogo|bundle|tiered|rebate');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `end_date` SET TAGS ('dbx_business_glossary_term' = 'Campaign End Date');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `geographic_scope` SET TAGS ('dbx_value_regex' = 'national|regional|local|store_specific');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `owner_email` SET TAGS ('dbx_business_glossary_term' = 'Campaign Owner Email');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `owner_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `owner_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `owner_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `owner_name` SET TAGS ('dbx_business_glossary_term' = 'Campaign Owner Name');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `priority_level` SET TAGS ('dbx_value_regex' = 'critical|high|medium|low');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `promo_campaign_status` SET TAGS ('dbx_business_glossary_term' = 'Campaign Status');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `promo_campaign_status` SET TAGS ('dbx_value_regex' = 'draft|scheduled|active|paused|completed|cancelled');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `start_date` SET TAGS ('dbx_business_glossary_term' = 'Campaign Start Date');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ALTER COLUMN `target_revenue` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` SET TAGS ('dbx_subdomain' = 'campaign_management');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` SET TAGS ('dbx_subdomain' = 'campaign_planning');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promotional Offer ID');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `tier_id` SET TAGS ('dbx_business_glossary_term' = 'Eligible Tier Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Format Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Location Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `program_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Program Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `assortment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Plan Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `brand_id` SET TAGS ('dbx_business_glossary_term' = 'Product Brand Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `cluster_id` SET TAGS ('dbx_business_glossary_term' = 'Cluster Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Kpi Definition Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `otb_budget_id` SET TAGS ('dbx_business_glossary_term' = 'Otb Budget Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promotional Campaign ID');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `return_policy_id` SET TAGS ('dbx_business_glossary_term' = 'Return Policy Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `carrier_service_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Carrier Service Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `return_policy_id` SET TAGS ('dbx_business_glossary_term' = 'Return Policy Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `activation_trigger` SET TAGS ('dbx_value_regex' = 'manual|cart_threshold|login|geofence|time_based|event_based');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `channel_eligibility` SET TAGS ('dbx_value_regex' = 'POS|ecommerce|mobile|BOPIS|ROPIS|all_channels');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `cost_share_percentage` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `customer_segment_eligibility` SET TAGS ('dbx_value_regex' = 'all_customers|loyalty_members|VIP|new_customers|targeted_segment');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `discount_method` SET TAGS ('dbx_value_regex' = 'percentage|fixed_amount|tiered|quantity_based');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `effective_end_time` SET TAGS ('dbx_business_glossary_term' = 'Effective End Timestamp');
@@ -460,15 +469,16 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `offer_type`
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `product_eligibility_scope` SET TAGS ('dbx_value_regex' = 'all_products|category|SKU_list|brand|excluded_products');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ALTER COLUMN `store_eligibility_scope` SET TAGS ('dbx_value_regex' = 'all_stores|store_group|individual_store|excluded_stores');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` SET TAGS ('dbx_subdomain' = 'campaign_management');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` SET TAGS ('dbx_subdomain' = 'campaign_planning');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `brand_id` SET TAGS ('dbx_business_glossary_term' = 'Product Brand Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Issued To Profile Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Location Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `tier_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Tier Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `program_id` SET TAGS ('dbx_business_glossary_term' = 'Semantic Layer Entity Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion Campaign ID');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `region_id` SET TAGS ('dbx_business_glossary_term' = 'Region Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Storefront Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `barcode` SET TAGS ('dbx_value_regex' = '^[0-9]{12,14}$');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `coupon_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,20}$');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `coupon_status` SET TAGS ('dbx_value_regex' = 'active|inactive|expired|suspended|redeemed');
@@ -479,66 +489,66 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `eligible_channel
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `eligible_product_scope` SET TAGS ('dbx_value_regex' = 'all_products|category|brand|sku|basket');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ALTER COLUMN `issuing_authority` SET TAGS ('dbx_value_regex' = 'retailer|manufacturer|vendor|third_party');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` SET TAGS ('dbx_subdomain' = 'campaign_management');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` SET TAGS ('dbx_subdomain' = 'campaign_planning');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `circular_ad_id` SET TAGS ('dbx_business_glossary_term' = 'Circular Advertisement ID');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `dc_facility_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `assortment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Plan Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Budget Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `cluster_id` SET TAGS ('dbx_business_glossary_term' = 'Cluster Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Featured Sku Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Format Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Plan Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `markdown_id` SET TAGS ('dbx_business_glossary_term' = 'Markdown Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `promo_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Calendar Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `region_id` SET TAGS ('dbx_business_glossary_term' = 'Region Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `sku_price_id` SET TAGS ('dbx_business_glossary_term' = 'Creative Asset Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Storefront Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `circular_type` SET TAGS ('dbx_value_regex' = 'weekly|seasonal|holiday|event|clearance|grand_opening');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `distribution_channel` SET TAGS ('dbx_value_regex' = 'print|digital|email|mobile_app|social_media|in_store');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `is_vendor_funded` SET TAGS ('dbx_business_glossary_term' = 'Is Vendor Funded Flag');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `language_code` SET TAGS ('dbx_value_regex' = '^[a-z]{2}$');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Circular Notes');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `production_cost_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `production_cost_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `production_status` SET TAGS ('dbx_value_regex' = 'draft|in_review|approved|in_production|published|archived');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `theme` SET TAGS ('dbx_business_glossary_term' = 'Circular Theme');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ALTER COLUMN `vendor_funding_amount` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` SET TAGS ('dbx_subdomain' = 'campaign_management');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `tier_id` SET TAGS ('dbx_business_glossary_term' = 'Eligible Tier Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Approved By User ID');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `program_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Program Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion ID');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `region_id` SET TAGS ('dbx_business_glossary_term' = 'Region Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Submitted By Profile Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `amount` SET TAGS ('dbx_business_glossary_term' = 'Rebate Amount');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending_approval|approved|rejected');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `channel_eligibility` SET TAGS ('dbx_value_regex' = 'all_channels|pos_only|ecommerce_only|mobile_app_only|omnichannel');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `payment_method` SET TAGS ('dbx_value_regex' = 'check|store_credit|digital_credit|prepaid_card|bank_transfer|instant_discount');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `percentage` SET TAGS ('dbx_business_glossary_term' = 'Rebate Percentage');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `rebate_number` SET TAGS ('dbx_value_regex' = '^RBT-[A-Z0-9]{8,12}$');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `rebate_status` SET TAGS ('dbx_value_regex' = 'draft|active|paused|expired|cancelled|completed');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `rebate_type` SET TAGS ('dbx_value_regex' = 'instant_rebate|mail_in_rebate|vendor_funded_rebate|digital_rebate|promotional_allowance|volume_rebate');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ALTER COLUMN `total_budget_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` SET TAGS ('dbx_subdomain' = 'vendor_agreements');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `vendor_promo_agreement_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Promotional Agreement ID');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `brand_id` SET TAGS ('dbx_business_glossary_term' = 'Product Brand Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `buying_order_id` SET TAGS ('dbx_business_glossary_term' = 'Buying Order Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `accrual_method` SET TAGS ('dbx_value_regex' = 'purchase-based|sales-based|display-based|hybrid');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `ad_placement_required` SET TAGS ('dbx_business_glossary_term' = 'Advertisement Placement Required Flag');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `agreement_type` SET TAGS ('dbx_value_regex' = 'co-op advertising|off-invoice allowance|bill-back|scan allowance|new item allowance|volume rebate');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `chargeback_eligible` SET TAGS ('dbx_business_glossary_term' = 'Chargeback Eligible Flag');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `display_compliance_required` SET TAGS ('dbx_business_glossary_term' = 'Display Compliance Required Flag');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `funding_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Agreement Notes');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `qualifying_product_scope` SET TAGS ('dbx_value_regex' = 'all products|specific SKU|product category|brand|private label');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `settlement_frequency` SET TAGS ('dbx_value_regex' = 'one-time|weekly|monthly|quarterly|annually|event-based');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `settlement_terms` SET TAGS ('dbx_value_regex' = 'upfront credit|monthly accrual|quarterly settlement|post-event claim|scan-based settlement');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_agreement` ALTER COLUMN `vendor_promo_agreement_status` SET TAGS ('dbx_business_glossary_term' = 'Agreement Status');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` SET TAGS ('dbx_subdomain' = 'transaction_processing');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` SET TAGS ('dbx_subdomain' = 'transaction_execution');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `promo_redemption_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion Redemption ID');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `coupon_id` SET TAGS ('dbx_business_glossary_term' = 'Coupon Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `fulfillment_line_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Line Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order Header Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `membership_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Membership Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `fulfillment_node_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Node Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order Header Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `order_line_id` SET TAGS ('dbx_business_glossary_term' = 'Order Line Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `pos_terminal_id` SET TAGS ('dbx_business_glossary_term' = 'Point of Sale (POS) Terminal ID');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `pos_transaction_id` SET TAGS ('dbx_business_glossary_term' = 'Transaction ID');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion ID');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Offer Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `rebate_id` SET TAGS ('dbx_business_glossary_term' = 'Rebate Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `reward_id` SET TAGS ('dbx_business_glossary_term' = 'Reward Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Attribution Touchpoint Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `rma_id` SET TAGS ('dbx_business_glossary_term' = 'Returns Rma Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Rebate Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `chargeback_status` SET TAGS ('dbx_value_regex' = 'pending|submitted|approved|rejected|paid');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `discount_type` SET TAGS ('dbx_value_regex' = 'percentage_off|fixed_amount_off|bogo|bundle_discount|threshold_discount|free_shipping');
@@ -549,48 +559,47 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `redemp
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ALTER COLUMN `source_record_reference` SET TAGS ('dbx_business_glossary_term' = 'Source Record ID');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` SET TAGS ('dbx_subdomain' = 'transaction_processing');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` SET TAGS ('dbx_subdomain' = 'transaction_execution');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `promo_performance_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion Performance ID');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `cluster_id` SET TAGS ('dbx_business_glossary_term' = 'Cluster Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `demand_forecast_id` SET TAGS ('dbx_business_glossary_term' = 'Demand Forecast Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `department_id` SET TAGS ('dbx_business_glossary_term' = 'Department Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `format_id` SET TAGS ('dbx_business_glossary_term' = 'Kpi Definition Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `fulfillment_node_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Node Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Plan Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `merch_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Merch Plan Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `price_list_id` SET TAGS ('dbx_business_glossary_term' = 'Price List Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `program_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Program Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `promo_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Calendar Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `promo_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Campaign Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `promo_offer_id` SET TAGS ('dbx_business_glossary_term' = 'Promotion Offer ID');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `region_id` SET TAGS ('dbx_business_glossary_term' = 'Region Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `rule_id` SET TAGS ('dbx_business_glossary_term' = 'Rule Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `stock_ledger_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Ledger Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Storefront Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `vendor_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Contract Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `vendor_scorecard_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Scorecard Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `average_transaction_value` SET TAGS ('dbx_business_glossary_term' = 'Average Transaction Value (ATV)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Sales Channel');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'in_store|ecommerce|mobile_app|bopis|ropis');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `cogs` SET TAGS ('dbx_business_glossary_term' = 'Cost of Goods Sold (COGS)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `cogs` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `data_source_system` SET TAGS ('dbx_value_regex' = 'sap_car|blue_yonder|oracle_rpm|manual_adjustment');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `forecast_accuracy_percent` SET TAGS ('dbx_business_glossary_term' = 'Forecast Accuracy Percentage');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `gross_margin` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `gross_margin_percent` SET TAGS ('dbx_business_glossary_term' = 'Gross Margin Percentage');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `gross_margin_percent` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Performance Notes');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `performance_status` SET TAGS ('dbx_value_regex' = 'preliminary|final|adjusted|settled');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `promotional_roi` SET TAGS ('dbx_business_glossary_term' = 'Promotional Return on Investment (ROI)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `promotional_roi` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `retailer_funded_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `sell_through_rate` SET TAGS ('dbx_business_glossary_term' = 'Sell-Through Rate');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,14}$');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `units_per_transaction` SET TAGS ('dbx_business_glossary_term' = 'Units Per Transaction (UPT)');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ALTER COLUMN `vendor_funded_amount` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` SET TAGS ('dbx_subdomain' = 'campaign_management');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` SET TAGS ('dbx_subdomain' = 'vendor_agreements');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `promo_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Promotional Calendar ID');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Item Hierarchy Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `region_id` SET TAGS ('dbx_business_glossary_term' = 'Region Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `season_id` SET TAGS ('dbx_business_glossary_term' = 'Season Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `storefront_id` SET TAGS ('dbx_business_glossary_term' = 'Storefront Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `banner_applicability` SET TAGS ('dbx_business_glossary_term' = 'Banner Applicability Scope');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `banner_applicability` SET TAGS ('dbx_value_regex' = 'enterprise_wide|banner_specific');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `blackout_reason` SET TAGS ('dbx_business_glossary_term' = 'Blackout Period Reason');
@@ -613,7 +622,8 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `period_t
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `period_type` SET TAGS ('dbx_value_regex' = 'weekly_ad_cycle|seasonal_event|holiday|clearance_window|competitive_response|vendor_funded');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `planning_owner_email` SET TAGS ('dbx_business_glossary_term' = 'Planning Owner Email Address');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `planning_owner_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `planning_owner_email` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `planning_owner_email` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `planning_owner_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `planning_status` SET TAGS ('dbx_value_regex' = 'draft|locked|active|archived');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `priority_tier` SET TAGS ('dbx_business_glossary_term' = 'Promotional Priority Tier');
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ALTER COLUMN `priority_tier` SET TAGS ('dbx_value_regex' = 'tier_1_strategic|tier_2_major|tier_3_standard|tier_4_tactical');

@@ -1,5 +1,5 @@
 -- Schema for Domain: service | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:26
+-- Generated on: 2026-07-12 13:53:25
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`service` COMMENT 'Reviewer-directed domain for rehomed products.';
@@ -57,30 +57,71 @@ ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ADD CONSTRAINT `fk_service
 ALTER SCHEMA `vibe_retail_v1`.`service` SET TAGS ('dbx_division' = 'business');
 ALTER SCHEMA `vibe_retail_v1`.`service` SET TAGS ('dbx_domain' = 'service');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `service_case_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned Agent ID');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `associate_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `buyer_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Order Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `fulfillment_order_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Order ID');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `header_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Store ID');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `location_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `parent_case_service_case_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Case ID');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `parent_case_service_case_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `profile_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `profile_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `redemption_id` SET TAGS ('dbx_business_glossary_term' = 'Redemption Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `redemption_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `sku_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `vendor_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `violation_notice_id` SET TAGS ('dbx_business_glossary_term' = 'Related Violation Notice Id (Foreign Key)');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `violation_notice_id` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `assigned_team` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `case_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,20}$');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `case_number` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `case_owner_type` SET TAGS ('dbx_value_regex' = 'agent|queue|automated_system');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `case_owner_type` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `case_status` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `case_type` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Channel of Origin');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `channel` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `closed_timestamp` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `contact_attempts` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `currency_code` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `customer_satisfaction_rating` SET TAGS ('dbx_business_glossary_term' = 'Customer Satisfaction (CSAT) Rating');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `customer_satisfaction_rating` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `service_case_description` SET TAGS ('dbx_business_glossary_term' = 'Case Description');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `service_case_description` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `escalation_flag` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `escalation_reason` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `first_response_timestamp` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `interaction_count` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `is_closed` SET TAGS ('dbx_business_glossary_term' = 'Is Closed Flag');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `is_closed` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `modified_timestamp` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `nps_score` SET TAGS ('dbx_business_glossary_term' = 'Net Promoter Score (NPS)');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `nps_score` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `priority` SET TAGS ('dbx_business_glossary_term' = 'Case Priority');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `priority` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `priority` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `refund_amount` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `resolution_code` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `resolution_notes` SET TAGS ('dbx_subdomain' = 'service.service_case');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `resolution_timestamp` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `rma_number` SET TAGS ('dbx_business_glossary_term' = 'Return Merchandise Authorization (RMA) Number');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `rma_number` SET TAGS ('dbx_value_regex' = '^RMA[A-Z0-9]{8,15}$');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `rma_number` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `sla_breach_flag` SET TAGS ('dbx_business_glossary_term' = 'Service Level Agreement (SLA) Breach Flag');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `sla_breach_flag` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `sla_target_hours` SET TAGS ('dbx_business_glossary_term' = 'Service Level Agreement (SLA) Target Hours');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `sla_target_hours` SET TAGS ('dbx_subdomain' = 'service.service_case');
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `subject` SET TAGS ('dbx_business_glossary_term' = 'Case Subject');
+ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ALTER COLUMN `subject` SET TAGS ('dbx_subdomain' = 'service.service_case');

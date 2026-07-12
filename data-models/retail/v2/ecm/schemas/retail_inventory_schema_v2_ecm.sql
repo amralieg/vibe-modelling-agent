@@ -1,5 +1,5 @@
 -- Schema for Domain: inventory | Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:23
+-- Generated on: 2026-07-12 13:53:22
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_retail_v1`.`inventory` COMMENT 'Manages real-time and historical stock positions across all nodes including stores, DCs, and MFCs. Owns on-hand quantities, SKU-level tracking, shrinkage monitoring, dead stock identification, weeks of supply (WOS), sell-through rates, replenishment triggers, cycle counts, and RFID-based tracking. Supports VMI (Vendor Managed Inventory), inventory valuation (COGS), and real-time inventory visibility for omnichannel fulfillment.';
@@ -54,7 +54,6 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`inventory`.`stock_position` (
 CREATE OR REPLACE TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` (
     `stock_ledger_id` BIGINT COMMENT 'Unique surrogate identifier for each stock ledger transaction record. Primary key for the perpetual inventory ledger at the SKU-location-date level.',
     `associate_id` BIGINT COMMENT 'Foreign key linking to workforce.associate. Business justification: Stock ledger transactions (receipts, adjustments, transfers, sales) are executed by associates. Retail operations require tracking transaction ownership for audit trails, loss prevention investigation',
-    `audit_event_id` BIGINT COMMENT 'Foreign key linking to compliance.audit_event. Business justification: Inventory transactions are examined during compliance audits (cycle count audits, shrinkage investigations, financial audits). Retail operations require linking ledger entries to audit events for evid',
     `category_id` BIGINT COMMENT 'Foreign key linking to merchandising.category. Business justification: Financial close process requires inventory transaction detail by category for COGS calculation, shrink attribution, and margin reconciliation. Category-level P&L impact analysis is a core retail accou',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Inventory transactions are allocated to cost centers for departmental P&L and budget variance analysis. Stock_ledger has cost_center_code that needs FK to enable cost center performance reporting and',
     `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Every inventory transaction posts to a GL account for financial statement preparation. Stock_ledger has gl_account_code (plain attribute) that should be a proper FK to gl_account for inventory valuati',
@@ -155,6 +154,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` (
     `associate_id` BIGINT COMMENT 'Foreign key linking to workforce.associate. Business justification: Manual and emergency replenishment orders should track the creating associate for performance analysis, process improvement, and training needs assessment. Critical for understanding replenishment dec',
     `demand_forecast_id` BIGINT COMMENT 'Reference to the demand forecast record that informed the replenishment quantity calculation. Links to the Blue Yonder Demand Planning forecast used to size this order.',
     `inventory_node_id` BIGINT COMMENT 'Reference to the receiving fulfillment node (store, DC, or MFC) where replenished inventory will be delivered. Drives last-mile delivery routing and receiving dock scheduling.',
+    `inbound_appointment_id` BIGINT COMMENT 'Reference to the inbound receiving appointment scheduled at the destination DC or store for this replenishment order. Links to supplychain.inbound_appointment for dock scheduling and receiving resource planning. Nullable until appointment is booked.',
     `primary_replenishment_inventory_node_id` BIGINT COMMENT 'Reference to the originating fulfillment node (Distribution Center, Micro-Fulfillment Center, or supplier location) from which inventory will be shipped. Supports omnichannel inventory routing logic.',
     `promo_campaign_id` BIGINT COMMENT 'Reference to the promotion event that drove this replenishment order, when trigger_type is promotional. Links to the promotion master to support promotional inventory planning and post-event analysis. Nullable for non-promotional orders.',
     `purchase_order_id` BIGINT COMMENT 'Reference to the associated purchase order in SAP S/4HANA MM or the retail merchandising system Merchandising System (ORMS) when the replenishment order results in a supplier PO. Nullable for internal DC-to-store transfers.',
@@ -523,7 +523,7 @@ CREATE OR REPLACE TABLE `vibe_retail_v1`.`inventory`.`reservation` (
     `header_id` BIGINT COMMENT 'Reference to the customer order (OMS order) that triggered this inventory reservation. Populated for BOPIS, ROPIS, ship-from-store, and e-commerce hold encumbrances. Null for non-order-driven holds (quality, legal, regulatory). Links reservation to the order fulfillment lifecycle.',
     `inventory_node_id` BIGINT COMMENT 'System identifier for the inventory node (store, DC, MFC, dark store) where the reserved stock physically resides. Central to ATP calculation and omnichannel fulfillment routing (BOPIS, SFS, ship-from-DC).',
     `loyalty_membership_id` BIGINT COMMENT 'Foreign key linking to loyalty.membership. Business justification: Retail operations reserve inventory for loyalty members (VIP early access, tier-based allocation, BOPIS for members, exclusive product launches). Enables member-specific holds, tier-based inventory pr',
-    `profile_id` BIGINT COMMENT 'Foreign key linking to customer.profile. Business justification: Retail omnichannel fulfillment (BOPIS, ship-from-store, curbside pickup) requires tracking which customer profile created each inventory reservation. Essential for customer service, order fulfillment,',
+    `profile_id` BIGINT COMMENT 'Foreign key linking to customer.profile. Business justification: Retail omnichannel fulfillment (BOPIS, ship-from-store, curbside pickup) requires tracking which customer profile created each inventory reservation. Essential for customer service, order fulfillment',
     `rfid_tag_id` BIGINT COMMENT 'RFID tag identifier associated with the specific unit(s) reserved, enabling item-level tracking and automated hold verification. Populated when RFID-based inventory tracking is active at the node. Supports real-time inventory visibility for omnichannel fulfillment.',
     `sku_id` BIGINT COMMENT 'System identifier for the SKU (Stock Keeping Unit) whose inventory is being reserved or held. Links to the product master for item-level ATP (Available to Promise) calculation and omnichannel fulfillment routing.',
     `stock_position_id` BIGINT COMMENT 'Reference to the stock_position record at the SKU-node level that this reservation encumbers. Enables direct linkage between the reservation and the ATP calculation on the stock_position product, ensuring accurate real-time inventory visibility.',
@@ -830,7 +830,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_position` ALTER COLUMN `source_r
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_position` ALTER COLUMN `source_system_code` SET TAGS ('dbx_value_regex' = 'SAP_S4|ORMS|MAWMS|BYOND|SFCC|CAR');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_position` ALTER COLUMN `storage_location_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,30}$');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_position` ALTER COLUMN `unit_cost` SET TAGS ('dbx_business_glossary_term' = 'Unit Cost (Cost of Goods Sold - COGS)');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_position` ALTER COLUMN `unit_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_position` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_position` ALTER COLUMN `upc` SET TAGS ('dbx_business_glossary_term' = 'Universal Product Code (UPC)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_position` ALTER COLUMN `upc` SET TAGS ('dbx_value_regex' = '^[0-9]{12,14}$');
@@ -841,7 +840,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_position` ALTER COLUMN `weeks_of
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` SET TAGS ('dbx_subdomain' = 'stock_management');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Associate Id (Foreign Key)');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `audit_event_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Event Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
@@ -857,7 +855,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `currency_c
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `dsd_flag` SET TAGS ('dbx_business_glossary_term' = 'Direct Store Delivery (DSD) Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Product Expiry Date');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `extended_cost` SET TAGS ('dbx_business_glossary_term' = 'Extended Cost (Extended Cost of Goods Sold - COGS)');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `extended_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `fiscal_period` SET TAGS ('dbx_value_regex' = '^[0-9]{4}-P(0[1-9]|1[0-6])$');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number (Batch Number)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `movement_quantity` SET TAGS ('dbx_business_glossary_term' = 'Stock Movement Quantity');
@@ -875,7 +872,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `transactio
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `transaction_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Stock Transaction Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `transaction_type` SET TAGS ('dbx_business_glossary_term' = 'Stock Transaction Type');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `unit_cost` SET TAGS ('dbx_business_glossary_term' = 'Unit Cost (Cost of Goods Sold - COGS)');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `unit_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `unit_retail_price` SET TAGS ('dbx_business_glossary_term' = 'Unit Retail Price (Average Unit Retail - AUR)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
@@ -883,15 +879,9 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `valuation_
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `valuation_method` SET TAGS ('dbx_value_regex' = 'FIFO|WAC|RETAIL_METHOD|LIFO|SPECIFIC_ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ALTER COLUMN `vmf_flag` SET TAGS ('dbx_business_glossary_term' = 'Vendor Managed Inventory (VMI) Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` SET TAGS ('dbx_subdomain' = 'network_configuration');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` SET TAGS ('dbx_subdomain' = 'network_operations');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `address_line1` SET TAGS ('dbx_business_glossary_term' = 'Address Line 1');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `address_line1` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `address_line2` SET TAGS ('dbx_business_glossary_term' = 'Address Line 2');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `address_line2` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `city` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `city` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `close_date` SET TAGS ('dbx_business_glossary_term' = 'Node Close Date');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `country_code` SET TAGS ('dbx_business_glossary_term' = 'Country Code (ISO 3166-1 Alpha-3)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -910,11 +900,7 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `is_ship_
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `is_vmi_enabled` SET TAGS ('dbx_business_glossary_term' = 'Vendor Managed Inventory (VMI) Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `latitude` SET TAGS ('dbx_business_glossary_term' = 'Geographic Latitude');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `latitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `longitude` SET TAGS ('dbx_business_glossary_term' = 'Geographic Longitude');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `longitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `manager_name` SET TAGS ('dbx_business_glossary_term' = 'Node Manager Name');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `max_sku_capacity` SET TAGS ('dbx_business_glossary_term' = 'Maximum SKU (Stock Keeping Unit) Capacity');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `node_code` SET TAGS ('dbx_business_glossary_term' = 'Inventory Node Code');
@@ -927,11 +913,7 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `operatio
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `ownership_type` SET TAGS ('dbx_value_regex' = 'owned|leased|franchised|licensed|third_party');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `phone_number` SET TAGS ('dbx_business_glossary_term' = 'Node Phone Number');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `phone_number` SET TAGS ('dbx_value_regex' = '^+?[0-9s-().]{7,20}$');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `phone_number` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_phone' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `postal_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9 -]{3,10}$');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `postal_code` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `primary_dc_node_code` SET TAGS ('dbx_business_glossary_term' = 'Primary Distribution Center (DC) Node Code');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `primary_dc_node_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,20}$');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `region_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,15}$');
@@ -940,14 +922,12 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `safety_s
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `selling_area_sqft` SET TAGS ('dbx_business_glossary_term' = 'Selling Area (Square Feet)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `state_province` SET TAGS ('dbx_business_glossary_term' = 'State or Province Code');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `state_province` SET TAGS ('dbx_value_regex' = '^[A-Z]{2,3}$');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `state_province` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `state_province` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `subtype` SET TAGS ('dbx_business_glossary_term' = 'Inventory Node Subtype');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `temperature_zone` SET TAGS ('dbx_value_regex' = 'ambient|chilled|frozen|multi_temp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `time_zone` SET TAGS ('dbx_business_glossary_term' = 'Time Zone (IANA)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ALTER COLUMN `total_storage_capacity_sqft` SET TAGS ('dbx_business_glossary_term' = 'Total Storage Capacity (Square Feet)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` SET TAGS ('dbx_subdomain' = 'replenishment_receiving');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` SET TAGS ('dbx_subdomain' = 'network_operations');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
@@ -978,15 +958,13 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `ord
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `priority_level` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Priority Level');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `priority_level` SET TAGS ('dbx_value_regex' = 'critical|high|standard|low');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `source_system_order_ref` SET TAGS ('dbx_business_glossary_term' = 'Source System Order Reference');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `total_order_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `trigger_type` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Trigger Type');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `unit_cost` SET TAGS ('dbx_business_glossary_term' = 'Unit Cost (COGS)');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `unit_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|CS|PL|KG|LB|LT');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` SET TAGS ('dbx_subdomain' = 'accuracy_tracking');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` SET TAGS ('dbx_subdomain' = 'quality_tracking');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `adjustment_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Adjustment ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Approver Employee ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
@@ -1000,8 +978,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `abc_classif
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `adjustment_generated` SET TAGS ('dbx_business_glossary_term' = 'Inventory Adjustment Generated Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Count Approval Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_device_code` SET TAGS ('dbx_business_glossary_term' = 'Count Device ID');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_device_code` SET TAGS ('dbx_internal' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_device_code` SET TAGS ('dbx_pii' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_frequency` SET TAGS ('dbx_value_regex' = 'daily|weekly|monthly|quarterly|annual|event_driven');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_number` SET TAGS ('dbx_business_glossary_term' = 'Cycle Count Number');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_status` SET TAGS ('dbx_business_glossary_term' = 'Cycle Count Status');
@@ -1022,10 +998,8 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `storage_zon
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `system_quantity` SET TAGS ('dbx_business_glossary_term' = 'System On-Hand Quantity');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `trigger_reason` SET TAGS ('dbx_business_glossary_term' = 'Cycle Count Trigger Reason');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `unit_cost` SET TAGS ('dbx_business_glossary_term' = 'Unit Cost at Count');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `unit_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_cost` SET TAGS ('dbx_business_glossary_term' = 'Inventory Variance Cost');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_percentage` SET TAGS ('dbx_business_glossary_term' = 'Inventory Variance Percentage');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_quantity` SET TAGS ('dbx_business_glossary_term' = 'Inventory Variance Quantity');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_tolerance_pct` SET TAGS ('dbx_business_glossary_term' = 'Variance Tolerance Percentage');
@@ -1054,7 +1028,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `approval_sta
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Adjustment Approval Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Inventory Batch Number');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `cost_impact` SET TAGS ('dbx_business_glossary_term' = 'Cost Impact Amount');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `cost_impact` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
@@ -1074,7 +1047,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `reason_sub_c
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `recall_flag` SET TAGS ('dbx_business_glossary_term' = 'Product Recall Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `rfid_tag_count` SET TAGS ('dbx_business_glossary_term' = 'Radio Frequency Identification (RFID) Tag Count');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `unit_cost` SET TAGS ('dbx_business_glossary_term' = 'Unit Cost (COGS)');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `unit_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` SET TAGS ('dbx_data_type' = 'transactional_data');
@@ -1092,7 +1064,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `currency
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `destination_node_type` SET TAGS ('dbx_value_regex' = 'STORE|DC|MFC|VENDOR|DARK_STORE');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `initiated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Transfer Initiated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `inventory_cost_per_unit` SET TAGS ('dbx_business_glossary_term' = 'Inventory Cost of Goods Sold (COGS) Per Unit');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `inventory_cost_per_unit` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `is_cross_dock` SET TAGS ('dbx_business_glossary_term' = 'Cross-Dock Indicator');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `is_ship_from_store` SET TAGS ('dbx_business_glossary_term' = 'Ship-From-Store (SFS) Indicator');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `is_vendor_managed` SET TAGS ('dbx_business_glossary_term' = 'Vendor Managed Inventory (VMI) Indicator');
@@ -1103,7 +1074,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `rfid_ena
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `source_node_type` SET TAGS ('dbx_value_regex' = 'STORE|DC|MFC|VENDOR|DARK_STORE');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `source_system_code` SET TAGS ('dbx_value_regex' = 'SAP_WM|MANHATTAN_WMS|ORMS|BLUE_YONDER');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `tracking_number` SET TAGS ('dbx_business_glossary_term' = 'Carrier Tracking Number');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `transfer_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `transfer_number` SET TAGS ('dbx_business_glossary_term' = 'Stock Transfer Number');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `transfer_number` SET TAGS ('dbx_value_regex' = '^ST-[0-9]{10}$');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `transfer_reason_code` SET TAGS ('dbx_value_regex' = 'REPLENISHMENT|NETWORK_BALANCE|RTV|RECALL|DAMAGE_RETURN|OMNICHANNEL');
@@ -1120,7 +1090,7 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `variance
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `variance_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Transfer Variance Reason Code');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ALTER COLUMN `variance_reason_code` SET TAGS ('dbx_value_regex' = 'TRANSIT_DAMAGE|CARRIER_LOSS|PICKING_ERROR|OVERAGE|NO_VARIANCE');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` SET TAGS ('dbx_subdomain' = 'replenishment_receiving');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` SET TAGS ('dbx_subdomain' = 'network_operations');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `buyer_id` SET TAGS ('dbx_business_glossary_term' = 'Buyer Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
@@ -1159,14 +1129,12 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `rejected_
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `rfid_verified` SET TAGS ('dbx_business_glossary_term' = 'RFID Verified Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `rtv_initiated` SET TAGS ('dbx_business_glossary_term' = 'Return to Vendor (RTV) Initiated Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `shortage_qty` SET TAGS ('dbx_business_glossary_term' = 'Shortage Quantity');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `total_receipt_cost` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `unit_cost` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `upc` SET TAGS ('dbx_business_glossary_term' = 'Universal Product Code (UPC)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `upc` SET TAGS ('dbx_value_regex' = '^[0-9]{12}$');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`rfid_tag` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`rfid_tag` SET TAGS ('dbx_subdomain' = 'accuracy_tracking');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`rfid_tag` SET TAGS ('dbx_subdomain' = 'quality_tracking');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`rfid_tag` ALTER COLUMN `rfid_tag_id` SET TAGS ('dbx_business_glossary_term' = 'Radio Frequency Identification (RFID) Tag ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`rfid_tag` ALTER COLUMN `header_id` SET TAGS ('dbx_business_glossary_term' = 'Associated Order ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`rfid_tag` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Tag Encoding Location ID');
@@ -1208,7 +1176,7 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`rfid_tag` ALTER COLUMN `tag_type` SET 
 ALTER TABLE `vibe_retail_v1`.`inventory`.`rfid_tag` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`rfid_tag` ALTER COLUMN `user_memory_data` SET TAGS ('dbx_business_glossary_term' = 'RFID Tag User Memory Data');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` SET TAGS ('dbx_subdomain' = 'network_configuration');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` SET TAGS ('dbx_subdomain' = 'quality_tracking');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `vmi_agreement_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Managed Inventory (VMI) Agreement ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Product Category ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `item_hierarchy_id` SET TAGS ('dbx_business_glossary_term' = 'Hierarchy Node Id (Foreign Key)');
@@ -1221,7 +1189,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `agreement
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `auto_renewal` SET TAGS ('dbx_business_glossary_term' = 'Auto-Renewal Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `chargeback_enabled` SET TAGS ('dbx_business_glossary_term' = 'Chargeback Enabled Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `chargeback_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Chargeback Rate Percentage');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `chargeback_rate_pct` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `edi_transaction_set` SET TAGS ('dbx_business_glossary_term' = 'EDI Transaction Set Code');
@@ -1250,11 +1217,7 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `sku_scope
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `source_system_code` SET TAGS ('dbx_value_regex' = 'SAP_MM|ORMS|BLUE_YONDER|MANUAL');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `supplier_contact_email` SET TAGS ('dbx_business_glossary_term' = 'Supplier VMI Contact Email');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `supplier_contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `supplier_contact_email` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `supplier_contact_email` SET TAGS ('dbx_pii_email' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `supplier_contact_name` SET TAGS ('dbx_business_glossary_term' = 'Supplier VMI Contact Name');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `supplier_contact_name` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `supplier_contact_name` SET TAGS ('dbx_pii_name' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `target_fill_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Target Fill Rate Percentage');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `target_inventory_units` SET TAGS ('dbx_business_glossary_term' = 'Target Inventory Level (Units)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `target_otd_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Target On-Time Delivery (OTD) Rate Percentage');
@@ -1265,7 +1228,7 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `unit_of_m
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`vmi_agreement` ALTER COLUMN `vmi_agreement_status` SET TAGS ('dbx_value_regex' = 'draft|active|suspended|terminated|expired|pending_renewal');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` SET TAGS ('dbx_subdomain' = 'accuracy_tracking');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` SET TAGS ('dbx_subdomain' = 'quality_tracking');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `food_safety_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Food Safety Plan Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Location ID');
@@ -1285,7 +1248,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `disposa
 ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `expiry_risk_status` SET TAGS ('dbx_value_regex' = 'fresh|near_expiry|critical|expired|pulled');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `fefo_sequence` SET TAGS ('dbx_business_glossary_term' = 'First Expired First Out (FEFO) Sequence');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `inventory_cost_per_unit` SET TAGS ('dbx_business_glossary_term' = 'Inventory Cost Per Unit (COGS)');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `inventory_cost_per_unit` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `is_recall_active` SET TAGS ('dbx_business_glossary_term' = 'Active Recall Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `is_rfid_tracked` SET TAGS ('dbx_business_glossary_term' = 'Radio Frequency Identification (RFID) Tracked Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`expiry_tracking` ALTER COLUMN `is_vendor_managed` SET TAGS ('dbx_business_glossary_term' = 'Vendor Managed Inventory (VMI) Flag');
@@ -1324,7 +1286,6 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `expiry_time
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `fiscal_period` SET TAGS ('dbx_value_regex' = '^[0-9]{4}-P(0[1-9]|1[0-3])$');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `fulfillment_channel` SET TAGS ('dbx_value_regex' = 'bopis|ropis|ship_from_store|ecommerce|drop_ship|in_store');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `inventory_cost_per_unit` SET TAGS ('dbx_business_glossary_term' = 'Inventory Cost Per Unit (COGS)');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `inventory_cost_per_unit` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `is_recalled` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Recall Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `is_vendor_managed` SET TAGS ('dbx_business_glossary_term' = 'Vendor Managed Inventory (VMI) Flag');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `priority_level` SET TAGS ('dbx_value_regex' = 'critical|high|standard|low');
@@ -1337,7 +1298,7 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `upc` SET TA
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `upc` SET TAGS ('dbx_value_regex' = '^[0-9]{12}$');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reorder_policy` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`reorder_policy` SET TAGS ('dbx_subdomain' = 'network_configuration');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`reorder_policy` SET TAGS ('dbx_subdomain' = 'network_operations');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reorder_policy` ALTER COLUMN `location_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Location ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reorder_policy` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reorder_policy` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Preferred Supplier ID');
@@ -1373,14 +1334,13 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`reorder_policy` ALTER COLUMN `target_w
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reorder_policy` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reorder_policy` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` SET TAGS ('dbx_subdomain' = 'replenishment_receiving');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` SET TAGS ('dbx_subdomain' = 'network_operations');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `asn_id` SET TAGS ('dbx_business_glossary_term' = 'Advance Shipment Notice (ASN) ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Destination Node ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `dock_appointment_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Appointment ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `food_safety_log_id` SET TAGS ('dbx_business_glossary_term' = 'Food Safety Log Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `goods_receipt_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Goods Receipt ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `primary_asn_inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Source Node ID');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `vendor_id` SET TAGS ('dbx_internal' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order (PO) ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `supplier_edi_transaction_id` SET TAGS ('dbx_business_glossary_term' = 'Electronic Data Interchange (EDI) Transaction ID');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `asn_number` SET TAGS ('dbx_business_glossary_term' = 'Advance Shipment Notice (ASN) Number');
@@ -1412,13 +1372,12 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `transmission_method
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `transmission_timestamp` SET TAGS ('dbx_business_glossary_term' = 'ASN Transmission Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` SET TAGS ('dbx_subdomain' = 'accuracy_tracking');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` SET TAGS ('dbx_subdomain' = 'quality_tracking');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `lot_id` SET TAGS ('dbx_business_glossary_term' = 'Lot Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `category_id` SET TAGS ('dbx_business_glossary_term' = 'Category Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `cost_price_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Price Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `food_safety_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Food Safety Plan Id (Foreign Key)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `goods_receipt_id` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Identifier (ID)');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `parent_lot_id` SET TAGS ('dbx_self_ref_fk' = 'true');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order (PO) Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU) Identifier (ID)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Identifier (ID)');
@@ -1441,7 +1400,7 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `temperature_zone` S
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`node_assortment` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`node_assortment` SET TAGS ('dbx_subdomain' = 'network_configuration');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`node_assortment` SET TAGS ('dbx_subdomain' = 'network_operations');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`node_assortment` SET TAGS ('dbx_association_edges' = 'inventory.inventory_node,product.item_hierarchy');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`node_assortment` ALTER COLUMN `node_assortment_id` SET TAGS ('dbx_business_glossary_term' = 'Node Assortment Identifier');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`node_assortment` ALTER COLUMN `inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Node Assortment - Inventory Node Id');
@@ -1457,14 +1416,14 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`promo_stock_allocation` ALTER COLUMN `
 ALTER TABLE `vibe_retail_v1`.`inventory`.`promo_stock_allocation` ALTER COLUMN `stock_position_id` SET TAGS ('dbx_business_glossary_term' = 'Promo Stock Allocation - Stock Position Id');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`promo_stock_allocation` ALTER COLUMN `promotional_inventory_reserve_qty` SET TAGS ('dbx_business_glossary_term' = 'Promotional Inventory Reserve Quantity');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`location_assignment` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`location_assignment` SET TAGS ('dbx_subdomain' = 'network_configuration');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`location_assignment` SET TAGS ('dbx_subdomain' = 'network_operations');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`location_assignment` SET TAGS ('dbx_association_edges' = 'inventory.inventory_node,workforce.associate');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`location_assignment` ALTER COLUMN `location_assignment_id` SET TAGS ('dbx_business_glossary_term' = 'Location Assignment Identifier');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`location_assignment` ALTER COLUMN `associate_id` SET TAGS ('dbx_business_glossary_term' = 'Location Assignment - Associate Id');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`location_assignment` ALTER COLUMN `inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Node Identifier');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`location_assignment` ALTER COLUMN `location_node_inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Location Assignment - Inventory Node Id');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`assortment_deployment` SET TAGS ('dbx_data_type' = 'association_data');
-ALTER TABLE `vibe_retail_v1`.`inventory`.`assortment_deployment` SET TAGS ('dbx_subdomain' = 'network_configuration');
+ALTER TABLE `vibe_retail_v1`.`inventory`.`assortment_deployment` SET TAGS ('dbx_subdomain' = 'network_operations');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`assortment_deployment` SET TAGS ('dbx_association_edges' = 'inventory.inventory_node,merchandising.assortment_plan');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`assortment_deployment` ALTER COLUMN `assortment_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Deployment - Assortment Plan Id');
 ALTER TABLE `vibe_retail_v1`.`inventory`.`assortment_deployment` ALTER COLUMN `inventory_node_id` SET TAGS ('dbx_business_glossary_term' = 'Assortment Deployment - Inventory Node Id');

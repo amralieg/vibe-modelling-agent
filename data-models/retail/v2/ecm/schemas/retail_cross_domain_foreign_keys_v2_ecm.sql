@@ -1,6 +1,6 @@
 -- Cross-Domain Foreign Keys for Business:  | Version: v2_ecm
--- Generated on: 2026-07-12 09:24:27
--- Total cross-domain FK constraints: 1586
+-- Generated on: 2026-07-12 13:53:27
+-- Total cross-domain FK constraints: 1580
 --
 -- EXECUTION ORDER:
 --   1. Run ALL domain schema files first (any order).
@@ -8,11 +8,12 @@
 --
 -- PREREQUISITE DOMAINS: analytics, compliance, customer, ecommerce, finance, fulfillment, inventory, loyalty, marketing, merchandising, order, pricing, product, promotion, returns, service, store, supplier, supplychain, workforce
 
--- ========= analytics --> compliance (10 constraint(s)) =========
+-- ========= analytics --> compliance (11 constraint(s)) =========
 -- Requires: analytics schema, compliance schema
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ADD CONSTRAINT `fk_analytics_kpi_definition_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_definition` ADD CONSTRAINT `fk_analytics_report_definition_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
+ALTER TABLE `vibe_retail_v1`.`analytics`.`dashboard_widget` ADD CONSTRAINT `fk_analytics_dashboard_widget_audit_event_id` FOREIGN KEY (`audit_event_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_event`(`audit_event_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ADD CONSTRAINT `fk_analytics_dq_rule_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ADD CONSTRAINT `fk_analytics_dq_result_audit_event_id` FOREIGN KEY (`audit_event_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_event`(`audit_event_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ADD CONSTRAINT `fk_analytics_report_subscription_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
@@ -21,12 +22,13 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_al
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_alert_osha_incident_id` FOREIGN KEY (`osha_incident_id`) REFERENCES `vibe_retail_v1`.`compliance`.`osha_incident`(`osha_incident_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`glossary_term` ADD CONSTRAINT `fk_analytics_glossary_term_obligation_id` FOREIGN KEY (`obligation_id`) REFERENCES `vibe_retail_v1`.`compliance`.`obligation`(`obligation_id`);
 
--- ========= analytics --> customer (4 constraint(s)) =========
+-- ========= analytics --> customer (5 constraint(s)) =========
 -- Requires: analytics schema, customer schema
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ADD CONSTRAINT `fk_analytics_dq_issue_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
-ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ADD CONSTRAINT `fk_analytics_analytics_kpi_target_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
+ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ADD CONSTRAINT `fk_analytics_report_subscription_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_alert_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
+ALTER TABLE `vibe_retail_v1`.`analytics`.`workspace` ADD CONSTRAINT `fk_analytics_workspace_account_id` FOREIGN KEY (`account_id`) REFERENCES `vibe_retail_v1`.`customer`.`account`(`account_id`);
 
 -- ========= analytics --> ecommerce (1 constraint(s)) =========
 -- Requires: analytics schema, ecommerce schema
@@ -63,9 +65,10 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_al
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_alert_fulfillment_order_id` FOREIGN KEY (`fulfillment_order_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`fulfillment_order`(`fulfillment_order_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_alert_shipment_id` FOREIGN KEY (`shipment_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`shipment`(`shipment_id`);
 
--- ========= analytics --> inventory (11 constraint(s)) =========
+-- ========= analytics --> inventory (12 constraint(s)) =========
 -- Requires: analytics schema, inventory schema
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_adjustment_id` FOREIGN KEY (`adjustment_id`) REFERENCES `vibe_retail_v1`.`inventory`.`adjustment`(`adjustment_id`);
+ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_cycle_count_id` FOREIGN KEY (`cycle_count_id`) REFERENCES `vibe_retail_v1`.`inventory`.`cycle_count`(`cycle_count_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_stock_ledger_id` FOREIGN KEY (`stock_ledger_id`) REFERENCES `vibe_retail_v1`.`inventory`.`stock_ledger`(`stock_ledger_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_stock_position_id` FOREIGN KEY (`stock_position_id`) REFERENCES `vibe_retail_v1`.`inventory`.`stock_position`(`stock_position_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ADD CONSTRAINT `fk_analytics_dq_result_stock_position_id` FOREIGN KEY (`stock_position_id`) REFERENCES `vibe_retail_v1`.`inventory`.`stock_position`(`stock_position_id`);
@@ -97,19 +100,18 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_al
 -- ========= analytics --> pricing (8 constraint(s)) =========
 -- Requires: analytics schema, pricing schema
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_markdown_id` FOREIGN KEY (`markdown_id`) REFERENCES `vibe_retail_v1`.`pricing`.`markdown`(`markdown_id`);
+ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_price_change_id` FOREIGN KEY (`price_change_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_change`(`price_change_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_sku_price_id` FOREIGN KEY (`sku_price_id`) REFERENCES `vibe_retail_v1`.`pricing`.`sku_price`(`sku_price_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`semantic_metric` ADD CONSTRAINT `fk_analytics_semantic_metric_price_strategy_id` FOREIGN KEY (`price_strategy_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_strategy`(`price_strategy_id`);
-ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ADD CONSTRAINT `fk_analytics_report_subscription_price_list_id` FOREIGN KEY (`price_list_id`) REFERENCES `vibe_retail_v1`.`pricing`.`price_list`(`price_list_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ADD CONSTRAINT `fk_analytics_analytics_kpi_target_margin_target_id` FOREIGN KEY (`margin_target_id`) REFERENCES `vibe_retail_v1`.`pricing`.`margin_target`(`margin_target_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_alert_margin_target_id` FOREIGN KEY (`margin_target_id`) REFERENCES `vibe_retail_v1`.`pricing`.`margin_target`(`margin_target_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_alert_markdown_id` FOREIGN KEY (`markdown_id`) REFERENCES `vibe_retail_v1`.`pricing`.`markdown`(`markdown_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_alert_sku_price_id` FOREIGN KEY (`sku_price_id`) REFERENCES `vibe_retail_v1`.`pricing`.`sku_price`(`sku_price_id`);
 
--- ========= analytics --> product (9 constraint(s)) =========
+-- ========= analytics --> product (8 constraint(s)) =========
 -- Requires: analytics schema, product schema
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_item_hierarchy_id` FOREIGN KEY (`item_hierarchy_id`) REFERENCES `vibe_retail_v1`.`product`.`item_hierarchy`(`item_hierarchy_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
-ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_rule` ADD CONSTRAINT `fk_analytics_dq_rule_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ADD CONSTRAINT `fk_analytics_dq_result_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ADD CONSTRAINT `fk_analytics_dq_issue_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ADD CONSTRAINT `fk_analytics_analytics_kpi_target_item_hierarchy_id` FOREIGN KEY (`item_hierarchy_id`) REFERENCES `vibe_retail_v1`.`product`.`item_hierarchy`(`item_hierarchy_id`);
@@ -125,7 +127,7 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytic
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_value` ADD CONSTRAINT `fk_analytics_kpi_value_rma_id` FOREIGN KEY (`rma_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma`(`rma_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ADD CONSTRAINT `fk_analytics_dq_issue_return_fraud_case_id` FOREIGN KEY (`return_fraud_case_id`) REFERENCES `vibe_retail_v1`.`returns`.`return_fraud_case`(`return_fraud_case_id`);
 
--- ========= analytics --> store (8 constraint(s)) =========
+-- ========= analytics --> store (9 constraint(s)) =========
 -- Requires: analytics schema, store schema
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ADD CONSTRAINT `fk_analytics_kpi_definition_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`kpi_definition` ADD CONSTRAINT `fk_analytics_kpi_definition_format_id` FOREIGN KEY (`format_id`) REFERENCES `vibe_retail_v1`.`store`.`format`(`format_id`);
@@ -135,6 +137,7 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ADD CONSTRAINT `
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ADD CONSTRAINT `fk_analytics_analytics_kpi_target_format_id` FOREIGN KEY (`format_id`) REFERENCES `vibe_retail_v1`.`store`.`format`(`format_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ADD CONSTRAINT `fk_analytics_analytics_kpi_target_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_alert_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
+ALTER TABLE `vibe_retail_v1`.`analytics`.`workspace` ADD CONSTRAINT `fk_analytics_workspace_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
 
 -- ========= analytics --> supplychain (15 constraint(s)) =========
 -- Requires: analytics schema, supplychain schema
@@ -146,8 +149,8 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_result` ADD CONSTRAINT `fk_analytic
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ADD CONSTRAINT `fk_analytics_dq_issue_inbound_shipment_id` FOREIGN KEY (`inbound_shipment_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`inbound_shipment`(`inbound_shipment_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`dq_issue` ADD CONSTRAINT `fk_analytics_dq_issue_purchase_order_id` FOREIGN KEY (`purchase_order_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`purchase_order`(`purchase_order_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ADD CONSTRAINT `fk_analytics_report_subscription_demand_forecast_id` FOREIGN KEY (`demand_forecast_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`demand_forecast`(`demand_forecast_id`);
-ALTER TABLE `vibe_retail_v1`.`analytics`.`report_subscription` ADD CONSTRAINT `fk_analytics_report_subscription_replenishment_plan_id` FOREIGN KEY (`replenishment_plan_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`replenishment_plan`(`replenishment_plan_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ADD CONSTRAINT `fk_analytics_analytics_kpi_target_demand_forecast_id` FOREIGN KEY (`demand_forecast_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`demand_forecast`(`demand_forecast_id`);
+ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ADD CONSTRAINT `fk_analytics_analytics_kpi_target_plan_id` FOREIGN KEY (`plan_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`plan`(`plan_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`analytics_kpi_target` ADD CONSTRAINT `fk_analytics_analytics_kpi_target_purchase_order_id` FOREIGN KEY (`purchase_order_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`purchase_order`(`purchase_order_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_alert_demand_forecast_id` FOREIGN KEY (`demand_forecast_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`demand_forecast`(`demand_forecast_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_alert_replenishment_plan_id` FOREIGN KEY (`replenishment_plan_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`replenishment_plan`(`replenishment_plan_id`);
@@ -170,6 +173,11 @@ ALTER TABLE `vibe_retail_v1`.`analytics`.`alert` ADD CONSTRAINT `fk_analytics_al
 ALTER TABLE `vibe_retail_v1`.`analytics`.`self_service_query` ADD CONSTRAINT `fk_analytics_self_service_query_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`analytics`.`workspace` ADD CONSTRAINT `fk_analytics_workspace_org_unit_id` FOREIGN KEY (`org_unit_id`) REFERENCES `vibe_retail_v1`.`workforce`.`org_unit`(`org_unit_id`);
 
+-- ========= compliance --> customer (2 constraint(s)) =========
+-- Requires: compliance schema, customer schema
+ALTER TABLE `vibe_retail_v1`.`compliance`.`privacy_assessment` ADD CONSTRAINT `fk_compliance_privacy_assessment_account_id` FOREIGN KEY (`account_id`) REFERENCES `vibe_retail_v1`.`customer`.`account`(`account_id`);
+ALTER TABLE `vibe_retail_v1`.`compliance`.`consent` ADD CONSTRAINT `fk_compliance_consent_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
+
 -- ========= compliance --> finance (6 constraint(s)) =========
 -- Requires: compliance schema, finance schema
 ALTER TABLE `vibe_retail_v1`.`compliance`.`audit_event` ADD CONSTRAINT `fk_compliance_audit_event_cost_center_id` FOREIGN KEY (`cost_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`cost_center`(`cost_center_id`);
@@ -187,6 +195,10 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`food_safety_log` ADD CONSTRAINT `fk_c
 ALTER TABLE `vibe_retail_v1`.`compliance`.`license_permit` ADD CONSTRAINT `fk_compliance_license_permit_item_hierarchy_id` FOREIGN KEY (`item_hierarchy_id`) REFERENCES `vibe_retail_v1`.`product`.`item_hierarchy`(`item_hierarchy_id`);
 ALTER TABLE `vibe_retail_v1`.`compliance`.`certification` ADD CONSTRAINT `fk_compliance_certification_item_hierarchy_id` FOREIGN KEY (`item_hierarchy_id`) REFERENCES `vibe_retail_v1`.`product`.`item_hierarchy`(`item_hierarchy_id`);
 ALTER TABLE `vibe_retail_v1`.`compliance`.`violation_notice` ADD CONSTRAINT `fk_compliance_violation_notice_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
+
+-- ========= compliance --> promotion (1 constraint(s)) =========
+-- Requires: compliance schema, promotion schema
+ALTER TABLE `vibe_retail_v1`.`compliance`.`training_completion` ADD CONSTRAINT `fk_compliance_training_completion_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 
 -- ========= compliance --> store (12 constraint(s)) =========
 -- Requires: compliance schema, store schema
@@ -270,6 +282,10 @@ ALTER TABLE `vibe_retail_v1`.`compliance`.`third_party_assessment` ADD CONSTRAIN
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ADD CONSTRAINT `fk_customer_interaction_web_session_id` FOREIGN KEY (`web_session_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`web_session`(`web_session_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`segment_banner_targeting` ADD CONSTRAINT `fk_customer_segment_banner_targeting_promotion_banner_id` FOREIGN KEY (`promotion_banner_id`) REFERENCES `vibe_retail_v1`.`ecommerce`.`promotion_banner`(`promotion_banner_id`);
 
+-- ========= customer --> finance (1 constraint(s)) =========
+-- Requires: customer schema, finance schema
+ALTER TABLE `vibe_retail_v1`.`customer`.`account` ADD CONSTRAINT `fk_customer_account_payment_method_id` FOREIGN KEY (`payment_method_id`) REFERENCES `vibe_retail_v1`.`finance`.`payment_method`(`payment_method_id`);
+
 -- ========= customer --> loyalty (1 constraint(s)) =========
 -- Requires: customer schema, loyalty schema
 ALTER TABLE `vibe_retail_v1`.`customer`.`privacy_request` ADD CONSTRAINT `fk_customer_privacy_request_loyalty_membership_id` FOREIGN KEY (`loyalty_membership_id`) REFERENCES `vibe_retail_v1`.`loyalty`.`loyalty_membership`(`loyalty_membership_id`);
@@ -305,10 +321,9 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ADD CONSTRAINT `fk_customer_w
 ALTER TABLE `vibe_retail_v1`.`customer`.`customer_attribute` ADD CONSTRAINT `fk_customer_customer_attribute_item_hierarchy_id` FOREIGN KEY (`item_hierarchy_id`) REFERENCES `vibe_retail_v1`.`product`.`item_hierarchy`(`item_hierarchy_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`customer_attribute` ADD CONSTRAINT `fk_customer_customer_attribute_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 
--- ========= customer --> promotion (3 constraint(s)) =========
+-- ========= customer --> promotion (2 constraint(s)) =========
 -- Requires: customer schema, promotion schema
 ALTER TABLE `vibe_retail_v1`.`customer`.`interaction` ADD CONSTRAINT `fk_customer_interaction_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
-ALTER TABLE `vibe_retail_v1`.`customer`.`wishlist` ADD CONSTRAINT `fk_customer_wishlist_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
 ALTER TABLE `vibe_retail_v1`.`customer`.`issuance` ADD CONSTRAINT `fk_customer_issuance_coupon_id` FOREIGN KEY (`coupon_id`) REFERENCES `vibe_retail_v1`.`promotion`.`coupon`(`coupon_id`);
 
 -- ========= customer --> returns (1 constraint(s)) =========
@@ -345,13 +360,14 @@ ALTER TABLE `vibe_retail_v1`.`customer`.`b2b_contract` ADD CONSTRAINT `fk_custom
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ADD CONSTRAINT `fk_ecommerce_storefront_pci_assessment_id` FOREIGN KEY (`pci_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`pci_assessment`(`pci_assessment_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ADD CONSTRAINT `fk_ecommerce_digital_catalog_license_permit_id` FOREIGN KEY (`license_permit_id`) REFERENCES `vibe_retail_v1`.`compliance`.`license_permit`(`license_permit_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ADD CONSTRAINT `fk_ecommerce_ab_test_privacy_assessment_id` FOREIGN KEY (`privacy_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`privacy_assessment`(`privacy_assessment_id`);
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ADD CONSTRAINT `fk_ecommerce_abandoned_cart_recovery_privacy_assessment_id` FOREIGN KEY (`privacy_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`privacy_assessment`(`privacy_assessment_id`);
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ADD CONSTRAINT `fk_ecommerce_personalization_rule_privacy_assessment_id` FOREIGN KEY (`privacy_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`privacy_assessment`(`privacy_assessment_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ADD CONSTRAINT `fk_ecommerce_recommendation_privacy_assessment_id` FOREIGN KEY (`privacy_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`privacy_assessment`(`privacy_assessment_id`);
 
--- ========= ecommerce --> customer (12 constraint(s)) =========
+-- ========= ecommerce --> customer (13 constraint(s)) =========
 -- Requires: ecommerce schema, customer schema
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ADD CONSTRAINT `fk_ecommerce_web_session_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ADD CONSTRAINT `fk_ecommerce_cart_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ADD CONSTRAINT `fk_ecommerce_cart_item_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ADD CONSTRAINT `fk_ecommerce_checkout_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ADD CONSTRAINT `fk_ecommerce_checkout_address_id` FOREIGN KEY (`address_id`) REFERENCES `vibe_retail_v1`.`customer`.`address`(`address_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ADD CONSTRAINT `fk_ecommerce_digital_payment_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
@@ -363,25 +379,21 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ADD CONSTRAIN
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ADD CONSTRAINT `fk_ecommerce_recommendation_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ADD CONSTRAINT `fk_ecommerce_site_notification_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 
--- ========= ecommerce --> finance (11 constraint(s)) =========
+-- ========= ecommerce --> finance (9 constraint(s)) =========
 -- Requires: ecommerce schema, finance schema
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront` ADD CONSTRAINT `fk_ecommerce_storefront_profit_center_id` FOREIGN KEY (`profit_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`profit_center`(`profit_center_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ADD CONSTRAINT `fk_ecommerce_digital_catalog_profit_center_id` FOREIGN KEY (`profit_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`profit_center`(`profit_center_id`);
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ADD CONSTRAINT `fk_ecommerce_cart_cost_center_id` FOREIGN KEY (`cost_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`cost_center`(`cost_center_id`);
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ADD CONSTRAINT `fk_ecommerce_checkout_cost_center_id` FOREIGN KEY (`cost_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`cost_center`(`cost_center_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ADD CONSTRAINT `fk_ecommerce_digital_payment_ar_invoice_id` FOREIGN KEY (`ar_invoice_id`) REFERENCES `vibe_retail_v1`.`finance`.`ar_invoice`(`ar_invoice_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ADD CONSTRAINT `fk_ecommerce_digital_payment_payment_method_id` FOREIGN KEY (`payment_method_id`) REFERENCES `vibe_retail_v1`.`finance`.`payment_method`(`payment_method_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ADD CONSTRAINT `fk_ecommerce_digital_payment_gl_account_id` FOREIGN KEY (`gl_account_id`) REFERENCES `vibe_retail_v1`.`finance`.`gl_account`(`gl_account_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ADD CONSTRAINT `fk_ecommerce_digital_payment_profit_center_id` FOREIGN KEY (`profit_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`profit_center`(`profit_center_id`);
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ADD CONSTRAINT `fk_ecommerce_search_query_profit_center_id` FOREIGN KEY (`profit_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`profit_center`(`profit_center_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ADD CONSTRAINT `fk_ecommerce_recommendation_profit_center_id` FOREIGN KEY (`profit_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`profit_center`(`profit_center_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ADD CONSTRAINT `fk_ecommerce_promotion_banner_cost_center_id` FOREIGN KEY (`cost_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`cost_center`(`cost_center_id`);
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`promotion_banner` ADD CONSTRAINT `fk_ecommerce_promotion_banner_profit_center_id` FOREIGN KEY (`profit_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`profit_center`(`profit_center_id`);
 
--- ========= ecommerce --> fulfillment (9 constraint(s)) =========
+-- ========= ecommerce --> fulfillment (7 constraint(s)) =========
 -- Requires: ecommerce schema, fulfillment schema
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ADD CONSTRAINT `fk_ecommerce_cart_fulfillment_order_id` FOREIGN KEY (`fulfillment_order_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`fulfillment_order`(`fulfillment_order_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ADD CONSTRAINT `fk_ecommerce_cart_item_fulfillment_order_id` FOREIGN KEY (`fulfillment_order_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`fulfillment_order`(`fulfillment_order_id`);
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ADD CONSTRAINT `fk_ecommerce_checkout_fulfillment_order_id` FOREIGN KEY (`fulfillment_order_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`fulfillment_order`(`fulfillment_order_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ADD CONSTRAINT `fk_ecommerce_product_page_view_fulfillment_node_id` FOREIGN KEY (`fulfillment_node_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`fulfillment_node`(`fulfillment_node_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ADD CONSTRAINT `fk_ecommerce_recommendation_fulfillment_node_id` FOREIGN KEY (`fulfillment_node_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`fulfillment_node`(`fulfillment_node_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ADD CONSTRAINT `fk_ecommerce_site_notification_bopis_appointment_id` FOREIGN KEY (`bopis_appointment_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`bopis_appointment`(`bopis_appointment_id`);
@@ -401,8 +413,9 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ADD CONSTRAINT `fk_
 -- Requires: ecommerce schema, loyalty schema
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ADD CONSTRAINT `fk_ecommerce_web_session_loyalty_program_id` FOREIGN KEY (`loyalty_program_id`) REFERENCES `vibe_retail_v1`.`loyalty`.`loyalty_program`(`loyalty_program_id`);
 
--- ========= ecommerce --> marketing (5 constraint(s)) =========
+-- ========= ecommerce --> marketing (6 constraint(s)) =========
 -- Requires: ecommerce schema, marketing schema
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ADD CONSTRAINT `fk_ecommerce_digital_payment_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ADD CONSTRAINT `fk_ecommerce_ab_test_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ADD CONSTRAINT `fk_ecommerce_abandoned_cart_recovery_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ADD CONSTRAINT `fk_ecommerce_personalization_rule_segment_id` FOREIGN KEY (`segment_id`) REFERENCES `vibe_retail_v1`.`marketing`.`segment`(`segment_id`);
@@ -416,8 +429,8 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ADD CONSTRAINT `fk_ec
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ADD CONSTRAINT `fk_ecommerce_digital_catalog_season_id` FOREIGN KEY (`season_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`season`(`season_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart_item` ADD CONSTRAINT `fk_ecommerce_cart_item_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ADD CONSTRAINT `fk_ecommerce_product_page_view_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ADD CONSTRAINT `fk_ecommerce_search_query_buyer_id` FOREIGN KEY (`buyer_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`buyer`(`buyer_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ADD CONSTRAINT `fk_ecommerce_search_query_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ADD CONSTRAINT `fk_ecommerce_abandoned_cart_recovery_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ADD CONSTRAINT `fk_ecommerce_marketplace_listing_buyer_id` FOREIGN KEY (`buyer_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`buyer`(`buyer_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ADD CONSTRAINT `fk_ecommerce_marketplace_listing_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`personalization_rule` ADD CONSTRAINT `fk_ecommerce_personalization_rule_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
@@ -482,31 +495,35 @@ ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ADD CONSTRAINT `fk_
 -- Requires: ecommerce schema, supplier schema
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`marketplace_listing` ADD CONSTRAINT `fk_ecommerce_marketplace_listing_vendor_id` FOREIGN KEY (`vendor_id`) REFERENCES `vibe_retail_v1`.`supplier`.`vendor`(`vendor_id`);
 
--- ========= ecommerce --> supplychain (3 constraint(s)) =========
+-- ========= ecommerce --> supplychain (2 constraint(s)) =========
 -- Requires: ecommerce schema, supplychain schema
-ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_catalog` ADD CONSTRAINT `fk_ecommerce_digital_catalog_demand_forecast_id` FOREIGN KEY (`demand_forecast_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`demand_forecast`(`demand_forecast_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ADD CONSTRAINT `fk_ecommerce_recommendation_replenishment_plan_id` FOREIGN KEY (`replenishment_plan_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`replenishment_plan`(`replenishment_plan_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` ADD CONSTRAINT `fk_ecommerce_storefront_fulfillment_network_dc_facility_id` FOREIGN KEY (`dc_facility_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`dc_facility`(`dc_facility_id`);
 
--- ========= ecommerce --> workforce (12 constraint(s)) =========
+-- ========= ecommerce --> workforce (15 constraint(s)) =========
 -- Requires: ecommerce schema, workforce schema
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`web_session` ADD CONSTRAINT `fk_ecommerce_web_session_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`cart` ADD CONSTRAINT `fk_ecommerce_cart_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`checkout` ADD CONSTRAINT `fk_ecommerce_checkout_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`digital_payment` ADD CONSTRAINT `fk_ecommerce_digital_payment_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_page_view` ADD CONSTRAINT `fk_ecommerce_product_page_view_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`search_query` ADD CONSTRAINT `fk_ecommerce_search_query_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`product_review` ADD CONSTRAINT `fk_ecommerce_product_review_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`ab_test` ADD CONSTRAINT `fk_ecommerce_ab_test_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`abandoned_cart_recovery` ADD CONSTRAINT `fk_ecommerce_abandoned_cart_recovery_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
+ALTER TABLE `vibe_retail_v1`.`ecommerce`.`recommendation` ADD CONSTRAINT `fk_ecommerce_recommendation_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`site_notification` ADD CONSTRAINT `fk_ecommerce_site_notification_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_fulfillment_network` ADD CONSTRAINT `fk_ecommerce_storefront_fulfillment_network_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`storefront_assortment` ADD CONSTRAINT `fk_ecommerce_storefront_assortment_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`message_template` ADD CONSTRAINT `fk_ecommerce_message_template_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`ecommerce`.`message_template` ADD CONSTRAINT `fk_ecommerce_message_template_message_last_modified_by_user_associate_id` FOREIGN KEY (`message_last_modified_by_user_associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= finance --> compliance (2 constraint(s)) =========
+-- ========= finance --> compliance (4 constraint(s)) =========
 -- Requires: finance schema, compliance schema
 ALTER TABLE `vibe_retail_v1`.`finance`.`journal_entry` ADD CONSTRAINT `fk_finance_journal_entry_violation_notice_id` FOREIGN KEY (`violation_notice_id`) REFERENCES `vibe_retail_v1`.`compliance`.`violation_notice`(`violation_notice_id`);
 ALTER TABLE `vibe_retail_v1`.`finance`.`finance_budget` ADD CONSTRAINT `fk_finance_finance_budget_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
+ALTER TABLE `vibe_retail_v1`.`finance`.`lease_contract` ADD CONSTRAINT `fk_finance_lease_contract_environmental_event_id` FOREIGN KEY (`environmental_event_id`) REFERENCES `vibe_retail_v1`.`compliance`.`environmental_event`(`environmental_event_id`);
+ALTER TABLE `vibe_retail_v1`.`finance`.`lease_contract` ADD CONSTRAINT `fk_finance_lease_contract_regulatory_filing_id` FOREIGN KEY (`regulatory_filing_id`) REFERENCES `vibe_retail_v1`.`compliance`.`regulatory_filing`(`regulatory_filing_id`);
 
 -- ========= finance --> customer (5 constraint(s)) =========
 -- Requires: finance schema, customer schema
@@ -563,15 +580,14 @@ ALTER TABLE `vibe_retail_v1`.`finance`.`plan_version` ADD CONSTRAINT `fk_finance
 ALTER TABLE `vibe_retail_v1`.`finance`.`netting_run` ADD CONSTRAINT `fk_finance_netting_run_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`finance`.`netting_run` ADD CONSTRAINT `fk_finance_netting_run_netting_initiated_by_user_associate_id` FOREIGN KEY (`netting_initiated_by_user_associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= fulfillment --> compliance (7 constraint(s)) =========
+-- ========= fulfillment --> compliance (6 constraint(s)) =========
 -- Requires: fulfillment schema, compliance schema
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ADD CONSTRAINT `fk_fulfillment_fulfillment_order_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
+ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_line` ADD CONSTRAINT `fk_fulfillment_fulfillment_line_haccp_control_point_id` FOREIGN KEY (`haccp_control_point_id`) REFERENCES `vibe_retail_v1`.`compliance`.`haccp_control_point`(`haccp_control_point_id`);
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ADD CONSTRAINT `fk_fulfillment_shipment_environmental_event_id` FOREIGN KEY (`environmental_event_id`) REFERENCES `vibe_retail_v1`.`compliance`.`environmental_event`(`environmental_event_id`);
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_route` ADD CONSTRAINT `fk_fulfillment_delivery_route_safety_inspection_id` FOREIGN KEY (`safety_inspection_id`) REFERENCES `vibe_retail_v1`.`compliance`.`safety_inspection`(`safety_inspection_id`);
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`carrier` ADD CONSTRAINT `fk_fulfillment_carrier_certification_id` FOREIGN KEY (`certification_id`) REFERENCES `vibe_retail_v1`.`compliance`.`certification`(`certification_id`);
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ADD CONSTRAINT `fk_fulfillment_fulfillment_node_food_safety_plan_id` FOREIGN KEY (`food_safety_plan_id`) REFERENCES `vibe_retail_v1`.`compliance`.`food_safety_plan`(`food_safety_plan_id`);
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ADD CONSTRAINT `fk_fulfillment_exception_corrective_action_id` FOREIGN KEY (`corrective_action_id`) REFERENCES `vibe_retail_v1`.`compliance`.`corrective_action`(`corrective_action_id`);
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ADD CONSTRAINT `fk_fulfillment_drop_ship_order_third_party_assessment_id` FOREIGN KEY (`third_party_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`third_party_assessment`(`third_party_assessment_id`);
 
 -- ========= fulfillment --> customer (6 constraint(s)) =========
 -- Requires: fulfillment schema, customer schema
@@ -582,7 +598,7 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_stop` ADD CONSTRAINT `fk_fu
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ADD CONSTRAINT `fk_fulfillment_bopis_appointment_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`drop_ship_order` ADD CONSTRAINT `fk_fulfillment_drop_ship_order_profile_id` FOREIGN KEY (`profile_id`) REFERENCES `vibe_retail_v1`.`customer`.`profile`(`profile_id`);
 
--- ========= fulfillment --> finance (8 constraint(s)) =========
+-- ========= fulfillment --> finance (7 constraint(s)) =========
 -- Requires: fulfillment schema, finance schema
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ADD CONSTRAINT `fk_fulfillment_fulfillment_order_cost_center_id` FOREIGN KEY (`cost_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`cost_center`(`cost_center_id`);
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_order` ADD CONSTRAINT `fk_fulfillment_fulfillment_order_profit_center_id` FOREIGN KEY (`profit_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`profit_center`(`profit_center_id`);
@@ -590,7 +606,6 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`shipment` ADD CONSTRAINT `fk_fulfill
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`delivery_route` ADD CONSTRAINT `fk_fulfillment_delivery_route_cost_center_id` FOREIGN KEY (`cost_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`cost_center`(`cost_center_id`);
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ADD CONSTRAINT `fk_fulfillment_fulfillment_node_cost_center_id` FOREIGN KEY (`cost_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`cost_center`(`cost_center_id`);
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`fulfillment_node` ADD CONSTRAINT `fk_fulfillment_fulfillment_node_profit_center_id` FOREIGN KEY (`profit_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`profit_center`(`profit_center_id`);
-ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ADD CONSTRAINT `fk_fulfillment_bopis_appointment_ar_invoice_id` FOREIGN KEY (`ar_invoice_id`) REFERENCES `vibe_retail_v1`.`finance`.`ar_invoice`(`ar_invoice_id`);
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ADD CONSTRAINT `fk_fulfillment_exception_cost_center_id` FOREIGN KEY (`cost_center_id`) REFERENCES `vibe_retail_v1`.`finance`.`cost_center`(`cost_center_id`);
 
 -- ========= fulfillment --> loyalty (1 constraint(s)) =========
@@ -672,9 +687,8 @@ ALTER TABLE `vibe_retail_v1`.`fulfillment`.`bopis_appointment` ADD CONSTRAINT `f
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`exception` ADD CONSTRAINT `fk_fulfillment_exception_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`fulfillment`.`proof_of_delivery` ADD CONSTRAINT `fk_fulfillment_proof_of_delivery_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= inventory --> compliance (8 constraint(s)) =========
+-- ========= inventory --> compliance (7 constraint(s)) =========
 -- Requires: inventory schema, compliance schema
-ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_ledger` ADD CONSTRAINT `fk_inventory_stock_ledger_audit_event_id` FOREIGN KEY (`audit_event_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_event`(`audit_event_id`);
 ALTER TABLE `vibe_retail_v1`.`inventory`.`adjustment` ADD CONSTRAINT `fk_inventory_adjustment_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ADD CONSTRAINT `fk_inventory_goods_receipt_food_safety_plan_id` FOREIGN KEY (`food_safety_plan_id`) REFERENCES `vibe_retail_v1`.`compliance`.`food_safety_plan`(`food_safety_plan_id`);
 ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ADD CONSTRAINT `fk_inventory_goods_receipt_haccp_control_point_id` FOREIGN KEY (`haccp_control_point_id`) REFERENCES `vibe_retail_v1`.`compliance`.`haccp_control_point`(`haccp_control_point_id`);
@@ -797,10 +811,11 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ADD CONSTRAINT `fk_inventory_asn_
 ALTER TABLE `vibe_retail_v1`.`inventory`.`asn` ADD CONSTRAINT `fk_inventory_asn_supplier_edi_transaction_id` FOREIGN KEY (`supplier_edi_transaction_id`) REFERENCES `vibe_retail_v1`.`supplier`.`supplier_edi_transaction`(`supplier_edi_transaction_id`);
 ALTER TABLE `vibe_retail_v1`.`inventory`.`lot` ADD CONSTRAINT `fk_inventory_lot_vendor_id` FOREIGN KEY (`vendor_id`) REFERENCES `vibe_retail_v1`.`supplier`.`vendor`(`vendor_id`);
 
--- ========= inventory --> supplychain (18 constraint(s)) =========
+-- ========= inventory --> supplychain (19 constraint(s)) =========
 -- Requires: inventory schema, supplychain schema
 ALTER TABLE `vibe_retail_v1`.`inventory`.`inventory_node` ADD CONSTRAINT `fk_inventory_inventory_node_dc_facility_id` FOREIGN KEY (`dc_facility_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`dc_facility`(`dc_facility_id`);
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ADD CONSTRAINT `fk_inventory_replenishment_order_demand_forecast_id` FOREIGN KEY (`demand_forecast_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`demand_forecast`(`demand_forecast_id`);
+ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ADD CONSTRAINT `fk_inventory_replenishment_order_inbound_appointment_id` FOREIGN KEY (`inbound_appointment_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`inbound_appointment`(`inbound_appointment_id`);
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ADD CONSTRAINT `fk_inventory_replenishment_order_purchase_order_id` FOREIGN KEY (`purchase_order_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`purchase_order`(`purchase_order_id`);
 ALTER TABLE `vibe_retail_v1`.`inventory`.`replenishment_order` ADD CONSTRAINT `fk_inventory_replenishment_order_supplychain_edi_transaction_id` FOREIGN KEY (`supplychain_edi_transaction_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`supplychain_edi_transaction`(`supplychain_edi_transaction_id`);
 ALTER TABLE `vibe_retail_v1`.`inventory`.`stock_transfer` ADD CONSTRAINT `fk_inventory_stock_transfer_purchase_order_id` FOREIGN KEY (`purchase_order_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`purchase_order`(`purchase_order_id`);
@@ -830,10 +845,9 @@ ALTER TABLE `vibe_retail_v1`.`inventory`.`goods_receipt` ADD CONSTRAINT `fk_inve
 ALTER TABLE `vibe_retail_v1`.`inventory`.`reservation` ADD CONSTRAINT `fk_inventory_reservation_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`inventory`.`location_assignment` ADD CONSTRAINT `fk_inventory_location_assignment_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= loyalty --> compliance (3 constraint(s)) =========
+-- ========= loyalty --> compliance (2 constraint(s)) =========
 -- Requires: loyalty schema, compliance schema
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`loyalty_program` ADD CONSTRAINT `fk_loyalty_loyalty_program_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
-ALTER TABLE `vibe_retail_v1`.`loyalty`.`engagement_campaign` ADD CONSTRAINT `fk_loyalty_engagement_campaign_privacy_assessment_id` FOREIGN KEY (`privacy_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`privacy_assessment`(`privacy_assessment_id`);
 ALTER TABLE `vibe_retail_v1`.`loyalty`.`partner_program` ADD CONSTRAINT `fk_loyalty_partner_program_third_party_assessment_id` FOREIGN KEY (`third_party_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`third_party_assessment`(`third_party_assessment_id`);
 
 -- ========= loyalty --> customer (3 constraint(s)) =========
@@ -1100,21 +1114,20 @@ ALTER TABLE `vibe_retail_v1`.`marketing`.`email_template` ADD CONSTRAINT `fk_mar
 ALTER TABLE `vibe_retail_v1`.`marketing`.`email_template` ADD CONSTRAINT `fk_marketing_email_template_email_last_modified_by_user_associate_id` FOREIGN KEY (`email_last_modified_by_user_associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`marketing`.`segment` ADD CONSTRAINT `fk_marketing_segment_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= merchandising --> analytics (8 constraint(s)) =========
+-- ========= merchandising --> analytics (6 constraint(s)) =========
 -- Requires: merchandising schema, analytics schema
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`merch_plan` ADD CONSTRAINT `fk_merchandising_merch_plan_kpi_definition_id` FOREIGN KEY (`kpi_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_definition`(`kpi_definition_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`assortment_plan` ADD CONSTRAINT `fk_merchandising_assortment_plan_kpi_definition_id` FOREIGN KEY (`kpi_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_definition`(`kpi_definition_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`assortment_plan` ADD CONSTRAINT `fk_merchandising_assortment_plan_report_subscription_id` FOREIGN KEY (`report_subscription_id`) REFERENCES `vibe_retail_v1`.`analytics`.`report_subscription`(`report_subscription_id`);
-ALTER TABLE `vibe_retail_v1`.`merchandising`.`buyer` ADD CONSTRAINT `fk_merchandising_buyer_semantic_layer_entity_id` FOREIGN KEY (`semantic_layer_entity_id`) REFERENCES `vibe_retail_v1`.`analytics`.`semantic_layer_entity`(`semantic_layer_entity_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`season` ADD CONSTRAINT `fk_merchandising_season_semantic_layer_entity_id` FOREIGN KEY (`semantic_layer_entity_id`) REFERENCES `vibe_retail_v1`.`analytics`.`semantic_layer_entity`(`semantic_layer_entity_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`otb_budget` ADD CONSTRAINT `fk_merchandising_otb_budget_kpi_definition_id` FOREIGN KEY (`kpi_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_definition`(`kpi_definition_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`markdown_event` ADD CONSTRAINT `fk_merchandising_markdown_event_alert_id` FOREIGN KEY (`alert_id`) REFERENCES `vibe_retail_v1`.`analytics`.`alert`(`alert_id`);
-ALTER TABLE `vibe_retail_v1`.`merchandising`.`private_label_program` ADD CONSTRAINT `fk_merchandising_private_label_program_kpi_definition_id` FOREIGN KEY (`kpi_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_definition`(`kpi_definition_id`);
 
--- ========= merchandising --> compliance (5 constraint(s)) =========
+-- ========= merchandising --> compliance (6 constraint(s)) =========
 -- Requires: merchandising schema, compliance schema
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`category` ADD CONSTRAINT `fk_merchandising_category_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`buying_order` ADD CONSTRAINT `fk_merchandising_buying_order_license_permit_id` FOREIGN KEY (`license_permit_id`) REFERENCES `vibe_retail_v1`.`compliance`.`license_permit`(`license_permit_id`);
+ALTER TABLE `vibe_retail_v1`.`merchandising`.`assortment_item` ADD CONSTRAINT `fk_merchandising_assortment_item_certification_id` FOREIGN KEY (`certification_id`) REFERENCES `vibe_retail_v1`.`compliance`.`certification`(`certification_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`vendor_negotiation` ADD CONSTRAINT `fk_merchandising_vendor_negotiation_corrective_action_id` FOREIGN KEY (`corrective_action_id`) REFERENCES `vibe_retail_v1`.`compliance`.`corrective_action`(`corrective_action_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`markdown_event` ADD CONSTRAINT `fk_merchandising_markdown_event_audit_finding_id` FOREIGN KEY (`audit_finding_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_finding`(`audit_finding_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`private_label_program` ADD CONSTRAINT `fk_merchandising_private_label_program_certification_id` FOREIGN KEY (`certification_id`) REFERENCES `vibe_retail_v1`.`compliance`.`certification`(`certification_id`);
@@ -1147,10 +1160,9 @@ ALTER TABLE `vibe_retail_v1`.`merchandising`.`buying_order` ADD CONSTRAINT `fk_m
 -- Requires: merchandising schema, loyalty schema
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`category_accrual_rule` ADD CONSTRAINT `fk_merchandising_category_accrual_rule_accrual_rule_id` FOREIGN KEY (`accrual_rule_id`) REFERENCES `vibe_retail_v1`.`loyalty`.`accrual_rule`(`accrual_rule_id`);
 
--- ========= merchandising --> marketing (5 constraint(s)) =========
+-- ========= merchandising --> marketing (4 constraint(s)) =========
 -- Requires: merchandising schema, marketing schema
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`assortment_plan` ADD CONSTRAINT `fk_merchandising_assortment_plan_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
-ALTER TABLE `vibe_retail_v1`.`merchandising`.`assortment_item` ADD CONSTRAINT `fk_merchandising_assortment_item_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`markdown_event` ADD CONSTRAINT `fk_merchandising_markdown_event_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`private_label_program` ADD CONSTRAINT `fk_merchandising_private_label_program_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`category_campaign_placement` ADD CONSTRAINT `fk_merchandising_category_campaign_placement_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
@@ -1177,12 +1189,11 @@ ALTER TABLE `vibe_retail_v1`.`merchandising`.`private_label_program` ADD CONSTRA
 -- Requires: merchandising schema, promotion schema
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`markdown_event` ADD CONSTRAINT `fk_merchandising_markdown_event_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 
--- ========= merchandising --> store (19 constraint(s)) =========
+-- ========= merchandising --> store (18 constraint(s)) =========
 -- Requires: merchandising schema, store schema
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`merch_plan` ADD CONSTRAINT `fk_merchandising_merch_plan_cluster_id` FOREIGN KEY (`cluster_id`) REFERENCES `vibe_retail_v1`.`store`.`cluster`(`cluster_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`merch_plan` ADD CONSTRAINT `fk_merchandising_merch_plan_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`assortment_plan` ADD CONSTRAINT `fk_merchandising_assortment_plan_cluster_id` FOREIGN KEY (`cluster_id`) REFERENCES `vibe_retail_v1`.`store`.`cluster`(`cluster_id`);
-ALTER TABLE `vibe_retail_v1`.`merchandising`.`assortment_plan` ADD CONSTRAINT `fk_merchandising_assortment_plan_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`assortment_plan` ADD CONSTRAINT `fk_merchandising_assortment_plan_format_id` FOREIGN KEY (`format_id`) REFERENCES `vibe_retail_v1`.`store`.`format`(`format_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`assortment_plan` ADD CONSTRAINT `fk_merchandising_assortment_plan_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`otb_budget` ADD CONSTRAINT `fk_merchandising_otb_budget_cluster_id` FOREIGN KEY (`cluster_id`) REFERENCES `vibe_retail_v1`.`store`.`cluster`(`cluster_id`);
@@ -1229,13 +1240,12 @@ ALTER TABLE `vibe_retail_v1`.`merchandising`.`markdown_event` ADD CONSTRAINT `fk
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`private_label_program` ADD CONSTRAINT `fk_merchandising_private_label_program_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`merchandising`.`category_accrual_rule` ADD CONSTRAINT `fk_merchandising_category_accrual_rule_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= order --> compliance (5 constraint(s)) =========
+-- ========= order --> compliance (4 constraint(s)) =========
 -- Requires: order schema, compliance schema
-ALTER TABLE `vibe_retail_v1`.`order`.`header` ADD CONSTRAINT `fk_order_header_privacy_assessment_id` FOREIGN KEY (`privacy_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`privacy_assessment`(`privacy_assessment_id`);
-ALTER TABLE `vibe_retail_v1`.`order`.`pos_transaction` ADD CONSTRAINT `fk_order_pos_transaction_pci_assessment_id` FOREIGN KEY (`pci_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`pci_assessment`(`pci_assessment_id`);
+ALTER TABLE `vibe_retail_v1`.`order`.`header` ADD CONSTRAINT `fk_order_header_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`order`.`payment` ADD CONSTRAINT `fk_order_payment_pci_assessment_id` FOREIGN KEY (`pci_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`pci_assessment`(`pci_assessment_id`);
-ALTER TABLE `vibe_retail_v1`.`order`.`cancellation` ADD CONSTRAINT `fk_order_cancellation_audit_finding_id` FOREIGN KEY (`audit_finding_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_finding`(`audit_finding_id`);
 ALTER TABLE `vibe_retail_v1`.`order`.`hold` ADD CONSTRAINT `fk_order_hold_audit_finding_id` FOREIGN KEY (`audit_finding_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_finding`(`audit_finding_id`);
+ALTER TABLE `vibe_retail_v1`.`order`.`gift_card` ADD CONSTRAINT `fk_order_gift_card_pci_assessment_id` FOREIGN KEY (`pci_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`pci_assessment`(`pci_assessment_id`);
 
 -- ========= order --> customer (9 constraint(s)) =========
 -- Requires: order schema, customer schema
@@ -1368,7 +1378,7 @@ ALTER TABLE `vibe_retail_v1`.`order`.`hold` ADD CONSTRAINT `fk_order_hold_associ
 ALTER TABLE `vibe_retail_v1`.`order`.`gift_card_transaction` ADD CONSTRAINT `fk_order_gift_card_transaction_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`order`.`subscription` ADD CONSTRAINT `fk_order_subscription_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= pricing --> compliance (17 constraint(s)) =========
+-- ========= pricing --> compliance (14 constraint(s)) =========
 -- Requires: pricing schema, compliance schema
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ADD CONSTRAINT `fk_pricing_sku_price_food_safety_plan_id` FOREIGN KEY (`food_safety_plan_id`) REFERENCES `vibe_retail_v1`.`compliance`.`food_safety_plan`(`food_safety_plan_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ADD CONSTRAINT `fk_pricing_sku_price_license_permit_id` FOREIGN KEY (`license_permit_id`) REFERENCES `vibe_retail_v1`.`compliance`.`license_permit`(`license_permit_id`);
@@ -1377,14 +1387,11 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing_price_change_violation_notice_id` FOREIGN KEY (`violation_notice_id`) REFERENCES `vibe_retail_v1`.`compliance`.`violation_notice`(`violation_notice_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ADD CONSTRAINT `fk_pricing_markdown_audit_finding_id` FOREIGN KEY (`audit_finding_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_finding`(`audit_finding_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ADD CONSTRAINT `fk_pricing_markdown_license_permit_id` FOREIGN KEY (`license_permit_id`) REFERENCES `vibe_retail_v1`.`compliance`.`license_permit`(`license_permit_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ADD CONSTRAINT `fk_pricing_cost_price_food_safety_plan_id` FOREIGN KEY (`food_safety_plan_id`) REFERENCES `vibe_retail_v1`.`compliance`.`food_safety_plan`(`food_safety_plan_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ADD CONSTRAINT `fk_pricing_rule_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ADD CONSTRAINT `fk_pricing_competitive_price_privacy_assessment_id` FOREIGN KEY (`privacy_assessment_id`) REFERENCES `vibe_retail_v1`.`compliance`.`privacy_assessment`(`privacy_assessment_id`);
+ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ADD CONSTRAINT `fk_pricing_rule_risk_register_id` FOREIGN KEY (`risk_register_id`) REFERENCES `vibe_retail_v1`.`compliance`.`risk_register`(`risk_register_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ADD CONSTRAINT `fk_pricing_price_approval_policy_id` FOREIGN KEY (`policy_id`) REFERENCES `vibe_retail_v1`.`compliance`.`policy`(`policy_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ADD CONSTRAINT `fk_pricing_margin_target_risk_register_id` FOREIGN KEY (`risk_register_id`) REFERENCES `vibe_retail_v1`.`compliance`.`risk_register`(`risk_register_id`);
+ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ADD CONSTRAINT `fk_pricing_margin_target_obligation_id` FOREIGN KEY (`obligation_id`) REFERENCES `vibe_retail_v1`.`compliance`.`obligation`(`obligation_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ADD CONSTRAINT `fk_pricing_price_override_audit_finding_id` FOREIGN KEY (`audit_finding_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_finding`(`audit_finding_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ADD CONSTRAINT `fk_pricing_price_override_training_completion_id` FOREIGN KEY (`training_completion_id`) REFERENCES `vibe_retail_v1`.`compliance`.`training_completion`(`training_completion_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ADD CONSTRAINT `fk_pricing_price_override_violation_notice_id` FOREIGN KEY (`violation_notice_id`) REFERENCES `vibe_retail_v1`.`compliance`.`violation_notice`(`violation_notice_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ADD CONSTRAINT `fk_pricing_price_audit_log_audit_event_id` FOREIGN KEY (`audit_event_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_event`(`audit_event_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ADD CONSTRAINT `fk_pricing_price_audit_log_policy_id` FOREIGN KEY (`policy_id`) REFERENCES `vibe_retail_v1`.`compliance`.`policy`(`policy_id`);
 
@@ -1452,7 +1459,7 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ADD CONSTRAINT `fk_prici
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_sensitivity` ADD CONSTRAINT `fk_pricing_price_sensitivity_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ADD CONSTRAINT `fk_pricing_price_audit_log_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 
--- ========= pricing --> promotion (10 constraint(s)) =========
+-- ========= pricing --> promotion (9 constraint(s)) =========
 -- Requires: pricing schema, promotion schema
 ALTER TABLE `vibe_retail_v1`.`pricing`.`sku_price` ADD CONSTRAINT `fk_pricing_sku_price_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing_price_change_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
@@ -1460,19 +1467,16 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ADD CONSTRAINT `fk_pricing_markdown_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ADD CONSTRAINT `fk_pricing_competitive_price_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ADD CONSTRAINT `fk_pricing_price_approval_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ADD CONSTRAINT `fk_pricing_margin_target_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ADD CONSTRAINT `fk_pricing_price_override_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_audit_log` ADD CONSTRAINT `fk_pricing_price_audit_log_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule_application` ADD CONSTRAINT `fk_pricing_rule_application_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
 
--- ========= pricing --> store (10 constraint(s)) =========
+-- ========= pricing --> store (8 constraint(s)) =========
 -- Requires: pricing schema, store schema
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing_price_change_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`markdown` ADD CONSTRAINT `fk_pricing_markdown_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`rule` ADD CONSTRAINT `fk_pricing_rule_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ADD CONSTRAINT `fk_pricing_competitive_price_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_approval` ADD CONSTRAINT `fk_pricing_price_approval_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
-ALTER TABLE `vibe_retail_v1`.`pricing`.`margin_target` ADD CONSTRAINT `fk_pricing_margin_target_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ADD CONSTRAINT `fk_pricing_price_override_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_override` ADD CONSTRAINT `fk_pricing_price_override_pos_terminal_id` FOREIGN KEY (`pos_terminal_id`) REFERENCES `vibe_retail_v1`.`store`.`pos_terminal`(`pos_terminal_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`price_strategy` ADD CONSTRAINT `fk_pricing_price_strategy_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
@@ -1485,9 +1489,8 @@ ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ADD CONSTRAINT `fk_pricing_c
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ADD CONSTRAINT `fk_pricing_cost_price_vendor_id` FOREIGN KEY (`vendor_id`) REFERENCES `vibe_retail_v1`.`supplier`.`vendor`(`vendor_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`competitive_price` ADD CONSTRAINT `fk_pricing_competitive_price_vendor_id` FOREIGN KEY (`vendor_id`) REFERENCES `vibe_retail_v1`.`supplier`.`vendor`(`vendor_id`);
 
--- ========= pricing --> supplychain (2 constraint(s)) =========
+-- ========= pricing --> supplychain (1 constraint(s)) =========
 -- Requires: pricing schema, supplychain schema
-ALTER TABLE `vibe_retail_v1`.`pricing`.`price_change` ADD CONSTRAINT `fk_pricing_price_change_replenishment_plan_id` FOREIGN KEY (`replenishment_plan_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`replenishment_plan`(`replenishment_plan_id`);
 ALTER TABLE `vibe_retail_v1`.`pricing`.`cost_price` ADD CONSTRAINT `fk_pricing_cost_price_purchase_order_id` FOREIGN KEY (`purchase_order_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`purchase_order`(`purchase_order_id`);
 
 -- ========= pricing --> workforce (11 constraint(s)) =========
@@ -1565,24 +1568,24 @@ ALTER TABLE `vibe_retail_v1`.`product`.`item_nutritional` ADD CONSTRAINT `fk_pro
 ALTER TABLE `vibe_retail_v1`.`product`.`item_cross_reference` ADD CONSTRAINT `fk_product_item_cross_reference_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`product`.`category_campaign_plan` ADD CONSTRAINT `fk_product_category_campaign_plan_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= promotion --> analytics (7 constraint(s)) =========
+-- ========= promotion --> analytics (8 constraint(s)) =========
 -- Requires: promotion schema, analytics schema
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ADD CONSTRAINT `fk_promotion_promo_campaign_kpi_definition_id` FOREIGN KEY (`kpi_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_definition`(`kpi_definition_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ADD CONSTRAINT `fk_promotion_promo_campaign_semantic_layer_entity_id` FOREIGN KEY (`semantic_layer_entity_id`) REFERENCES `vibe_retail_v1`.`analytics`.`semantic_layer_entity`(`semantic_layer_entity_id`);
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ADD CONSTRAINT `fk_promotion_promo_offer_kpi_definition_id` FOREIGN KEY (`kpi_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_definition`(`kpi_definition_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ADD CONSTRAINT `fk_promotion_coupon_semantic_layer_entity_id` FOREIGN KEY (`semantic_layer_entity_id`) REFERENCES `vibe_retail_v1`.`analytics`.`semantic_layer_entity`(`semantic_layer_entity_id`);
-ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ADD CONSTRAINT `fk_promotion_circular_ad_report_definition_id` FOREIGN KEY (`report_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`report_definition`(`report_definition_id`);
-ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate_claim` ADD CONSTRAINT `fk_promotion_rebate_claim_dq_rule_id` FOREIGN KEY (`dq_rule_id`) REFERENCES `vibe_retail_v1`.`analytics`.`dq_rule`(`dq_rule_id`);
+ALTER TABLE `vibe_retail_v1`.`promotion`.`vendor_promo_claim` ADD CONSTRAINT `fk_promotion_vendor_promo_claim_dq_rule_id` FOREIGN KEY (`dq_rule_id`) REFERENCES `vibe_retail_v1`.`analytics`.`dq_rule`(`dq_rule_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ADD CONSTRAINT `fk_promotion_promo_performance_kpi_definition_id` FOREIGN KEY (`kpi_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_definition`(`kpi_definition_id`);
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_budget` ADD CONSTRAINT `fk_promotion_promo_budget_report_definition_id` FOREIGN KEY (`report_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`report_definition`(`report_definition_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_forecast` ADD CONSTRAINT `fk_promotion_promo_forecast_kpi_definition_id` FOREIGN KEY (`kpi_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_definition`(`kpi_definition_id`);
 
--- ========= promotion --> compliance (6 constraint(s)) =========
+-- ========= promotion --> compliance (5 constraint(s)) =========
 -- Requires: promotion schema, compliance schema
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ADD CONSTRAINT `fk_promotion_promo_campaign_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_offer` ADD CONSTRAINT `fk_promotion_promo_offer_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon` ADD CONSTRAINT `fk_promotion_coupon_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ADD CONSTRAINT `fk_promotion_circular_ad_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ADD CONSTRAINT `fk_promotion_rebate_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_calendar` ADD CONSTRAINT `fk_promotion_promo_calendar_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
 
 -- ========= promotion --> customer (2 constraint(s)) =========
 -- Requires: promotion schema, customer schema
@@ -1635,7 +1638,7 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_forecast` ADD CONSTRAINT `fk_pro
 ALTER TABLE `vibe_retail_v1`.`promotion`.`coupon_distribution` ADD CONSTRAINT `fk_promotion_coupon_distribution_audience_segment_id` FOREIGN KEY (`audience_segment_id`) REFERENCES `vibe_retail_v1`.`marketing`.`audience_segment`(`audience_segment_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promotion_stack` ADD CONSTRAINT `fk_promotion_promotion_stack_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
 
--- ========= promotion --> merchandising (17 constraint(s)) =========
+-- ========= promotion --> merchandising (16 constraint(s)) =========
 -- Requires: promotion schema, merchandising schema
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ADD CONSTRAINT `fk_promotion_promo_campaign_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_campaign` ADD CONSTRAINT `fk_promotion_promo_campaign_season_id` FOREIGN KEY (`season_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`season`(`season_id`);
@@ -1646,7 +1649,6 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad` ADD CONSTRAINT `fk_promot
 ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ADD CONSTRAINT `fk_promotion_rebate_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ADD CONSTRAINT `fk_promotion_rebate_season_id` FOREIGN KEY (`season_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`season`(`season_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ADD CONSTRAINT `fk_promotion_promo_redemption_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
-ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ADD CONSTRAINT `fk_promotion_promo_performance_assortment_plan_id` FOREIGN KEY (`assortment_plan_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`assortment_plan`(`assortment_plan_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ADD CONSTRAINT `fk_promotion_promo_performance_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_budget` ADD CONSTRAINT `fk_promotion_promo_budget_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_budget` ADD CONSTRAINT `fk_promotion_promo_budget_merch_plan_id` FOREIGN KEY (`merch_plan_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`merch_plan`(`merch_plan_id`);
@@ -1671,6 +1673,10 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`rebate` ADD CONSTRAINT `fk_promotion_r
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ADD CONSTRAINT `fk_promotion_promo_redemption_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_performance` ADD CONSTRAINT `fk_promotion_promo_performance_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_forecast` ADD CONSTRAINT `fk_promotion_promo_forecast_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
+
+-- ========= promotion --> returns (1 constraint(s)) =========
+-- Requires: promotion schema, returns schema
+ALTER TABLE `vibe_retail_v1`.`promotion`.`promo_redemption` ADD CONSTRAINT `fk_promotion_promo_redemption_rma_id` FOREIGN KEY (`rma_id`) REFERENCES `vibe_retail_v1`.`returns`.`rma`(`rma_id`);
 
 -- ========= promotion --> store (5 constraint(s)) =========
 -- Requires: promotion schema, store schema
@@ -1719,11 +1725,11 @@ ALTER TABLE `vibe_retail_v1`.`promotion`.`circular_ad_category_feature` ADD CONS
 
 -- ========= returns --> compliance (7 constraint(s)) =========
 -- Requires: returns schema, compliance schema
+ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ADD CONSTRAINT `fk_returns_disposition_corrective_action_id` FOREIGN KEY (`corrective_action_id`) REFERENCES `vibe_retail_v1`.`compliance`.`corrective_action`(`corrective_action_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`disposition` ADD CONSTRAINT `fk_returns_disposition_environmental_event_id` FOREIGN KEY (`environmental_event_id`) REFERENCES `vibe_retail_v1`.`compliance`.`environmental_event`(`environmental_event_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ADD CONSTRAINT `fk_returns_return_policy_policy_id` FOREIGN KEY (`policy_id`) REFERENCES `vibe_retail_v1`.`compliance`.`policy`(`policy_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ADD CONSTRAINT `fk_returns_return_policy_training_program_id` FOREIGN KEY (`training_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`training_program`(`training_program_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` ADD CONSTRAINT `fk_returns_liquidation_batch_environmental_event_id` FOREIGN KEY (`environmental_event_id`) REFERENCES `vibe_retail_v1`.`compliance`.`environmental_event`(`environmental_event_id`);
-ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_batch` ADD CONSTRAINT `fk_returns_liquidation_batch_regulatory_filing_id` FOREIGN KEY (`regulatory_filing_id`) REFERENCES `vibe_retail_v1`.`compliance`.`regulatory_filing`(`regulatory_filing_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ADD CONSTRAINT `fk_returns_return_fraud_case_audit_finding_id` FOREIGN KEY (`audit_finding_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_finding`(`audit_finding_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_fraud_case` ADD CONSTRAINT `fk_returns_return_fraud_case_violation_notice_id` FOREIGN KEY (`violation_notice_id`) REFERENCES `vibe_retail_v1`.`compliance`.`violation_notice`(`violation_notice_id`);
 
@@ -1778,9 +1784,8 @@ ALTER TABLE `vibe_retail_v1`.`returns`.`restock_event` ADD CONSTRAINT `fk_return
 ALTER TABLE `vibe_retail_v1`.`returns`.`restock_event` ADD CONSTRAINT `fk_returns_restock_event_stock_position_id` FOREIGN KEY (`stock_position_id`) REFERENCES `vibe_retail_v1`.`inventory`.`stock_position`(`stock_position_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`liquidation_item` ADD CONSTRAINT `fk_returns_liquidation_item_lot_id` FOREIGN KEY (`lot_id`) REFERENCES `vibe_retail_v1`.`inventory`.`lot`(`lot_id`);
 
--- ========= returns --> merchandising (2 constraint(s)) =========
+-- ========= returns --> merchandising (1 constraint(s)) =========
 -- Requires: returns schema, merchandising schema
-ALTER TABLE `vibe_retail_v1`.`returns`.`rma_line` ADD CONSTRAINT `fk_returns_rma_line_buying_order_line_id` FOREIGN KEY (`buying_order_line_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`buying_order_line`(`buying_order_line_id`);
 ALTER TABLE `vibe_retail_v1`.`returns`.`return_policy` ADD CONSTRAINT `fk_returns_return_policy_category_id` FOREIGN KEY (`category_id`) REFERENCES `vibe_retail_v1`.`merchandising`.`category`(`category_id`);
 
 -- ========= returns --> order (9 constraint(s)) =========
@@ -1918,13 +1923,11 @@ ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ADD CONSTRAINT `fk_service
 -- Requires: service schema, workforce schema
 ALTER TABLE `vibe_retail_v1`.`service`.`service_case` ADD CONSTRAINT `fk_service_service_case_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= store --> analytics (5 constraint(s)) =========
+-- ========= store --> analytics (3 constraint(s)) =========
 -- Requires: store schema, analytics schema
-ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ADD CONSTRAINT `fk_store_traffic_count_kpi_value_id` FOREIGN KEY (`kpi_value_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_value`(`kpi_value_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ADD CONSTRAINT `fk_store_comparable_sales_kpi_value_id` FOREIGN KEY (`kpi_value_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_value`(`kpi_value_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ADD CONSTRAINT `fk_store_shrinkage_event_dq_issue_id` FOREIGN KEY (`dq_issue_id`) REFERENCES `vibe_retail_v1`.`analytics`.`dq_issue`(`dq_issue_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ADD CONSTRAINT `fk_store_cluster_reporting_hierarchy_id` FOREIGN KEY (`reporting_hierarchy_id`) REFERENCES `vibe_retail_v1`.`analytics`.`reporting_hierarchy`(`reporting_hierarchy_id`);
-ALTER TABLE `vibe_retail_v1`.`store`.`audit` ADD CONSTRAINT `fk_store_audit_dq_result_id` FOREIGN KEY (`dq_result_id`) REFERENCES `vibe_retail_v1`.`analytics`.`dq_result`(`dq_result_id`);
 
 -- ========= store --> compliance (1 constraint(s)) =========
 -- Requires: store schema, compliance schema
@@ -1943,8 +1946,9 @@ ALTER TABLE `vibe_retail_v1`.`store`.`license` ADD CONSTRAINT `fk_store_license_
 ALTER TABLE `vibe_retail_v1`.`store`.`store_profit_loss` ADD CONSTRAINT `fk_store_store_profit_loss_financial_period_id` FOREIGN KEY (`financial_period_id`) REFERENCES `vibe_retail_v1`.`finance`.`financial_period`(`financial_period_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ADD CONSTRAINT `fk_store_direct_store_delivery_ap_invoice_id` FOREIGN KEY (`ap_invoice_id`) REFERENCES `vibe_retail_v1`.`finance`.`ap_invoice`(`ap_invoice_id`);
 
--- ========= store --> fulfillment (1 constraint(s)) =========
+-- ========= store --> fulfillment (2 constraint(s)) =========
 -- Requires: store schema, fulfillment schema
+ALTER TABLE `vibe_retail_v1`.`store`.`location` ADD CONSTRAINT `fk_store_location_fulfillment_node_id` FOREIGN KEY (`fulfillment_node_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`fulfillment_node`(`fulfillment_node_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`carrier_agreement` ADD CONSTRAINT `fk_store_carrier_agreement_carrier_id` FOREIGN KEY (`carrier_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`carrier`(`carrier_id`);
 
 -- ========= store --> inventory (3 constraint(s)) =========
@@ -1965,7 +1969,7 @@ ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ADD CONSTRAINT `fk_store
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ADD CONSTRAINT `fk_store_shrinkage_event_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ADD CONSTRAINT `fk_store_department_marketing_brand_id` FOREIGN KEY (`marketing_brand_id`) REFERENCES `vibe_retail_v1`.`marketing`.`marketing_brand`(`marketing_brand_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`remodel` ADD CONSTRAINT `fk_store_remodel_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
-ALTER TABLE `vibe_retail_v1`.`store`.`ship_from_store_node` ADD CONSTRAINT `fk_store_ship_from_store_node_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
+ALTER TABLE `vibe_retail_v1`.`store`.`audit` ADD CONSTRAINT `fk_store_audit_campaign_id` FOREIGN KEY (`campaign_id`) REFERENCES `vibe_retail_v1`.`marketing`.`campaign`(`campaign_id`);
 
 -- ========= store --> merchandising (4 constraint(s)) =========
 -- Requires: store schema, merchandising schema
@@ -1985,7 +1989,7 @@ ALTER TABLE `vibe_retail_v1`.`store`.`store_planogram` ADD CONSTRAINT `fk_store_
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ADD CONSTRAINT `fk_store_department_item_hierarchy_id` FOREIGN KEY (`item_hierarchy_id`) REFERENCES `vibe_retail_v1`.`product`.`item_hierarchy`(`item_hierarchy_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ADD CONSTRAINT `fk_store_direct_store_delivery_sku_id` FOREIGN KEY (`sku_id`) REFERENCES `vibe_retail_v1`.`product`.`sku`(`sku_id`);
 
--- ========= store --> promotion (12 constraint(s)) =========
+-- ========= store --> promotion (13 constraint(s)) =========
 -- Requires: store schema, promotion schema
 ALTER TABLE `vibe_retail_v1`.`store`.`store_planogram` ADD CONSTRAINT `fk_store_store_planogram_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`fixture` ADD CONSTRAINT `fk_store_fixture_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
@@ -1993,6 +1997,7 @@ ALTER TABLE `vibe_retail_v1`.`store`.`traffic_count` ADD CONSTRAINT `fk_store_tr
 ALTER TABLE `vibe_retail_v1`.`store`.`comparable_sales` ADD CONSTRAINT `fk_store_comparable_sales_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ADD CONSTRAINT `fk_store_shrinkage_event_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`remodel` ADD CONSTRAINT `fk_store_remodel_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
+ALTER TABLE `vibe_retail_v1`.`store`.`cluster` ADD CONSTRAINT `fk_store_cluster_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`audit` ADD CONSTRAINT `fk_store_audit_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`license` ADD CONSTRAINT `fk_store_license_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` ADD CONSTRAINT `fk_store_format_offer_eligibility_promo_offer_id` FOREIGN KEY (`promo_offer_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_offer`(`promo_offer_id`);
@@ -2020,7 +2025,7 @@ ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ADD CONSTRAINT `fk_
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ADD CONSTRAINT `fk_store_direct_store_delivery_inbound_appointment_id` FOREIGN KEY (`inbound_appointment_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`inbound_appointment`(`inbound_appointment_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ADD CONSTRAINT `fk_store_direct_store_delivery_purchase_order_id` FOREIGN KEY (`purchase_order_id`) REFERENCES `vibe_retail_v1`.`supplychain`.`purchase_order`(`purchase_order_id`);
 
--- ========= store --> workforce (7 constraint(s)) =========
+-- ========= store --> workforce (9 constraint(s)) =========
 -- Requires: store schema, workforce schema
 ALTER TABLE `vibe_retail_v1`.`store`.`shrinkage_event` ADD CONSTRAINT `fk_store_shrinkage_event_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`department` ADD CONSTRAINT `fk_store_department_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
@@ -2029,8 +2034,10 @@ ALTER TABLE `vibe_retail_v1`.`store`.`license` ADD CONSTRAINT `fk_store_license_
 ALTER TABLE `vibe_retail_v1`.`store`.`format_offer_eligibility` ADD CONSTRAINT `fk_store_format_offer_eligibility_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`sales_territory` ADD CONSTRAINT `fk_store_sales_territory_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`store`.`direct_store_delivery` ADD CONSTRAINT `fk_store_direct_store_delivery_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
+ALTER TABLE `vibe_retail_v1`.`store`.`region` ADD CONSTRAINT `fk_store_region_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
+ALTER TABLE `vibe_retail_v1`.`store`.`region` ADD CONSTRAINT `fk_store_region_ops_vp_employee_associate_id` FOREIGN KEY (`ops_vp_employee_associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= supplier --> analytics (7 constraint(s)) =========
+-- ========= supplier --> analytics (8 constraint(s)) =========
 -- Requires: supplier schema, analytics schema
 ALTER TABLE `vibe_retail_v1`.`supplier`.`vendor_scorecard` ADD CONSTRAINT `fk_supplier_vendor_scorecard_kpi_definition_id` FOREIGN KEY (`kpi_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_definition`(`kpi_definition_id`);
 ALTER TABLE `vibe_retail_v1`.`supplier`.`vendor_scorecard` ADD CONSTRAINT `fk_supplier_vendor_scorecard_kpi_value_id` FOREIGN KEY (`kpi_value_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_value`(`kpi_value_id`);
@@ -2039,6 +2046,7 @@ ALTER TABLE `vibe_retail_v1`.`supplier`.`lead_time_agreement` ADD CONSTRAINT `fk
 ALTER TABLE `vibe_retail_v1`.`supplier`.`vmi_config` ADD CONSTRAINT `fk_supplier_vmi_config_kpi_definition_id` FOREIGN KEY (`kpi_definition_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_definition`(`kpi_definition_id`);
 ALTER TABLE `vibe_retail_v1`.`supplier`.`vendor_allowance` ADD CONSTRAINT `fk_supplier_vendor_allowance_kpi_value_id` FOREIGN KEY (`kpi_value_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_value`(`kpi_value_id`);
 ALTER TABLE `vibe_retail_v1`.`supplier`.`risk_assessment` ADD CONSTRAINT `fk_supplier_risk_assessment_kpi_value_id` FOREIGN KEY (`kpi_value_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_value`(`kpi_value_id`);
+ALTER TABLE `vibe_retail_v1`.`supplier`.`vendor_dispute` ADD CONSTRAINT `fk_supplier_vendor_dispute_kpi_value_id` FOREIGN KEY (`kpi_value_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_value`(`kpi_value_id`);
 
 -- ========= supplier --> compliance (9 constraint(s)) =========
 -- Requires: supplier schema, compliance schema
@@ -2140,9 +2148,10 @@ ALTER TABLE `vibe_retail_v1`.`supplier`.`risk_assessment` ADD CONSTRAINT `fk_sup
 ALTER TABLE `vibe_retail_v1`.`supplier`.`vendor_dispute` ADD CONSTRAINT `fk_supplier_vendor_dispute_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`supplier`.`routing_guide` ADD CONSTRAINT `fk_supplier_routing_guide_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= supplychain --> compliance (3 constraint(s)) =========
+-- ========= supplychain --> compliance (4 constraint(s)) =========
 -- Requires: supplychain schema, compliance schema
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`sla_performance` ADD CONSTRAINT `fk_supplychain_sla_performance_compliance_program_id` FOREIGN KEY (`compliance_program_id`) REFERENCES `vibe_retail_v1`.`compliance`.`compliance_program`(`compliance_program_id`);
+ALTER TABLE `vibe_retail_v1`.`supplychain`.`receiving_event` ADD CONSTRAINT `fk_supplychain_receiving_event_food_safety_log_id` FOREIGN KEY (`food_safety_log_id`) REFERENCES `vibe_retail_v1`.`compliance`.`food_safety_log`(`food_safety_log_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`quality_hold` ADD CONSTRAINT `fk_supplychain_quality_hold_audit_finding_id` FOREIGN KEY (`audit_finding_id`) REFERENCES `vibe_retail_v1`.`compliance`.`audit_finding`(`audit_finding_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`quality_hold` ADD CONSTRAINT `fk_supplychain_quality_hold_corrective_action_id` FOREIGN KEY (`corrective_action_id`) REFERENCES `vibe_retail_v1`.`compliance`.`corrective_action`(`corrective_action_id`);
 
@@ -2150,7 +2159,7 @@ ALTER TABLE `vibe_retail_v1`.`supplychain`.`quality_hold` ADD CONSTRAINT `fk_sup
 -- Requires: supplychain schema, finance schema
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`demand_forecast` ADD CONSTRAINT `fk_supplychain_demand_forecast_financial_period_id` FOREIGN KEY (`financial_period_id`) REFERENCES `vibe_retail_v1`.`finance`.`financial_period`(`financial_period_id`);
 
--- ========= supplychain --> fulfillment (18 constraint(s)) =========
+-- ========= supplychain --> fulfillment (16 constraint(s)) =========
 -- Requires: supplychain schema, fulfillment schema
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`inbound_appointment` ADD CONSTRAINT `fk_supplychain_inbound_appointment_carrier_id` FOREIGN KEY (`carrier_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`carrier`(`carrier_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`cross_dock_plan` ADD CONSTRAINT `fk_supplychain_cross_dock_plan_carrier_id` FOREIGN KEY (`carrier_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`carrier`(`carrier_id`);
@@ -2160,8 +2169,6 @@ ALTER TABLE `vibe_retail_v1`.`supplychain`.`receiving_event` ADD CONSTRAINT `fk_
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`warehouse_task` ADD CONSTRAINT `fk_supplychain_warehouse_task_shipment_id` FOREIGN KEY (`shipment_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`shipment`(`shipment_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`outbound_order` ADD CONSTRAINT `fk_supplychain_outbound_order_carrier_id` FOREIGN KEY (`carrier_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`carrier`(`carrier_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`outbound_order_line` ADD CONSTRAINT `fk_supplychain_outbound_order_line_carrier_id` FOREIGN KEY (`carrier_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`carrier`(`carrier_id`);
-ALTER TABLE `vibe_retail_v1`.`supplychain`.`outbound_order_line` ADD CONSTRAINT `fk_supplychain_outbound_order_line_pack_task_id` FOREIGN KEY (`pack_task_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`pack_task`(`pack_task_id`);
-ALTER TABLE `vibe_retail_v1`.`supplychain`.`outbound_order_line` ADD CONSTRAINT `fk_supplychain_outbound_order_line_pick_task_id` FOREIGN KEY (`pick_task_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`pick_task`(`pick_task_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`wave` ADD CONSTRAINT `fk_supplychain_wave_carrier_id` FOREIGN KEY (`carrier_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`carrier`(`carrier_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`outbound_shipment` ADD CONSTRAINT `fk_supplychain_outbound_shipment_carrier_id` FOREIGN KEY (`carrier_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`carrier`(`carrier_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`crossdock_transaction` ADD CONSTRAINT `fk_supplychain_crossdock_transaction_carrier_id` FOREIGN KEY (`carrier_id`) REFERENCES `vibe_retail_v1`.`fulfillment`.`carrier`(`carrier_id`);
@@ -2213,12 +2220,13 @@ ALTER TABLE `vibe_retail_v1`.`supplychain`.`cross_dock_plan` ADD CONSTRAINT `fk_
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`outbound_order` ADD CONSTRAINT `fk_supplychain_outbound_order_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`crossdock_transaction` ADD CONSTRAINT `fk_supplychain_crossdock_transaction_promo_campaign_id` FOREIGN KEY (`promo_campaign_id`) REFERENCES `vibe_retail_v1`.`promotion`.`promo_campaign`(`promo_campaign_id`);
 
--- ========= supplychain --> store (7 constraint(s)) =========
+-- ========= supplychain --> store (8 constraint(s)) =========
 -- Requires: supplychain schema, store schema
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`demand_forecast` ADD CONSTRAINT `fk_supplychain_demand_forecast_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`po_line` ADD CONSTRAINT `fk_supplychain_po_line_department_id` FOREIGN KEY (`department_id`) REFERENCES `vibe_retail_v1`.`store`.`department`(`department_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`cross_dock_plan` ADD CONSTRAINT `fk_supplychain_cross_dock_plan_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`dc_facility` ADD CONSTRAINT `fk_supplychain_dc_facility_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
+ALTER TABLE `vibe_retail_v1`.`supplychain`.`warehouse_task` ADD CONSTRAINT `fk_supplychain_warehouse_task_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`outbound_order_line` ADD CONSTRAINT `fk_supplychain_outbound_order_line_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`outbound_order_line` ADD CONSTRAINT `fk_supplychain_outbound_order_line_source_location_id` FOREIGN KEY (`source_location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`crossdock_transaction` ADD CONSTRAINT `fk_supplychain_crossdock_transaction_location_id` FOREIGN KEY (`location_id`) REFERENCES `vibe_retail_v1`.`store`.`location`(`location_id`);
@@ -2259,13 +2267,11 @@ ALTER TABLE `vibe_retail_v1`.`supplychain`.`quality_hold` ADD CONSTRAINT `fk_sup
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`quality_hold` ADD CONSTRAINT `fk_supplychain_quality_hold_primary_quality_associate_id` FOREIGN KEY (`primary_quality_associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 ALTER TABLE `vibe_retail_v1`.`supplychain`.`po_shipment_receipt` ADD CONSTRAINT `fk_supplychain_po_shipment_receipt_associate_id` FOREIGN KEY (`associate_id`) REFERENCES `vibe_retail_v1`.`workforce`.`associate`(`associate_id`);
 
--- ========= workforce --> analytics (9 constraint(s)) =========
+-- ========= workforce --> analytics (7 constraint(s)) =========
 -- Requires: workforce schema, analytics schema
-ALTER TABLE `vibe_retail_v1`.`workforce`.`job_profile` ADD CONSTRAINT `fk_workforce_job_profile_semantic_layer_entity_id` FOREIGN KEY (`semantic_layer_entity_id`) REFERENCES `vibe_retail_v1`.`analytics`.`semantic_layer_entity`(`semantic_layer_entity_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`performance_review` ADD CONSTRAINT `fk_workforce_performance_review_kpi_value_id` FOREIGN KEY (`kpi_value_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_value`(`kpi_value_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`training_enrollment` ADD CONSTRAINT `fk_workforce_training_enrollment_kpi_value_id` FOREIGN KEY (`kpi_value_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_value`(`kpi_value_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`requisition` ADD CONSTRAINT `fk_workforce_requisition_kpi_value_id` FOREIGN KEY (`kpi_value_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_value`(`kpi_value_id`);
-ALTER TABLE `vibe_retail_v1`.`workforce`.`labor_budget` ADD CONSTRAINT `fk_workforce_labor_budget_kpi_value_id` FOREIGN KEY (`kpi_value_id`) REFERENCES `vibe_retail_v1`.`analytics`.`kpi_value`(`kpi_value_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`org_unit` ADD CONSTRAINT `fk_workforce_org_unit_semantic_layer_entity_id` FOREIGN KEY (`semantic_layer_entity_id`) REFERENCES `vibe_retail_v1`.`analytics`.`semantic_layer_entity`(`semantic_layer_entity_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`dashboard_access` ADD CONSTRAINT `fk_workforce_dashboard_access_dashboard_config_id` FOREIGN KEY (`dashboard_config_id`) REFERENCES `vibe_retail_v1`.`analytics`.`dashboard_config`(`dashboard_config_id`);
 ALTER TABLE `vibe_retail_v1`.`workforce`.`workforce_kpi_target` ADD CONSTRAINT `fk_workforce_workforce_kpi_target_analytics_kpi_target_id` FOREIGN KEY (`analytics_kpi_target_id`) REFERENCES `vibe_retail_v1`.`analytics`.`analytics_kpi_target`(`analytics_kpi_target_id`);
