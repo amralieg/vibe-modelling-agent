@@ -249,6 +249,89 @@ def test_verifier_scores_fulfilled_when_products_present():
     assert verdict is not None and verdict["status"] == "fulfilled", verdict
 
 
+# ---------------------------------------------------------------- v4.5.1 automotive phrasings (fail-pre/pass-post)
+# Automotive reviewer directives use two phrasings the shipping-tuned parser (v4.5.0) never matched, so it
+# captured ZERO automotive targets -> the deterministic backstop was inert and ~36 secondary products rode the
+# flaky LLM path. fail-pre (v4.5.0): add_domain requires a colon immediately after ('add_domain:'), and there is
+# no domain-scoped bare-list extractor -> A1/A2/A5 capture nothing. pass-post (v4.5.1): all land.
+A1 = ("REVIEWER-PRIORITY 1 - add_domain field_services: the value chain has NO dedicated Field Services domain. "
+      "Add a field_services domain in the operations division. Create the field_services domain with the "
+      "following products: field_technician_dispatch, mobile_service_order, roadside_assistance_case, "
+      "towing_event, breakdown_case, field_visit, field_activity, field_quality_investigation, "
+      "field_failure_analysis, field_engineering_report, field_service_appointment, field_parts_usage.")
+A2 = ("REVIEWER-PRIORITY 2 - add F&I products to sales: Financing and leasing is a major revenue stream not "
+      "modeled. Add more tables to the sales domain to cover Finance & Insurance (F&I): finance_contract, "
+      "lease_contract, insurance_policy, fni_menu_product, credit_application, residual_value_schedule.")
+A5 = ("REVIEWER-PRIORITY 5 - add ESG and energy products (production + governance): Add more tables to the "
+      "manufacturing domain for ESG and energy tracking: energy_consumption_record, co2_emission_record, "
+      "water_usage_record, line_energy_meter. Add more tables to the compliance domain for ESG reporting: "
+      "esg_report, social_compliance_audit, sustainability_metric.")
+A7 = ("REVIEWER-PRIORITY 7 - connect telemetry to aftersales: In the aftersales domain, the service appointment "
+      "table should reference mobility.connected_vehicle: add column connected_vehicle_id to the aftersales "
+      "service appointment table with FK to mobility.connected_vehicle.")
+
+
+def test_parser_add_domain_name_before_colon():
+    ns = _load_parser_and_finalizer()
+    tg = ns["_vov_named_create_targets"](A1)
+    assert "field_services" in tg["domains"], ("add_domain <name>: not recognized", tg["domains"])
+
+
+def test_parser_new_domain_with_following_products_all_12():
+    ns = _load_parser_and_finalizer()
+    tg = ns["_vov_named_create_targets"](A1)
+    prods = tg["domain_meta"]["field_services"]["products"]
+    for p in ["field_technician_dispatch", "mobile_service_order", "roadside_assistance_case", "towing_event",
+              "breakdown_case", "field_visit", "field_activity", "field_quality_investigation",
+              "field_failure_analysis", "field_engineering_report", "field_service_appointment",
+              "field_parts_usage"]:
+        assert p in prods, (p, prods)
+    assert tg["domain_meta"]["field_services"]["division"] == "operations", tg["domain_meta"]["field_services"]
+
+
+def test_parser_existing_domain_bare_list_routes_to_products():
+    ns = _load_parser_and_finalizer()
+    tg = ns["_vov_named_create_targets"](A2)
+    prods = set(tg["products"])
+    for p in ["finance_contract", "lease_contract", "insurance_policy", "fni_menu_product",
+              "credit_application", "residual_value_schedule"]:
+        assert ("sales", p) in prods, (p, sorted(prods))
+    assert not tg["domains"], ("existing-domain add must NOT declare a new domain", tg["domains"])
+
+
+def test_parser_two_domain_directive_both_captured():
+    ns = _load_parser_and_finalizer()
+    tg = ns["_vov_named_create_targets"](A5)
+    prods = set(tg["products"])
+    for p in ["energy_consumption_record", "co2_emission_record", "water_usage_record", "line_energy_meter"]:
+        assert ("manufacturing", p) in prods, ("manufacturing leg lost", p, sorted(prods))
+    for p in ["esg_report", "social_compliance_audit", "sustainability_metric"]:
+        assert ("compliance", p) in prods, ("compliance/governance leg lost", p, sorted(prods))
+
+
+def test_parser_add_column_directive_creates_nothing():
+    ns = _load_parser_and_finalizer()
+    tg = ns["_vov_named_create_targets"](A7)
+    # an add-column/FK directive is not a product create; the FK target 'mobility.connected_vehicle' must not
+    # be mistaken for a product to create, and no bare-list is captured.
+    assert ("mobility", "connected_vehicle") not in tg["products"], tg["products"]
+    assert tg["products"] == [] and tg["domains"] == [], (tg["products"], tg["domains"])
+
+
+def test_parser_shipping_capture_unchanged_regression():
+    # the v4.5.1 additions are ADDITIVE — shipping's existing capture must be byte-for-byte unchanged.
+    ns = _load_parser_and_finalizer()
+    ship = ns["_vov_named_create_targets"](R4)  # add_domain: sustainability with 'with products' phrasing
+    sp = ns["_vov_named_create_targets"](R1)
+    assert "sustainability" in ship["domains"], ship["domains"]
+    for p in ["cii_rating", "eexi_record", "shore_power_session", "bunker_carbon_intensity"]:
+        assert p in ship["domain_meta"]["sustainability"]["products"], (p, ship["domain_meta"]["sustainability"])
+    # R4 sustainability must NOT leak a phantom (parenthetical strip preserved)
+    assert "emissions" not in ship["domain_meta"]["sustainability"]["products"], ship["domain_meta"]["sustainability"]
+    # R1 dotted add_product still works
+    assert ("cargo", "transhipment") in sp["products"] and ("cargo", "transhipment_leg") in sp["products"], sp["products"]
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(pytest.main([__file__, "-v"]))
