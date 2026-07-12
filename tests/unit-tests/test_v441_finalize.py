@@ -525,6 +525,168 @@ def test_p2_preserves_color_space_standard():
     assert "Adobe RGB" in d, "color-space standard 'Adobe RGB' must survive: %r" % d
 
 
+# =========================================================================================
+# v4.4.6 — PK-self-ref corruption repair (G5/G2) + siloed-table relink (G7).
+# Fail-pre proof: on the committed v4.4.5 notebook these two passes are absent, so the corrupted
+# PK's name stays mangled (dangling inbound FK survives; PK self-references) and the silo keeps
+# zero links. git-stash the working tree -> these two tests FAIL; pop -> they PASS.
+# =========================================================================================
+
+
+def _corrupt_pk_model():
+    # NON-retail names to prove genericity. audit_finding's PK column was renamed into a self-ref FK
+    # (name=related_audit_finding_id, column_name=audit_finding_id, tagged primary_key, self-FK to own
+    # PK), orphaning the logical PK so an inbound FK from another table dangles.
+    return {
+        "model": {
+            "domains": [
+                {"name": "compliance", "products": [
+                    {"name": "audit_finding", "primary_key": "audit_finding_id", "attributes": [
+                        {"name": "related_audit_finding_id", "column_name": "audit_finding_id",
+                         "type": "BIGINT", "is_primary_key": None,
+                         "tags": "primary_key,self_ref_fk=true,renamed_from=audit_finding_id",
+                         "tag_set": [{"key": "primary_key", "value": ""},
+                                     {"key": "self_ref_fk", "value": "true"},
+                                     {"key": "renamed_from", "value": "audit_finding_id"}],
+                         "foreign_key_to": "compliance.audit_finding.audit_finding_id"},
+                        {"name": "parent_audit_finding_id", "column_name": "parent_audit_finding_id",
+                         "type": "BIGINT", "tags": "self_ref_fk",
+                         "foreign_key_to": "compliance.audit_finding.audit_finding_id"},
+                        {"name": "title", "type": "STRING", "description": "Title."},
+                    ]},
+                ]},
+                {"name": "operations", "products": [
+                    # inbound FK to the orphaned PK -> dangles until the PK name is repaired
+                    {"name": "corrective_action", "primary_key": "corrective_action_id", "attributes": [
+                        {"name": "corrective_action_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                        {"name": "audit_finding_id", "type": "BIGINT",
+                         "foreign_key_to": "compliance.audit_finding.audit_finding_id", "tags": "foreign_key"},
+                    ]},
+                ]},
+            ]
+        }
+    }
+
+
+def _has_col(prod, name):
+    return any((a.get("name") or a.get("column_name")) == name for a in prod["attributes"])
+
+
+def test_g5g2_repairs_corrupted_self_ref_pk_column():
+    ns = _harden_ns()
+    dm = _corrupt_pk_model()
+    ns["_v443_structural_hardening"](dm, _Log())
+    af = _find_prod(dm, "compliance", "audit_finding")
+    # the logical PK name is restored (was mangled to related_audit_finding_id)
+    assert _has_col(af, "audit_finding_id"), "declared PK column name must be restored"
+    pk = next(a for a in af["attributes"] if (a.get("name") or a.get("column_name")) == "audit_finding_id")
+    # a PK must not self-reference
+    assert not (pk.get("foreign_key_to") or ""), "repaired PK must not carry a self-FK"
+    # the bogus self_ref_fk / renamed_from tags are stripped; primary_key stays
+    assert "self_ref_fk" not in str(pk.get("tags") or "")
+    assert "renamed_from" not in str(pk.get("tags") or "")
+    assert pk.get("is_primary_key") is True
+    # the mangled name is gone
+    assert not _has_col(af, "related_audit_finding_id"), "mangled PK alias must be removed"
+    # a LEGIT separate self-ref (parent_audit_finding_id) is untouched
+    assert _has_col(af, "parent_audit_finding_id")
+
+
+def test_g5g2_repair_resolves_the_dangling_inbound_fk():
+    """After repair the inbound FK from operations.corrective_action resolves to a real PK column."""
+    ns = _harden_ns()
+    dm = _corrupt_pk_model()
+    ns["_v443_structural_hardening"](dm, _Log())
+    af = _find_prod(dm, "compliance", "audit_finding")
+    pk_names = {(a.get("name") or a.get("column_name")) for a in af["attributes"]}
+    ca = _find_prod(dm, "operations", "corrective_action")
+    fk = next(a for a in ca["attributes"] if a["name"] == "audit_finding_id")["foreign_key_to"]
+    assert fk.split(".")[-1] in pk_names, "inbound FK target column must now exist on the target table"
+
+
+def test_g5g2_leaves_healthy_pk_untouched():
+    """A table whose declared PK name is already present must not be altered."""
+    ns = _harden_ns()
+    dm = {
+        "model": {"domains": [
+            {"name": "sales", "products": [
+                {"name": "order", "primary_key": "order_id", "attributes": [
+                    {"name": "order_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                    {"name": "prior_order_id", "type": "BIGINT",
+                     "foreign_key_to": "sales.order.order_id", "tags": "self_ref_fk"},
+                ]},
+            ]},
+        ]}
+    }
+    ns["_v443_structural_hardening"](dm, _Log())
+    order = _find_prod(dm, "sales", "order")
+    # the legitimate self-ref FK (not a PK) survives; the PK is untouched
+    prior = next(a for a in order["attributes"] if a["name"] == "prior_order_id")
+    assert prior["foreign_key_to"] == "sales.order.order_id"
+
+
+def test_g7_relinks_siloed_table_to_best_same_domain_parent():
+    ns = _harden_ns()
+    # payment_instrument is a total silo (0 in / 0 out); payment_method (same domain, shared token
+    # 'payment', fewer attrs) is the best parent. Generic token-overlap, no 'payment' hardcode.
+    dm = {
+        "model": {"domains": [
+            {"name": "finance", "products": [
+                {"name": "payment_method", "primary_key": "payment_method_id", "attributes": [
+                    {"name": "payment_method_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                    {"name": "method_name", "type": "STRING"},
+                    {"name": "is_active", "type": "BOOLEAN"},
+                ]},
+                {"name": "payment_run", "primary_key": "payment_run_id", "attributes": [
+                    {"name": "payment_run_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                    {"name": "run_date", "type": "DATE"},
+                    {"name": "run_status", "type": "STRING"},
+                    {"name": "total_amount", "type": "DECIMAL(18,2)"},
+                    {"name": "approved_by", "type": "STRING"},
+                ]},
+                {"name": "payment_instrument", "primary_key": "payment_instrument_id", "attributes": [
+                    {"name": "payment_instrument_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                    {"name": "token", "type": "STRING"},
+                ]},
+                # a hub that already links to payment_method so payment_method is NOT itself a silo
+                {"name": "settlement", "primary_key": "settlement_id", "attributes": [
+                    {"name": "settlement_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                    {"name": "payment_method_id", "type": "BIGINT",
+                     "foreign_key_to": "finance.payment_method.payment_method_id", "tags": "foreign_key"},
+                ]},
+            ]},
+        ]}
+    }
+    ns["_v443_structural_hardening"](dm, _Log())
+    pi = _find_prod(dm, "finance", "payment_instrument")
+    fks = [a.get("foreign_key_to") for a in pi["attributes"] if a.get("foreign_key_to")]
+    assert fks, "silo must be relinked with at least one FK"
+    # tie-break: max token overlap, fewest attributes -> payment_method (3 attrs) over payment_run (5)
+    assert fks[0] == "finance.payment_method.payment_method_id", "silo must link to best-match parent: %r" % fks
+
+
+def test_g7_leaves_isolated_table_untouched_when_no_token_match():
+    """A silo with NO same-domain token match must be left as-is (no invented FK)."""
+    ns = _harden_ns()
+    dm = {
+        "model": {"domains": [
+            {"name": "reference", "products": [
+                {"name": "currency", "primary_key": "currency_id", "attributes": [
+                    {"name": "currency_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                    {"name": "iso_code", "type": "STRING"},
+                ]},
+                {"name": "calendar_day", "primary_key": "calendar_day_id", "attributes": [
+                    {"name": "calendar_day_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                    {"name": "day_date", "type": "DATE"},
+                ]},
+            ]},
+        ]}
+    }
+    ns["_v443_structural_hardening"](dm, _Log())
+    cur = _find_prod(dm, "reference", "currency")
+    assert not any(a.get("foreign_key_to") for a in cur["attributes"]), "no invented FK when no token match"
+
+
 # ============================================================ P3 (v4.4.5): enum free-STRING
 def test_p3_clears_brand_enum_on_reviewer_named_free_string_column():
     """The reviewer names card_brand / wallet_provider as free STRING; the pass clears their brand-list
