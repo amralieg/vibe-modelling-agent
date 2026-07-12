@@ -470,3 +470,82 @@ def test_g11_canonicalizes_invalid_type_to_databricks_type():
     ca = next(a for a in cons["attributes"] if a["name"] == "captured_at")["type"].upper()
     assert at == "STRING", "TEXT must canonicalize to STRING (got %s)" % at
     assert ca == "TIMESTAMP", "DATETIME must canonicalize to TIMESTAMP (got %s)" % ca
+
+
+# ============================================================ P2-extend (v4.4.5): generic vendor lexicon
+_P3_REVIEWER = (
+    "The customer domain is a ROOT master-data domain.\n\n"
+    "REVIEWER-PRIORITY 3 - enum_type_categories_only: Store customer.payment_method.card_brand and "
+    "customer.payment_method.wallet_provider as free STRING (not a fixed visa|mastercard|amex enum) "
+    "so new brands need no schema change.\n"
+)
+
+
+def test_p2_strips_unnamed_vendor_tool_via_lexicon():
+    """v4.4.5: an implementation tool the reviewer did NOT explicitly pair (Blue Yonder) must still be
+    stripped by the generic cross-industry vendor lexicon. Fail-pre (v4.4.4): only reviewer-paired
+    names are stripped, so 'Blue Yonder' survives."""
+    ns = _finalize_ns()
+    dm = _base_model()
+    _prod(_cust(dm), "profile")["attributes"].append(
+        {"name": "reorder_point_qty", "type": "INT",
+         "description": "Calculated by Blue Yonder Demand Planning from historical sales velocity."})
+    ns["_v441_reviewer_finalization"](dm, REVIEWER_TEXT, _Log())
+    d = next(a for a in _prod(_cust(dm), "profile")["attributes"]
+             if a["name"] == "reorder_point_qty")["description"].lower()
+    assert "blue yonder" not in d, "un-named vendor 'Blue Yonder' must be stripped: %r" % d
+    assert "the source system" in d
+
+
+def test_p2_anchor_does_not_mangle_common_word_with_acronym_substring():
+    """The ORMS acronym must not match inside 'performs' (non-letter left-anchor). Guards the v4.4.5
+    anchored pattern against the substring over-strip regression."""
+    ns = _finalize_ns()
+    dm = _base_model()
+    _prod(_cust(dm), "profile")["attributes"].append(
+        {"name": "role_at_location", "type": "STRING",
+         "description": "Specific role the associate performs at this node."})
+    ns["_v441_reviewer_finalization"](dm, REVIEWER_TEXT, _Log())
+    d = next(a for a in _prod(_cust(dm), "profile")["attributes"]
+             if a["name"] == "role_at_location")["description"]
+    assert "performs at this node" in d, "common word 'performs' must survive (ORMS substring): %r" % d
+
+
+def test_p2_preserves_color_space_standard():
+    """'Adobe RGB' is a color-space STANDARD, not a vendor tool — must survive. Bare 'adobe' is not a
+    lexicon root and the color-std shield double-protects."""
+    ns = _finalize_ns()
+    dm = _base_model()
+    _prod(_cust(dm), "profile")["attributes"].append(
+        {"name": "color_profile", "type": "STRING",
+         "description": "Master image color captured in the Adobe RGB color space."})
+    ns["_v441_reviewer_finalization"](dm, REVIEWER_TEXT, _Log())
+    d = next(a for a in _prod(_cust(dm), "profile")["attributes"]
+             if a["name"] == "color_profile")["description"]
+    assert "Adobe RGB" in d, "color-space standard 'Adobe RGB' must survive: %r" % d
+
+
+# ============================================================ P3 (v4.4.5): enum free-STRING
+def test_p3_clears_brand_enum_on_reviewer_named_free_string_column():
+    """The reviewer names card_brand / wallet_provider as free STRING; the pass clears their brand-list
+    value_regex/enum wherever the column lands (matched by leaf column name, not FQN). Fail-pre
+    (v4.4.4): no P3 block -> the brand regex/enum survives."""
+    ns = _finalize_ns()
+    dm = _base_model()
+    _cust(dm)["products"].append({
+        "name": "digital_payment",  # DIFFERENT product name than the reviewer FQN (payment_method)
+        "attributes": [
+            {"name": "dp_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+            {"name": "wallet_provider", "type": "STRING", "value_regex": "apple_pay|google_pay|samsung_pay"},
+            {"name": "card_brand", "type": "STRING", "enum": ["visa", "mastercard", "amex"]},
+            {"name": "auth_status", "type": "STRING", "value_regex": "approved|declined"},
+        ],
+    })
+    ns["_v441_reviewer_finalization"](dm, _P3_REVIEWER, _Log())
+    dp = _prod(_cust(dm), "digital_payment")
+    wp = next(a for a in dp["attributes"] if a["name"] == "wallet_provider")
+    cb = next(a for a in dp["attributes"] if a["name"] == "card_brand")
+    au = next(a for a in dp["attributes"] if a["name"] == "auth_status")
+    assert not wp.get("value_regex"), "wallet_provider brand regex must be cleared: %r" % wp
+    assert "enum" not in cb, "card_brand enum must be cleared"
+    assert au.get("value_regex") == "approved|declined", "unrelated enum column must be untouched"
