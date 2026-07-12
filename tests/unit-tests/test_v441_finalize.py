@@ -445,3 +445,28 @@ def test_g12_preserves_existing_descriptions():
     ns["_v443_structural_hardening"](dm, _Log())
     after = next(a for a in prof["attributes"] if a["name"] == "party_profile_id")["description"]
     assert after == before == "PK.", "existing descriptions must be preserved verbatim"
+
+
+def test_g11_canonicalizes_invalid_type_to_databricks_type():
+    """v4.4.4 — a non-Databricks type (TEXT) the LLM/self-fixer introduces must be canonicalized
+    to a valid Databricks SQL type at the serialization boundary (fail-pre: TEXT survives)."""
+    ns = _harden_ns()
+    dm = {
+        "model": {
+            "domains": [
+                {"name": "compliance", "products": [
+                    {"name": "consent", "attributes": [
+                        {"name": "consent_id", "type": "BIGINT", "is_primary_key": True, "tags": "primary_key"},
+                        {"name": "audit_trail", "type": "TEXT"},
+                        {"name": "captured_at", "type": "DATETIME"},
+                    ]},
+                ]},
+            ]
+        }
+    }
+    ns["_v443_structural_hardening"](dm, _Log())
+    cons = _find_prod(dm, "compliance", "consent")
+    at = next(a for a in cons["attributes"] if a["name"] == "audit_trail")["type"].upper()
+    ca = next(a for a in cons["attributes"] if a["name"] == "captured_at")["type"].upper()
+    assert at == "STRING", "TEXT must canonicalize to STRING (got %s)" % at
+    assert ca == "TIMESTAMP", "DATETIME must canonicalize to TIMESTAMP (got %s)" % ca
