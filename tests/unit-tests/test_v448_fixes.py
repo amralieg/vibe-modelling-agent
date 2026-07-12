@@ -116,6 +116,22 @@ def _verifier(nb):
                 and (len(lines[i]) - len(lines[i].lstrip())) == indent), len(lines))
     body = "\n".join(l[indent:] if len(l) >= indent else l for l in lines[start:end])
     ns = {"re": re}
+    # GAP-5 v4.4.9: the verifier now delegates create-target parsing to the shared
+    # _vov_named_create_targets helper (CLAUDE.md 3d DRY) — inject it into the slice namespace.
+    pidx = next((i for i, c in enumerate(nb["cells"])
+                 if c.get("cell_type") == "code"
+                 and "def _vov_named_create_targets" in _cell_src(nb, i)), None)
+    if pidx is not None:
+        plines = _cell_src(nb, pidx).split("\n")
+        pstart = next((i for i, l in enumerate(plines)
+                       if l.strip().startswith("def _vov_named_create_targets")), None)
+        if pstart is not None:
+            pindent = len(plines[pstart]) - len(plines[pstart].lstrip())
+            pend = next((i for i in range(pstart + 1, len(plines))
+                         if plines[i].strip().startswith(("def ", "class "))
+                         and (len(plines[i]) - len(plines[i].lstrip())) == pindent), len(plines))
+            pbody = "\n".join(l[pindent:] if len(l) >= pindent else l for l in plines[pstart:pend])
+            exec(pbody, ns)
     exec(body, ns)
     return ns["_verify_product_create_coverage"]
 
