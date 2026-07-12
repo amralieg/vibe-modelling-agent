@@ -36,8 +36,15 @@ def _fn_working_tree():
         return _extract_v441(f.read())
 
 
-def _fn_head():
-    txt = subprocess.check_output(["git", "show", "HEAD:agent/dbx_vibe_modelling_agent.ipynb"], cwd=REPO).decode()
+# Pre-patch reference is pinned to the v4.4.6 commit (766c3f6) that shipped the retail P8/P10
+# regression, NOT to a moving HEAD: once v4.4.7 is committed HEAD becomes the PATCHED function and
+# the fail-pre check would compare the fix against itself (tautology). 766c3f6 is the durable anchor.
+_V446_SHA = "766c3f6"
+
+
+def _fn_prepatch():
+    txt = subprocess.check_output(
+        ["git", "show", f"{_V446_SHA}:agent/dbx_vibe_modelling_agent.ipynb"], cwd=REPO).decode()
     return _extract_v441(txt)
 
 
@@ -131,11 +138,11 @@ def test_p1_rehome_rename_aware_retype_post():
     assert r["p1_contact"] and r["p1_pref"] and r["p1_usage"], "v4.4.7 must retype renamed/rehomed reviewer columns to STRING/INT"
 
 
-# ---------------- fail-pre (HEAD = v4.4.6 has no P1/P8/P10 blocks) ----------------
+# ---------------- fail-pre (v4.4.6 @ 766c3f6 has no P1/P8/P10 blocks) ----------------
 
-def test_regression_absent_on_head():
-    r = _measure(_fn_head())
+def test_regression_absent_on_prepatch():
+    r = _measure(_fn_prepatch())
     # the v4.4.6 function lacks all three enforcement blocks: none of the reviewer-named artifacts land
-    assert not r["p8_vault"], "PRE-PATCH SANITY: HEAD must NOT rename to payment_instrument (else test is tautological)"
-    assert not (r["p10_profile"] and r["p10_account"]), "PRE-PATCH SANITY: HEAD must NOT add named SCD cols"
-    assert not (r["p1_contact"] and r["p1_pref"]), "PRE-PATCH SANITY: HEAD must NOT retype the DECIMAL free-text cols"
+    assert not r["p8_vault"], "PRE-PATCH SANITY: v4.4.6 must NOT rename to payment_instrument (else test is tautological)"
+    assert not (r["p10_profile"] and r["p10_account"]), "PRE-PATCH SANITY: v4.4.6 must NOT add named SCD cols"
+    assert not (r["p1_contact"] and r["p1_pref"]), "PRE-PATCH SANITY: v4.4.6 must NOT retype the DECIMAL free-text cols"
