@@ -109,6 +109,25 @@ def test_parser_extracts_add_domain_with_products():
         assert p in meta["products"], (p, meta["products"])
 
 
+# real shipping R4 carries parenthetical prose ('... kWh and emissions avoided') that leaked a phantom
+# 'emissions' product when the 'with products' list was split on 'and'. The parenthetical-strip fix
+# (alias=vov-named-create-targets) removes '(...)' before splitting. fail-pre: 'emissions' present.
+R4_PARENS = ("REVIEWER-PRIORITY 4 - add_domain: sustainability - create a new FIRST-CLASS domain "
+             "sustainability in the operations division, with products cii_rating (IMO CII A-E rating), "
+             "eexi_record (Energy Efficiency Existing Ship Index), shore_power_session (cold-ironing / OPS "
+             "session with kWh and emissions avoided), and bunker_carbon_intensity (well-to-wake). "
+             "Classify sustainability as division=operations.")
+
+
+def test_parser_strips_parenthetical_prose_no_phantom_product():
+    ns = _load_parser_and_finalizer()
+    tg = ns["_vov_named_create_targets"](R4_PARENS)
+    prods = tg["domain_meta"]["sustainability"]["products"]
+    assert "emissions" not in prods, ("phantom 'emissions' leaked from parenthetical prose", prods)
+    for p in ["cii_rating", "eexi_record", "shore_power_session", "bunker_carbon_intensity"]:
+        assert p in prods, (p, prods)
+
+
 # ---------------------------------------------------------------- finalizer P0-create (behavioral)
 def _base_model():
     # cargo exists (so a domain-present verifier would false-fulfill), but transhipment is absent;
