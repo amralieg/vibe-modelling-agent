@@ -187,6 +187,41 @@ def test_finalizer_idempotent_no_dup():
     assert n1 == n2, ("re-running finalization must not duplicate", n1, n2)
 
 
+# v4.5.0: the LAST directive's secondary products were lost when a trailing agent-auto block (containing
+# 'add column'/SA findings) bled into it and tripped the per-segment add-column veto (shipping live:
+# R9 damage_liability dropped, 12/25 -> 48%). Per-line segmentation scopes each directive so ALL
+# secondaries land. fail-pre: whole-text / loose-boundary parse drops the last directive's 2nd product.
+FULL_WITH_TRAILING_AUTOBLOCK = "\n".join([
+    "REVIEWER-PRIORITY 1 - add_product: cargo.transhipment - model transhipment as a first-class concept. "
+    "Add product cargo.transhipment plus cargo.transhipment_leg.",
+    "REVIEWER-PRIORITY 9 - add_product: cargo.container_condition_report - complete the damage workflow. "
+    "Add products cargo.container_condition_report and cargo.damage_liability. FK cargo.damage_liability "
+    "to the existing cargo.damage_claim; do NOT duplicate the claim table.",
+    "================================================================================",
+    "AGENT AUTO-GENERATED PRIORITIES (retain and also apply).",
+    "  - [SA:denormalized_natural_key] Product 'x.y' has both FK 'y_id' and add column natural key 'y_code'.",
+    "  - [SA:unlinked_fk] Column a.b.c_id looks like an FK but has no foreign_key_to reference.",
+])
+
+
+def test_finalizer_per_line_segmentation_captures_last_directive_secondary():
+    ns = _load_parser_and_finalizer()
+    m = _base_model()
+    # ensure damage_claim exists so damage_liability is a genuine NEW product (not a dup)
+    cargo = next(d for d in m["model"]["domains"] if d["name"] == "cargo")
+    cargo.setdefault("products", []).append(
+        {"name": "damage_claim", "primary_key": "damage_claim_id",
+         "attributes": [{"name": "damage_claim_id", "type": "BIGINT", "is_primary_key": True}]})
+    ns["_v441_reviewer_finalization"](m, FULL_WITH_TRAILING_AUTOBLOCK, logger=None)
+    names = {p for (_d, p) in _all_products(m)}
+    # the R9 SECONDARY product must be materialized despite the trailing add-column autoblock
+    assert "damage_liability" in names, ("R9 secondary lost to trailing-block veto bleed", sorted(names))
+    assert "transhipment_leg" in names, ("R1 secondary lost", sorted(names))
+    # trailing SA/autoblock lines must NOT create spurious products
+    for spurious in ["y", "b", "natural"]:
+        assert spurious not in names, ("trailing autoblock leaked a phantom product", spurious, sorted(names))
+
+
 # ---------------------------------------------------------------- verifier honesty (fail-pre/pass-post)
 def test_verifier_scope_domain_named_product_scores_failed_when_missing():
     ns = _load_pcc()
