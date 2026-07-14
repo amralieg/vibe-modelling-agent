@@ -26,6 +26,13 @@
 - **Iterate in natural language:** every "vibe" produces a new versioned model, validated against enforceable rules, reviewed by two architect personas, repaired by a closed agentic loop, and redeployed to Unity Catalog. No version is ever overwritten.
 - **One logical model, many physical layouts:** render the same model as one catalog, a catalog per division, or a catalog per domain. No rebuild required.
 
+### Learn more
+
+This is the Vibe Modeling Agent (see [`agent/dbx_vibe_modelling_agent.ipynb`](agent/dbx_vibe_modelling_agent.ipynb)): the same agent that generated every one of the published [40 Lakehouse Industry Data Models](https://github.com/amralieg/lakehouse-business-data-models). Background reading:
+
+- [Reimagining Data Modeling on the Lakehouse: Introducing Vibe Data Modeling](https://www.databricks.com/blog/reimagining-data-modeling-lakehouse-introducing-vibe-data-modeling)
+- [Jumpstart your Data Modeling with Databricks Industry Data Models](https://www.databricks.com/blog/jumpstart-your-data-modeling-databricks-industry-data-models)
+
 ---
 
 ## How to run it
