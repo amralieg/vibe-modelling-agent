@@ -1,25 +1,72 @@
 -- Schema for Domain: procurement | Business: Automotive | Version: v2_mvm
--- Generated on: 2026-07-13 17:05:58
+-- Generated on: 2026-07-14 04:30:41
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_automotive_v1`.`procurement` COMMENT 'Strategic sourcing and procurement operations for direct materials (production parts) and indirect materials (MRO, tooling, services). Manages supplier contracts, SOR (Statement of Requirements), purchase requisitions, purchase orders, goods receipt, invoice verification, and spend analytics. Includes global sourcing strategies, supplier development programs, and CapEx procurement workflows. Integrates with SAP MM and Ariba for procure-to-pay processes.';
 
 -- ========= TABLES =========
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`supplier` (
-    `supplier_id` BIGINT COMMENT 'Primary key for local procurement_supplier reference',
-    `ssot_governance_note` STRING COMMENT '',
-    CONSTRAINT pk_supplier PRIMARY KEY(`supplier_id`)
-) COMMENT 'Reference to SSOT owner supply.supply_supplier. Master record for all suppliers and vendors providing direct materials (production parts, raw materials) and indirect materials (MRO, tooling, services) to Automotive. Captures supplier identity, classification (tier-1, tier-2, tier-3), business registration details, DUNS number, tax identifiers, payment terms, currency, incoterms, preferred language, supplier status (active, blocked, under-development), IATF 16949 certification status, ISO 9001/14001 certification flags, geographic footprint, commodity specialization, and strategic sourcing category. SSOT for supplier identity within the procurement domain; integrates with SAP MM vendor master.';
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` (
+    `procurement_supplier_id` BIGINT COMMENT 'System-generated unique identifier for the supplier master record.',
+    `parent_supplier_procurement_supplier_id` BIGINT COMMENT 'Identifier of the parent organization in a corporate supplier hierarchy.',
+    `address_line1` STRING COMMENT 'First line of the suppliers primary business address.',
+    `bank_account_number` STRING COMMENT 'Suppliers bank account number for payments.',
+    `bank_name` STRING COMMENT 'Name of the financial institution holding the suppliers account.',
+    `certification_status` STRING COMMENT 'Current overall status of the suppliers certifications.. Valid values are `active|expired|pending`',
+    `city` STRING COMMENT 'City component of the suppliers primary address.',
+    `commodity_specialization` STRING COMMENT 'Specific commodity or material the supplier specializes in providing.',
+    `country_code` STRING COMMENT 'Three‑letter ISO country code of the suppliers primary location.',
+    `created_timestamp` TIMESTAMP COMMENT 'Date and time when the supplier record was first created.',
+    `credit_limit` DECIMAL(18,2) COMMENT 'Maximum credit amount approved for the supplier.',
+    `currency_code` STRING COMMENT 'Default currency used for transactions with the supplier.',
+    `deactivation_date` DATE COMMENT 'Date when the supplier record was marked inactive or blocked.',
+    `duns_number` STRING COMMENT 'Dun & Bradstreet unique identifier for the supplier organization.',
+    `iatf16949_cert_expiry` DATE COMMENT 'Expiration date of the suppliers IATF 16949 certification.',
+    `iatf16949_certified` BOOLEAN COMMENT 'Indicates whether the supplier holds a valid IATF 16949 certification.',
+    `incoterms` STRING COMMENT 'International commercial terms defining delivery responsibilities.. Valid values are `EXW|FOB|CIF|DAP|DDP`',
+    `iso14001_cert_expiry` DATE COMMENT 'Expiration date of the ISO 14001 certification.',
+    `iso14001_certified` BOOLEAN COMMENT 'Indicates whether the supplier holds an ISO 14001 environmental certification.',
+    `iso9001_cert_expiry` DATE COMMENT 'Expiration date of the ISO 9001 certification.',
+    `iso9001_certified` BOOLEAN COMMENT 'Indicates whether the supplier is ISO 9001 certified.',
+    `last_updated_timestamp` TIMESTAMP COMMENT 'Date and time of the most recent update to the supplier record.',
+    `lead_time_days` STRING COMMENT 'Typical number of days from order placement to delivery.',
+    `legal_name` STRING COMMENT 'Full legal registered name of the supplier entity.',
+    `max_order_quantity` BIGINT COMMENT 'Largest quantity the supplier can deliver in a single order.',
+    `min_order_quantity` BIGINT COMMENT 'Smallest quantity the supplier accepts per purchase order.',
+    `procurement_supplier_name` STRING COMMENT 'Primary display name of the supplier used in procurement processes.',
+    `onboarding_date` DATE COMMENT 'Date when the supplier was first approved for procurement.',
+    `payment_terms` STRING COMMENT 'Standard payment condition agreed with the supplier.. Valid values are `net30|net45|net60|cash|prepaid`',
+    `postal_code` STRING COMMENT 'Postal or ZIP code of the suppliers primary address.',
+    `preferred_language` STRING COMMENT 'Language used for communications with the supplier.',
+    `primary_contact_email` STRING COMMENT 'Email address of the primary procurement contact.. Valid values are `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$`',
+    `primary_contact_name` STRING COMMENT 'Name of the main contact person for procurement communications.',
+    `primary_contact_phone` STRING COMMENT 'Telephone number of the primary procurement contact.',
+    `procurement_supplier_status` STRING COMMENT 'Current operational status of the supplier record.. Valid values are `active|inactive|blocked|under_development`',
+    `rating_score` DECIMAL(18,2) COMMENT 'Overall performance rating assigned by the procurement team.',
+    `risk_score` DECIMAL(18,2) COMMENT 'Risk assessment score based on financial, compliance, and operational factors.',
+    `state_province` STRING COMMENT 'State or province of the suppliers primary address.',
+    `supplier_category` STRING COMMENT 'Broad business category describing the goods or services supplied.. Valid values are `raw_materials|components|services|logistics|technology`',
+    `supplier_type` STRING COMMENT 'Classification of the supplier based on its position in the supply chain.. Valid values are `tier-1|tier-2|tier-3|internal|service`',
+    `sustainability_score` DECIMAL(18,2) COMMENT 'Score reflecting the suppliers environmental and social sustainability performance.',
+    `swift_code` STRING COMMENT 'International bank identifier for cross‑border payments.',
+    `tax_identification_number` STRING COMMENT 'Government‑issued tax identifier for the supplier.',
+    `vat_number` STRING COMMENT 'Value‑Added Tax registration number for the supplier.',
+    `website_url` STRING COMMENT 'Public website address of the supplier.',
+    CONSTRAINT pk_procurement_supplier PRIMARY KEY(`procurement_supplier_id`)
+) COMMENT 'Master record for all suppliers and vendors providing direct materials (production parts, raw materials) and indirect materials (MRO, tooling, services) to Automotive. Captures supplier identity, classification (tier-1, tier-2, tier-3), business registration details, DUNS number, tax identifiers, payment terms, currency, incoterms, preferred language, supplier status (active, blocked, under-development), IATF 16949 certification status, ISO 9001/14001 certification flags, geographic footprint, commodity specialization, and strategic sourcing category. SSOT for supplier identity within the procurement domain; integrates with SAP MM vendor master.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` (
     `purchase_requisition_id` BIGINT COMMENT 'Unique identifier for the purchase requisition.',
-    `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Requisition cost allocation to cost center is required for pre‑PO budgeting and approval.',
-    `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Requisition GL account enables automatic posting of approved requisitions to the ledger.',
+    `inbound_part_id` BIGINT COMMENT 'Foreign key linking to supply.inbound_part. Business justification: Purchase requisitions in automotive are raised for specific inbound parts to replenish production supply. Linking requisition to inbound_part enables part-level demand-driven procurement tracking, lea',
+    `mrp_requirement_id` BIGINT COMMENT 'Foreign key linking to inventory.mrp_requirement. Business justification: In automotive MRP-driven procurement, purchase requisitions are automatically generated from MRP requirement records. This FK enables end-to-end demand-to-procurement traceability — a mandatory audit ',
+    `organization_account_id` BIGINT COMMENT 'Foreign key linking to customer.organization_account. Business justification: Corporate fleet customers trigger internal purchase requisitions via OEM procurement portals. Linking PR to organization_account enables volume commitment tracking, preferred-OEM-program eligibility r',
+    `parts_inventory_id` BIGINT COMMENT 'Foreign key linking to dealer.parts_inventory. Business justification: Demand-driven dealer parts replenishment: when a dealer parts_inventory record hits reorder point, the resulting purchase requisition must trace back to the specific inventory record that triggered it',
     `plant_id` BIGINT COMMENT 'Foreign key linking to manufacturing.plant. Business justification: Required for Plant Requisition Allocation Report linking each requisition to its manufacturing plant.',
-    `purchase_order_id` BIGINT COMMENT 'Foreign key linking to procurement.procurement_purchase_order. Business justification: A purchase requisition is converted to a purchase order in the procure-to-pay workflow (is_converted_to_po: BOOLEAN flag already exists on purchase_requisition). purchase_requisition currently stores ',
+    `procurement_purchase_order_id` BIGINT COMMENT 'Foreign key linking to procurement.procurement_purchase_order. Business justification: In SAP MM, a purchase requisition is converted into a purchase order (is_converted_to_po flag already exists on the PR). The purchase_requisition table currently stores purchase_order_number as a deno',
+    `production_schedule_id` BIGINT COMMENT 'Foreign key linking to manufacturing.production_schedule. Business justification: In automotive MRP (SAP PP→MM), production schedules drive MRP runs that generate purchase requisitions. Linking requisition back to originating production schedule enables S&OP reporting, schedule-dri',
     `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: REQUIRED: Requisition planning and allocation reports need the SKU master to forecast demand and allocate inventory.',
-    `supplier_id` BIGINT COMMENT 'Identifier of the selected vendor for the requisition (if known).',
-    `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: Program‑specific purchase requisition; finance and engineering track spend per vehicle program.',
+    `supplier_contract_id` BIGINT COMMENT 'Foreign key linking to procurement.supplier_contract. Business justification: In SAP MM sourcing, a purchase requisition can be assigned a source of supply which may be a supplier contract (outline agreement). The purchase_requisition table has a source_of_supply STRING field t',
+    `supply_supplier_id` BIGINT COMMENT 'Foreign key linking to supply.supply_supplier. Business justification: Equipment Requisition initiates creation of a new equipment asset; linking requisition to equipment registry enables traceability from request to asset.',
+    `vehicle_order_id` BIGINT COMMENT 'Foreign key linking to sales.vehicle_order. Business justification: In automotive build-to-order, a confirmed vehicle order triggers purchase requisitions for specific components via order-driven MRP. Direct PR-to-vehicle-order traceability is required for delivery da',
     `account_assignment_category` STRING COMMENT 'Category indicating how the cost will be allocated (e.g., cost center, project).. Valid values are `cost_center|project|asset|order`',
     `approval_status` STRING COMMENT 'Current approval state of the requisition.. Valid values are `pending|approved|rejected`',
     `approved_timestamp` TIMESTAMP COMMENT 'Timestamp when the requisition was approved.',
@@ -39,22 +86,19 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition
     `requisition_date` DATE COMMENT 'Date when the requisition was initially created.',
     `requisition_number` STRING COMMENT 'Business identifier assigned to the purchase requisition.',
     `source_of_supply` STRING COMMENT 'Specifies if the supply is internal, external vendor, or consignment.. Valid values are `internal|external|consignment`',
-    `ssot_governance_note` STRING COMMENT 'SSOT owner in this domain per governance; consolidated master data with cross-domain references maintained via foreign keys.',
     `tax_code` STRING COMMENT 'Tax classification code applicable to the requisition.',
     `unit_of_measure` STRING COMMENT 'Unit in which the quantity is expressed (e.g., EA, KG, L).',
     CONSTRAINT pk_purchase_requisition PRIMARY KEY(`purchase_requisition_id`)
 ) COMMENT 'Internal request to procure direct or indirect materials, tooling, or services. Captures requisition number, requestor, cost center, plant, material/service description, quantity, required delivery date, estimated value, account assignment category (cost center, project, asset), approval status, and conversion-to-PO status. Represents the demand signal that initiates the procure-to-pay cycle. Sourced from SAP MM MRP-generated or manually created purchase requisitions (BANF/EBAN).';
 
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` (
-    `purchase_order_id` BIGINT COMMENT 'System-generated unique identifier for the purchase order record.',
-    `company_code_id` BIGINT COMMENT 'Foreign key linking to finance.company_code. Business justification: Purchase orders are issued by a specific legal entity (company code) for statutory procurement reporting, intercompany PO tracking, and financial consolidation. The purchasing_organization on the PO m',
-    `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Required for PO cost allocation report; finance tracks spend by cost center for each purchase order.',
-    `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: GL account needed for posting PO amounts to the general ledger; mandatory for financial statements.',
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` (
+    `procurement_purchase_order_id` BIGINT COMMENT 'System-generated unique identifier for the purchase order record.',
     `inspection_plan_id` BIGINT COMMENT 'Foreign key linking to quality.inspection_plan. Business justification: Incoming Inspection Planning: each PO is assigned an inspection plan used by quality to inspect received parts; standard practice in automotive manufacturing.',
+    `lane_id` BIGINT COMMENT 'Foreign key linking to logistics.lane. Business justification: Automotive procurement pre-assigns inbound logistics lanes at PO creation for freight cost allocation, carrier compliance, and OTD tracking. Linking PO to lane enables landed cost calculation and inbo',
     `plant_id` BIGINT COMMENT 'Identifier of the manufacturing plant or site receiving the goods/services.',
+    `production_line_id` BIGINT COMMENT 'Foreign key linking to manufacturing.production_line. Business justification: Needed for Line Delivery Schedule to allocate PO deliveries to specific production lines.',
     `supplier_contract_id` BIGINT COMMENT 'Identifier of the underlying procurement contract or framework agreement, if applicable.',
-    `supplier_id` BIGINT COMMENT 'Unique identifier of the supplier (vendor) to which the purchase order is issued.',
-    `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: Purchase orders are linked to vehicle programs for cost allocation and program profitability analysis.',
+    `supply_supplier_id` BIGINT COMMENT 'Foreign key linking to supply.supply_supplier. Business justification: Capital Equipment Procurement process requires linking PO to the registered equipment asset for depreciation, warranty, and maintenance tracking.',
     `account_assignment` STRING COMMENT 'Cost object (e.g., cost center, internal order) to which the PO costs are charged.',
     `approval_status` STRING COMMENT 'Current status of the internal approval workflow for the PO.. Valid values are `pending|approved|rejected`',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the purchase order record was first inserted into the data lake.',
@@ -74,25 +118,24 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` (
     `procurement_purchase_order_status` STRING COMMENT 'Current lifecycle state of the purchase order within the procure-to-pay process.. Valid values are `draft|released|approved|partially_received|closed|cancelled`',
     `purchase_group` STRING COMMENT 'Organizational group responsible for processing the purchase order.',
     `purchasing_organization` STRING COMMENT 'Entity within the enterprise that conducts procurement activities.',
-    `ssot_governance_note` STRING COMMENT 'SSOT owner in this domain per governance; consolidated master data with cross-domain references maintained via foreign keys.',
+    `supplier_name` STRING COMMENT 'Legal name of the supplier organization.',
     `tax_amount` DECIMAL(18,2) COMMENT 'Aggregate tax amount applicable to the purchase order.',
     `tax_code` STRING COMMENT 'Code representing the tax jurisdiction and rate applied to the PO.',
     `total_quantity` BIGINT COMMENT 'Aggregate quantity of all line items on the purchase order.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to the purchase order record.',
-    CONSTRAINT pk_purchase_order PRIMARY KEY(`purchase_order_id`)
+    CONSTRAINT pk_procurement_purchase_order PRIMARY KEY(`procurement_purchase_order_id`)
 ) COMMENT 'Legally binding procurement document issued to a supplier for delivery of direct materials, indirect materials, MRO, tooling, or services. Captures PO number, PO type (standard, blanket, consignment, subcontracting, service), supplier, plant, delivery date, incoterms, payment terms, total net value, currency, tax code, account assignment, approval workflow status, and GR/IR (Goods Receipt/Invoice Receipt) control flags. Core transactional entity of the procure-to-pay process. Sourced from SAP MM (EKKO/EKPO).';
 
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`po_line` (
-    `po_line_id` BIGINT COMMENT 'Unique surrogate key for each purchase order line item.',
-    `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Cost center allocation per PO line is required for internal cost reporting and variance analysis.',
-    `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Each PO line maps to a specific expense GL account for detailed ledger posting.',
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` (
+    `procurement_po_line_id` BIGINT COMMENT 'Unique surrogate key for each purchase order line item.',
+    `inbound_part_id` BIGINT COMMENT 'Foreign key linking to supply.inbound_part. Business justification: Procurement PO lines in automotive order specific inbound parts. While sku_master_id exists, linking directly to inbound_part enables PPAP level validation, lead time verification, engineering change ',
     `inspection_plan_id` BIGINT COMMENT 'Foreign key linking to quality.inspection_plan. Business justification: Line‑level inspection: each PO line (material) follows a specific inspection plan defined by quality for incoming inspection.',
     `plant_id` BIGINT COMMENT 'FK to manufacturing.plant',
-    `purchase_order_id` BIGINT COMMENT 'Identifier of the purchase order header to which this line belongs.',
+    `procurement_purchase_order_id` BIGINT COMMENT 'Identifier of the purchase order header to which this line belongs.',
+    `procurement_supplier_id` BIGINT COMMENT 'Unique identifier of the vendor supplying the material.',
     `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: REQUIRED: PO receipt matching uses SKU master to update stock; PO lines must reference the exact SKU for inventory posting.',
-    `storage_location_id` BIGINT COMMENT 'Foreign key linking to inventory.storage_location. Business justification: PO lines specify the target storage location for ordered goods, enabling inbound logistics pre-assignment and warehouse slotting. The existing plain-text storage_location column is a denormalization',
-    `supplier_contract_id` BIGINT COMMENT 'Foreign key linking to procurement.supplier_contract. Business justification: In SAP MM, purchase order lines can be created as release orders against a supplier contract (outline agreement). procurement_po_line currently stores contract_number as a denormalized STRING. Adding ',
-    `supplier_id` BIGINT COMMENT 'Unique identifier of the vendor supplying the material.',
+    `storage_location_id` BIGINT COMMENT 'Foreign key linking to inventory.storage_location. Business justification: PO lines in automotive procurement specify the destination storage location for inbound delivery (line-side buffer, incoming inspection area). This FK enables inbound logistics scheduling, capacity pl',
+    `supplier_contract_id` BIGINT COMMENT 'Foreign key linking to procurement.supplier_contract. Business justification: In SAP MM, purchase order lines can reference a contract (scheduling agreement or value contract) at the line level, independent of the header-level contract reference. The procurement_po_line table c',
     `work_center_id` BIGINT COMMENT 'Foreign key linking to manufacturing.work_center. Business justification: Supports Work Center Procurement Tracking, tying each PO line to the work center that will consume the material.',
     `account_assignment_category` STRING COMMENT 'Category indicating how costs are allocated (e.g., cost center, order).. Valid values are `K|P|U|F|M`',
     `batch_management_flag` BOOLEAN COMMENT 'True if the material is managed in batches.',
@@ -124,24 +167,18 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`po_line` (
     `remarks` STRING COMMENT 'Free‑form comments or notes entered by users.',
     `short_text` STRING COMMENT 'Brief free‑form text entered on the PO line.',
     `source_of_supply` STRING COMMENT 'Indicates whether the material is supplied internally, externally, or on consignment.. Valid values are `internal|external|consignment`',
-    `ssot_governance_note` STRING COMMENT '',
     `supplier_part_number` STRING COMMENT 'Vendors own part number for the material.',
     `tax_amount` DECIMAL(18,2) COMMENT 'Tax amount calculated for the line.',
     `tax_code` STRING COMMENT 'Tax classification code applicable to the line.',
     `under_delivery_tolerance_percent` DECIMAL(18,2) COMMENT 'Maximum allowed percentage under the ordered quantity.',
     `unit_of_measure` STRING COMMENT 'Measurement unit for the ordered quantity.. Valid values are `EA|KG|L|M|SET`',
-    CONSTRAINT pk_po_line PRIMARY KEY(`po_line_id`)
+    CONSTRAINT pk_procurement_po_line PRIMARY KEY(`procurement_po_line_id`)
 ) COMMENT 'Individual line item within a purchase order, representing a specific material, service, or part number being procured. Captures line number, material number, short text, quantity ordered, unit of measure, net price, delivery date, storage location, batch management flag, PPAP level required, over/under-delivery tolerance, and line-level confirmation status. Enables granular spend tracking and goods receipt matching at the part level. Sourced from SAP MM PO item table (EKPO).';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` (
     `supplier_contract_id` BIGINT COMMENT 'System-generated unique identifier for the supplier contract record.',
-    `company_code_id` BIGINT COMMENT 'Foreign key linking to finance.company_code. Business justification: Supplier contracts are legally binding under a specific company code (legal entity). Total contract value, penalty clauses, and payment terms are reported at company code level for financial planning,',
-    `design_specification_id` BIGINT COMMENT 'Foreign key linking to engineering.design_specification. Business justification: Automotive supplier technical agreements contractually bind suppliers to specific design specifications (dimensional tolerances, material grades, performance targets). Linking supplier_contract to des',
-    `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Contractual spend must be mapped to a GL account for accruals and expense recognition.',
-    `platform_id` BIGINT COMMENT 'Foreign key linking to vehicle.platform. Business justification: Automotive suppliers are awarded long-term contracts at the platform level (e.g., common chassis platform spanning multiple models). Platform-level sourcing contracts govern multi-model supply commitm',
-    `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: Automotive supplier contracts (scheduling agreements, blanket orders) are frequently SKU-specific, defining annual volume commitments and pricing per part number. A FK to sku_master enables contract c',
-    `supplier_id` BIGINT COMMENT 'Unique identifier of the supplier party associated with the contract.',
-    `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: Supplier contracts are scoped to specific vehicle programs, enabling contract compliance and program‑level spend tracking.',
+    `lane_id` BIGINT COMMENT 'Foreign key linking to logistics.lane. Business justification: Automotive supplier contracts specify inbound logistics lanes (origin-destination pairs) governing delivery terms, incoterms, and carrier requirements. Procurement teams use this to enforce contractua',
+    `procurement_supplier_id` BIGINT COMMENT 'Unique identifier of the supplier party associated with the contract.',
     `approval_timestamp` TIMESTAMP COMMENT 'Date and time when the contract received formal approval.',
     `audit_trail_notes` STRING COMMENT 'Chronological notes of significant changes, approvals, or exceptions.',
     `compliance_requirements` STRING COMMENT 'List of regulatory or industry standards the contract must satisfy (e.g., IATF 16949, ISO 14001).',
@@ -166,7 +203,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` (
     `penalty_clause` STRING COMMENT 'Text describing penalties for late delivery, quality breaches, or other defaults.',
     `price_escalation_clause` STRING COMMENT 'Text describing any price adjustment mechanisms tied to indices or time.',
     `renewal_option` STRING COMMENT 'Indicates whether the contract renews automatically, requires manual action, or does not renew.. Valid values are `auto|manual|none`',
-    `ssot_governance_note` STRING COMMENT '',
     `supplier_contract_status` STRING COMMENT 'Current lifecycle state of the contract.. Valid values are `draft|active|suspended|terminated|expired`',
     `termination_notice_period_days` STRING COMMENT 'Number of days the buyer must notify the supplier before terminating the contract.',
     `total_contract_value` DECIMAL(18,2) COMMENT 'Aggregate monetary value of the contract over its full term.',
@@ -175,18 +211,19 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` (
     CONSTRAINT pk_supplier_contract PRIMARY KEY(`supplier_contract_id`)
 ) COMMENT 'Long-term procurement contract (outline agreement) with a supplier covering pricing, volume commitments, delivery schedules, quality requirements, and commercial terms for direct or indirect materials. Captures contract type (value contract, quantity contract, scheduling agreement), validity period, target value, release order documentation requirement, price escalation clauses, penalty terms, and contract status. Supports blanket PO releases and scheduling agreement delivery lines. Sourced from SAP MM contract (EKKO with doc type MK/WK).';
 
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` (
-    `goods_receipt_id` BIGINT COMMENT 'System-generated unique identifier for the goods receipt record.',
-    `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Goods receipts for cost-assigned POs (account assignment category K) post directly to a cost center. This FK replaces the denormalized cost_center_code attribute and enables cost center actual-spend r',
-    `dealership_id` BIGINT COMMENT 'Identifier of the user who posted the goods receipt.',
-    `inspection_lot_id` BIGINT COMMENT 'Foreign key linking to quality.inspection_lot. Business justification: In automotive incoming inspection, every GR against a PO triggers creation of a quality inspection lot (standard SAP QM flow). The GR already carries a denormalized inspection_lot_number; replacing ',
-    `po_line_id` BIGINT COMMENT 'Foreign key linking to procurement.procurement_po_line. Business justification: In SAP MM, goods receipts are posted at the PO line item level — each GR references a specific PO line (purchase_order_item). procurement_goods_receipt currently stores purchase_order_item as a denorm',
-    `purchase_order_id` BIGINT COMMENT 'Foreign key linking to procurement.procurement_purchase_order. Business justification: In SAP MM, every goods receipt (MIGO) is posted against a specific purchase order. procurement_goods_receipt currently stores purchase_order_number as a denormalized STRING. Adding a proper FK procure',
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` (
+    `procurement_goods_receipt_id` BIGINT COMMENT 'System-generated unique identifier for the goods receipt record.',
+    `inbound_part_id` BIGINT COMMENT 'Foreign key linking to supply.inbound_part. Business justification: Goods receipts in automotive must be traceable to the specific inbound part received for quality inspection lot creation, hazardous material handling, customs tariff verification, and lot-size-based i',
+    `plant_id` BIGINT COMMENT 'Identifier of the user who posted the goods receipt.',
+    `procurement_po_line_id` BIGINT COMMENT 'Foreign key linking to procurement.procurement_po_line. Business justification: In SAP MM, goods receipts are posted at the PO line item level (not just the header). The procurement_goods_receipt table currently stores purchase_order_item as a denormalized INT (line number), whic',
+    `procurement_purchase_order_id` BIGINT COMMENT 'Foreign key linking to procurement.procurement_purchase_order. Business justification: In SAP MM, every goods receipt (movement type 101) is posted against a specific purchase order. The procurement_goods_receipt table currently stores purchase_order_number as a denormalized STRING, whi',
+    `procurement_supplier_id` BIGINT COMMENT 'Identifier of the supplier (vendor) from whom the goods were received.',
     `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: REQUIRED: Goods receipt posting updates stock balances; FK to SKU master ensures correct inventory item is credited.',
-    `storage_location_id` BIGINT COMMENT 'Foreign key linking to inventory.storage_location. Business justification: Goods receipt documents record the physical storage location where inbound parts are placed. A proper FK to storage_location enables warehouse capacity utilization reports, inbound slotting optimizati',
-    `supplier_id` BIGINT COMMENT 'Identifier of the supplier (vendor) from whom the goods were received.',
+    `storage_location_id` BIGINT COMMENT 'Foreign key linking to inventory.storage_location. Business justification: Goods receipt posting in automotive manufacturing requires recording the exact destination storage location (GR zone, quality hold, raw material store) for inventory accuracy, 3-way match reporting, a',
+    `accounting_document_number` STRING COMMENT 'Financial accounting document generated for the receipt.',
     `accounting_year` STRING COMMENT 'Fiscal year of the accounting document.',
     `batch_number` STRING COMMENT 'Batch or lot identifier for the received material, if applicable.',
+    `cost_center_code` STRING COMMENT 'Cost center to which the receipt cost is charged.',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the goods receipt record was first created in the system.',
     `currency_code` STRING COMMENT 'Three‑letter ISO 4217 currency code for monetary amounts.',
     `gross_amount` DECIMAL(18,2) COMMENT 'Total value of the receipt before taxes and discounts.',
@@ -205,23 +242,20 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` (
     `receipt_type` STRING COMMENT 'Classification of the receipt (e.g., standard receipt, return, stock transfer).. Valid values are `standard|return|transfer`',
     `slip_number` STRING COMMENT 'Physical slip or document number associated with the receipt.',
     `source_system_load_timestamp` TIMESTAMP COMMENT 'Timestamp when the record was loaded from the source system into the lakehouse.',
-    `ssot_governance_note` STRING COMMENT '',
     `tax_amount` DECIMAL(18,2) COMMENT 'Tax component associated with the receipt.',
     `unit_of_measure` STRING COMMENT 'Unit in which the quantity is measured.. Valid values are `EA|KG|L|M|PCS`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the goods receipt record.',
     `vendor_invoice_number` STRING COMMENT 'Invoice number supplied by the vendor for the received goods.',
-    CONSTRAINT pk_goods_receipt PRIMARY KEY(`goods_receipt_id`)
+    CONSTRAINT pk_procurement_goods_receipt PRIMARY KEY(`procurement_goods_receipt_id`)
 ) COMMENT 'Record of physical receipt of materials or services at an Automotive plant or warehouse against a purchase order or scheduling agreement. Captures GR document number, posting date, material document number, plant, storage location, received quantity, unit of measure, batch number, quality inspection lot reference, GR slip number, and movement type (101 standard GR, 103 GR blocked stock). Triggers inventory update and initiates three-way match for invoice verification. Sourced from SAP MM material document (MSEG/MKPF).';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` (
     `supplier_invoice_id` BIGINT COMMENT 'Unique surrogate key for supplier invoice.',
-    `company_code_id` BIGINT COMMENT 'Foreign key linking to finance.company_code. Business justification: Supplier invoices are posted to a specific legal entity (company code) for statutory AP reporting, VAT filing, and intercompany reconciliation. In multi-entity automotive groups, company code determin',
-    `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Invoice cost allocation to cost center is required for budgeting and profitability analysis.',
-    `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: AP invoice posting must reference a GL account to record expense in the ledger.',
-    `goods_receipt_id` BIGINT COMMENT 'Foreign key linking to procurement.procurement_goods_receipt. Business justification: The 3-way match in SAP MM (PO-GR-Invoice) requires the invoice to reference the goods receipt. supplier_invoice currently stores goods_receipt_number as a denormalized STRING. Adding a proper FK procu',
-    `journal_entry_id` BIGINT COMMENT 'Foreign key linking to finance.journal_entry. Business justification: AP invoice posting generates a journal entry (debit expense/GR-IR, credit AP). Linking supplier_invoice to journal_entry enables three-way match reconciliation, period-close AP-to-GL tie-out, and audi',
-    `purchase_order_id` BIGINT COMMENT 'Foreign key linking to procurement.procurement_purchase_order. Business justification: SAP MM invoice verification (MIRO) requires matching a supplier invoice to a purchase order as part of the 3-way match process (PO-GR-Invoice). supplier_invoice currently stores purchase_order_number ',
-    `supplier_id` BIGINT COMMENT 'Identifier of the supplier who issued the invoice.',
+    `dealership_id` BIGINT COMMENT 'Foreign key linking to dealer.dealership. Business justification: Dealer-specific AP reporting and three-way match: supplier invoices for parts ordered by or on behalf of a dealership must be reconciled at dealer level. OEM finance teams run dealer-level invoice agi',
+    `plant_id` BIGINT COMMENT 'Foreign key linking to manufacturing.plant. Business justification: Invoice cost allocation to cost center is required for budgeting and profitability analysis.',
+    `procurement_goods_receipt_id` BIGINT COMMENT 'Foreign key linking to procurement.procurement_goods_receipt. Business justification: Three-way match (PO + GR + Invoice) is the cornerstone of automotive procurement invoice verification in SAP MM. The supplier_invoice table currently stores goods_receipt_number as a denormalized STRI',
+    `procurement_purchase_order_id` BIGINT COMMENT 'Foreign key linking to procurement.procurement_purchase_order. Business justification: In SAP MM invoice verification (MIRO), every supplier invoice references a purchase order for two-way or three-way matching. The supplier_invoice table currently stores purchase_order_number as a deno',
+    `procurement_supplier_id` BIGINT COMMENT 'Identifier of the supplier who issued the invoice.',
     `accounting_document_number` STRING COMMENT 'GL document number generated for the invoice.',
     `attachment_flag` BOOLEAN COMMENT 'Indicates if supporting documents are attached.',
     `blocking_reason` STRING COMMENT 'Reason why invoice is blocked from payment.',
@@ -249,7 +283,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` (
     `posting_date` DATE COMMENT 'Date the invoice was posted to the general ledger.',
     `profit_center_code` STRING COMMENT 'Profit center linked to the invoice.',
     `reference` STRING COMMENT 'Reference number used by supplier for internal tracking.',
-    `ssot_governance_note` STRING COMMENT '',
     `supplier_address_line` STRING COMMENT 'Street address of the supplier.',
     `supplier_city` STRING COMMENT 'City where the supplier is located.',
     `supplier_country_code` STRING COMMENT 'Three-letter ISO country code of the supplier.. Valid values are `^[A-Z]{3}$`',
@@ -265,12 +298,47 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` (
     CONSTRAINT pk_supplier_invoice PRIMARY KEY(`supplier_invoice_id`)
 ) COMMENT 'Supplier-submitted invoice for goods or services delivered to Automotive, processed through SAP MM invoice verification (Logistics Invoice Verification - LIV). Captures invoice number, supplier invoice reference, invoice date, posting date, gross amount, tax amount, currency, payment terms, due date, three-way match status (PO/GR/Invoice), tolerance check result, blocking reason, and payment status. Enables accounts payable processing and spend actuals capture. Sourced from SAP MM invoice document (RBKP/RSEG).';
 
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` (
+    `approved_vendor_list_id` BIGINT COMMENT 'System-generated unique identifier for each approved vendor list record.',
+    `audit_id` BIGINT COMMENT 'Foreign key linking to quality.audit. Business justification: AVL approval and re-qualification in automotive supplier management is directly driven by supplier audit outcomes (IATF 16949 supplier audits). Procurement teams reference the qualifying audit when gr',
+    `dealership_id` BIGINT COMMENT 'Foreign key linking to dealer.dealership. Business justification: Dealer vendor authorization compliance: OEMs maintain dealer-specific AVL entries to enforce which suppliers dealers may source warranty-eligible parts from. Compliance audits and warranty claim valid',
+    `inbound_part_id` BIGINT COMMENT 'Foreign key linking to supply.inbound_part. Business justification: AVL entries in automotive are per supplier-part combination — a supplier is approved to supply a specific part. Linking AVL to inbound_part completes the supplier-part approval record required for PPA',
+    `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: The AVL is fundamentally a supplier-to-part approval record required by IATF16949 and PPAP processes — each entry approves a specific supplier for a specific part (SKU). Without this FK, AVL cannot en',
+    `supplier_contract_id` BIGINT COMMENT 'Identifier of the underlying supplier contract governing the AVL.',
+    `supply_supplier_id` BIGINT COMMENT 'Unique identifier of the material or part covered by the AVL.',
+    `approval_date` DATE COMMENT 'Date the approval becomes effective (start of validity).',
+    `approval_status` STRING COMMENT 'Current status of the AVL entry indicating if the supplier is approved, conditionally approved, or disqualified.. Valid values are `approved|conditional|disqualified`',
+    `avl_number` STRING COMMENT 'Unique alphanumeric code assigned to the approved vendor list entry.',
+    `backup_supplier_flag` BOOLEAN COMMENT 'True if the supplier serves as a backup source for the material.',
+    `compliance_status` STRING COMMENT 'Indicates whether the supplier-material combination meets regulatory and IATF 16949 requirements.. Valid values are `compliant|non_compliant|pending`',
+    `created_by_user` STRING COMMENT 'User identifier who created the AVL record.',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the AVL record was first inserted into the lakehouse.',
+    `currency_code` STRING COMMENT 'ISO 4217 currency code used for any price‑related fields in the AVL.. Valid values are `USD|EUR|JPY|GBP|CNY|CAD`',
+    `entry_date` DATE COMMENT 'Date the AVL record was initially created in the system.',
+    `expiry_date` DATE COMMENT 'Date the AVL entry expires or must be re‑validated.',
+    `last_review_date` DATE COMMENT 'Most recent date the AVL entry was reviewed for continued eligibility.',
+    `lead_time_days` STRING COMMENT 'Standard supplier lead time in calendar days for the material.',
+    `min_order_quantity` STRING COMMENT 'Minimum quantity that must be ordered per purchase order for this AVL.',
+    `notes` STRING COMMENT 'Free‑form comments or observations about the AVL entry.',
+    `ppap_approval_level` STRING COMMENT 'Production Part Approval Process level achieved for the supplier-material combination.. Valid values are `Level1|Level2|Level3|Level4|Level5`',
+    `preferred_supplier_flag` BOOLEAN COMMENT 'True if the supplier is designated as a preferred source for the material.',
+    `price_cap` DECIMAL(18,2) COMMENT 'Maximum unit price the supplier may charge for the material under this AVL.',
+    `quality_rating_threshold` DECIMAL(18,2) COMMENT 'Minimum quality rating percentage the supplier must maintain for this material.',
+    `regulatory_approval_required` BOOLEAN COMMENT 'True if additional regulatory approval (e.g., EPA, NHTSA) is required for the material.',
+    `review_cycle_months` STRING COMMENT 'Number of months between mandatory AVL reviews.',
+    `single_source_justification` STRING COMMENT 'Narrative explanation for why a single source supplier is required.',
+    `source_list_flag` BOOLEAN COMMENT 'True if the AVL entry is reflected in SAP MM source list (EORD).',
+    `updated_by_user` STRING COMMENT 'User identifier who last modified the AVL record.',
+    `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the AVL record.',
+    CONSTRAINT pk_approved_vendor_list PRIMARY KEY(`approved_vendor_list_id`)
+) COMMENT 'Formally approved supplier-material combination (AVL) authorizing a specific supplier to supply a specific part number or commodity to Automotive plants. Captures AVL entry date, approval status (approved, conditional, disqualified), PPAP approval level, quality rating threshold, preferred supplier flag, backup supplier flag, single-source justification, and expiry date. Governs which suppliers are eligible to receive purchase orders for specific materials. Integrates with SAP MM source list (EORD).';
+
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`info_record` (
     `info_record_id` BIGINT COMMENT 'System-generated unique identifier for the purchasing info record.',
-    `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Purchasing info records define the default GL account for automatic account determination when creating POs for a supplier-material combination. This link enables consistent expense/inventory classifi',
-    `part_master_id` BIGINT COMMENT 'Foreign key linking to engineering.part_master. Business justification: Purchasing Info Records (PIRs) are the ERP master records linking a suppliers price and lead time to a specific engineering part. BOM costing, make-vs-buy decisions, and supplier selection all requir',
-    `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: Purchasing info records (Einkaufsinfosatz) define supplier-material pricing, lead times, and sourcing conditions per SKU. Every info record in automotive procurement is tied to a specific material. Th',
-    `supplier_id` BIGINT COMMENT 'Unique identifier of the supplier (vendor) associated with this info record.',
+    `inbound_part_id` BIGINT COMMENT 'Foreign key linking to supply.inbound_part. Business justification: The procurement info record (SAP PIR) holds supplier-material price, lead time, and ordering conditions for a specific part. Linking info_record to inbound_part completes the supplier-material combina',
+    `inspection_plan_id` BIGINT COMMENT 'Foreign key linking to quality.inspection_plan. Business justification: Purchasing info records in automotive procurement define the inspection plan for a supplier-part combination. The info_record drives automatic inspection plan assignment on PO creation — a standard SA',
+    `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: Purchasing info records in automotive procurement are keyed on supplier + material (SKU), storing negotiated price, lead time, and delivery conditions per part. Without a sku_master_id FK, info record',
+    `supply_supplier_id` BIGINT COMMENT 'Unique identifier of the material or service category covered by this info record.',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the info record was first created.',
     `currency_code` STRING COMMENT 'Three‑letter ISO currency code for the price.. Valid values are `USD|EUR|JPY|GBP|CNY|CAD`',
     `effective_from` DATE COMMENT 'Date on which the info record becomes effective.',
@@ -295,79 +363,120 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`info_record` (
     `vendor_evaluation_score` DECIMAL(18,2) COMMENT 'Score (0‑5) reflecting supplier performance for this material.',
     `created_by` STRING COMMENT 'System user identifier who created the record.',
     CONSTRAINT pk_info_record PRIMARY KEY(`info_record_id`)
-) COMMENT 'Purchasing info record storing the commercial relationship between a supplier and a specific material or service category, including the last negotiated price, price validity period, planned delivery time, over/under-delivery tolerance, reminder days, and vendor evaluation score. Serves as the default pricing and delivery condition source when creating purchase orders. Sourced from SAP MM purchasing info record (EINE/EINA/ME11). [preservation_guardrail: verified]';
-
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` (
-    `supplier_evaluation_id` BIGINT COMMENT 'System-generated unique identifier for each supplier evaluation record.',
-    `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Supplier evaluations are conducted per cost center to assess procurement spend efficiency and quality performance. Cost center managers use evaluation scores for supplier development budget allocation',
-    `model_id` BIGINT COMMENT 'Foreign key linking to vehicle.model. Business justification: Automotive OEMs conduct model-specific supplier scorecards — e.g., PPM defect rate and on-time delivery measured per vehicle model (not just per plant). This drives model launch readiness decisions an',
-    `plant_id` BIGINT COMMENT 'Identifier of the employee or system that performed the evaluation.',
-    `supplier_id` BIGINT COMMENT 'Unique identifier of the supplier being evaluated.',
-    `comments` STRING COMMENT 'Free‑text notes from the evaluator providing context or observations.',
-    `compliance_status` STRING COMMENT 'Indicates whether the supplier meets regulatory and internal compliance requirements.. Valid values are `compliant|non_compliant|exempt`',
-    `cost_score` DECIMAL(18,2) COMMENT 'Score (0‑100) for commercial performance (price competitiveness, invoice accuracy).',
-    `created_timestamp` TIMESTAMP COMMENT 'Date‑time when the evaluation record was first created in the system.',
-    `delivery_score` DECIMAL(18,2) COMMENT 'Score (0‑100) for delivery performance (OTD, schedule adherence).',
-    `development_score` DECIMAL(18,2) COMMENT 'Score (0‑100) for development dimension (responsiveness, engineering change support).',
-    `evaluation_date` DATE COMMENT 'Date on which the evaluation was performed.',
-    `evaluation_method` STRING COMMENT 'How the evaluation data was collected (automated, manual, or mixed).. Valid values are `automated|manual|mixed`',
-    `evaluation_number` STRING COMMENT 'Human‑readable identifier for the evaluation (e.g., EV‑2024‑Q1).',
-    `evaluation_status` STRING COMMENT 'Current processing state of the evaluation record.. Valid values are `draft|in_progress|completed|approved|archived`',
-    `evaluation_type` STRING COMMENT 'Frequency or trigger of the evaluation (annual, quarterly, or ad‑hoc).. Valid values are `annual|quarterly|ad_hoc`',
-    `evaluation_version` STRING COMMENT 'Version number for the evaluation record to support revisions.',
-    `failed_criteria_count` STRING COMMENT 'Number of criteria where the supplier fell below the required threshold.',
-    `invoice_accuracy_pct` DECIMAL(18,2) COMMENT 'Percentage of invoices that match purchase order terms without discrepancies.',
-    `on_time_delivery_pct` DECIMAL(18,2) COMMENT 'Percentage of deliveries arriving on or before the promised date.',
-    `overall_score` DECIMAL(18,2) COMMENT 'Aggregated score (0‑100) summarising supplier performance.',
-    `passed_criteria_count` STRING COMMENT 'Number of criteria where the supplier met or exceeded the threshold.',
-    `period_end_date` DATE COMMENT 'Last day of the period covered by the evaluation.',
-    `period_start_date` DATE COMMENT 'First day of the period covered by the evaluation.',
-    `ppm_defect_rate` DECIMAL(18,2) COMMENT 'Parts‑per‑million defect rate observed during the period.',
-    `price_variance_pct` DECIMAL(18,2) COMMENT 'Percentage difference between contracted price and actual invoiced price.',
-    `quality_score` DECIMAL(18,2) COMMENT 'Score (0‑100) for quality dimension (PPM defect rate, PPAP compliance).',
-    `recommended_action` STRING COMMENT 'Suggested strategic response based on evaluation results.. Valid values are `maintain|develop|reduce|disqualify`',
-    `risk_level` STRING COMMENT 'Risk classification derived from evaluation outcomes.. Valid values are `low|medium|high|critical`',
-    `ssot_governance_note` STRING COMMENT '',
-    `supplier_category` STRING COMMENT 'Business classification of the supplier (e.g., Tier 1, Tier 2).. Valid values are `tier1|tier2|tier3|tier4`',
-    `supplier_region` STRING COMMENT 'ISO‑3 country code of the suppliers primary operating location.. Valid values are `^[A-Z]{3}$`',
-    `total_criteria_count` STRING COMMENT 'Number of evaluation criteria applied to the supplier.',
-    `updated_timestamp` TIMESTAMP COMMENT 'Date‑time of the most recent modification to the evaluation record.',
-    CONSTRAINT pk_supplier_evaluation PRIMARY KEY(`supplier_evaluation_id`)
-) COMMENT 'Periodic formal assessment of supplier performance across quality (PPM defect rate, PPAP compliance), delivery (OTD - On-Time Delivery, schedule adherence), commercial (price competitiveness, invoice accuracy), and development (responsiveness, engineering change support) dimensions. Captures evaluation period, overall score, sub-scores by criterion, evaluator, evaluation method (automated from SAP QM/MM or manual), and recommended action (maintain, develop, reduce, disqualify). Supports supplier development programs and strategic sourcing decisions.';
+) COMMENT 'Purchasing info record storing the commercial relationship between a supplier and a specific material or service category, including the last negotiated price, price validity period, planned delivery time, over/under-delivery tolerance, reminder days, and vendor evaluation score. Serves as the default pricing and delivery condition source when creating purchase orders. Sourced from SAP MM purchasing info record (EINE/EINA/ME11).';
 
 -- ========= FOREIGN KEYS =========
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ADD CONSTRAINT `fk_procurement_purchase_requisition_purchase_order_id` FOREIGN KEY (`purchase_order_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`purchase_order`(`purchase_order_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ADD CONSTRAINT `fk_procurement_purchase_requisition_supplier_id` FOREIGN KEY (`supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier`(`supplier_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ADD CONSTRAINT `fk_procurement_purchase_order_supplier_contract_id` FOREIGN KEY (`supplier_contract_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier_contract`(`supplier_contract_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ADD CONSTRAINT `fk_procurement_purchase_order_supplier_id` FOREIGN KEY (`supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier`(`supplier_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ADD CONSTRAINT `fk_procurement_po_line_purchase_order_id` FOREIGN KEY (`purchase_order_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`purchase_order`(`purchase_order_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ADD CONSTRAINT `fk_procurement_po_line_supplier_contract_id` FOREIGN KEY (`supplier_contract_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier_contract`(`supplier_contract_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ADD CONSTRAINT `fk_procurement_po_line_supplier_id` FOREIGN KEY (`supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier`(`supplier_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ADD CONSTRAINT `fk_procurement_supplier_contract_supplier_id` FOREIGN KEY (`supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier`(`supplier_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ADD CONSTRAINT `fk_procurement_goods_receipt_po_line_id` FOREIGN KEY (`po_line_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`po_line`(`po_line_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ADD CONSTRAINT `fk_procurement_goods_receipt_purchase_order_id` FOREIGN KEY (`purchase_order_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`purchase_order`(`purchase_order_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ADD CONSTRAINT `fk_procurement_goods_receipt_supplier_id` FOREIGN KEY (`supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier`(`supplier_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ADD CONSTRAINT `fk_procurement_supplier_invoice_goods_receipt_id` FOREIGN KEY (`goods_receipt_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`goods_receipt`(`goods_receipt_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ADD CONSTRAINT `fk_procurement_supplier_invoice_purchase_order_id` FOREIGN KEY (`purchase_order_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`purchase_order`(`purchase_order_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ADD CONSTRAINT `fk_procurement_supplier_invoice_supplier_id` FOREIGN KEY (`supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier`(`supplier_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ADD CONSTRAINT `fk_procurement_info_record_supplier_id` FOREIGN KEY (`supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier`(`supplier_id`);
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ADD CONSTRAINT `fk_procurement_supplier_evaluation_supplier_id` FOREIGN KEY (`supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier`(`supplier_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ADD CONSTRAINT `fk_procurement_procurement_supplier_parent_supplier_procurement_supplier_id` FOREIGN KEY (`parent_supplier_procurement_supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_supplier`(`procurement_supplier_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ADD CONSTRAINT `fk_procurement_purchase_requisition_procurement_purchase_order_id` FOREIGN KEY (`procurement_purchase_order_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_purchase_order`(`procurement_purchase_order_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ADD CONSTRAINT `fk_procurement_purchase_requisition_supplier_contract_id` FOREIGN KEY (`supplier_contract_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier_contract`(`supplier_contract_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ADD CONSTRAINT `fk_procurement_procurement_purchase_order_supplier_contract_id` FOREIGN KEY (`supplier_contract_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier_contract`(`supplier_contract_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ADD CONSTRAINT `fk_procurement_procurement_po_line_procurement_purchase_order_id` FOREIGN KEY (`procurement_purchase_order_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_purchase_order`(`procurement_purchase_order_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ADD CONSTRAINT `fk_procurement_procurement_po_line_procurement_supplier_id` FOREIGN KEY (`procurement_supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_supplier`(`procurement_supplier_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ADD CONSTRAINT `fk_procurement_procurement_po_line_supplier_contract_id` FOREIGN KEY (`supplier_contract_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier_contract`(`supplier_contract_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ADD CONSTRAINT `fk_procurement_supplier_contract_procurement_supplier_id` FOREIGN KEY (`procurement_supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_supplier`(`procurement_supplier_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ADD CONSTRAINT `fk_procurement_procurement_goods_receipt_procurement_po_line_id` FOREIGN KEY (`procurement_po_line_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_po_line`(`procurement_po_line_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ADD CONSTRAINT `fk_procurement_procurement_goods_receipt_procurement_purchase_order_id` FOREIGN KEY (`procurement_purchase_order_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_purchase_order`(`procurement_purchase_order_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ADD CONSTRAINT `fk_procurement_procurement_goods_receipt_procurement_supplier_id` FOREIGN KEY (`procurement_supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_supplier`(`procurement_supplier_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ADD CONSTRAINT `fk_procurement_supplier_invoice_procurement_goods_receipt_id` FOREIGN KEY (`procurement_goods_receipt_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt`(`procurement_goods_receipt_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ADD CONSTRAINT `fk_procurement_supplier_invoice_procurement_purchase_order_id` FOREIGN KEY (`procurement_purchase_order_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_purchase_order`(`procurement_purchase_order_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ADD CONSTRAINT `fk_procurement_supplier_invoice_procurement_supplier_id` FOREIGN KEY (`procurement_supplier_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`procurement_supplier`(`procurement_supplier_id`);
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ADD CONSTRAINT `fk_procurement_approved_vendor_list_supplier_contract_id` FOREIGN KEY (`supplier_contract_id`) REFERENCES `vibe_automotive_v1`.`procurement`.`supplier_contract`(`supplier_contract_id`);
 
 -- ========= TAGS =========
 ALTER SCHEMA `vibe_automotive_v1`.`procurement` SET TAGS ('dbx_division' = 'operations');
 ALTER SCHEMA `vibe_automotive_v1`.`procurement` SET TAGS ('dbx_domain' = 'procurement');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier` SET TAGS ('dbx_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier` SET TAGS ('dbx_subdomain' = 'vendor_management');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` SET TAGS ('dbx_subdomain' = 'vendor_management');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Identifier (SUPPLIER_ID)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `parent_supplier_procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Supplier Identifier (PARENT_SUPPLIER_ID)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `address_line1` SET TAGS ('dbx_business_glossary_term' = 'Supplier Address Line 1 (ADDRESS_LINE1)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `address_line1` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `bank_account_number` SET TAGS ('dbx_business_glossary_term' = 'Bank Account Number (BANK_ACCOUNT_NUMBER)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `bank_account_number` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `bank_account_number` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `bank_name` SET TAGS ('dbx_business_glossary_term' = 'Bank Name (BANK_NAME)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `certification_status` SET TAGS ('dbx_business_glossary_term' = 'Overall Certification Status (CERTIFICATION_STATUS)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `certification_status` SET TAGS ('dbx_value_regex' = 'active|expired|pending');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `city` SET TAGS ('dbx_business_glossary_term' = 'Supplier City (CITY)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `city` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `commodity_specialization` SET TAGS ('dbx_business_glossary_term' = 'Commodity Specialization (COMMODITY_SPECIALIZATION)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `country_code` SET TAGS ('dbx_business_glossary_term' = 'Supplier Country Code (COUNTRY_CODE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp (CREATED_TIMESTAMP)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `credit_limit` SET TAGS ('dbx_business_glossary_term' = 'Credit Limit (CREDIT_LIMIT)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `credit_limit` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `credit_limit` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Transaction Currency Code (CURRENCY_CODE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `deactivation_date` SET TAGS ('dbx_business_glossary_term' = 'Supplier Deactivation Date (DEACTIVATION_DATE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `duns_number` SET TAGS ('dbx_business_glossary_term' = 'DUNS Number (DUNS_NUMBER)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `duns_number` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `duns_number` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `iatf16949_cert_expiry` SET TAGS ('dbx_business_glossary_term' = 'IATF 16949 Certification Expiry Date (IATF16949_CERT_EXPIRY)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `iatf16949_certified` SET TAGS ('dbx_business_glossary_term' = 'IATF 16949 Certification Flag (IATF16949_CERTIFIED)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `incoterms` SET TAGS ('dbx_business_glossary_term' = 'Incoterms (INCOTERMS)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `incoterms` SET TAGS ('dbx_value_regex' = 'EXW|FOB|CIF|DAP|DDP');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `iso14001_cert_expiry` SET TAGS ('dbx_business_glossary_term' = 'ISO 14001 Certification Expiry Date (ISO14001_CERT_EXPIRY)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `iso14001_certified` SET TAGS ('dbx_business_glossary_term' = 'ISO 14001 Certification Flag (ISO14001_CERTIFIED)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `iso9001_cert_expiry` SET TAGS ('dbx_business_glossary_term' = 'ISO 9001 Certification Expiry Date (ISO9001_CERT_EXPIRY)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `iso9001_certified` SET TAGS ('dbx_business_glossary_term' = 'ISO 9001 Certification Flag (ISO9001_CERTIFIED)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp (LAST_UPDATED_TIMESTAMP)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Average Lead Time (LEAD_TIME_DAYS)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `legal_name` SET TAGS ('dbx_business_glossary_term' = 'Legal Supplier Name (LEGAL_NAME)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `max_order_quantity` SET TAGS ('dbx_business_glossary_term' = 'Maximum Order Quantity (MAX_ORDER_QUANTITY)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `min_order_quantity` SET TAGS ('dbx_business_glossary_term' = 'Minimum Order Quantity (MIN_ORDER_QUANTITY)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `procurement_supplier_name` SET TAGS ('dbx_business_glossary_term' = 'Supplier Name (SUPPLIER_NAME)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `onboarding_date` SET TAGS ('dbx_business_glossary_term' = 'Supplier Onboarding Date (ONBOARDING_DATE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `payment_terms` SET TAGS ('dbx_business_glossary_term' = 'Payment Terms (PAYMENT_TERMS)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `payment_terms` SET TAGS ('dbx_value_regex' = 'net30|net45|net60|cash|prepaid');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `postal_code` SET TAGS ('dbx_business_glossary_term' = 'Supplier Postal Code (POSTAL_CODE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `postal_code` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `preferred_language` SET TAGS ('dbx_business_glossary_term' = 'Preferred Language (PREFERRED_LANGUAGE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `primary_contact_email` SET TAGS ('dbx_business_glossary_term' = 'Primary Contact Email Address (PRIMARY_CONTACT_EMAIL)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `primary_contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `primary_contact_email` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `primary_contact_email` SET TAGS ('dbx_pii_email' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `primary_contact_name` SET TAGS ('dbx_business_glossary_term' = 'Primary Contact Person Name (PRIMARY_CONTACT_NAME)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `primary_contact_name` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `primary_contact_name` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `primary_contact_phone` SET TAGS ('dbx_business_glossary_term' = 'Primary Contact Phone Number (PRIMARY_CONTACT_PHONE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `primary_contact_phone` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `primary_contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `procurement_supplier_status` SET TAGS ('dbx_business_glossary_term' = 'Supplier Status (STATUS)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `procurement_supplier_status` SET TAGS ('dbx_value_regex' = 'active|inactive|blocked|under_development');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `rating_score` SET TAGS ('dbx_business_glossary_term' = 'Supplier Rating Score (RATING_SCORE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `risk_score` SET TAGS ('dbx_business_glossary_term' = 'Supplier Risk Score (RISK_SCORE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `state_province` SET TAGS ('dbx_business_glossary_term' = 'Supplier State or Province (STATE_PROVINCE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `state_province` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `supplier_category` SET TAGS ('dbx_business_glossary_term' = 'Supplier Category (SUPPLIER_CATEGORY)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `supplier_category` SET TAGS ('dbx_value_regex' = 'raw_materials|components|services|logistics|technology');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `supplier_type` SET TAGS ('dbx_business_glossary_term' = 'Supplier Type (SUPPLIER_TYPE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `supplier_type` SET TAGS ('dbx_value_regex' = 'tier-1|tier-2|tier-3|internal|service');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `sustainability_score` SET TAGS ('dbx_business_glossary_term' = 'Supplier Sustainability Score (SUSTAINABILITY_SCORE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `swift_code` SET TAGS ('dbx_business_glossary_term' = 'SWIFT/BIC Code (SWIFT_CODE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `swift_code` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `swift_code` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `tax_identification_number` SET TAGS ('dbx_business_glossary_term' = 'Tax Identification Number (TAX_ID)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `tax_identification_number` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `tax_identification_number` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `vat_number` SET TAGS ('dbx_business_glossary_term' = 'VAT Registration Number (VAT_NUMBER)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `vat_number` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `vat_number` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_supplier` ALTER COLUMN `website_url` SET TAGS ('dbx_business_glossary_term' = 'Supplier Website URL (WEBSITE_URL)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` SET TAGS ('dbx_subdomain' = 'order_processing');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `purchase_requisition_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Requisition ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `mrp_requirement_id` SET TAGS ('dbx_business_glossary_term' = 'Mrp Requirement Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `organization_account_id` SET TAGS ('dbx_business_glossary_term' = 'Organization Account Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `parts_inventory_id` SET TAGS ('dbx_business_glossary_term' = 'Parts Inventory Id (Foreign Key)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Purchase Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `procurement_purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Purchase Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `production_schedule_id` SET TAGS ('dbx_business_glossary_term' = 'Production Schedule Id (Foreign Key)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `supplier_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Contract Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `supply_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `account_assignment_category` SET TAGS ('dbx_business_glossary_term' = 'Account Assignment Category');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `account_assignment_category` SET TAGS ('dbx_value_regex' = 'cost_center|project|asset|order');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Approval Status');
@@ -396,111 +505,104 @@ ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLU
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `source_of_supply` SET TAGS ('dbx_value_regex' = 'internal|external|consignment');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `tax_code` SET TAGS ('dbx_business_glossary_term' = 'Tax Code');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_requisition` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` SET TAGS ('dbx_subdomain' = 'order_processing');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `company_code_id` SET TAGS ('dbx_business_glossary_term' = 'Company Code Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `inspection_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Inspection Plan Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `supplier_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Contract ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `account_assignment` SET TAGS ('dbx_business_glossary_term' = 'Account Assignment');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CNY|GBP|CHF');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `currency_rate` SET TAGS ('dbx_business_glossary_term' = 'Currency Exchange Rate');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Requested Delivery Date');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `goods_receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Date');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `gr_ir_control_flag` SET TAGS ('dbx_business_glossary_term' = 'GR/IR Control Flag');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `gross_amount` SET TAGS ('dbx_business_glossary_term' = 'Gross Amount (PO_GROSS)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `incoterms` SET TAGS ('dbx_business_glossary_term' = 'Incoterms (International Commercial Terms)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `incoterms` SET TAGS ('dbx_value_regex' = 'EXW|FCA|CPT|CIP|DAP|DDP');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `invoice_receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Invoice Receipt Date');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `net_amount` SET TAGS ('dbx_business_glossary_term' = 'Net Amount (PO_NET)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `order_date` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Date (PO_DATE)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `payment_terms` SET TAGS ('dbx_business_glossary_term' = 'Payment Terms');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `po_number` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Number (PO_NUMBER)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `po_type` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Type (PO_TYPE)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `po_type` SET TAGS ('dbx_value_regex' = 'standard|blanket|consignment|subcontract|service');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `procurement_purchase_order_status` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Status (PO_STATUS)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `procurement_purchase_order_status` SET TAGS ('dbx_value_regex' = 'draft|released|approved|partially_received|closed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `purchase_group` SET TAGS ('dbx_business_glossary_term' = 'Purchase Group');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `purchasing_organization` SET TAGS ('dbx_business_glossary_term' = 'Purchasing Organization');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `tax_amount` SET TAGS ('dbx_business_glossary_term' = 'Tax Amount (PO_TAX)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `tax_code` SET TAGS ('dbx_business_glossary_term' = 'Tax Code');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `total_quantity` SET TAGS ('dbx_business_glossary_term' = 'Total Quantity');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`purchase_order` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` SET TAGS ('dbx_subdomain' = 'order_processing');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `po_line_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Line ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `inspection_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Inspection Plan Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant Id');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `plant_id` SET TAGS ('dbx_internal' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `supplier_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Contract Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `account_assignment_category` SET TAGS ('dbx_business_glossary_term' = 'Account Assignment Category');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `account_assignment_category` SET TAGS ('dbx_value_regex' = 'K|P|U|F|M');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `batch_management_flag` SET TAGS ('dbx_business_glossary_term' = 'Batch Management Indicator');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `confirmation_date` SET TAGS ('dbx_business_glossary_term' = 'Line Confirmation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (WAERS)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CNY|GBP|CAD');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Requested Delivery Date');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `goods_receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Date');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `gross_amount` SET TAGS ('dbx_business_glossary_term' = 'Gross Amount');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `internal_order_number` SET TAGS ('dbx_business_glossary_term' = 'Internal Order Number');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `invoice_number` SET TAGS ('dbx_business_glossary_term' = 'Invoice Number');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `invoice_receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Invoice Receipt Date');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `is_blocked` SET TAGS ('dbx_business_glossary_term' = 'Blocked Indicator');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `is_deleted` SET TAGS ('dbx_business_glossary_term' = 'Soft Delete Flag');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `last_updated_by` SET TAGS ('dbx_business_glossary_term' = 'Last Updated By User ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `line_number` SET TAGS ('dbx_business_glossary_term' = 'Line Sequence Number');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `line_status` SET TAGS ('dbx_business_glossary_term' = 'Line Status');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `line_status` SET TAGS ('dbx_value_regex' = 'open|confirmed|closed|canceled');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `net_amount` SET TAGS ('dbx_business_glossary_term' = 'Net Amount');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `net_price` SET TAGS ('dbx_business_glossary_term' = 'Net Price per Unit');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `over_delivery_tolerance_percent` SET TAGS ('dbx_business_glossary_term' = 'Over‑Delivery Tolerance (%)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `ppap_level` SET TAGS ('dbx_business_glossary_term' = 'PPAP Level Required');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `ppap_level` SET TAGS ('dbx_value_regex' = 'Level0|Level1|Level2|Level3|Level4');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `price_condition` SET TAGS ('dbx_business_glossary_term' = 'Price Condition Type');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `price_condition` SET TAGS ('dbx_value_regex' = 'Standard|Discount|Special');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `purchasing_group` SET TAGS ('dbx_business_glossary_term' = 'Purchasing Group');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `quality_inspection_required` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `quantity_ordered` SET TAGS ('dbx_business_glossary_term' = 'Quantity Ordered');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `release_number` SET TAGS ('dbx_business_glossary_term' = 'Release Number');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `remarks` SET TAGS ('dbx_business_glossary_term' = 'Remarks');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `short_text` SET TAGS ('dbx_business_glossary_term' = 'Short Text');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `source_of_supply` SET TAGS ('dbx_business_glossary_term' = 'Source of Supply');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `source_of_supply` SET TAGS ('dbx_value_regex' = 'internal|external|consignment');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `supplier_part_number` SET TAGS ('dbx_business_glossary_term' = 'Supplier Part Number');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `tax_amount` SET TAGS ('dbx_business_glossary_term' = 'Tax Amount');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `tax_code` SET TAGS ('dbx_business_glossary_term' = 'Tax Code');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `under_delivery_tolerance_percent` SET TAGS ('dbx_business_glossary_term' = 'Under‑Delivery Tolerance (%)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (MEINS)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`po_line` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M|SET');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` SET TAGS ('dbx_subdomain' = 'order_processing');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `procurement_purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `inspection_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Inspection Plan Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `lane_id` SET TAGS ('dbx_business_glossary_term' = 'Lane Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `supplier_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Contract ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `supply_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `account_assignment` SET TAGS ('dbx_business_glossary_term' = 'Account Assignment');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CNY|GBP|CHF');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `currency_rate` SET TAGS ('dbx_business_glossary_term' = 'Currency Exchange Rate');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Requested Delivery Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `goods_receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `gr_ir_control_flag` SET TAGS ('dbx_business_glossary_term' = 'GR/IR Control Flag');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `gross_amount` SET TAGS ('dbx_business_glossary_term' = 'Gross Amount (PO_GROSS)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `incoterms` SET TAGS ('dbx_business_glossary_term' = 'Incoterms (International Commercial Terms)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `incoterms` SET TAGS ('dbx_value_regex' = 'EXW|FCA|CPT|CIP|DAP|DDP');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `invoice_receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Invoice Receipt Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `net_amount` SET TAGS ('dbx_business_glossary_term' = 'Net Amount (PO_NET)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `order_date` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Date (PO_DATE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `payment_terms` SET TAGS ('dbx_business_glossary_term' = 'Payment Terms');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `po_number` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Number (PO_NUMBER)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `po_type` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Type (PO_TYPE)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `po_type` SET TAGS ('dbx_value_regex' = 'standard|blanket|consignment|subcontract|service');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `procurement_purchase_order_status` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Status (PO_STATUS)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `procurement_purchase_order_status` SET TAGS ('dbx_value_regex' = 'draft|released|approved|partially_received|closed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `purchase_group` SET TAGS ('dbx_business_glossary_term' = 'Purchase Group');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `purchasing_organization` SET TAGS ('dbx_business_glossary_term' = 'Purchasing Organization');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `supplier_name` SET TAGS ('dbx_business_glossary_term' = 'Supplier Name');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `tax_amount` SET TAGS ('dbx_business_glossary_term' = 'Tax Amount (PO_TAX)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `tax_code` SET TAGS ('dbx_business_glossary_term' = 'Tax Code');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `total_quantity` SET TAGS ('dbx_business_glossary_term' = 'Total Quantity');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_purchase_order` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` SET TAGS ('dbx_subdomain' = 'order_processing');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `procurement_po_line_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Line ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `inspection_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Inspection Plan Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant Id');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `plant_id` SET TAGS ('dbx_internal' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `procurement_purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `supplier_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Contract Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `account_assignment_category` SET TAGS ('dbx_business_glossary_term' = 'Account Assignment Category');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `account_assignment_category` SET TAGS ('dbx_value_regex' = 'K|P|U|F|M');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `batch_management_flag` SET TAGS ('dbx_business_glossary_term' = 'Batch Management Indicator');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `confirmation_date` SET TAGS ('dbx_business_glossary_term' = 'Line Confirmation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (WAERS)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CNY|GBP|CAD');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Requested Delivery Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `goods_receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `gross_amount` SET TAGS ('dbx_business_glossary_term' = 'Gross Amount');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `internal_order_number` SET TAGS ('dbx_business_glossary_term' = 'Internal Order Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `invoice_number` SET TAGS ('dbx_business_glossary_term' = 'Invoice Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `invoice_receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Invoice Receipt Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `is_blocked` SET TAGS ('dbx_business_glossary_term' = 'Blocked Indicator');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `is_deleted` SET TAGS ('dbx_business_glossary_term' = 'Soft Delete Flag');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `last_updated_by` SET TAGS ('dbx_business_glossary_term' = 'Last Updated By User ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `line_number` SET TAGS ('dbx_business_glossary_term' = 'Line Sequence Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `line_status` SET TAGS ('dbx_business_glossary_term' = 'Line Status');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `line_status` SET TAGS ('dbx_value_regex' = 'open|confirmed|closed|canceled');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `net_amount` SET TAGS ('dbx_business_glossary_term' = 'Net Amount');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `net_price` SET TAGS ('dbx_business_glossary_term' = 'Net Price per Unit');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `over_delivery_tolerance_percent` SET TAGS ('dbx_business_glossary_term' = 'Over‑Delivery Tolerance (%)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `ppap_level` SET TAGS ('dbx_business_glossary_term' = 'PPAP Level Required');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `ppap_level` SET TAGS ('dbx_value_regex' = 'Level0|Level1|Level2|Level3|Level4');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `price_condition` SET TAGS ('dbx_business_glossary_term' = 'Price Condition Type');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `price_condition` SET TAGS ('dbx_value_regex' = 'Standard|Discount|Special');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `purchasing_group` SET TAGS ('dbx_business_glossary_term' = 'Purchasing Group');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `quality_inspection_required` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `quantity_ordered` SET TAGS ('dbx_business_glossary_term' = 'Quantity Ordered');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `release_number` SET TAGS ('dbx_business_glossary_term' = 'Release Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `remarks` SET TAGS ('dbx_business_glossary_term' = 'Remarks');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `short_text` SET TAGS ('dbx_business_glossary_term' = 'Short Text');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `source_of_supply` SET TAGS ('dbx_business_glossary_term' = 'Source of Supply');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `source_of_supply` SET TAGS ('dbx_value_regex' = 'internal|external|consignment');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `supplier_part_number` SET TAGS ('dbx_business_glossary_term' = 'Supplier Part Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `tax_amount` SET TAGS ('dbx_business_glossary_term' = 'Tax Amount');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `tax_code` SET TAGS ('dbx_business_glossary_term' = 'Tax Code');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `under_delivery_tolerance_percent` SET TAGS ('dbx_business_glossary_term' = 'Under‑Delivery Tolerance (%)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (MEINS)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_po_line` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M|SET');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` SET TAGS ('dbx_subdomain' = 'vendor_management');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `supplier_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Contract ID (SCID)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `company_code_id` SET TAGS ('dbx_business_glossary_term' = 'Company Code Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `design_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Design Specification Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `platform_id` SET TAGS ('dbx_business_glossary_term' = 'Platform Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID (SID)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `lane_id` SET TAGS ('dbx_business_glossary_term' = 'Lane Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID (SID)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp (AT)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `audit_trail_notes` SET TAGS ('dbx_business_glossary_term' = 'Audit Trail Notes (ATN)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `compliance_requirements` SET TAGS ('dbx_business_glossary_term' = 'Compliance Requirements (CR)');
@@ -537,59 +639,58 @@ ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN 
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `volume_commitment_quantity` SET TAGS ('dbx_business_glossary_term' = 'Volume Commitment Quantity (VCQ)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `volume_commitment_uom` SET TAGS ('dbx_business_glossary_term' = 'Volume Commitment UOM (VCU)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_contract` ALTER COLUMN `volume_commitment_uom` SET TAGS ('dbx_value_regex' = 'pcs|kg|liters|units|meters|hours');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` SET TAGS ('dbx_subdomain' = 'order_processing');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `goods_receipt_id` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Receipt User ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `dealership_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `inspection_lot_id` SET TAGS ('dbx_business_glossary_term' = 'Inspection Lot Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `po_line_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Po Line Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Purchase Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `accounting_year` SET TAGS ('dbx_business_glossary_term' = 'Accounting Year');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `gross_amount` SET TAGS ('dbx_business_glossary_term' = 'Gross Amount');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `invoice_match_status` SET TAGS ('dbx_business_glossary_term' = 'Invoice Match Status');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `invoice_match_status` SET TAGS ('dbx_value_regex' = 'matched|unmatched|partial');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `is_blocked_stock` SET TAGS ('dbx_business_glossary_term' = 'Blocked Stock Indicator');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `is_quality_inspection_required` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `movement_type` SET TAGS ('dbx_business_glossary_term' = 'Movement Type');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `movement_type` SET TAGS ('dbx_value_regex' = '101|103|105');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `net_amount` SET TAGS ('dbx_business_glossary_term' = 'Net Amount');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `posting_date` SET TAGS ('dbx_business_glossary_term' = 'Posting Date');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `procurement_goods_receipt_status` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Status');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `procurement_goods_receipt_status` SET TAGS ('dbx_value_regex' = 'posted|reversed|pending');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `profit_center_code` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Code');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `quality_inspection_result` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Result');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `quality_inspection_result` SET TAGS ('dbx_value_regex' = 'passed|failed|pending');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `quantity_received` SET TAGS ('dbx_business_glossary_term' = 'Quantity Received');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `receipt_number` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Number');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `receipt_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `receipt_type` SET TAGS ('dbx_business_glossary_term' = 'Receipt Type');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `receipt_type` SET TAGS ('dbx_value_regex' = 'standard|return|transfer');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `slip_number` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Slip Number');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `source_system_load_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Source System Load Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `tax_amount` SET TAGS ('dbx_business_glossary_term' = 'Tax Amount');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M|PCS');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`goods_receipt` ALTER COLUMN `vendor_invoice_number` SET TAGS ('dbx_business_glossary_term' = 'Vendor Invoice Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` SET TAGS ('dbx_subdomain' = 'order_processing');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `procurement_goods_receipt_id` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Receipt User ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `plant_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `procurement_po_line_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Po Line Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `procurement_purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Purchase Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `accounting_document_number` SET TAGS ('dbx_business_glossary_term' = 'Accounting Document Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `accounting_year` SET TAGS ('dbx_business_glossary_term' = 'Accounting Year');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Code');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `gross_amount` SET TAGS ('dbx_business_glossary_term' = 'Gross Amount');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `invoice_match_status` SET TAGS ('dbx_business_glossary_term' = 'Invoice Match Status');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `invoice_match_status` SET TAGS ('dbx_value_regex' = 'matched|unmatched|partial');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `is_blocked_stock` SET TAGS ('dbx_business_glossary_term' = 'Blocked Stock Indicator');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `is_quality_inspection_required` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `movement_type` SET TAGS ('dbx_business_glossary_term' = 'Movement Type');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `movement_type` SET TAGS ('dbx_value_regex' = '101|103|105');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `net_amount` SET TAGS ('dbx_business_glossary_term' = 'Net Amount');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `posting_date` SET TAGS ('dbx_business_glossary_term' = 'Posting Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `procurement_goods_receipt_status` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Status');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `procurement_goods_receipt_status` SET TAGS ('dbx_value_regex' = 'posted|reversed|pending');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `profit_center_code` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Code');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `quality_inspection_result` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Result');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `quality_inspection_result` SET TAGS ('dbx_value_regex' = 'passed|failed|pending');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `quantity_received` SET TAGS ('dbx_business_glossary_term' = 'Quantity Received');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `receipt_number` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `receipt_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `receipt_type` SET TAGS ('dbx_business_glossary_term' = 'Receipt Type');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `receipt_type` SET TAGS ('dbx_value_regex' = 'standard|return|transfer');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `slip_number` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Slip Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `source_system_load_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Source System Load Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `tax_amount` SET TAGS ('dbx_business_glossary_term' = 'Tax Amount');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M|PCS');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`procurement_goods_receipt` ALTER COLUMN `vendor_invoice_number` SET TAGS ('dbx_business_glossary_term' = 'Vendor Invoice Number');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` SET TAGS ('dbx_data_type' = 'transactional_data');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` SET TAGS ('dbx_subdomain' = 'order_processing');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `supplier_invoice_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Invoice ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `company_code_id` SET TAGS ('dbx_business_glossary_term' = 'Company Code Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `goods_receipt_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Goods Receipt Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `journal_entry_id` SET TAGS ('dbx_business_glossary_term' = 'Journal Entry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Purchase Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealership Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `procurement_goods_receipt_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Goods Receipt Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `procurement_purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Purchase Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `accounting_document_number` SET TAGS ('dbx_business_glossary_term' = 'Accounting Document Number');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `attachment_flag` SET TAGS ('dbx_business_glossary_term' = 'Attachment Flag');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `blocking_reason` SET TAGS ('dbx_business_glossary_term' = 'Blocking Reason');
@@ -626,7 +727,7 @@ ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `supplier_address_line` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `supplier_address_line` SET TAGS ('dbx_pii_address' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `supplier_city` SET TAGS ('dbx_business_glossary_term' = 'Supplier City');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `supplier_city` SET TAGS ('dbx_pii_person_data' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `supplier_city` SET TAGS ('dbx_pii_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `supplier_country_code` SET TAGS ('dbx_business_glossary_term' = 'Supplier Country Code');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `supplier_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `supplier_invoice_status` SET TAGS ('dbx_business_glossary_term' = 'Invoice Lifecycle Status');
@@ -641,13 +742,51 @@ ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `tolerance_check_result` SET TAGS ('dbx_value_regex' = 'within|exceeded|not_applicable');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `vat_number` SET TAGS ('dbx_business_glossary_term' = 'VAT Number');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_invoice` ALTER COLUMN `vat_number` SET TAGS ('dbx_pii_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` SET TAGS ('dbx_subdomain' = 'vendor_management');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `approved_vendor_list_id` SET TAGS ('dbx_business_glossary_term' = 'Approved Vendor List ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `audit_id` SET TAGS ('dbx_business_glossary_term' = 'Audit Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealership Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `supplier_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Contract ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `supply_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Material ID');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Effective Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'approved|conditional|disqualified');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `avl_number` SET TAGS ('dbx_business_glossary_term' = 'Approved Vendor List Number (AVL)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `backup_supplier_flag` SET TAGS ('dbx_business_glossary_term' = 'Backup Supplier Indicator');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `created_by_user` SET TAGS ('dbx_business_glossary_term' = 'Created By User');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|GBP|CNY|CAD');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `entry_date` SET TAGS ('dbx_business_glossary_term' = 'Entry Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time (Days)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `min_order_quantity` SET TAGS ('dbx_business_glossary_term' = 'Minimum Order Quantity');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `ppap_approval_level` SET TAGS ('dbx_business_glossary_term' = 'PPAP Approval Level');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `ppap_approval_level` SET TAGS ('dbx_value_regex' = 'Level1|Level2|Level3|Level4|Level5');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `preferred_supplier_flag` SET TAGS ('dbx_business_glossary_term' = 'Preferred Supplier Indicator');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `price_cap` SET TAGS ('dbx_business_glossary_term' = 'Price Cap (Maximum Allowed Price)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `quality_rating_threshold` SET TAGS ('dbx_business_glossary_term' = 'Quality Rating Threshold (%)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `regulatory_approval_required` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Approval Required');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `review_cycle_months` SET TAGS ('dbx_business_glossary_term' = 'Review Cycle (Months)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `single_source_justification` SET TAGS ('dbx_business_glossary_term' = 'Single Source Justification');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `source_list_flag` SET TAGS ('dbx_business_glossary_term' = 'Source List Indicator');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `updated_by_user` SET TAGS ('dbx_business_glossary_term' = 'Updated By User');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`approved_vendor_list` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` SET TAGS ('dbx_data_type' = 'master_data');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` SET TAGS ('dbx_subdomain' = 'vendor_management');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `info_record_id` SET TAGS ('dbx_business_glossary_term' = 'Purchasing Info Record ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `inspection_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Inspection Plan Id (Foreign Key)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Identifier');
+ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `supply_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Material Identifier');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|GBP|CNY|CAD');
@@ -677,48 +816,3 @@ ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `updat
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `vendor_evaluation_score` SET TAGS ('dbx_business_glossary_term' = 'Vendor Evaluation Score');
 ALTER TABLE `vibe_automotive_v1`.`procurement`.`info_record` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Created By User ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` SET TAGS ('dbx_subdomain' = 'vendor_management');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `supplier_evaluation_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Evaluation ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `model_id` SET TAGS ('dbx_business_glossary_term' = 'Model Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Evaluator ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `plant_id` SET TAGS ('dbx_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `comments` SET TAGS ('dbx_business_glossary_term' = 'Evaluation Comments');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|exempt');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `cost_score` SET TAGS ('dbx_business_glossary_term' = 'Cost Score');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `delivery_score` SET TAGS ('dbx_business_glossary_term' = 'Delivery Score');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `development_score` SET TAGS ('dbx_business_glossary_term' = 'Development Score');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `evaluation_date` SET TAGS ('dbx_business_glossary_term' = 'Evaluation Date');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `evaluation_method` SET TAGS ('dbx_business_glossary_term' = 'Evaluation Method');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `evaluation_method` SET TAGS ('dbx_value_regex' = 'automated|manual|mixed');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `evaluation_number` SET TAGS ('dbx_business_glossary_term' = 'Evaluation Number');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `evaluation_status` SET TAGS ('dbx_business_glossary_term' = 'Evaluation Status');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `evaluation_status` SET TAGS ('dbx_value_regex' = 'draft|in_progress|completed|approved|archived');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `evaluation_type` SET TAGS ('dbx_business_glossary_term' = 'Evaluation Type');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `evaluation_type` SET TAGS ('dbx_value_regex' = 'annual|quarterly|ad_hoc');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `evaluation_version` SET TAGS ('dbx_business_glossary_term' = 'Evaluation Version');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `failed_criteria_count` SET TAGS ('dbx_business_glossary_term' = 'Failed Criteria Count');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `invoice_accuracy_pct` SET TAGS ('dbx_business_glossary_term' = 'Invoice Accuracy Percentage');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `on_time_delivery_pct` SET TAGS ('dbx_business_glossary_term' = 'On‑Time Delivery Percentage');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `overall_score` SET TAGS ('dbx_business_glossary_term' = 'Overall Evaluation Score');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `passed_criteria_count` SET TAGS ('dbx_business_glossary_term' = 'Passed Criteria Count');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `period_end_date` SET TAGS ('dbx_business_glossary_term' = 'Evaluation Period End Date');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `period_start_date` SET TAGS ('dbx_business_glossary_term' = 'Evaluation Period Start Date');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `ppm_defect_rate` SET TAGS ('dbx_business_glossary_term' = 'PPM Defect Rate');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `price_variance_pct` SET TAGS ('dbx_business_glossary_term' = 'Price Variance Percentage');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `quality_score` SET TAGS ('dbx_business_glossary_term' = 'Quality Score');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `recommended_action` SET TAGS ('dbx_business_glossary_term' = 'Recommended Action');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `recommended_action` SET TAGS ('dbx_value_regex' = 'maintain|develop|reduce|disqualify');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `risk_level` SET TAGS ('dbx_business_glossary_term' = 'Risk Level');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `risk_level` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `supplier_category` SET TAGS ('dbx_business_glossary_term' = 'Supplier Category');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `supplier_category` SET TAGS ('dbx_value_regex' = 'tier1|tier2|tier3|tier4');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `supplier_region` SET TAGS ('dbx_business_glossary_term' = 'Supplier Region');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `supplier_region` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `total_criteria_count` SET TAGS ('dbx_business_glossary_term' = 'Total Criteria Count');
-ALTER TABLE `vibe_automotive_v1`.`procurement`.`supplier_evaluation` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');

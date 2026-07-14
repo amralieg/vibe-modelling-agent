@@ -1,5 +1,5 @@
 -- Schema for Domain: customer | Business: Automotive | Version: v2_mvm
--- Generated on: 2026-07-13 17:05:56
+-- Generated on: 2026-07-14 04:30:39
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_automotive_v1`.`customer` COMMENT 'SSOT for all customer identities including retail buyers, fleet operators, corporate accounts, and government entities. Manages customer profiles, contact information, preferences, vehicle ownership history, loyalty program membership, household linkages, and customer segmentation. Tracks NPS (Net Promoter Score), CLTV (Customer Lifetime Value), and customer journey touchpoints. Supports both B2C and B2B customer types with unified identity management. Integrates with Salesforce Automotive Cloud.';
@@ -55,8 +55,8 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`party` (
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`individual` (
     `individual_id` BIGINT COMMENT 'Unique system-generated identifier for the individual.',
     `dealership_id` BIGINT COMMENT 'Identifier of the dealer the individual prefers for service or purchase.',
+    `individual_preferred_dealer_dealership_id` BIGINT COMMENT 'Identifier of the dealer the individual prefers for service or purchase.',
     `party_id` BIGINT COMMENT 'add column party_id (BIGINT) with FK to customer.party.party_id - individual is a subtype of party and must reference the parent party record',
-    `primary_dealership_id` BIGINT COMMENT 'Identifier of the dealer the individual prefers for service or purchase.',
     `address_line1` STRING COMMENT 'First line of the individuals street address.',
     `address_line2` STRING COMMENT 'Second line of the street address (apartment, suite, etc.).',
     `annual_income_band` STRING COMMENT 'Income range band used for segmentation and marketing.. Valid values are `0-25k|25k-50k|50k-75k|75k-100k|100k-150k|150k+`',
@@ -104,7 +104,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`organization_account` (
     `organization_account_id` BIGINT COMMENT 'Unique surrogate key for the organization account record.',
     `dealership_id` BIGINT COMMENT 'Foreign key linking to dealer.dealership. Business justification: Fleet Account Management requires linking each fleet account to the fleet manager employee responsible.',
     `parent_organization_account_id` BIGINT COMMENT 'Identifier of the parent organization in corporate hierarchy, if applicable.',
-    `party_id` BIGINT COMMENT 'Foreign key linking to customer.party. Business justification: organization_account is the B2B customer profile and must link to the party master identity table — the same pattern as individual.party_id → party.party_id for B2C. The party table is the SSOT for al',
+    `party_id` BIGINT COMMENT 'Foreign key linking to customer.party. Business justification: organization_account is the B2B customer profile that extends the party master, exactly as individual extends party for B2C. The party table is the SSOT for all customer identities including corporate',
     `account_tier` STRING COMMENT 'Tier classification of the account based on strategic importance.. Valid values are `strategic|key|standard`',
     `accounts_payable_contact_email` STRING COMMENT 'Email address of the accounts payable contact.',
     `accounts_payable_contact_name` STRING COMMENT 'Name of the accounts payable contact.',
@@ -177,10 +177,14 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`contact_point` (
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` (
     `vehicle_ownership_id` BIGINT COMMENT 'Surrogate primary key uniquely identifying each vehicle ownership record.',
+    `connected_vehicle_id` BIGINT COMMENT 'Foreign key linking to customer.connected_vehicle. Business justification: Required for OTA campaign and warranty management linking each ownership record to its connected vehicle entity.',
     `dealership_id` BIGINT COMMENT 'Foreign key linking to dealer.dealership. Business justification: Required for warranty/service eligibility reports linking each ownership record to the dealer that sold the vehicle; dealer_code is denormalized and replaced.',
+    `fleet_contract_id` BIGINT COMMENT 'Foreign key linking to sales.fleet_contract. Business justification: Fleet operations require knowing which contract governs each owned/leased vehicle — for maintenance scheduling, mileage allowance enforcement, and contract compliance reporting. The fleet vehicle-to-',
+    `organization_account_id` BIGINT COMMENT 'Foreign key linking to customer.customer_fleet_account. Business justification: vehicle_ownership tracks the ownership history of vehicles by customers. For fleet operators, vehicles are owned/managed under a fleet account rather than (or in addition to) an individual party. Link',
     `party_id` BIGINT COMMENT 'Unique identifier of the customer (party) that owns or leases the vehicle.',
-    `powertrain_spec_id` BIGINT COMMENT 'Foreign key linking to engineering.powertrain_spec. Business justification: Aftersales and recall management: vehicle ownership must identify the exact powertrain spec to support EV charging/range customer communications, powertrain-specific recall targeting, OTA update eligi',
-    `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: Required for warranty, recall and production tracking reports that map each owned vehicle to its engineering program.',
+    `trade_in_id` BIGINT COMMENT 'Foreign key linking to sales.trade_in. Business justification: Vehicle disposition tracking requires linking an ownership record to the trade-in that disposed of it. The vehicle disposition via trade-in process — used for title transfer, lien payoff, and residu',
+    `vehicle_order_id` BIGINT COMMENT 'Foreign key linking to sales.vehicle_order. Business justification: Links ownership record to the original sales order, enabling warranty, service, and revenue attribution reports.',
+    `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Required for ownership verification and warranty claim processing; links each ownership record to the VIN registry entry to retrieve vehicle specs.',
     `acquisition_channel` STRING COMMENT 'Source through which the vehicle was obtained.. Valid values are `dealer|direct|auction|fleet`',
     `acquisition_date` DATE COMMENT 'Date the customer acquired the vehicle (purchase, lease start, etc.).',
     `acquisition_dealer_code` STRING COMMENT 'Identifier of the dealer that facilitated the acquisition.',
@@ -210,16 +214,72 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` (
     CONSTRAINT pk_vehicle_ownership PRIMARY KEY(`vehicle_ownership_id`)
 ) COMMENT 'Tracks the ownership history of vehicles by customers — the authoritative record linking a customer (party) to a VIN. Captures: VIN, party_id (owner), ownership type (retail purchase/lease/fleet/government), acquisition date, acquisition channel (dealer/direct/auction/fleet), acquisition dealer code, purchase price, trade-in VIN, registration state/country, registration number, registration expiry, title number, title state, lien holder name, insurance carrier, insurance policy number, insurance expiry, odometer at acquisition, current odometer (last reported), is_primary_vehicle flag, disposition type (sold/traded/totaled/repossessed), disposition date, and disposition odometer. SSOT for customer-vehicle relationship; cross-references vehicle domain VIN master.';
 
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` (
+    `loyalty_membership_id` BIGINT COMMENT 'System-generated unique identifier for the loyalty membership record.',
+    `dealership_id` BIGINT COMMENT 'Foreign key linking to dealer.dealership. Business justification: Loyalty Membership Enrollment Tracking records the employee who enrolled the party into the loyalty program.',
+    `individual_id` BIGINT COMMENT 'Identifier linking members belonging to the same household.',
+    `party_id` BIGINT COMMENT 'Unique identifier of the customer (party) that holds the membership.',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the loyalty membership record was first created.',
+    `current_tier` STRING COMMENT 'Current loyalty tier of the member based on points qualification.. Valid values are `bronze|silver|gold|platinum`',
+    `enrollment_channel` STRING COMMENT 'Channel through which the customer enrolled (e.g., online, in‑store).. Valid values are `online|in_store|dealer|call_center|mobile_app`',
+    `enrollment_date` DATE COMMENT 'Date the customer enrolled in the loyalty program.',
+    `is_primary_member` BOOLEAN COMMENT 'Indicates if this member is the primary account holder in a household linkage.',
+    `last_activity_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent activity (e.g., point accrual, redemption) by the member.',
+    `last_redemption_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent points redemption.',
+    `lifetime_points_earned` DECIMAL(18,2) COMMENT 'Total points the member has earned over the lifetime of the membership.',
+    `membership_expiry_date` DATE COMMENT 'Date when the membership itself expires if not renewed.',
+    `membership_number` STRING COMMENT 'Business identifier assigned to the member within the loyalty program.',
+    `notes` STRING COMMENT 'Free‑form comments or notes about the membership.',
+    `points_balance` DECIMAL(18,2) COMMENT 'Current balance of loyalty points available for redemption.',
+    `points_balance_last_year` DECIMAL(18,2) COMMENT 'Points balance at the end of the previous fiscal year.',
+    `points_earned_this_year` DECIMAL(18,2) COMMENT 'Points accrued by the member during the current calendar year.',
+    `points_expiry_date` DATE COMMENT 'Date on which the current points balance will expire if not used.',
+    `points_redeemed_this_year` DECIMAL(18,2) COMMENT 'Points redeemed by the member during the current calendar year.',
+    `preferred_redemption_category` STRING COMMENT 'Members preferred category for redeeming points.. Valid values are `service|accessories|cash|gift_card|charity`',
+    `program_status` STRING COMMENT 'Current status of the membership within the loyalty program.. Valid values are `active|suspended|expired|cancelled`',
+    `record_status` STRING COMMENT 'Lifecycle status of the record for data‑governance purposes.. Valid values are `active|inactive|deleted`',
+    `redemption_eligibility_flag` BOOLEAN COMMENT 'Indicates whether the member is currently eligible to redeem points.',
+    `referral_code` STRING COMMENT 'Alphanumeric code used by the member to refer new customers.',
+    `salesforce_loyalty_member_reference` STRING COMMENT 'Identifier of the member record in Salesforce Automotive Cloud Loyalty Management.',
+    `tier_benefits_description` STRING COMMENT 'Textual description of benefits associated with the current tier.',
+    `tier_expiry_date` DATE COMMENT 'Date the current tier expires if not renewed.',
+    `tier_points_required` DECIMAL(18,2) COMMENT 'Number of points required to reach the next tier level.',
+    `tier_qualification_date` DATE COMMENT 'Date the member qualified for the current tier.',
+    `total_points_redeemed` DECIMAL(18,2) COMMENT 'Aggregate number of points the member has redeemed.',
+    `total_redemptions` STRING COMMENT 'Cumulative count of redemption transactions performed by the member.',
+    `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the loyalty membership record.',
+    CONSTRAINT pk_loyalty_membership PRIMARY KEY(`loyalty_membership_id`)
+) COMMENT 'Manages customer enrollment and status in Automotive loyalty programs (e.g., owner rewards, EV early adopter program, fleet loyalty). Captures: program_id, party_id, membership number, enrollment date, enrollment channel, current tier (bronze/silver/gold/platinum), tier qualification date, tier expiry date, points balance, lifetime points earned, points expiry date, redemption eligibility flag, referral code, referred_by party_id, preferred redemption category, program status (active/suspended/expired/cancelled), and Salesforce Loyalty Management program member ID. Enables tier-based benefits, points accrual/redemption, and retention marketing.';
+
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`preference` (
+    `preference_id` BIGINT COMMENT 'Unique system-generated identifier for each preference entry.',
+    `party_id` BIGINT COMMENT 'Identifier of the customer (person or organization) to whom the preference applies.',
+    `preference_category` STRING COMMENT 'High‑level grouping of the preference (e.g., communication, vehicle feature, service scheduling, digital experience, privacy).. Valid values are `communication|vehicle|service|digital|privacy`',
+    `channel` STRING COMMENT 'Preferred channel for delivering communications when the preference_category is communication.. Valid values are `email|sms|push|mail|phone`',
+    `confidence_score` DECIMAL(18,2) COMMENT 'Confidence level (0.0000‑1.0000) that the stored preference accurately reflects the customers intent.',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the preference record was first created in the system.',
+    `data_origin_system` STRING COMMENT 'Identifies the source system that supplied the preference record.. Valid values are `salesforce|cdk|custom|other`',
+    `effective_date` DATE COMMENT 'Date on which the preference becomes active.',
+    `expiry_date` DATE COMMENT 'Date after which the preference is no longer valid; null if indefinite.',
+    `is_opt_out` BOOLEAN COMMENT 'True if the customer has explicitly opted out of the indicated preference; otherwise false.',
+    `last_updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the preference record.',
+    `notes` STRING COMMENT 'Optional free‑form comments or remarks about the preference.',
+    `preference_status` STRING COMMENT 'Current lifecycle state of the preference (e.g., active, inactive, expired, pending review).. Valid values are `active|inactive|expired|pending`',
+    `source` STRING COMMENT 'Origin of the preference record: self‑declared by the customer, inferred by analytics, or imported from an external system.. Valid values are `self_declared|inferred|imported`',
+    `value` DECIMAL(18,2) COMMENT 'The value assigned to the preference key; stored as text and interpreted according to value_data_type.',
+    `value_data_type` STRING COMMENT 'Indicates the native data type of preference_value (e.g., string, boolean, integer, list).. Valid values are `string|boolean|integer|list`',
+    CONSTRAINT pk_preference PRIMARY KEY(`preference_id`)
+) COMMENT 'Stores customer-declared and inferred preferences for communications, vehicle features, service scheduling, and digital experiences. Each record captures: party_id, preference category (communication/vehicle/service/digital/privacy), preference key (e.g., preferred_fuel_type, preferred_body_style, preferred_service_day, email_frequency), preference value, value data type (string/boolean/integer/list), source (self-declared/inferred/imported), confidence score, effective date, expiry date, and last updated timestamp. Supports personalized marketing, product recommendation engines, and connected vehicle feature configuration.';
+
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`case` (
     `case_id` BIGINT COMMENT 'Unique system-generated identifier for the customer service case.',
-    `aftersales_repair_order_id` BIGINT COMMENT 'Foreign key linking to aftersales.aftersales_repair_order. Business justification: CRM case escalation and resolution tracking requires direct linkage to the repair order under dispute. Automotive customer experience teams use this link daily to resolve failed repair complaints, t',
-    `connected_vehicle_id` BIGINT COMMENT 'Foreign key linking to vehicle.connected_vehicle. Business justification: Connectivity and telematics cases (OTA failures, remote-start errors, subscription issues) require direct access to the connected_vehicle device record for firmware version, activation status, and las',
+    `aftersales_service_appointment_id` BIGINT COMMENT 'Foreign key linking to aftersales.aftersales_service_appointment. Business justification: Customer cases triggered by or resolved via a service appointment booking must be linked for aftersales case management workflows. Dealers use this to track which appointment was booked in response to',
     `dealership_id` BIGINT COMMENT 'Identifier of the service agent currently assigned to the case.',
-    `delivery_appointment_id` BIGINT COMMENT 'Foreign key linking to sales.delivery_appointment. Business justification: Post-delivery defect and PDI issue cases must reference the originating delivery_appointment to trace what was promised vs. delivered (pdi_status, vehicle_preparation_status, documentation_status). Cu',
-    `part_master_id` BIGINT COMMENT 'Foreign key linking to engineering.part_master. Business justification: Warranty and field quality process: customer cases (defect complaints, warranty claims) reference the specific failed part. Linking case to part_master enables warranty analytics by part number, suppl',
+    `inbound_part_id` BIGINT COMMENT 'Foreign key linking to supply.inbound_part. Business justification: Warranty and recall management in automotive requires linking a customer quality case to the specific implicated inbound part (OEM part number, supplier, engineering change level). This enables suppli',
     `party_id` BIGINT COMMENT 'Identifier of the customer (individual, fleet, corporate) who raised the case.',
-    `vehicle_build_id` BIGINT COMMENT 'Foreign key linking to manufacturing.vehicle_build. Business justification: Warranty and recall case management requires direct traceability from a customer case to the exact vehicle build record, enabling access to build timestamps, quality gate results, paint/assembly stage',
-    `vehicle_ownership_id` BIGINT COMMENT 'Foreign key linking to customer.vehicle_ownership. Business justification: A customer service case — particularly warranty claims, recall notifications, and service complaints — is frequently tied to a specific vehicle ownership record, not just a VIN or a party in isolation',
+    `vehicle_order_id` BIGINT COMMENT 'Foreign key linking to sales.vehicle_order. Business justification: Customer service agents open cases directly referencing a vehicle order (delivery disputes, order-related complaints, warranty activation issues). The case-to-order linkage process in CRM/aftersales',
+    `vehicle_warranty_id` BIGINT COMMENT 'Foreign key linking to aftersales.vehicle_warranty. Business justification: Warranty dispute and goodwill cases must reference the vehicle warranty being contested. Aftersales customer relations teams require this link to adjudicate coverage disputes and produce warranty-rela',
+    `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Needed for service case management to pull vehicle specifications, warranty status, and recall info from VIN registry.',
     `case_number` STRING COMMENT 'Business-visible case number assigned at creation.',
     `case_status` STRING COMMENT 'Current lifecycle state of the case.. Valid values are `new|in_progress|pending_customer|resolved|closed|escalated`',
     `case_type` STRING COMMENT 'High-level classification of the case purpose.. Valid values are `complaint|inquiry|warranty_claim|recall|roadside|goodwill`',
@@ -247,56 +307,99 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`case` (
     CONSTRAINT pk_case PRIMARY KEY(`case_id`)
 ) COMMENT 'Customer service case record tracking complaints, inquiries, warranty claims, recall notifications, and roadside assistance requests raised by customers through any channel. Captures: party_id, VIN (if vehicle-related), case number, case type (complaint/inquiry/warranty_claim/recall/roadside/goodwill/lemon_law/regulatory), case category, case sub-category, subject, description, priority (P1-P4), status (new/in_progress/pending_customer/resolved/closed/escalated), opened date, SLA due date, resolved date, closed date, resolution code, resolution description, dealer code (if dealer-handled), assigned agent ID, escalation level, escalation reason, total handle time (minutes), customer satisfaction score (post-resolution), Salesforce Case ID, and Microsoft Dynamics 365 Case ID. SSOT for customer service operations.';
 
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` (
-    `telemetry_event_id` BIGINT COMMENT 'Unique surrogate key for each telemetry event record.',
-    `connected_vehicle_id` BIGINT COMMENT 'Foreign key linking to vehicle.connected_vehicle. Business justification: Telematics event processing and OTA update tracking require linking each telemetry event to the active connected_vehicle subscription/device record — not just the VIN — because firmware version, subsc',
-    `ecu_specification_id` BIGINT COMMENT 'Foreign key linking to engineering.ecu_specification. Business justification: Connected vehicle operations: telemetry events are generated by specific ECUs. Linking to ecu_specification enables OTA update eligibility targeting by ECU software version, diagnostic trouble code an',
-    `individual_id` BIGINT COMMENT 'Unique identifier of the driver associated with the vehicle at event time.',
-    `altitude` DOUBLE COMMENT 'Elevation above sea level of the vehicle at event time, in meters.',
-    `battery_soc_percent` DOUBLE COMMENT 'Current electric battery charge level for EV/HEV vehicles, expressed as a percentage.',
-    `battery_voltage_volt` DOUBLE COMMENT 'Instantaneous voltage of the vehicles high‑voltage battery, expressed in volts.',
-    `charging_status` BOOLEAN COMMENT 'True if the vehicle is currently connected to a charger and charging, otherwise false.',
-    `connectivity_status` BOOLEAN COMMENT 'True if the telematics device had an active network connection at event time.',
-    `engine_rpm` STRING COMMENT 'Engine speed measured in revolutions per minute at the time of the event.',
-    `engine_temperature_c` DOUBLE COMMENT 'Measured temperature of the engine coolant at event time, in degrees Celsius.',
-    `event_sequence` BIGINT COMMENT 'Monotonically increasing sequence number for events from the same vehicle, used for ordering.',
-    `event_source` STRING COMMENT 'Identifier of the source system that produced the telemetry record (e.g., Geotab, Bosch).',
-    `event_timestamp` TIMESTAMP COMMENT 'Date and time when the telemetry event was generated by the vehicle sensor.',
-    `event_type_code` STRING COMMENT 'Code that categorizes the type of telemetry event (e.g., speed, harsh_brake, idle).',
-    `firmware_version` STRING COMMENT 'Version identifier of the telematics device firmware that generated the event.',
-    `fuel_level_percent` DOUBLE COMMENT 'Remaining fuel level expressed as a percentage of tank capacity.',
-    `gps_accuracy_m` DOUBLE COMMENT 'Estimated horizontal accuracy of the GPS position in meters.',
-    `heading_degrees` DOUBLE COMMENT 'Compass direction the vehicle is facing at event time, expressed in degrees from true north.',
-    `ignition_state` BOOLEAN COMMENT 'Indicates whether the vehicle ignition is on (true) or off (false) at the moment of the event.',
-    `latitude` DOUBLE COMMENT 'Geographic latitude of the vehicle at event time, expressed in decimal degrees.',
-    `latitude_accuracy` DOUBLE COMMENT 'Estimated vertical accuracy of the latitude measurement.',
-    `location_city` STRING COMMENT 'City name derived from the GPS coordinates at event time.',
-    `location_country` STRING COMMENT 'Three‑letter ISO country code derived from the GPS coordinates at event time.',
-    `location_state` STRING COMMENT 'State or province name derived from the GPS coordinates at event time.',
-    `longitude` DOUBLE COMMENT 'Geographic longitude of the vehicle at event time, expressed in decimal degrees.',
-    `longitude_accuracy` DOUBLE COMMENT 'Estimated vertical accuracy of the longitude measurement.',
-    `odometer_km` DOUBLE COMMENT 'Cumulative distance traveled by the vehicle, recorded in kilometers.',
-    `raw_payload` STRING COMMENT 'Original JSON payload received from the telematics device before any transformation.',
-    `record_audit_created` TIMESTAMP COMMENT 'Timestamp when the telemetry record was first ingested into the silver layer.',
-    `record_audit_updated` TIMESTAMP COMMENT 'Timestamp of the most recent update to the telemetry record in the lakehouse.',
-    `signal_quality` STRING COMMENT 'Qualitative assessment of the telemetry signal (e.g., good, moderate, poor).',
-    `speed_kph` DOUBLE COMMENT 'Instantaneous vehicle speed at event time, measured in kilometers per hour.',
-    `tire_pressure_front_left_psi` DOUBLE COMMENT 'Air pressure of the front‑left tire measured in pounds per square inch.',
-    `tire_pressure_front_right_psi` DOUBLE COMMENT 'Air pressure of the front‑right tire measured in pounds per square inch.',
-    `tire_pressure_rear_left_psi` DOUBLE COMMENT 'Air pressure of the rear‑left tire measured in pounds per square inch.',
-    `tire_pressure_rear_right_psi` DOUBLE COMMENT 'Air pressure of the rear‑right tire measured in pounds per square inch.',
-    CONSTRAINT pk_telemetry_event PRIMARY KEY(`telemetry_event_id`)
-) COMMENT 'High-frequency transactional record of raw and processed telematics events streamed from connected vehicles via Geotab or Bosch IoT. Each record captures event timestamp, VIN reference, GPS coordinates (latitude, longitude, altitude), vehicle speed, heading, ignition state, odometer reading, fuel level, battery state of charge (for EV/HEV), engine RPM, and event type code. Silver layer record represents cleansed and deduplicated stream from the bronze ingestion layer.';
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` (
+    `connected_vehicle_id` BIGINT COMMENT 'Unique surrogate key for the connected vehicle record.',
+    `dealership_id` BIGINT COMMENT 'Foreign key linking to dealer.dealership. Business justification: Sales Attribution Report links each connected vehicle to the dealer that sold it, enabling dealer‑level warranty and service responsibility.',
+    `organization_account_id` BIGINT COMMENT 'Identifier of the fleet to which the vehicle belongs, if applicable.',
+    `party_id` BIGINT COMMENT 'Foreign key linking to customer.party. Business justification: Needed to identify the legal owner for billing, data‑privacy compliance, and service entitlement of each connected vehicle.',
+    `plant_id` BIGINT COMMENT 'Foreign key linking to manufacturing.plant. Business justification: Fleet driver assignment report requires linking each vehicle to its current driver employee for compliance and usage tracking.',
+    `service_campaign_id` BIGINT COMMENT 'Foreign key linking to aftersales.service_campaign. Business justification: Connected vehicle recall notification: OTA campaign applicability is determined per connected vehicle VIN. This link enables direct push notification to affected connected vehicles for safety recalls ',
+    `vehicle_order_id` BIGINT COMMENT 'Foreign key linking to sales.vehicle_order. Business justification: Connected services activation, warranty start determination, and OTA provisioning all reference the originating vehicle order. The connected services activation workflow requires linking a connected',
+    `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Required for warranty, recall and OTA management linking each connected vehicle to the official VIN registry record.',
+    `activation_status` STRING COMMENT 'Current lifecycle state of the device activation.. Valid values are `inactive|active|suspended|decommissioned`',
+    `activation_timestamp` TIMESTAMP COMMENT 'Date and time when the device was first activated.',
+    `battery_health_percent` DECIMAL(18,2) COMMENT 'Estimated health of the battery relative to its original capacity.',
+    `battery_state_of_charge_percent` DECIMAL(18,2) COMMENT 'Current state of charge of the vehicles battery expressed as a percentage.',
+    `connectivity_tier` STRING COMMENT 'Service tier defining data allowance and priority for the vehicle.. Valid values are `basic|standard|premium`',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the connected vehicle record was first created in the lakehouse.',
+    `data_plan` STRING COMMENT 'Subscription plan governing cellular data usage.. Valid values are `none|payg|monthly|annual`',
+    `data_usage_gb` DECIMAL(18,2) COMMENT 'Cumulative cellular data consumed by the vehicle in the current billing cycle.',
+    `data_usage_last_reset` DATE COMMENT 'Date when the data usage counter was last reset.',
+    `deactivation_timestamp` TIMESTAMP COMMENT 'Date and time when the device was deactivated or retired.',
+    `device_type` STRING COMMENT 'Model or family of the connected telematics device.. Valid values are `Geotab_GO|Bosch_IoT|Continental|Delphi|Valeo|Denso`',
+    `diagnostic_status` STRING COMMENT 'Overall health status derived from the latest diagnostic data.. Valid values are `ok|warning|critical`',
+    `firmware_version` STRING COMMENT 'Current firmware version installed on the telematics device.',
+    `geographic_region` STRING COMMENT 'Three‑letter ISO country code representing the primary market of the vehicle.. Valid values are `USA|CAN|MEX|DEU|JPN|CHN`',
+    `last_diagnostic_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent vehicle diagnostic event.',
+    `last_error_code` STRING COMMENT 'Most recent Diagnostic Trouble Code reported by the vehicle.',
+    `last_ota_update_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent Over‑The‑Air software update.',
+    `last_tpms_update_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent TPMS firmware or configuration update.',
+    `last_v2x_update_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent V2X software update.',
+    `manufacturer` STRING COMMENT 'Original Equipment Manufacturer of the vehicle.',
+    `mileage_km` DECIMAL(18,2) COMMENT 'Total distance traveled by the vehicle, reported in kilometers.',
+    `mileage_last_update` TIMESTAMP COMMENT 'Timestamp of the most recent mileage reading.',
+    `model_year` STRING COMMENT 'Model year of the vehicle (calendar year).',
+    `ota_capability` BOOLEAN COMMENT 'Indicates whether the vehicle supports Over-The-Air updates.',
+    `powertrain_type` STRING COMMENT 'Primary propulsion technology of the vehicle.. Valid values are `ev|phev|hev|ice`',
+    `registration_date` DATE COMMENT 'Date the vehicle was enrolled in the connected mobility program.',
+    `registration_status` STRING COMMENT 'Current status of the vehicles connectivity service registration.. Valid values are `registered|pending|rejected`',
+    `sim_iccid` STRING COMMENT 'Integrated Circuit Card Identifier of the SIM/eSIM used for connectivity.',
+    `sim_imsi` STRING COMMENT 'International Mobile Subscriber Identity associated with the SIM.',
+    `software_version` STRING COMMENT 'Version of the vehicles on‑board software platform.',
+    `subscription_end_date` DATE COMMENT 'Date when the current subscription plan expires (null if open‑ended).',
+    `subscription_plan` STRING COMMENT 'Service plan governing feature entitlements for the connected vehicle.. Valid values are `basic|standard|premium|enterprise`',
+    `subscription_start_date` DATE COMMENT 'Date when the current subscription plan became effective.',
+    `tpms_capability` BOOLEAN COMMENT 'Indicates whether the vehicle is equipped with Tire Pressure Monitoring System telemetry.',
+    `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the connected vehicle record.',
+    `v2x_capability` BOOLEAN COMMENT 'Indicates whether the vehicle can communicate Vehicle‑to‑Everything.',
+    `vehicle_type` STRING COMMENT 'Broad category of the vehicle.. Valid values are `car|truck|suv|commercial|ev|phev`',
+    `vin` STRING COMMENT 'Globally unique identifier assigned to each vehicle by the manufacturer.',
+    `warranty_expiration_date` DATE COMMENT 'Date when the vehicles warranty coverage ends.',
+    `warranty_status` STRING COMMENT 'Current warranty coverage status of the vehicle.. Valid values are `in_warranty|out_of_warranty|extended`',
+    CONSTRAINT pk_connected_vehicle PRIMARY KEY(`connected_vehicle_id`)
+) COMMENT 'Master registry of all connected vehicles enrolled in mobility and telematics services. Owns the connected device identity per VIN, connectivity hardware profile (Geotab/Bosch IoT device), SIM/eSIM identifiers, connectivity tier, activation status, OTA capability flags, V2X capability flags, and TPMS sensor registration. This is the SSOT for connected vehicle device identity within the mobility domain, distinct from the vehicle master in the vehicle domain which owns VIN-level manufacturing identity. Links to telematics_device for hardware asset details.';
+
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` (
+    `predictive_maintenance_alert_id` BIGINT COMMENT 'System‑generated unique identifier for each predictive maintenance alert record.',
+    `aftersales_repair_order_id` BIGINT COMMENT 'Foreign key to aftersales.service_order.service_order_id',
+    `case_id` BIGINT COMMENT 'Foreign key linking to customer.case. Business justification: A predictive maintenance alert frequently triggers the creation of a customer service case (e.g., a warranty claim or proactive service notification). Linking predictive_maintenance_alert to case prov',
+    `connected_vehicle_id` BIGINT COMMENT 'Foreign key linking to customer.connected_vehicle. Business justification: Link vehicle VIN to master connected_vehicle record; VIN column redundant.',
+    `inbound_part_id` BIGINT COMMENT 'Foreign key linking to supply.inbound_part. Business justification: Connected vehicle predictive maintenance alerts identify a specific failing component. Linking to inbound_part normalizes the text component field into a structured FK, enabling parts availability c',
+    `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Predictive maintenance alerts must be directly traceable to a physical VIN for service scheduling, warranty validation, and recall cross-referencing. Technicians and service systems query alerts by VI',
+    `alert_category` STRING COMMENT 'High‑level classification of the alert (e.g., engine, brake, battery, software).',
+    `alert_code` STRING COMMENT 'Business identifier code assigned to the alert for tracking and reference.',
+    `alert_status` STRING COMMENT 'Current lifecycle state of the alert.. Valid values are `open|acknowledged|resolved|expired`',
+    `confidence_percentage` DECIMAL(18,2) COMMENT 'Model confidence that the predicted failure will occur, expressed as a percentage (0‑100).',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the alert record was first persisted in the lakehouse.',
+    `failure_mode` STRING COMMENT 'Textual description of the failure mode the model predicts (e.g., coolant leak, battery degradation).',
+    `generation_timestamp` TIMESTAMP COMMENT 'Timestamp when the predictive maintenance alert was generated by the analytics engine.',
+    `mileage_at_alert` BIGINT COMMENT 'Odometer reading of the vehicle at the time the alert was generated.',
+    `predicted_failure_end` TIMESTAMP COMMENT 'Latest timestamp when the predicted failure is expected to occur.',
+    `predicted_failure_start` TIMESTAMP COMMENT 'Earliest timestamp when the predicted failure is expected to occur.',
+    `recommended_service_action` STRING COMMENT 'Prescribed maintenance or repair action to address the predicted issue.',
+    `resolution_timestamp` TIMESTAMP COMMENT 'Timestamp when the alert was marked resolved or closed.',
+    `severity` STRING COMMENT 'Severity classification of the alert indicating potential impact.. Valid values are `low|medium|high|critical`',
+    `temperature_celsius` DECIMAL(18,2) COMMENT 'Ambient temperature recorded by the vehicle sensor when the alert was generated.',
+    `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the alert record.',
+    CONSTRAINT pk_predictive_maintenance_alert PRIMARY KEY(`predictive_maintenance_alert_id`)
+) COMMENT 'Operational alert record generated when telematics and DTC data patterns indicate an impending vehicle component failure or maintenance need. Captures alert generation timestamp, VIN reference, affected component or system, predicted failure window, confidence level, alert severity, recommended service action, alert status (open/acknowledged/resolved/expired), and resolution timestamp. Distinct from a DTC event (which is a raw fault code) — this is a processed, actionable maintenance recommendation.';
 
 -- ========= FOREIGN KEYS =========
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ADD CONSTRAINT `fk_customer_individual_party_id` FOREIGN KEY (`party_id`) REFERENCES `vibe_automotive_v1`.`customer`.`party`(`party_id`);
 ALTER TABLE `vibe_automotive_v1`.`customer`.`organization_account` ADD CONSTRAINT `fk_customer_organization_account_parent_organization_account_id` FOREIGN KEY (`parent_organization_account_id`) REFERENCES `vibe_automotive_v1`.`customer`.`organization_account`(`organization_account_id`);
 ALTER TABLE `vibe_automotive_v1`.`customer`.`organization_account` ADD CONSTRAINT `fk_customer_organization_account_party_id` FOREIGN KEY (`party_id`) REFERENCES `vibe_automotive_v1`.`customer`.`party`(`party_id`);
 ALTER TABLE `vibe_automotive_v1`.`customer`.`contact_point` ADD CONSTRAINT `fk_customer_contact_point_party_id` FOREIGN KEY (`party_id`) REFERENCES `vibe_automotive_v1`.`customer`.`party`(`party_id`);
+ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ADD CONSTRAINT `fk_customer_vehicle_ownership_connected_vehicle_id` FOREIGN KEY (`connected_vehicle_id`) REFERENCES `vibe_automotive_v1`.`customer`.`connected_vehicle`(`connected_vehicle_id`);
+ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ADD CONSTRAINT `fk_customer_vehicle_ownership_organization_account_id` FOREIGN KEY (`organization_account_id`) REFERENCES `vibe_automotive_v1`.`customer`.`organization_account`(`organization_account_id`);
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ADD CONSTRAINT `fk_customer_vehicle_ownership_party_id` FOREIGN KEY (`party_id`) REFERENCES `vibe_automotive_v1`.`customer`.`party`(`party_id`);
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ADD CONSTRAINT `fk_customer_loyalty_membership_individual_id` FOREIGN KEY (`individual_id`) REFERENCES `vibe_automotive_v1`.`customer`.`individual`(`individual_id`);
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ADD CONSTRAINT `fk_customer_loyalty_membership_party_id` FOREIGN KEY (`party_id`) REFERENCES `vibe_automotive_v1`.`customer`.`party`(`party_id`);
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ADD CONSTRAINT `fk_customer_preference_party_id` FOREIGN KEY (`party_id`) REFERENCES `vibe_automotive_v1`.`customer`.`party`(`party_id`);
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ADD CONSTRAINT `fk_customer_case_party_id` FOREIGN KEY (`party_id`) REFERENCES `vibe_automotive_v1`.`customer`.`party`(`party_id`);
-ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ADD CONSTRAINT `fk_customer_case_vehicle_ownership_id` FOREIGN KEY (`vehicle_ownership_id`) REFERENCES `vibe_automotive_v1`.`customer`.`vehicle_ownership`(`vehicle_ownership_id`);
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ADD CONSTRAINT `fk_customer_telemetry_event_individual_id` FOREIGN KEY (`individual_id`) REFERENCES `vibe_automotive_v1`.`customer`.`individual`(`individual_id`);
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ADD CONSTRAINT `fk_customer_connected_vehicle_organization_account_id` FOREIGN KEY (`organization_account_id`) REFERENCES `vibe_automotive_v1`.`customer`.`organization_account`(`organization_account_id`);
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ADD CONSTRAINT `fk_customer_connected_vehicle_party_id` FOREIGN KEY (`party_id`) REFERENCES `vibe_automotive_v1`.`customer`.`party`(`party_id`);
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ADD CONSTRAINT `fk_customer_predictive_maintenance_alert_case_id` FOREIGN KEY (`case_id`) REFERENCES `vibe_automotive_v1`.`customer`.`case`(`case_id`);
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ADD CONSTRAINT `fk_customer_predictive_maintenance_alert_connected_vehicle_id` FOREIGN KEY (`connected_vehicle_id`) REFERENCES `vibe_automotive_v1`.`customer`.`connected_vehicle`(`connected_vehicle_id`);
 
 -- ========= TAGS =========
 ALTER SCHEMA `vibe_automotive_v1`.`customer` SET TAGS ('dbx_division' = 'business');
@@ -374,7 +477,6 @@ ALTER TABLE `vibe_automotive_v1`.`customer`.`party` ALTER COLUMN `preferred_curr
 ALTER TABLE `vibe_automotive_v1`.`customer`.`party` ALTER COLUMN `preferred_language` SET TAGS ('dbx_business_glossary_term' = 'Preferred Language (LANG_PREF)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`party` ALTER COLUMN `primary_contact_method` SET TAGS ('dbx_business_glossary_term' = 'Primary Contact Method (PRIMARY_CONTACT)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`party` ALTER COLUMN `primary_contact_method` SET TAGS ('dbx_value_regex' = 'email|phone|mail');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`party` ALTER COLUMN `primary_contact_method` SET TAGS ('dbx_pii_person_data' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`party` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp (CREATED_TS)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`party` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp (UPDATED_TS)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`party` ALTER COLUMN `registration_number` SET TAGS ('dbx_business_glossary_term' = 'Registration Number (REG_NO)');
@@ -393,7 +495,7 @@ ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` SET TAGS ('dbx_data_typ
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` SET TAGS ('dbx_subdomain' = 'identity_management');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `individual_id` SET TAGS ('dbx_business_glossary_term' = 'Individual ID');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Preferred Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `primary_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Preferred Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `individual_preferred_dealer_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Preferred Dealer ID');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `address_line1` SET TAGS ('dbx_business_glossary_term' = 'Address Line 1');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `address_line1` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_address' = 'true');
@@ -403,7 +505,7 @@ ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `address_l
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `annual_income_band` SET TAGS ('dbx_business_glossary_term' = 'Annual Income Band');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `annual_income_band` SET TAGS ('dbx_value_regex' = '0-25k|25k-50k|50k-75k|75k-100k|100k-150k|150k+');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `city` SET TAGS ('dbx_business_glossary_term' = 'City');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `city` SET TAGS ('dbx_pii_person_data' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `city` SET TAGS ('dbx_pii_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `cltv_estimate` SET TAGS ('dbx_business_glossary_term' = 'Customer Lifetime Value Estimate (CLTV)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `cltv_estimate` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `cltv_estimate` SET TAGS ('dbx_pii_financial' = 'true');
@@ -439,7 +541,7 @@ ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `gender` S
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `gender` SET TAGS ('dbx_value_regex' = 'male|female|other|prefer_not_to_say');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `gender` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `gender` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `gender` SET TAGS ('dbx_pii_person_data' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `gender` SET TAGS ('dbx_pii_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `individual_status` SET TAGS ('dbx_business_glossary_term' = 'Individual Status');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `individual_status` SET TAGS ('dbx_value_regex' = 'active|inactive|suspended|prospect|deceased');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `last_name` SET TAGS ('dbx_business_glossary_term' = 'Last Name (LN)');
@@ -452,6 +554,7 @@ ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `marital_s
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `marital_status` SET TAGS ('dbx_value_regex' = 'single|married|divorced|widowed|partnered|prefer_not_to_say');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `marital_status` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `marital_status` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `marital_status` SET TAGS ('dbx_pii_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `marketing_opt_in_email` SET TAGS ('dbx_business_glossary_term' = 'Marketing Opt‑In Email');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `marketing_opt_in_email` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `marketing_opt_in_email` SET TAGS ('dbx_pii_email' = 'true');
@@ -465,6 +568,7 @@ ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `middle_na
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `nationality` SET TAGS ('dbx_business_glossary_term' = 'Nationality (ISO 3166‑1 Alpha‑3)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `nationality` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `nationality` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `nationality` SET TAGS ('dbx_pii_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `nps_score` SET TAGS ('dbx_business_glossary_term' = 'Net Promoter Score (NPS)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `occupation` SET TAGS ('dbx_business_glossary_term' = 'Occupation');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `phone_number` SET TAGS ('dbx_business_glossary_term' = 'Phone Number');
@@ -480,6 +584,7 @@ ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `record_au
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `segment` SET TAGS ('dbx_business_glossary_term' = 'Customer Segment');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `state_province` SET TAGS ('dbx_business_glossary_term' = 'State/Province');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `state_province` SET TAGS ('dbx_pii_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `suffix` SET TAGS ('dbx_business_glossary_term' = 'Name Suffix');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `suffix` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`individual` ALTER COLUMN `suffix` SET TAGS ('dbx_pii_name' = 'true');
@@ -616,12 +721,16 @@ ALTER TABLE `vibe_automotive_v1`.`customer`.`contact_point` ALTER COLUMN `verifi
 ALTER TABLE `vibe_automotive_v1`.`customer`.`contact_point` ALTER COLUMN `verification_method` SET TAGS ('dbx_business_glossary_term' = 'Verification Method');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`contact_point` ALTER COLUMN `verification_method` SET TAGS ('dbx_value_regex' = 'email|sms|call|postal|in_person|other');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` SET TAGS ('dbx_subdomain' = 'identity_management');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` SET TAGS ('dbx_subdomain' = 'ownership_services');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `vehicle_ownership_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Ownership Record ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealership Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `fleet_contract_id` SET TAGS ('dbx_business_glossary_term' = 'Fleet Contract Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `organization_account_id` SET TAGS ('dbx_business_glossary_term' = 'Customer Fleet Account Id (Foreign Key)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `powertrain_spec_id` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Spec Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `trade_in_id` SET TAGS ('dbx_business_glossary_term' = 'Trade In Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `acquisition_channel` SET TAGS ('dbx_business_glossary_term' = 'Acquisition Channel');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `acquisition_channel` SET TAGS ('dbx_value_regex' = 'dealer|direct|auction|fleet');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `acquisition_date` SET TAGS ('dbx_business_glossary_term' = 'Acquisition Date');
@@ -657,19 +766,88 @@ ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `tr
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `vehicle_ownership_status` SET TAGS ('dbx_business_glossary_term' = 'Ownership Record Status');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`vehicle_ownership` ALTER COLUMN `vehicle_ownership_status` SET TAGS ('dbx_value_regex' = 'active|inactive|closed|pending');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` SET TAGS ('dbx_subdomain' = 'ownership_services');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `loyalty_membership_id` SET TAGS ('dbx_business_glossary_term' = 'Loyalty Membership ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Enrollment Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `dealership_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `individual_id` SET TAGS ('dbx_business_glossary_term' = 'Household ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `current_tier` SET TAGS ('dbx_business_glossary_term' = 'Current Tier (BRONZE/SILVER/GOLD/PLATINUM)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `current_tier` SET TAGS ('dbx_value_regex' = 'bronze|silver|gold|platinum');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `enrollment_channel` SET TAGS ('dbx_business_glossary_term' = 'Enrollment Channel');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `enrollment_channel` SET TAGS ('dbx_value_regex' = 'online|in_store|dealer|call_center|mobile_app');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `enrollment_date` SET TAGS ('dbx_business_glossary_term' = 'Enrollment Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `is_primary_member` SET TAGS ('dbx_business_glossary_term' = 'Is Primary Member Flag');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `last_activity_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Activity Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `last_redemption_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Redemption Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `lifetime_points_earned` SET TAGS ('dbx_business_glossary_term' = 'Lifetime Points Earned');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `membership_expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Membership Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `membership_number` SET TAGS ('dbx_business_glossary_term' = 'Membership Number (MEMBER_NO)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `membership_number` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `membership_number` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `points_balance` SET TAGS ('dbx_business_glossary_term' = 'Points Balance');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `points_balance_last_year` SET TAGS ('dbx_business_glossary_term' = 'Points Balance Last Year');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `points_earned_this_year` SET TAGS ('dbx_business_glossary_term' = 'Points Earned This Year');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `points_expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Points Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `points_redeemed_this_year` SET TAGS ('dbx_business_glossary_term' = 'Points Redeemed This Year');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `preferred_redemption_category` SET TAGS ('dbx_business_glossary_term' = 'Preferred Redemption Category');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `preferred_redemption_category` SET TAGS ('dbx_value_regex' = 'service|accessories|cash|gift_card|charity');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `program_status` SET TAGS ('dbx_business_glossary_term' = 'Program Status');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `program_status` SET TAGS ('dbx_value_regex' = 'active|suspended|expired|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `record_status` SET TAGS ('dbx_business_glossary_term' = 'Record Status');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `record_status` SET TAGS ('dbx_value_regex' = 'active|inactive|deleted');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `redemption_eligibility_flag` SET TAGS ('dbx_business_glossary_term' = 'Redemption Eligibility Flag');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `referral_code` SET TAGS ('dbx_business_glossary_term' = 'Referral Code');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `salesforce_loyalty_member_reference` SET TAGS ('dbx_business_glossary_term' = 'Salesforce Loyalty Member ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `salesforce_loyalty_member_reference` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `salesforce_loyalty_member_reference` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `tier_benefits_description` SET TAGS ('dbx_business_glossary_term' = 'Tier Benefits Description');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `tier_expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Tier Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `tier_points_required` SET TAGS ('dbx_business_glossary_term' = 'Tier Points Required');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `tier_qualification_date` SET TAGS ('dbx_business_glossary_term' = 'Tier Qualification Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `total_points_redeemed` SET TAGS ('dbx_business_glossary_term' = 'Total Points Redeemed');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `total_redemptions` SET TAGS ('dbx_business_glossary_term' = 'Total Redemptions');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`loyalty_membership` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` SET TAGS ('dbx_subdomain' = 'identity_management');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `preference_id` SET TAGS ('dbx_business_glossary_term' = 'Preference ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `preference_category` SET TAGS ('dbx_business_glossary_term' = 'Preference Category');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `preference_category` SET TAGS ('dbx_value_regex' = 'communication|vehicle|service|digital|privacy');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `channel` SET TAGS ('dbx_business_glossary_term' = 'Preference Communication Channel');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `channel` SET TAGS ('dbx_value_regex' = 'email|sms|push|mail|phone');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `confidence_score` SET TAGS ('dbx_business_glossary_term' = 'Preference Confidence Score');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Preference Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `data_origin_system` SET TAGS ('dbx_business_glossary_term' = 'Preference Data Origin System');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `data_origin_system` SET TAGS ('dbx_value_regex' = 'salesforce|cdk|custom|other');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Preference Effective Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Preference Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `is_opt_out` SET TAGS ('dbx_business_glossary_term' = 'Preference Opt‑Out Indicator');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Preference Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Preference Notes');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `preference_status` SET TAGS ('dbx_business_glossary_term' = 'Preference Status');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `preference_status` SET TAGS ('dbx_value_regex' = 'active|inactive|expired|pending');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `source` SET TAGS ('dbx_business_glossary_term' = 'Preference Source');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `source` SET TAGS ('dbx_value_regex' = 'self_declared|inferred|imported');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `value` SET TAGS ('dbx_business_glossary_term' = 'Preference Value');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `value_data_type` SET TAGS ('dbx_business_glossary_term' = 'Preference Value Data Type');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`preference` ALTER COLUMN `value_data_type` SET TAGS ('dbx_value_regex' = 'string|boolean|integer|list');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`case` SET TAGS ('dbx_subdomain' = 'service_operations');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`case` SET TAGS ('dbx_subdomain' = 'support_operations');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `case_id` SET TAGS ('dbx_business_glossary_term' = 'Case ID');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `aftersales_repair_order_id` SET TAGS ('dbx_business_glossary_term' = 'Aftersales Repair Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `aftersales_service_appointment_id` SET TAGS ('dbx_business_glossary_term' = 'Aftersales Service Appointment Id (Foreign Key)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned Agent ID');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `dealership_id` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `delivery_appointment_id` SET TAGS ('dbx_business_glossary_term' = 'Delivery Appointment Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer Party ID');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `vehicle_build_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Build Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `vehicle_ownership_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Ownership Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `vehicle_warranty_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Warranty Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `case_number` SET TAGS ('dbx_business_glossary_term' = 'Case Number');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `case_status` SET TAGS ('dbx_business_glossary_term' = 'Case Status');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `case_status` SET TAGS ('dbx_value_regex' = 'new|in_progress|pending_customer|resolved|closed|escalated');
@@ -699,56 +877,98 @@ ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `source_channel`
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `sub_category` SET TAGS ('dbx_business_glossary_term' = 'Case Sub-Category');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `subject` SET TAGS ('dbx_business_glossary_term' = 'Case Subject');
 ALTER TABLE `vibe_automotive_v1`.`customer`.`case` ALTER COLUMN `total_handle_time_minutes` SET TAGS ('dbx_business_glossary_term' = 'Total Handle Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` SET TAGS ('dbx_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` SET TAGS ('dbx_subdomain' = 'service_operations');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `telemetry_event_id` SET TAGS ('dbx_business_glossary_term' = 'Telemetry Event Identifier');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `ecu_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Ecu Specification Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `individual_id` SET TAGS ('dbx_business_glossary_term' = 'Driver Identifier');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `altitude` SET TAGS ('dbx_business_glossary_term' = 'Altitude (Meters)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `battery_soc_percent` SET TAGS ('dbx_business_glossary_term' = 'Battery State of Charge (SOC) Percentage');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `battery_voltage_volt` SET TAGS ('dbx_business_glossary_term' = 'Battery Voltage (V)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `charging_status` SET TAGS ('dbx_business_glossary_term' = 'Charging Status');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `connectivity_status` SET TAGS ('dbx_business_glossary_term' = 'Connectivity Status');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `engine_rpm` SET TAGS ('dbx_business_glossary_term' = 'Engine Revolutions Per Minute (RPM)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `engine_temperature_c` SET TAGS ('dbx_business_glossary_term' = 'Engine Temperature (°C)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `event_sequence` SET TAGS ('dbx_business_glossary_term' = 'Event Sequence Number');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `event_source` SET TAGS ('dbx_business_glossary_term' = 'Event Source System');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `event_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Event Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `event_type_code` SET TAGS ('dbx_business_glossary_term' = 'Event Type Code');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `firmware_version` SET TAGS ('dbx_business_glossary_term' = 'Device Firmware Version');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `fuel_level_percent` SET TAGS ('dbx_business_glossary_term' = 'Fuel Level Percentage');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `gps_accuracy_m` SET TAGS ('dbx_business_glossary_term' = 'GPS Accuracy (Meters)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `gps_accuracy_m` SET TAGS ('dbx_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `heading_degrees` SET TAGS ('dbx_business_glossary_term' = 'Heading (Degrees)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `ignition_state` SET TAGS ('dbx_business_glossary_term' = 'Ignition State');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `ignition_state` SET TAGS ('dbx_pii_present' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `latitude` SET TAGS ('dbx_business_glossary_term' = 'Latitude (Degrees)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `latitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_geo_location' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `latitude_accuracy` SET TAGS ('dbx_business_glossary_term' = 'Latitude Accuracy (Meters)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `latitude_accuracy` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `latitude_accuracy` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `location_city` SET TAGS ('dbx_business_glossary_term' = 'Location City');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `location_city` SET TAGS ('dbx_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `location_country` SET TAGS ('dbx_business_glossary_term' = 'Location Country (ISO 3166‑1 Alpha‑3)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `location_state` SET TAGS ('dbx_business_glossary_term' = 'Location State/Province');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `location_state` SET TAGS ('dbx_pii_present' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `longitude` SET TAGS ('dbx_business_glossary_term' = 'Longitude (Degrees)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `longitude` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_geo_location' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `longitude_accuracy` SET TAGS ('dbx_business_glossary_term' = 'Longitude Accuracy (Meters)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `longitude_accuracy` SET TAGS ('dbx_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `longitude_accuracy` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `odometer_km` SET TAGS ('dbx_business_glossary_term' = 'Odometer Reading (km)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `raw_payload` SET TAGS ('dbx_business_glossary_term' = 'Raw Telemetry Payload');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `signal_quality` SET TAGS ('dbx_business_glossary_term' = 'Signal Quality Indicator');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `speed_kph` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Speed (km/h)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `tire_pressure_front_left_psi` SET TAGS ('dbx_business_glossary_term' = 'Front Left Tire Pressure (psi)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `tire_pressure_front_right_psi` SET TAGS ('dbx_business_glossary_term' = 'Front Right Tire Pressure (psi)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `tire_pressure_rear_left_psi` SET TAGS ('dbx_business_glossary_term' = 'Rear Left Tire Pressure (psi)');
-ALTER TABLE `vibe_automotive_v1`.`customer`.`telemetry_event` ALTER COLUMN `tire_pressure_rear_right_psi` SET TAGS ('dbx_business_glossary_term' = 'Rear Right Tire Pressure (psi)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` SET TAGS ('dbx_subdomain' = 'ownership_services');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealership Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `organization_account_id` SET TAGS ('dbx_business_glossary_term' = 'Fleet ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Owner Party Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Driver Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `plant_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `service_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Service Campaign Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `activation_status` SET TAGS ('dbx_business_glossary_term' = 'Activation Status');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `activation_status` SET TAGS ('dbx_value_regex' = 'inactive|active|suspended|decommissioned');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `activation_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Activation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `battery_health_percent` SET TAGS ('dbx_business_glossary_term' = 'Battery Health (%)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `battery_health_percent` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `battery_health_percent` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `battery_state_of_charge_percent` SET TAGS ('dbx_business_glossary_term' = 'Battery State of Charge (%)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `connectivity_tier` SET TAGS ('dbx_business_glossary_term' = 'Connectivity Tier');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `connectivity_tier` SET TAGS ('dbx_value_regex' = 'basic|standard|premium');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `data_plan` SET TAGS ('dbx_business_glossary_term' = 'Data Plan');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `data_plan` SET TAGS ('dbx_value_regex' = 'none|payg|monthly|annual');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `data_usage_gb` SET TAGS ('dbx_business_glossary_term' = 'Data Usage (GB)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `data_usage_last_reset` SET TAGS ('dbx_business_glossary_term' = 'Data Usage Reset Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `deactivation_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Deactivation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `device_type` SET TAGS ('dbx_business_glossary_term' = 'Device Type');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `device_type` SET TAGS ('dbx_value_regex' = 'Geotab_GO|Bosch_IoT|Continental|Delphi|Valeo|Denso');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `diagnostic_status` SET TAGS ('dbx_business_glossary_term' = 'Diagnostic Status');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `diagnostic_status` SET TAGS ('dbx_value_regex' = 'ok|warning|critical');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `firmware_version` SET TAGS ('dbx_business_glossary_term' = 'Firmware Version');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `geographic_region` SET TAGS ('dbx_business_glossary_term' = 'Geographic Region');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `geographic_region` SET TAGS ('dbx_value_regex' = 'USA|CAN|MEX|DEU|JPN|CHN');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `last_diagnostic_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Diagnostic Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `last_error_code` SET TAGS ('dbx_business_glossary_term' = 'Last DTC Code');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `last_ota_update_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last OTA Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `last_tpms_update_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last TPMS Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `last_v2x_update_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last V2X Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `manufacturer` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Manufacturer');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `mileage_km` SET TAGS ('dbx_business_glossary_term' = 'Mileage (km)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `mileage_last_update` SET TAGS ('dbx_business_glossary_term' = 'Mileage Last Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `ota_capability` SET TAGS ('dbx_business_glossary_term' = 'OTA Capability');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ev|phev|hev|ice');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `registration_date` SET TAGS ('dbx_business_glossary_term' = 'Registration Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `registration_status` SET TAGS ('dbx_business_glossary_term' = 'Registration Status');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `registration_status` SET TAGS ('dbx_value_regex' = 'registered|pending|rejected');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `sim_iccid` SET TAGS ('dbx_business_glossary_term' = 'SIM ICCID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `sim_iccid` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `sim_iccid` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `sim_imsi` SET TAGS ('dbx_business_glossary_term' = 'SIM IMSI');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `sim_imsi` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `sim_imsi` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `software_version` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Software Version');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `subscription_end_date` SET TAGS ('dbx_business_glossary_term' = 'Subscription End Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `subscription_plan` SET TAGS ('dbx_business_glossary_term' = 'Subscription Plan');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `subscription_plan` SET TAGS ('dbx_value_regex' = 'basic|standard|premium|enterprise');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `subscription_start_date` SET TAGS ('dbx_business_glossary_term' = 'Subscription Start Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `tpms_capability` SET TAGS ('dbx_business_glossary_term' = 'TPMS Capability');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `v2x_capability` SET TAGS ('dbx_business_glossary_term' = 'V2X Capability');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `vehicle_type` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Type');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `vehicle_type` SET TAGS ('dbx_value_regex' = 'car|truck|suv|commercial|ev|phev');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `vin` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `vin` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `warranty_expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Warranty Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `warranty_status` SET TAGS ('dbx_business_glossary_term' = 'Warranty Status');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`connected_vehicle` ALTER COLUMN `warranty_status` SET TAGS ('dbx_value_regex' = 'in_warranty|out_of_warranty|extended');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` SET TAGS ('dbx_subdomain' = 'support_operations');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `predictive_maintenance_alert_id` SET TAGS ('dbx_business_glossary_term' = 'Predictive Maintenance Alert ID');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `case_id` SET TAGS ('dbx_business_glossary_term' = 'Case Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `alert_category` SET TAGS ('dbx_business_glossary_term' = 'Alert Category');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `alert_code` SET TAGS ('dbx_business_glossary_term' = 'Alert Code (ALERT_CODE)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `alert_status` SET TAGS ('dbx_business_glossary_term' = 'Alert Status');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `alert_status` SET TAGS ('dbx_value_regex' = 'open|acknowledged|resolved|expired');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `confidence_percentage` SET TAGS ('dbx_business_glossary_term' = 'Confidence Percentage (CONF_PCT)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `failure_mode` SET TAGS ('dbx_business_glossary_term' = 'Predicted Failure Mode Description');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `generation_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Alert Generation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `mileage_at_alert` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Mileage at Alert Generation');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `predicted_failure_end` SET TAGS ('dbx_business_glossary_term' = 'Predicted Failure Window End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `predicted_failure_start` SET TAGS ('dbx_business_glossary_term' = 'Predicted Failure Window Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `recommended_service_action` SET TAGS ('dbx_business_glossary_term' = 'Recommended Service Action');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `resolution_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Alert Resolution Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `severity` SET TAGS ('dbx_business_glossary_term' = 'Alert Severity Level');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `severity` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `temperature_celsius` SET TAGS ('dbx_business_glossary_term' = 'Ambient Temperature at Alert Generation (°C)');
+ALTER TABLE `vibe_automotive_v1`.`customer`.`predictive_maintenance_alert` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');

@@ -1,5 +1,5 @@
 -- Schema for Domain: dealer | Business:  | Version: v2_ecm
--- Generated on: 2026-07-13 15:03:50
+-- Generated on: 2026-07-14 02:32:20
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_automotive_v1`.`dealer` COMMENT 'Dealer network management including dealer profiles, franchise agreements, territory assignments, and dealer performance scorecards. Manages dealer inventory allocation, vehicle allocation rules, dealer incentive programs, and DMS (Dealer Management System) integration. Tracks dealer sales performance, customer satisfaction scores, service capacity, and parts inventory at dealer locations. Supports both OEM-owned and independent franchise dealer models. Integrates with CDK Global DMS.';
@@ -28,8 +28,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealership` (
     `dms_integration_status` STRING COMMENT 'Current status of the CDK Global DMS data integration feed for this dealership. Indicates whether real-time inventory, sales, and service data is flowing correctly into the OEM lakehouse.. Valid values are `active|inactive|pending_setup|error|suspended`',
     `ev_certified` BOOLEAN COMMENT 'Indicates whether the dealership has completed OEM Electric Vehicle (EV) certification requirements including technician training, charging infrastructure installation, and EV-specific tooling. Required for allocation of BEV and PHEV models.',
     `ev_charger_count` STRING COMMENT 'Number of EV charging stations installed at the dealership for customer and demo vehicle use. Relevant for EV certification compliance and customer experience reporting.',
-    `field_service_enabled` BOOLEAN COMMENT 'Whether this dealership offers field/mobile service.',
-    `field_visit_id` BIGINT COMMENT 'FK to latest field visit',
     `franchise_agreement_number` STRING COMMENT 'Reference number of the active franchise agreement between the OEM and the dealer entity. Used to link the dealership master record to the franchise agreement contract for legal and compliance purposes.',
     `franchise_expiry_date` DATE COMMENT 'Date on which the current franchise agreement is scheduled to expire or must be renewed. Nullable for perpetual agreements. Triggers renewal workflow when within the notice period.',
     `franchise_start_date` DATE COMMENT 'Date on which the current franchise agreement between the OEM and the dealer became effective. Used for tenure calculations, renewal scheduling, and performance baseline setting.',
@@ -66,7 +64,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealership` (
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` (
     `franchise_agreement_id` BIGINT COMMENT 'Unique identifier for the franchise agreement record. Primary key.',
     `dealership_id` BIGINT COMMENT 'Reference to the dealer entity that is party to this franchise agreement.',
-    `primary_dealership_id` BIGINT COMMENT 'Reference to the dealer entity that is party to this franchise agreement.',
+    `franchise_dealership_id` BIGINT COMMENT 'Reference to the dealer entity that is party to this franchise agreement.',
     `agreement_currency_code` STRING COMMENT 'Three-letter ISO 4217 currency code for all financial terms in the franchise agreement (quotas, fees, investment requirements). Example: USD, EUR, JPY.. Valid values are `^[A-Z]{3}$`',
     `agreement_document_url` STRING COMMENT 'Secure URL or file path to the digitally stored franchise agreement contract document (PDF or scanned image).',
     `agreement_name` STRING COMMENT 'Human-readable name or title of the franchise agreement, typically including dealer name and location.',
@@ -114,13 +112,55 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` (
 ) COMMENT 'Formal franchise contract between the OEM and an independent or OEM-owned dealer. Tracks agreement effective dates, expiration, renewal terms, franchise tier, authorized vehicle lines (nameplates), territory rights, performance obligations, and agreement status. Supports both new franchise grants and renewals.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` (
-    `dealer_territory_id` BIGINT COMMENT 'Primary key for local dealer_territory reference',
-    `sales_territory_id` BIGINT COMMENT 'FK reference to SSOT sales.sales_territory',
+    `dealer_territory_id` BIGINT COMMENT 'Unique identifier for the dealer territory assignment. Primary key.',
+    `franchise_agreement_id` BIGINT COMMENT 'Reference to the franchise agreement that governs this territory assignment. Links territory rights to contractual terms.',
+    `jurisdiction_id` BIGINT COMMENT 'Foreign key linking to compliance.jurisdiction. Business justification: Territory planning aligns with the legal jurisdiction for emissions and safety regulations; linking enables jurisdiction‑specific reporting.',
+    `employee_id` BIGINT COMMENT 'Foreign key linking to workforce.employee. Business justification: Territory manager assignment needed for territory performance reporting and incentive eligibility.',
+    `dealership_id` BIGINT COMMENT 'Reference to the dealership that owns or is assigned this territory.',
+    `sales_territory_id` BIGINT COMMENT 'SSOT reference to sales.sales_territory (cross-domain duplicate reconciliation; sales designated SSOT owner for territory).',
+    `allocation_quota_percentage` DECIMAL(18,2) COMMENT 'Percentage of regional or national vehicle allocation assigned to this territory. Sum of all territory percentages within a region should equal 100.',
+    `approval_date` DATE COMMENT 'Date when the territory assignment or modification was formally approved by OEM (Original Equipment Manufacturer) management.',
+    `approved_by` STRING COMMENT 'Name or identifier of the OEM (Original Equipment Manufacturer) executive or manager who approved this territory assignment or modification.',
+    `city_list` STRING COMMENT 'Comma-separated list of cities or municipalities included in the territory coverage area.',
+    `competitive_intensity_rating` STRING COMMENT 'Assessment of competitive pressure within the territory based on number of competing brands, dealer density, and market saturation.. Valid values are `low|medium|high|very_high`',
+    `country_code` STRING COMMENT 'Three-letter ISO country code for the territory location (e.g., USA, CAN, MEX).. Valid values are `^[A-Z]{3}$`',
+    `county_region` STRING COMMENT 'County, district, or regional subdivision name within the state/province that defines part of the territory boundary.',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this territory assignment record was first created in the system. Audit trail for data lineage.',
+    `dms_integration_status` STRING COMMENT 'Status of territory data synchronization with the dealers DMS (Dealer Management System), specifically CDK Global DMS. Indicates whether territory boundaries are reflected in dealer systems.. Valid values are `integrated|pending|failed|not_applicable`',
+    `dms_last_sync_timestamp` TIMESTAMP COMMENT 'Timestamp of the last successful synchronization of territory data with the dealers DMS (Dealer Management System). Used to monitor data freshness and integration health.',
+    `effective_end_date` DATE COMMENT 'Date when the territory assignment expires or is terminated. Null indicates an open-ended assignment.',
+    `effective_start_date` DATE COMMENT 'Date when the territory assignment becomes active and the dealer assumes responsibility for the defined area.',
+    `geographic_boundary_description` STRING COMMENT 'Textual description of territory boundaries using landmarks, highways, or natural features (e.g., North of I-40, East of Highway 101).',
+    `household_count_estimate` STRING COMMENT 'Estimated number of households within the territory. Used for market penetration analysis and vehicle allocation planning.',
+    `incentive_program_eligibility_flag` BOOLEAN COMMENT 'Indicates whether dealers in this territory are eligible for special OEM (Original Equipment Manufacturer) incentive programs or bonuses. True = eligible; False = not eligible.',
+    `last_modified_timestamp` TIMESTAMP COMMENT 'Timestamp when this territory assignment record was last updated. Tracks the most recent change to any field in the record.',
+    `last_review_date` DATE COMMENT 'Date when the territory assignment was last reviewed or audited by OEM (Original Equipment Manufacturer) management. Used to track compliance with periodic review requirements.',
+    `manager_email` STRING COMMENT 'Email address of the OEM (Original Equipment Manufacturer) territory manager. Used for dealer communications and escalations.. Valid values are `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$`',
+    `manager_name` STRING COMMENT 'Name of the OEM (Original Equipment Manufacturer) regional or territory manager responsible for overseeing this territory and dealer relationship.',
+    `manager_phone` STRING COMMENT 'Contact phone number for the OEM (Original Equipment Manufacturer) territory manager.',
+    `market_segment_classification` STRING COMMENT 'Classification of the territory market type based on population density and urbanization level. Influences vehicle mix allocation and marketing strategies.. Valid values are `urban|suburban|rural|metro|mixed`',
+    `modification_reason` STRING COMMENT 'Business justification for the most recent change to the territory assignment (e.g., market expansion, dealer consolidation, performance adjustment).',
+    `next_review_date` DATE COMMENT 'Scheduled date for the next territory assignment review. Ensures regular evaluation of territory boundaries and dealer performance.',
+    `overlap_allowed_flag` BOOLEAN COMMENT 'Indicates whether this territory can overlap with other dealer territories. True allows shared coverage; False enforces exclusive boundaries.',
+    `overlap_rule_description` STRING COMMENT 'Business rules governing how overlapping territories are managed, including priority rules, customer assignment logic, and conflict resolution procedures.',
+    `performance_benchmark_group` STRING COMMENT 'Peer group or cohort used for dealer performance benchmarking. Territories with similar characteristics are grouped for fair comparison.',
+    `population_estimate` STRING COMMENT 'Estimated total population within the territory boundaries. Used for market sizing and dealer performance benchmarking.',
+    `postal_code_list` STRING COMMENT 'Comma-separated or range-based list of postal/zip codes included in the territory (e.g., 90001-90099,91000). Used for precise geographic allocation.',
+    `primary_area_of_responsibility` STRING COMMENT 'Geographic description of the core territory where the dealer has primary sales and service responsibility. May include city names, county boundaries, or regional descriptors.',
+    `sales_potential_index` DECIMAL(18,2) COMMENT 'Numeric index representing the relative sales potential of the territory compared to a baseline (e.g., 100 = average, 150 = 50% above average). Used for vehicle allocation and quota setting.',
+    `special_program_notes` STRING COMMENT 'Free-text notes describing any special programs, pilot initiatives, or unique conditions applicable to this territory (e.g., EV (Electric Vehicle) launch market, rural incentive zone).',
+    `state_province_code` STRING COMMENT 'Two or three-letter code for the state, province, or administrative region (e.g., CA, TX, ON).. Valid values are `^[A-Z]{2,3}$`',
+    `territory_code` STRING COMMENT 'Unique alphanumeric code identifying the territory within the dealer network. Used for vehicle allocation and market planning.. Valid values are `^[A-Z0-9]{3,12}$`',
+    `territory_name` STRING COMMENT 'Business-friendly name or description of the territory (e.g., Metro East Region, Downtown District).',
+    `territory_status` STRING COMMENT 'Current lifecycle status of the territory assignment. Active territories are operational; pending awaits approval; suspended is temporarily halted; terminated is closed.. Valid values are `active|inactive|pending|suspended|under_review|terminated`',
+    `territory_type` STRING COMMENT 'Classification of territory assignment model: exclusive (single dealer), shared (multiple dealers), open (no restrictions), primary (main responsibility), secondary (backup coverage), overlay (special program).. Valid values are `exclusive|shared|open|primary|secondary|overlay`',
+    `vehicle_allocation_priority` STRING COMMENT 'Priority ranking for vehicle inventory allocation to this territory. Lower numbers indicate higher priority. Used during supply constraints.',
     CONSTRAINT pk_dealer_territory PRIMARY KEY(`dealer_territory_id`)
-) COMMENT 'Reference to SSOT owner sales.sales_territory. Geographic sales territory assigned to a dealership. Defines primary area of responsibility (PAR), zip/postal code coverage, county or region boundaries, territory type (exclusive, shared, open), effective dates, and overlap rules. Used for vehicle allocation, market representation planning, and dealer performance benchmarking.';
+) COMMENT 'Geographic sales territory assigned to a dealership. Defines primary area of responsibility (PAR), zip/postal code coverage, county or region boundaries, territory type (exclusive, shared, open), effective dates, and overlap rules. Used for vehicle allocation, market representation planning, and dealer performance benchmarking.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` (
     `dealer_certification_id` BIGINT COMMENT 'Unique identifier for the dealer certification record. Primary key.',
+    `compliance_emissions_certification_id` BIGINT COMMENT 'SSOT reference to compliance.compliance_emissions_certification (cross-domain duplicate reconciliation; compliance designated SSOT owner for certification).',
     `obligation_id` BIGINT COMMENT 'Foreign key linking to compliance.compliance_obligation. Business justification: Regulatory compliance requires each dealer certification to be linked to the specific compliance obligation it satisfies, enabling audit of certification against obligations.',
     `dealership_id` BIGINT COMMENT 'Reference to the dealership that holds this certification. Links to the dealer master record.',
     `allocation_eligibility_flag` BOOLEAN COMMENT 'Indicates whether this certification makes the dealer eligible for preferential vehicle allocation (e.g., EV-certified dealers receive priority allocation of electric vehicles).',
@@ -168,10 +208,10 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` (
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` (
     `vehicle_allocation_id` BIGINT COMMENT 'Unique surrogate identifier for each vehicle allocation record linking a specific vehicle unit or allocation batch from OEM manufacturing output to a dealership inventory pipeline.',
-    `dealership_id` BIGINT COMMENT 'Reference to the dealership receiving this vehicle allocation. Links to the dealer master record in the dealer network.',
     `production_order_id` BIGINT COMMENT 'Reference to the manufacturing production order that produced the allocated vehicle units. Links manufacturing output to dealer allocation pipeline.',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Allocation planning reports require linking each allocated vehicle to its SKU for capacity, cost, and compliance tracking.',
-    `vehicle_dealer_dealership_id` BIGINT COMMENT 'Reference to the dealership receiving this vehicle allocation. Links to the dealer master record in the dealer network.',
+    `dealership_id` BIGINT COMMENT 'Reference to the dealership receiving this vehicle allocation. Links to the dealer master record in the dealer network.',
+    `vehicle_dealership_id` BIGINT COMMENT 'Reference to the dealership receiving this vehicle allocation. Links to the dealer master record in the dealer network.',
     `acceptance_deadline` DATE COMMENT 'Date by which the dealer must formally accept or reject this allocation. Failure to respond by this date may result in automatic acceptance or reallocation per OEM dealer agreement terms.',
     `acceptance_timestamp` TIMESTAMP COMMENT 'Exact timestamp when the dealer formally accepted this vehicle allocation via the dealer portal or DMS integration. Provides precise audit trail for dealer commitment.',
     `accepted_quantity` STRING COMMENT 'Number of vehicle units formally accepted by the dealer from this allocation. May be less than allocated_quantity if the dealer partially accepts or rejects units.',
@@ -312,7 +352,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` (
     `parts_inventory_id` BIGINT COMMENT 'Unique surrogate identifier for each parts inventory record at the dealer location. Primary key for the dealer parts inventory entity in the Silver Layer lakehouse.',
     `inbound_part_id` BIGINT COMMENT 'Foreign key linking to supply.inbound_part. Business justification: Traceability for recalls and quality requires linking each dealer part stock item to its inbound part record.',
     `dealership_id` BIGINT COMMENT 'Reference to the dealer location where this parts inventory record is maintained. Links to the dealer master entity in the dealer domain.',
-    `primary_dealership_id` BIGINT COMMENT 'Reference to the dealer location where this parts inventory record is maintained. Links to the dealer master entity in the dealer domain.',
+    `parts_dealership_id` BIGINT COMMENT 'Reference to the dealer location where this parts inventory record is maintained. Links to the dealer master entity in the dealer domain.',
     `procurement_supplier_id` BIGINT COMMENT 'Foreign key linking to procurement.supplier. Business justification: Needed for Parts Inventory Management to associate each part stock with its supplying vendor for ordering, pricing, and compliance.',
     `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: REQUIRED: Parts pricing, valuation and regulatory compliance reports require linking dealer parts stock to the master SKU definition.',
     `spare_parts_catalog_id` BIGINT COMMENT 'Foreign key linking to asset.spare_parts_catalog. Business justification: Parts inventory must reference the master parts catalog for pricing, compliance, and warranty reporting; this is required for the Parts Pricing & Compliance Report.',
@@ -363,11 +403,11 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` (
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` (
     `retail_sale_id` BIGINT COMMENT 'Unique surrogate identifier for each retail vehicle sale transaction record in the dealer domain. Primary key for the retail_sale data product.',
     `opportunity_id` BIGINT COMMENT 'Foreign key linking to sales.opportunity. Business justification: Retail sale conversion analysis links the final sale back to the originating sales opportunity for win‑loss tracking.',
-    `dealership_id` BIGINT COMMENT 'Reference to the dealership that executed the retail sale transaction. Links to the dealer master record in the dealer domain.',
-    `employee_id` BIGINT COMMENT 'Reference to the dealership salesperson (finance and insurance associate or sales consultant) who managed and closed the retail deal.',
     `party_id` BIGINT COMMENT 'Reference to the retail customer (buyer) who purchased the vehicle. Links to the customer master record.',
-    `retail_customer_party_id` BIGINT COMMENT 'Reference to the retail customer (buyer) who purchased the vehicle. Links to the customer master record.',
-    `retail_dealer_dealership_id` BIGINT COMMENT 'Reference to the dealership that executed the retail sale transaction. Links to the dealer master record in the dealer domain.',
+    `dealership_id` BIGINT COMMENT 'Reference to the dealership that executed the retail sale transaction. Links to the dealer master record in the dealer domain.',
+    `retail_dealership_id` BIGINT COMMENT 'Reference to the dealership that executed the retail sale transaction. Links to the dealer master record in the dealer domain.',
+    `employee_id` BIGINT COMMENT 'Reference to the dealership salesperson (finance and insurance associate or sales consultant) who managed and closed the retail deal.',
+    `retail_party_id` BIGINT COMMENT 'Reference to the retail customer (buyer) who purchased the vehicle. Links to the customer master record.',
     `retail_salesperson_employee_id` BIGINT COMMENT 'Reference to the dealership salesperson (finance and insurance associate or sales consultant) who managed and closed the retail deal.',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Retail sale transaction must reference the SKU for warranty registration, service history, and post‑sale reporting.',
     `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Retail sale reporting and warranty registration depend on linking the sold vehicle to its VIN registry entry.',
@@ -409,35 +449,134 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` (
 ) COMMENT 'Records the retail sale of a new or used vehicle by a dealership to an end customer. Captures VIN, sale date, sale price, MSRP, discount amount, trade-in details, financing type (cash, retail finance, lease), F&I products sold, salesperson, and deal status. Sourced from CDK Global DMS F&I module. SSOT for dealer-level vehicle sales transactions.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` (
-    `dealer_service_appointment_id` BIGINT COMMENT 'Primary key for local dealer_service_appointment reference',
-    `aftersales_service_appointment_id` BIGINT COMMENT 'FK reference to SSOT aftersales.aftersales_service_appointment',
+    `dealer_service_appointment_id` BIGINT COMMENT 'Unique identifier for the dealer_service_appointment data product (auto-inserted pre-linking).',
+    `aftersales_service_appointment_id` BIGINT COMMENT 'Foreign key linking to aftersales.service_appointment. Business justification: Business process: Dealer DMS schedules service appointments; aftersales processes them. Linking ensures appointment sync for parts, labor, and warranty tracking.',
+    `connected_vehicle_id` BIGINT COMMENT 'Foreign key linking to mobility.connected_vehicle. Business justification: Service Appointment Optimization uses real‑time vehicle location from the connected vehicle; required for scheduling and parts readiness.',
+    `dealership_id` BIGINT COMMENT 'Foreign key linking to dealer.dealership. Business justification: Dealer service appointments belong to a dealership; add dealership_id FK to link to dealership and remove redundant dealer_id column.',
+    `party_id` BIGINT COMMENT 'Foreign key linking to customer.party. Business justification: Service appointment scheduling needs to associate the customer (party) with the appointment for service history and follow‑up.',
+    `employee_id` BIGINT COMMENT 'Foreign key linking to workforce.employee. Business justification: Service appointments are assigned to a service advisor; required for labor costing and service KPI dashboards.',
+    `test_event_id` BIGINT COMMENT 'Foreign key linking to compliance.compliance_test_event. Business justification: Service appointments that include emissions or safety testing are recorded as compliance test events; linking captures that relationship.',
+    `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Service appointment scheduling must reference the specific vehicle VIN to allocate resources and track service history.',
     CONSTRAINT pk_dealer_service_appointment PRIMARY KEY(`dealer_service_appointment_id`)
-) COMMENT 'Reference to SSOT owner aftersales.aftersales_service_appointment. Scheduled service appointments at a dealership for vehicle maintenance, warranty repair, recall service, or customer-pay work. Tracks appointment date/time, customer, VIN, service type, advisor assigned, estimated duration, appointment status (scheduled, checked-in, in-progress, completed, no-show), and transportation option (loaner, shuttle, wait). Sourced from CDK Global DMS service scheduling module.';
+) COMMENT 'Scheduled service appointments at a dealership for vehicle maintenance, warranty repair, recall service, or customer-pay work. Tracks appointment date/time, customer, VIN, service type, advisor assigned, estimated duration, appointment status (scheduled, checked-in, in-progress, completed, no-show), and transportation option (loaner, shuttle, wait). Sourced from CDK Global DMS service scheduling module.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` (
-    `dealer_repair_order_id` BIGINT COMMENT 'Primary key for local dealer_repair_order reference',
-    `aftersales_repair_order_id` BIGINT COMMENT 'FK reference to SSOT aftersales.aftersales_repair_order',
+    `dealer_repair_order_id` BIGINT COMMENT 'Unique identifier for the dealer_repair_order data product (auto-inserted pre-linking).',
+    `aftersales_repair_order_id` BIGINT COMMENT 'Foreign key linking to aftersales.repair_order. Business justification: Process: Dealer creates a repair order in DMS; it must reference the central aftersales repair order for warranty validation and labor costing.',
+    `connected_vehicle_id` BIGINT COMMENT 'Foreign key linking to mobility.connected_vehicle. Business justification: Repair Order Diagnostic Integration pulls live diagnostic data from the connected vehicle to streamline repair workflow.',
+    `maintenance_order_id` BIGINT COMMENT 'Foreign key linking to asset.maintenance_order. Business justification: Dealer repair orders are executed using the plants maintenance order system, enabling unified cost, warranty, and downtime analysis.',
+    `party_id` BIGINT COMMENT 'Foreign key linking to customer.party. Business justification: Repair orders must be linked to the owning customer for warranty claim processing and regulatory reporting.',
+    `employee_id` BIGINT COMMENT 'Foreign key linking to workforce.employee. Business justification: Repair orders must record the technician performing work for warranty compliance and labor allocation.',
+    `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Repair orders must be tied to the VIN registry to manage warranty repairs and parts usage per vehicle.',
     CONSTRAINT pk_dealer_repair_order PRIMARY KEY(`dealer_repair_order_id`)
-) COMMENT 'Reference to SSOT owner aftersales.aftersales_repair_order. Detailed repair order (RO) record for each vehicle service event at a dealership. Captures RO number, open/close dates, VIN, mileage-in, complaint/cause/correction (3C), labor operations, technician assignments, parts consumed, warranty vs customer-pay vs internal split, total labor hours, total parts cost, and RO status. Core operational record for dealer service operations sourced from CDK Global DMS.';
+) COMMENT 'Detailed repair order (RO) record for each vehicle service event at a dealership. Captures RO number, open/close dates, VIN, mileage-in, complaint/cause/correction (3C), labor operations, technician assignments, parts consumed, warranty vs customer-pay vs internal split, total labor hours, total parts cost, and RO status. Core operational record for dealer service operations sourced from CDK Global DMS.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` (
-    `dealer_incentive_program_id` BIGINT COMMENT 'Primary key for local dealer_incentive_program reference',
-    `aftersales_nameplate_id` BIGINT COMMENT 'FK to product.aftersales_nameplate.aftersales_nameplate_id',
-    `sales_incentive_program_id` BIGINT COMMENT 'FK reference to SSOT sales.sales_incentive_program',
-    `vehicle_program_id` BIGINT COMMENT 'FK to engineering.vehicle_program.vehicle_program_id',
+    `dealer_incentive_program_id` BIGINT COMMENT 'Unique surrogate identifier for the OEM-sponsored dealer incentive program record in the Databricks Silver Layer.',
+    `aftersales_nameplate_id` BIGINT COMMENT '',
+    `sales_incentive_program_id` BIGINT COMMENT 'SSOT reference to sales.sales_incentive_program (cross-domain duplicate reconciliation; sales designated SSOT owner for incentive_program).',
+    `vehicle_program_id` BIGINT COMMENT 'add column vehicle_program_id (BIGINT) with FK to engineering.vehicle_program.vehicle_program_id - dealer incentive programs target specific vehicle programs',
+    `announcement_date` DATE COMMENT 'Date on which the incentive program was formally announced to the dealer network via the dealer portal or official OEM communications. Precedes effective_start_date to allow dealer preparation.',
+    `approved_by` STRING COMMENT 'Name or employee ID of the OEM finance or sales leadership authority who formally approved this incentive program. Required for SOX compliance and internal audit purposes.',
+    `approved_timestamp` TIMESTAMP COMMENT 'Timestamp when the incentive program was formally approved by OEM finance and sales leadership, transitioning from draft to active status. Required for SOX compliance audit trail.',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the incentive program record was first created in the OEM system of record (Salesforce Automotive Cloud or SAP S/4HANA). Formatted as yyyy-MM-ddTHH:mm:ss.SSSXXX per enterprise data standards.',
+    `currency_code` STRING COMMENT 'ISO 4217 three-letter currency code for all monetary amounts in this incentive program (e.g., USD, CAD, EUR, MXN). Supports multi-market OEM operations.. Valid values are `^[A-Z]{3}$`',
+    `dealer_tier_eligibility` STRING COMMENT 'Specifies which dealer performance tier classification is eligible to participate in this program. Platinum/Gold/Silver/Bronze tiers are OEM-assigned based on prior-year sales volume and CSI scores. All indicates no tier restriction.. Valid values are `all|platinum|gold|silver|bronze`',
+    `dealer_type_eligibility` STRING COMMENT 'Restricts program participation to specific dealer ownership models: franchise dealers, OEM-owned stores, or independent dealers. All applies to both OEM-owned and independent franchise dealer models.. Valid values are `all|franchise|oem_owned|independent`',
+    `dms_program_reference` STRING COMMENT 'The corresponding program identifier as recorded in CDK Global DMS used by dealer locations. Enables reconciliation between OEM master incentive records and dealer-side DMS reporting.. Valid values are `^[A-Z0-9_-]{1,50}$`',
+    `effective_end_date` DATE COMMENT 'Calendar date on which the incentive program measurement period closes and no further dealer performance accrual is accepted. Nullable for open-ended programs.',
+    `effective_start_date` DATE COMMENT 'Calendar date on which the incentive program becomes active and dealers begin accruing credit toward performance tiers. Aligns with the measurement period start.',
+    `eligible_dealer_count` STRING COMMENT 'Number of dealer locations determined to be eligible for participation in this incentive program at the time of program launch. Used for budget planning and program reach analysis by OEM sales operations.',
+    `eligible_nameplates` STRING COMMENT 'Pipe-delimited list of vehicle nameplates (brand/model lines) eligible for this incentive program (e.g., F-150|Mustang Mach-E|Explorer). Null if program applies to all nameplates. Managed in Salesforce Automotive Cloud vehicle catalog.',
+    `eligible_powertrain_types` STRING COMMENT 'Powertrain technology types eligible for this program. ICE (Internal Combustion Engine), EV (Electric Vehicle), HEV (Hybrid Electric Vehicle), PHEV (Plug-in Hybrid Electric Vehicle), or all. Critical for EV adoption incentive programs aligned with CAFE and EPA compliance targets.. Valid values are `ICE|EV|HEV|PHEV|all`',
+    `floor_plan_rate_pct` DECIMAL(18,2) COMMENT 'For floor plan assistance programs, the percentage of dealer inventory financing cost subsidized by the OEM. Expressed as an annual percentage rate (APR) subsidy. Null for non-floor-plan program types.',
+    `last_modified_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the incentive program record in the source system. Used for incremental data pipeline processing and audit trail in the Databricks Silver Layer.',
+    `max_payout_amount` DECIMAL(18,2) COMMENT 'The maximum total monetary payout a single dealer can earn under this incentive program during the measurement period. Acts as a cap to control OEM financial exposure. Null if no cap is defined.',
+    `measurement_period_type` STRING COMMENT 'Defines the cadence over which dealer performance is measured for incentive qualification. Monthly and quarterly are most common for volume bonuses; annual for loyalty programs; custom for special campaigns.. Valid values are `monthly|quarterly|annual|custom`',
+    `min_dealer_tenure_months` STRING COMMENT 'Minimum number of months a dealer must have been an active franchisee to be eligible for this program. Ensures new dealers meet a baseline operational maturity requirement.',
+    `model_year` STRING COMMENT 'The vehicle Model Year (MY) to which this incentive program applies. Restricts eligible vehicles to a specific MY production cycle (e.g., MY2024, MY2025). Null if program applies across all model years.. Valid values are `^(19|20)d{2}$`',
+    `oem_program_sponsor` STRING COMMENT 'Name or organizational unit of the OEM department sponsoring and funding this incentive program (e.g., North America Sales Operations, EV Business Unit, Truck Division). Used for internal cost allocation.',
+    `payout_date` DATE COMMENT 'Scheduled calendar date on which OEM processes and disburses earned incentive payments to qualifying dealers. May differ from effective_end_date due to reconciliation periods.',
+    `payout_structure_type` STRING COMMENT 'Defines how the incentive payout is calculated. Flat bonus: fixed dollar amount per tier. Per unit: dollar amount multiplied by units sold. Percentage of MSRP (Manufacturer Suggested Retail Price): payout as a percentage of vehicle MSRP. Percentage of invoice: payout as a percentage of dealer invoice price.. Valid values are `flat_bonus|per_unit|percentage_of_msrp|percentage_of_invoice`',
+    `performance_metric` STRING COMMENT 'The primary KPI used to measure dealer performance for this incentive program. Units sold for volume bonuses; NPS (Net Promoter Score) or CSAT score for satisfaction bonuses; EV units sold for EV adoption programs; PDI (Pre-Delivery Inspection) compliance rate for quality programs. [ENUM-REF-CANDIDATE: units_sold|nps_score|csat_score|ev_units_sold|market_share_pct|pdi_compliance_rate|revenue|floor_plan_days — promote to reference product]. Valid values are `units_sold|nps_score|csat_score|ev_units_sold|market_share_pct|pdi_compliance_rate`',
+    `program_code` STRING COMMENT 'Externally-known alphanumeric code assigned by OEM regional sales operations to uniquely identify the incentive program across systems including Salesforce Automotive Cloud and CDK Global DMS.. Valid values are `^[A-Z0-9_-]{3,30}$`',
+    `program_description` STRING COMMENT 'Detailed narrative description of the program objectives, eligibility rules, and payout mechanics as communicated to the dealer network. Sourced from OEM regional sales operations documentation.',
+    `program_manager_name` STRING COMMENT 'Full name of the OEM regional sales operations manager responsible for administering this incentive program. Used for dealer escalation and program governance.',
+    `program_name` STRING COMMENT 'Human-readable name of the dealer incentive program (e.g., Q3 2024 EV Adoption Bonus, Stair-Step Volume Bonus – Truck MY2024). Used in dealer communications and DMS reporting.',
+    `program_status` STRING COMMENT 'Current lifecycle state of the incentive program. Draft: under design by OEM regional sales ops. Active: open for dealer participation and accrual. Suspended: temporarily paused. Closed: measurement period ended, payouts being processed. Cancelled: terminated before completion.. Valid values are `draft|active|suspended|closed|cancelled`',
+    `program_type` STRING COMMENT 'Classification of the incentive program structure. Volume bonus rewards unit sales thresholds; stair-step provides escalating payouts per tier; CSAT bonus rewards customer satisfaction scores; EV adoption incentivizes electric vehicle sales; floor plan assistance subsidizes dealer inventory financing costs; market representation rewards geographic coverage. [ENUM-REF-CANDIDATE: volume_bonus|stair_step|csat_bonus|ev_adoption|floor_plan_assistance|market_representation|loyalty_retention|conquest — promote to reference product]. Valid values are `volume_bonus|stair_step|csat_bonus|ev_adoption|floor_plan_assistance|market_representation`',
+    `region_code` STRING COMMENT 'OEM-defined regional sales territory code identifying the geographic scope of the incentive program (e.g., NE, SE, MW, SW, W, NATIONAL). Managed by OEM regional sales operations.. Valid values are `^[A-Z]{2,10}$`',
+    `requires_pdi_compliance` BOOLEAN COMMENT 'Indicates whether the dealer must maintain a minimum PDI (Pre-Delivery Inspection) compliance rate as a prerequisite for incentive eligibility. True enforces PDI compliance gating; False means PDI compliance is not a condition.',
+    `requires_training_certification` BOOLEAN COMMENT 'Indicates whether dealer sales or service staff must hold current OEM-mandated training certifications (e.g., EV product training, ADAS certification) as an eligibility prerequisite for this program.',
+    `retroactive_flag` BOOLEAN COMMENT 'Indicates whether the stair-step payout structure applies retroactively to all units sold once a higher tier is achieved (True), or only incrementally to units sold above each threshold (False). Critical for stair-step program financial modeling.',
+    `salesforce_program_reference` STRING COMMENT 'The Salesforce Automotive Cloud record ID for this incentive program. Enables bi-directional synchronization between the Databricks Silver Layer and Salesforce CRM for dealer portal visibility.. Valid values are `^[a-zA-Z0-9]{15,18}$`',
+    `stackable_flag` BOOLEAN COMMENT 'Indicates whether this incentive program can be combined (stacked) with other concurrent OEM incentive programs for the same dealer and vehicle. True allows stacking; False means the program is mutually exclusive with other programs.',
+    `terms_version` STRING COMMENT 'Version identifier of the program terms and conditions document (e.g., v1.0, v2.1). Tracks amendments to program rules and ensures dealers are evaluated against the correct version of terms.. Valid values are `^vd+.d+$`',
+    `tier1_payout_amount` DECIMAL(18,2) COMMENT 'Monetary payout amount (in program currency) awarded to dealers achieving Tier 1 performance threshold. May represent a flat bonus or per-unit amount depending on payout_structure_type.',
+    `tier1_threshold` DECIMAL(18,2) COMMENT 'Minimum performance metric value a dealer must achieve to qualify for Tier 1 (entry-level) payout. Units depend on performance_metric (e.g., number of vehicles sold, NPS score points).',
+    `tier2_payout_amount` DECIMAL(18,2) COMMENT 'Monetary payout amount (in program currency) awarded to dealers achieving Tier 2 performance threshold. Null if program has fewer than 2 tiers.',
+    `tier2_threshold` DECIMAL(18,2) COMMENT 'Minimum performance metric value a dealer must achieve to qualify for Tier 2 payout. Must be greater than tier1_threshold. Null if program has fewer than 2 tiers.',
+    `tier3_payout_amount` DECIMAL(18,2) COMMENT 'Monetary payout amount (in program currency) awarded to dealers achieving Tier 3 performance threshold. Null if program has fewer than 3 tiers.',
+    `tier3_threshold` DECIMAL(18,2) COMMENT 'Minimum performance metric value a dealer must achieve to qualify for Tier 3 payout. Must be greater than tier2_threshold. Null if program has fewer than 3 tiers.',
+    `tier_count` STRING COMMENT 'Number of performance tiers defined within this incentive program (e.g., 3 for Bronze/Silver/Gold, 5 for stair-step programs). Determines the granularity of the payout structure.',
+    `total_program_budget` DECIMAL(18,2) COMMENT 'Total OEM-allocated budget for this incentive program across all participating dealers. Used by OEM regional sales operations for financial planning and CapEx/OpEx tracking in SAP S/4HANA CO.',
     CONSTRAINT pk_dealer_incentive_program PRIMARY KEY(`dealer_incentive_program_id`)
-) COMMENT 'Reference to SSOT owner sales.sales_incentive_program. OEM-sponsored dealer incentive and bonus programs including volume bonuses, stair-step programs, customer satisfaction bonuses, EV adoption incentives, and floor plan assistance. Defines program name, type, eligible nameplates, MY, performance tiers, payout structure, measurement period, and eligibility criteria. Managed by OEM regional sales operations.';
+) COMMENT 'OEM-sponsored dealer incentive and bonus programs including volume bonuses, stair-step programs, customer satisfaction bonuses, EV adoption incentives, and floor plan assistance. Defines program name, type, eligible nameplates, MY, performance tiers, payout structure, measurement period, and eligibility criteria. Managed by OEM regional sales operations.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` (
-    `dealer_incentive_claim_id` BIGINT COMMENT 'Primary key for local dealer_incentive_claim reference',
-    `sales_incentive_claim_id` BIGINT COMMENT 'FK reference to SSOT sales.sales_incentive_claim',
+    `dealer_incentive_claim_id` BIGINT COMMENT 'Unique system-generated identifier for each dealer incentive claim record. Primary key for the incentive_claim data product.',
+    `dealer_incentive_program_id` BIGINT COMMENT 'Reference to the OEM incentive program against which this claim is submitted. Links to the incentive program master record.',
+    `dealership_id` BIGINT COMMENT 'Reference to the dealer submitting this incentive claim. Links to the dealer master record in the dealer domain.',
+    `employee_id` BIGINT COMMENT 'Employee identifier of the OEM staff member who reviewed and approved or rejected the claim. Supports audit trail, segregation of duties compliance, and workload reporting for the dealer incentive operations team.',
+    `sales_incentive_claim_id` BIGINT COMMENT 'SSOT reference to sales.sales_incentive_claim (cross-domain duplicate reconciliation; sales designated SSOT owner for incentive_claim).',
+    `accrual_posted` BOOLEAN COMMENT 'Indicates whether a financial accrual has been posted in SAP FI for this incentive claim liability. True = accrual posted; False = accrual not yet posted. Used for period-end financial close management and EBITDA reporting accuracy.',
+    `adjustment_amount` DECIMAL(18,2) COMMENT 'Net monetary adjustment applied by the OEM during claim review, representing the difference between claimed_amount and approved_amount. A negative value indicates a reduction; positive indicates an upward correction. Supports audit trail and dispute resolution.',
+    `adjustment_reason` STRING COMMENT 'Reason code explaining why the approved_amount differs from the claimed_amount. Populated by the OEM reviewer when an adjustment is applied. [ENUM-REF-CANDIDATE: ineligible_units|duplicate_claim|missing_evidence|calculation_error|program_cap_exceeded|other — promote to reference product]. Valid values are `ineligible_units|duplicate_claim|missing_evidence|calculation_error|program_cap_exceeded|other`',
+    `approved_amount` DECIMAL(18,2) COMMENT 'Monetary amount approved by the OEM after review and validation of the dealers claim. May differ from claimed_amount due to adjustments, disallowed units, or partial approvals. This is the amount committed for payment processing in SAP FI.',
+    `approved_units` STRING COMMENT 'Number of vehicle units or qualifying transactions validated and approved by the OEM reviewer. May be less than claimed_units if some units are found ineligible during audit. Used to calculate the approved_amount for volume-based programs.',
+    `claim_number` STRING COMMENT 'Externally visible, human-readable unique claim reference number assigned at submission. Used by dealers and OEM finance teams to track and reference the claim across systems including CDK Global DMS and SAP FI.. Valid values are `^CLM-[0-9]{4}-[0-9]{6}$`',
+    `claim_period_end_date` DATE COMMENT 'End date of the performance or sales period covered by this incentive claim. Defines the close of the measurement window. Together with claim_period_start_date, establishes the claim period boundary for audit and reconciliation.',
+    `claim_period_start_date` DATE COMMENT 'Start date of the performance or sales period covered by this incentive claim. Defines the beginning of the measurement window for which the dealer is claiming the incentive.',
+    `claim_status` STRING COMMENT 'Current workflow state of the incentive claim through the OEM review and payment lifecycle. Valid states: submitted (initial dealer submission), under_review (OEM audit in progress), approved (claim validated and approved for payment), rejected (claim denied), paid (payment disbursed via SAP FI), cancelled (withdrawn by dealer or voided by OEM).. Valid values are `submitted|under_review|approved|rejected|paid|cancelled`',
+    `claim_type` STRING COMMENT 'Category of incentive claim being submitted, reflecting the nature of the OEM incentive program. [ENUM-REF-CANDIDATE: volume_bonus|retail_incentive|floor_plan|marketing_support|customer_satisfaction|parts_sales|service_absorption — promote to reference product]',
+    `claimed_amount` DECIMAL(18,2) COMMENT 'Gross monetary amount claimed by the dealer against the incentive program, expressed in the transaction currency. This is the dealer-submitted figure prior to OEM review and approval. Used for financial accrual and liability estimation.',
+    `claimed_metric_unit` STRING COMMENT 'Unit of measure for the claimed_metric_value field, indicating how the performance metric is expressed (e.g., units for vehicle count, percentage for service absorption rate, score for NPS/CSI, amount for revenue-based claims).. Valid values are `units|percentage|score|amount_usd|amount_local`',
+    `claimed_metric_value` DECIMAL(18,2) COMMENT 'The quantitative performance metric value being claimed by the dealer, applicable for non-unit-based programs such as customer satisfaction scores (NPS), service absorption rates, or parts sales amounts. Complements claimed_units for metric-driven incentive types.',
+    `claimed_units` STRING COMMENT 'Number of vehicle units or qualifying transactions the dealer is claiming against the incentive program for the claim period. Applicable for volume-based incentive programs such as volume bonus and retail incentive programs.',
+    `cost_center_code` STRING COMMENT 'SAP CO cost center code to which the incentive payout is charged. Used for internal cost allocation and management accounting of dealer incentive expenditure by brand, region, or program type.',
+    `country_code` STRING COMMENT 'ISO 3166-1 alpha-3 country code of the market in which the dealer operates and the claim is filed. Supports multi-market OEM operations and ensures correct regulatory and tax treatment of incentive payouts.. Valid values are `^[A-Z]{3}$`',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the incentive claim record was first created in the system. Represents the audit creation time (distinct from submission_date which is the business event date). Used for data lineage, audit trail, and Silver layer ingestion tracking.',
+    `currency_code` STRING COMMENT 'ISO 4217 three-letter currency code for all monetary amounts on this claim (claimed_amount, approved_amount, paid_amount). Supports multi-currency dealer networks operating in different markets.. Valid values are `^[A-Z]{3}$`',
+    `dealer_contact_email` STRING COMMENT 'Email address of the dealer representative responsible for this claim. Used for claim status notifications, evidence requests, and dispute correspondence. Classified as confidential PII per GDPR and applicable privacy regulations.. Valid values are `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$`',
+    `dealer_contact_name` STRING COMMENT 'Name of the dealer-side representative who submitted or is responsible for this incentive claim. Used for communication, follow-up, and audit correspondence between OEM and dealer.',
+    `dispute_date` DATE COMMENT 'Date on which the dealer formally raised a dispute against the OEMs claim decision. Populated only when dispute_flag is True. Used to track dispute aging and compliance with contractual dispute resolution timelines.',
+    `dispute_flag` BOOLEAN COMMENT 'Indicates whether the dealer has formally disputed the OEMs decision on this claim (e.g., disputed rejection or adjusted amount). True = claim is under dispute; False = no dispute raised. Triggers escalation workflow in Salesforce Automotive Cloud.',
+    `dispute_resolution_notes` STRING COMMENT 'Free-text notes documenting the outcome and resolution of a dealer dispute on this claim. Captures the agreed resolution, any revised approved amount, and the basis for the final decision. Supports audit trail and dealer relationship management.',
+    `dms_claim_reference` STRING COMMENT 'Claim reference number as recorded in the dealers CDK Global DMS system. Enables cross-system reconciliation between the OEMs incentive claim record and the dealers own DMS records. Critical for audit and dispute resolution.',
+    `evidence_document_ref` STRING COMMENT 'Reference identifier or URL pointing to the supporting evidence package submitted by the dealer with the claim (e.g., sales invoices, PDI records, customer satisfaction survey results, parts purchase orders). Stored in the document management system linked from CDK Global DMS or Salesforce Automotive Cloud.',
+    `evidence_verified` BOOLEAN COMMENT 'Indicates whether the OEM reviewer has verified the supporting evidence submitted with the claim. True = evidence reviewed and confirmed valid; False = evidence not yet verified or found insufficient. Used to gate claim approval workflow.',
+    `gl_account_code` STRING COMMENT 'SAP FI general ledger account code used to classify the incentive payout for financial reporting. Ensures correct P&L treatment of dealer incentive costs in accordance with IFRS 15 and OEM chart of accounts.',
+    `model_year` STRING COMMENT 'The vehicle model year (MY) associated with the units or transactions being claimed. Used to align incentive claims with specific model year programs and OEM production cycles (e.g., MY2024, MY2025).',
+    `paid_amount` DECIMAL(18,2) COMMENT 'Actual monetary amount disbursed to the dealer for this claim. May differ from approved_amount due to netting, offsets, or partial payment arrangements. Populated upon payment confirmation from SAP FI.',
+    `payment_date` DATE COMMENT 'Date on which the approved incentive amount was disbursed to the dealers bank account. Populated upon payment confirmation from SAP FI. Used for cash flow reporting and dealer payment aging analysis.',
+    `payment_reference` STRING COMMENT 'SAP FI payment document number or bank transfer reference assigned when the approved claim is paid. Links the incentive claim to the corresponding financial transaction in SAP FI Accounts Payable for reconciliation and audit.',
+    `powertrain_type` STRING COMMENT 'Powertrain technology category of the vehicles covered by this claim. Values: ICE (Internal Combustion Engine), HEV (Hybrid Electric Vehicle), PHEV (Plug-in Hybrid Electric Vehicle), EV (Electric Vehicle), FCEV (Fuel Cell Electric Vehicle). Used to track EV/electrification incentive program uptake and CAFE compliance reporting.. Valid values are `ICE|HEV|PHEV|EV|FCEV`',
+    `program_quarter` STRING COMMENT 'Fiscal quarter of the OEM incentive program period covered by this claim (Q1–Q4). Used for quarterly accrual reporting, dealer performance benchmarking, and incentive budget variance analysis.. Valid values are `Q1|Q2|Q3|Q4`',
+    `program_year` STRING COMMENT 'Fiscal or calendar year of the OEM incentive program under which this claim is filed. Used to segregate claims by annual program cycle for budget tracking, accrual management, and year-end financial close in SAP FI.',
+    `region_code` STRING COMMENT 'OEM sales region or zone code to which the submitting dealer belongs. Used for regional incentive program management, territory-based performance benchmarking, and regional finance reporting.',
+    `rejection_reason` STRING COMMENT 'Free-text or coded explanation provided by the OEM reviewer when a claim is rejected (claim_status = rejected). Documents the specific grounds for denial to support dealer dispute resolution and compliance with IATF 16949 dealer management requirements.',
+    `review_date` DATE COMMENT 'Date on which the OEM completed the review of the incentive claim and updated the claim_status to approved or rejected. Used for SLA tracking of claim processing turnaround time.',
+    `sap_fi_document_number` STRING COMMENT 'SAP FI accounting document number generated when the incentive claim liability or payment is posted in the general ledger. Provides direct traceability between the incentive claim and the SAP FI financial posting for audit and reconciliation purposes.',
+    `submission_date` DATE COMMENT 'Calendar date on which the dealer formally submitted the incentive claim to the OEM. This is the principal business event date for the claim lifecycle and is used for period-end cut-off and aging analysis.',
+    `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the incentive claim record. Tracks the last modification for change data capture (CDC), audit trail, and Silver layer incremental processing in the Databricks Lakehouse.',
+    `vehicle_line_code` STRING COMMENT 'OEM product line or nameplate code identifying the vehicle model family associated with this claim (e.g., F-150, Silverado, Model 3). Used to segment incentive claims by vehicle line for program performance analysis and brand-level reporting.',
     CONSTRAINT pk_dealer_incentive_claim PRIMARY KEY(`dealer_incentive_claim_id`)
-) COMMENT 'Reference to SSOT owner sales.sales_incentive_claim. Individual dealer claims submitted against OEM incentive programs. Tracks claim submission date, program, claim period, claimed units or metric, supporting evidence, claim status (submitted, under review, approved, rejected, paid), approved amount, and payment reference. Integrates with SAP FI for payout processing.';
+) COMMENT 'Individual dealer claims submitted against OEM incentive programs. Tracks claim submission date, program, claim period, claimed units or metric, supporting evidence, claim status (submitted, under review, approved, rejected, paid), approved amount, and payment reference. Integrates with SAP FI for payout processing.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` (
     `performance_scorecard_id` BIGINT COMMENT 'Unique identifier for the dealer performance scorecard record.',
     `dealership_id` BIGINT COMMENT 'Reference to the dealer being evaluated in this scorecard.',
-    `primary_dealership_id` BIGINT COMMENT 'Reference to the dealer being evaluated in this scorecard.',
+    `performance_dealership_id` BIGINT COMMENT 'Reference to the dealer being evaluated in this scorecard.',
     `comments` STRING COMMENT 'Additional notes or commentary from the OEM regarding the dealers performance during this period.',
     `composite_score` DECIMAL(18,2) COMMENT 'The overall weighted composite performance score combining all KPI categories (sales, service, parts, customer satisfaction, facility standards) used for franchise compliance and incentive eligibility.',
     `composite_score_benchmark` DECIMAL(18,2) COMMENT 'The minimum composite score required for franchise compliance and incentive program eligibility.',
@@ -484,11 +623,11 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` (
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` (
     `csi_survey_id` BIGINT COMMENT 'Unique identifier for the CSI survey response record.',
     `dealership_id` BIGINT COMMENT 'Identifier of the dealer location where the customer interaction occurred that triggered this survey.',
+    `csi_dealership_id` BIGINT COMMENT 'Identifier of the dealer location where the customer interaction occurred that triggered this survey.',
     `dealer_order_id` BIGINT COMMENT 'Identifier of the dealer order associated with this survey, if the survey is related to a sales transaction.',
     `csi_repair_order_id` BIGINT COMMENT 'Identifier of the repair order associated with this survey, if the survey is related to a service transaction.',
     `individual_id` BIGINT COMMENT 'Identifier of the customer who completed the survey.',
     `party_id` BIGINT COMMENT 'Identifier of the customer who completed the survey.',
-    `primary_dealership_id` BIGINT COMMENT 'Identifier of the dealer location where the customer interaction occurred that triggered this survey.',
     `vin_registry_id` BIGINT COMMENT 'Identifier of the vehicle associated with the customer interaction that triggered this survey.',
     `complaint_category` STRING COMMENT 'Category code classifying the nature of the customer complaint if complaint_flag is True (e.g., service_quality, pricing, staff_behavior, facility_issue).',
     `complaint_flag` BOOLEAN COMMENT 'Boolean indicator (True/False) whether the survey response contains a customer complaint requiring follow-up action.',
@@ -535,7 +674,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` (
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` (
     `service_capacity_id` BIGINT COMMENT 'Unique identifier for the service capacity configuration record. Primary key.',
     `dealership_id` BIGINT COMMENT 'Reference to the dealer location that owns this service capacity configuration.',
-    `service_dealer_dealership_id` BIGINT COMMENT 'Reference to the dealer location that owns this service capacity configuration.',
+    `service_dealership_id` BIGINT COMMENT 'Reference to the dealer location that owns this service capacity configuration.',
     `a_tech_headcount` STRING COMMENT 'Number of A-level (master) technicians certified for complex diagnostics, ECU (Electronic Control Unit) programming, and advanced repair work.',
     `adas_certified_tech_count` STRING COMMENT 'Number of technicians certified for ADAS calibration, sensor diagnostics, and autonomous driving system service.',
     `adas_service_bays` STRING COMMENT 'Number of service bays equipped with ADAS (Advanced Driver Assistance Systems) calibration equipment for sensor alignment and diagnostic work.',
@@ -584,7 +723,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` (
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` (
     `floor_plan_id` BIGINT COMMENT 'Unique identifier for the floor plan financing record.',
     `dealership_id` BIGINT COMMENT 'Reference to the dealer holding this floor plan financing arrangement.',
-    `primary_dealership_id` BIGINT COMMENT 'Reference to the dealer holding this floor plan financing arrangement.',
+    `floor_dealership_id` BIGINT COMMENT 'Reference to the dealer holding this floor plan financing arrangement.',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Floor‑plan financing is calculated per SKU to reflect cost, interest, and regulatory limits.',
     `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Floor plan financing is per‑vehicle; linking to VIN registry enables accurate interest calculation and balance tracking.',
     `account_number` STRING COMMENT 'Unique account number assigned by the financing institution to the dealers floor plan credit facility.',
@@ -628,9 +767,9 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` (
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` (
     `demo_vehicle_id` BIGINT COMMENT 'Unique identifier for the demo vehicle record. Primary key.',
     `dealership_id` BIGINT COMMENT 'Identifier of the dealer location where this demo vehicle is assigned.',
-    `primary_dealership_id` BIGINT COMMENT 'Identifier of the dealer location where this demo vehicle is assigned.',
+    `demo_dealership_id` BIGINT COMMENT 'Identifier of the dealer location where this demo vehicle is assigned.',
     `employee_id` BIGINT COMMENT 'Identifier of the salesperson to whom this demo vehicle is assigned.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the salesperson to whom this demo vehicle is assigned.',
+    `primary_demo_employee_id` BIGINT COMMENT 'Identifier of the salesperson to whom this demo vehicle is assigned.',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Demo vehicle program tracks specific SKU to manage feature availability, warranty coverage, and cost recovery.',
     `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Demo vehicle assignment and usage reporting require linking to the VIN registry for compliance and mileage tracking.',
     `accident_count` STRING COMMENT 'Number of reported accidents or incidents involving this demo vehicle during the demo period.',
@@ -672,28 +811,35 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` (
     `dealership_id` BIGINT COMMENT 'Foreign key linking to dealer.dealership. Business justification: Dealer test drives belong to a dealership; add dealership_id FK to link to dealership and remove redundant dealer_id column.',
     `employee_id` BIGINT COMMENT 'Foreign key linking to workforce.employee. Business justification: Test‑drive assignments are recorded to the employee conducting the drive for compliance and sales tracking.',
     `party_id` BIGINT COMMENT 'Foreign key linking to customer.party. Business justification: Test‑drive records must reference the interested customer to track conversion rates and follow‑up communications.',
-    `sales_test_drive_id` BIGINT COMMENT 'SSOT reference to sales.sales_test_drive (resolves cross-domain duplicate of test_drive).',
+    `sales_test_drive_id` BIGINT COMMENT 'SSOT reference to sales.sales_test_drive (cross-domain duplicate reconciliation; sales designated SSOT owner for test_drive).',
     CONSTRAINT pk_dealer_test_drive PRIMARY KEY(`dealer_test_drive_id`)
 ) COMMENT 'Records of customer test drive events conducted at a dealership. Captures test drive date/time, VIN driven, customer identifier, salesperson, duration, route type, customer feedback captured, and follow-up action scheduled. Supports sales funnel tracking and connects to lead management in Salesforce Automotive Cloud.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` (
-    `dealer_parts_order_id` BIGINT COMMENT 'Primary key for local dealer_parts_order reference',
-    `aftersales_parts_order_id` BIGINT COMMENT 'FK reference to SSOT aftersales.aftersales_parts_order',
+    `dealer_parts_order_id` BIGINT COMMENT 'Unique identifier for the dealer_parts_order data product (auto-inserted pre-linking).',
+    `aftersales_parts_order_id` BIGINT COMMENT 'Foreign key linking to aftersales.parts_order. Business justification: Decision: Dealer parts order must reference the aftersales parts order entity that holds supplier, line‑item, and delivery details.',
+    `compliance_document_id` BIGINT COMMENT 'Foreign key linking to compliance.compliance_document. Business justification: Parts orders must reference the compliance document certifying part suitability for regulated vehicles, required for audit trails.',
+    `party_id` BIGINT COMMENT 'Foreign key linking to customer.party. Business justification: Parts orders are often placed for a specific customers vehicle; linking enables parts‑to‑customer analytics and service cost allocation.',
     CONSTRAINT pk_dealer_parts_order PRIMARY KEY(`dealer_parts_order_id`)
-) COMMENT 'Reference to SSOT owner aftersales.aftersales_parts_order. Dealer parts replenishment orders placed with the OEM parts distribution center or aftermarket suppliers. Tracks order date, order type (emergency, stock, special order), line items with OEM part numbers, quantities ordered, quantities received, backorder status, estimated arrival date, and order total. Sourced from CDK Global DMS parts ordering module.';
+) COMMENT 'Dealer parts replenishment orders placed with the OEM parts distribution center or aftermarket suppliers. Tracks order date, order type (emergency, stock, special order), line items with OEM part numbers, quantities ordered, quantities received, backorder status, estimated arrival date, and order total. Sourced from CDK Global DMS parts ordering module.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` (
-    `dealer_warranty_claim_id` BIGINT COMMENT 'Primary key for local dealer_warranty_claim reference',
-    `aftersales_warranty_claim_id` BIGINT COMMENT 'FK reference to SSOT aftersales.aftersales_warranty_claim',
+    `dealer_warranty_claim_id` BIGINT COMMENT 'Unique identifier for the dealer_warranty_claim data product (auto-inserted pre-linking).',
+    `aftersales_warranty_claim_id` BIGINT COMMENT 'Foreign key linking to aftersales.warranty_claim. Business justification: Report: Dealer‑submitted warranty claim reports need to point to the authoritative aftersales warranty claim record for audit and reimbursement.',
+    `employee_id` BIGINT COMMENT 'Foreign key linking to workforce.employee. Business justification: Warranty claims are processed by a specific employee; required for claim audit trails and productivity metrics.',
+    `connected_vehicle_id` BIGINT COMMENT 'Foreign key linking to mobility.connected_vehicle. Business justification: Warranty Claim Validation requires telematics evidence from the connected vehicle to confirm usage and fault conditions.',
+    `party_id` BIGINT COMMENT 'Foreign key linking to customer.party. Business justification: Warranty claim handling and compliance reporting require the claimant party to be identified.',
+    `procurement_supplier_id` BIGINT COMMENT 'Foreign key linking to procurement.supplier. Business justification: Warranty Claim Processing requires identifying the supplier responsible for the defective component to route claims and track warranty liabilities.',
+    `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Warranty claim processing needs the VIN registry reference to verify coverage and claim eligibility.',
     CONSTRAINT pk_dealer_warranty_claim PRIMARY KEY(`dealer_warranty_claim_id`)
-) COMMENT 'Reference to SSOT owner aftersales.aftersales_warranty_claim. Warranty claims submitted by the dealership to the OEM for reimbursement of warranty repair labor and parts. Captures VIN, repair order reference, failure date, mileage at failure, DTC (Diagnostic Trouble Code), causal part number, labor operation codes, claimed labor hours, claimed parts cost, submission date, OEM adjudication status (approved, rejected, partially approved), and reimbursement amount.';
+) COMMENT 'Warranty claims submitted by the dealership to the OEM for reimbursement of warranty repair labor and parts. Captures VIN, repair order reference, failure date, mileage at failure, DTC (Diagnostic Trouble Code), causal part number, labor operation codes, claimed labor hours, claimed parts cost, submission date, OEM adjudication status (approved, rejected, partially approved), and reimbursement amount.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` (
     `recall_completion_id` BIGINT COMMENT 'Unique identifier for the recall completion record. Primary key for the recall completion transaction.',
-    `dealership_id` BIGINT COMMENT 'Identifier of the dealer location that performed the recall remediation work.',
     `party_id` BIGINT COMMENT 'Identifier of the customer who owns the vehicle at the time of recall completion.',
-    `recall_customer_party_id` BIGINT COMMENT 'Identifier of the customer who owns the vehicle at the time of recall completion.',
-    `recall_dealer_dealership_id` BIGINT COMMENT 'Identifier of the dealer location that performed the recall remediation work.',
+    `dealership_id` BIGINT COMMENT 'Identifier of the dealer location that performed the recall remediation work.',
+    `recall_dealership_id` BIGINT COMMENT 'Identifier of the dealer location that performed the recall remediation work.',
+    `recall_party_id` BIGINT COMMENT 'Identifier of the customer who owns the vehicle at the time of recall completion.',
     `dealer_order_id` BIGINT COMMENT 'Identifier of the repair order under which the recall work was performed.',
     `employee_id` BIGINT COMMENT 'Employee identifier of the technician who performed the recall remediation work. Used for quality tracking and reimbursement validation.',
     `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Recall completion tracking must reference the VIN registry to ensure the correct vehicle is marked as completed.',
@@ -741,7 +887,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` (
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` (
     `dms_integration_log_id` BIGINT COMMENT 'Unique identifier for each DMS integration event log entry. Primary key for the integration log table.',
     `dealership_id` BIGINT COMMENT 'Identifier of the dealership for which this integration event occurred. Links to the dealer master data.',
-    `primary_dealership_id` BIGINT COMMENT 'Identifier of the dealership for which this integration event occurred. Links to the dealer master data.',
+    `dms_dealership_id` BIGINT COMMENT 'Identifier of the dealership for which this integration event occurred. Links to the dealer master data.',
     `authentication_method` STRING COMMENT 'Authentication mechanism used to verify dealer DMS identity and authorize data access during synchronization.. Valid values are `oauth2|api_key|certificate|basic_auth`',
     `business_impact_severity` STRING COMMENT 'Assessment of business impact severity if this sync event failed. Critical failures affect customer-facing operations; low impact affects reporting only.. Valid values are `critical|high|medium|low|none`',
     `compression_enabled_flag` BOOLEAN COMMENT 'Indicates whether data compression was enabled for this synchronization event to optimize bandwidth usage.',
@@ -783,8 +929,8 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` (
     `facility_standard_id` BIGINT COMMENT 'Unique identifier for the facility standard compliance record. Primary key for this entity.',
     `employee_id` BIGINT COMMENT 'Employee identifier for the OEM assessor. Links to HR system for auditor qualification tracking.',
     `dealership_id` BIGINT COMMENT 'Reference to the dealership being assessed for facility standards compliance.',
+    `facility_dealership_id` BIGINT COMMENT 'Reference to the dealership being assessed for facility standards compliance.',
     `franchise_agreement_id` BIGINT COMMENT 'Reference to the franchise agreement under which this facility standard assessment is conducted. Links to contract terms and compliance obligations.',
-    `primary_dealership_id` BIGINT COMMENT 'Reference to the dealership being assessed for facility standards compliance.',
     `allocation_eligibility_impact_flag` BOOLEAN COMMENT 'Indicates whether non-compliance with this facility standard affects the dealers vehicle allocation eligibility. True = may reduce allocation, False = no allocation impact.',
     `assessment_date` DATE COMMENT 'Date when the facility standards assessment was conducted. Primary business event timestamp for this compliance record.',
     `assessment_method` STRING COMMENT 'Methodology used to conduct the facility standards assessment. On_site = physical inspection, remote = video/virtual tour, hybrid = combination, photographic_evidence = dealer-submitted photos reviewed by OEM, self_assessment = dealer self-evaluation with OEM verification.. Valid values are `on_site|remote|hybrid|photographic_evidence|self_assessment`',
@@ -829,10 +975,11 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` (
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` (
     `used_vehicle_appraisal_id` BIGINT COMMENT 'Unique identifier for the used vehicle appraisal record. Primary key for this entity.',
     `employee_id` BIGINT COMMENT 'Employee identifier of the dealership staff member who conducted the appraisal.',
-    `dealership_id` BIGINT COMMENT 'Identifier of the dealership where the appraisal was conducted.',
+    `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Appraisal systems need the SKU to derive baseline market value, warranty status, and compliance data.',
     `party_id` BIGINT COMMENT 'Identifier of the customer who owns the vehicle being appraised for trade-in or sale.',
-    `used_customer_party_id` BIGINT COMMENT 'Identifier of the customer who owns the vehicle being appraised for trade-in or sale.',
-    `used_dealer_dealership_id` BIGINT COMMENT 'Identifier of the dealership where the appraisal was conducted.',
+    `dealership_id` BIGINT COMMENT 'Identifier of the dealership where the appraisal was conducted.',
+    `used_dealership_id` BIGINT COMMENT 'Identifier of the dealership where the appraisal was conducted.',
+    `used_party_id` BIGINT COMMENT 'Identifier of the customer who owns the vehicle being appraised for trade-in or sale.',
     `accident_history_flag` BOOLEAN COMMENT 'Indicates whether the vehicle has a reported accident history based on vehicle history report or customer disclosure.',
     `appraisal_date` DATE COMMENT 'Date when the vehicle appraisal was conducted at the dealership.',
     `appraisal_number` STRING COMMENT 'Unique business identifier for the appraisal transaction, typically generated by the DMS (Dealer Management System) or appraisal tool.',
@@ -884,8 +1031,8 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` (
     `dealer_order_id` BIGINT COMMENT 'Unique surrogate identifier for each dealer order record in the lakehouse silver layer. Primary key for the dealer_order data product.',
     `connected_vehicle_id` BIGINT COMMENT 'Foreign key linking to mobility.connected_vehicle. Business justification: Order‑to‑OTA Mapping links each vehicle order to its connected vehicle record for OTA update eligibility tracking.',
     `party_id` BIGINT COMMENT 'Reference to the retail customer for whom this order is placed. Populated for retail (customer-specific) orders; null for stock orders.',
+    `dealer_party_id` BIGINT COMMENT 'Reference to the retail customer for whom this order is placed. Populated for retail (customer-specific) orders; null for stock orders.',
     `dealership_id` BIGINT COMMENT 'Reference to the dealership that placed this order. Links to the dealer master record in the dealer domain.',
-    `primary_party_id` BIGINT COMMENT 'Reference to the retail customer for whom this order is placed. Populated for retail (customer-specific) orders; null for stock orders.',
     `procurement_purchase_order_id` BIGINT COMMENT 'Foreign key linking to procurement.purchase_order. Business justification: Required for Dealer Order Fulfillment report linking each dealer order to the corresponding purchase order for cost, delivery, and compliance tracking.',
     `production_order_id` BIGINT COMMENT 'Foreign key linking to manufacturing.production_order. Business justification: Required for Dealer Order Fulfillment report linking each dealer order to the specific production order that will build the vehicle.',
     `sku_id` BIGINT COMMENT 'Foreign key linking to product.sku. Business justification: Dealer order processing and financing depend on the exact SKU to calculate MSRP, incentives, and regulatory compliance.',
@@ -1016,1316 +1163,1550 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` (
 -- ========= FOREIGN KEYS =========
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ADD CONSTRAINT `fk_dealer_dealership_dealer_region_id` FOREIGN KEY (`dealer_region_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealer_region`(`dealer_region_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ADD CONSTRAINT `fk_dealer_franchise_agreement_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ADD CONSTRAINT `fk_dealer_franchise_agreement_primary_dealership_id` FOREIGN KEY (`primary_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ADD CONSTRAINT `fk_dealer_franchise_agreement_franchise_dealership_id` FOREIGN KEY (`franchise_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ADD CONSTRAINT `fk_dealer_dealer_territory_franchise_agreement_id` FOREIGN KEY (`franchise_agreement_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`franchise_agreement`(`franchise_agreement_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ADD CONSTRAINT `fk_dealer_dealer_territory_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ADD CONSTRAINT `fk_dealer_dealer_certification_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ADD CONSTRAINT `fk_dealer_vehicle_allocation_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ADD CONSTRAINT `fk_dealer_vehicle_allocation_vehicle_dealer_dealership_id` FOREIGN KEY (`vehicle_dealer_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ADD CONSTRAINT `fk_dealer_vehicle_allocation_vehicle_dealership_id` FOREIGN KEY (`vehicle_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ADD CONSTRAINT `fk_dealer_allocation_rule_dealer_incentive_program_id` FOREIGN KEY (`dealer_incentive_program_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealer_incentive_program`(`dealer_incentive_program_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ADD CONSTRAINT `fk_dealer_allocation_rule_superseded_by_rule_allocation_rule_id` FOREIGN KEY (`superseded_by_rule_allocation_rule_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`allocation_rule`(`allocation_rule_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ADD CONSTRAINT `fk_dealer_dealer_inventory_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ADD CONSTRAINT `fk_dealer_parts_inventory_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ADD CONSTRAINT `fk_dealer_parts_inventory_primary_dealership_id` FOREIGN KEY (`primary_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ADD CONSTRAINT `fk_dealer_parts_inventory_parts_dealership_id` FOREIGN KEY (`parts_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ADD CONSTRAINT `fk_dealer_retail_sale_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ADD CONSTRAINT `fk_dealer_retail_sale_retail_dealer_dealership_id` FOREIGN KEY (`retail_dealer_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ADD CONSTRAINT `fk_dealer_retail_sale_retail_dealership_id` FOREIGN KEY (`retail_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ADD CONSTRAINT `fk_dealer_dealer_service_appointment_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ADD CONSTRAINT `fk_dealer_dealer_incentive_claim_dealer_incentive_program_id` FOREIGN KEY (`dealer_incentive_program_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealer_incentive_program`(`dealer_incentive_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ADD CONSTRAINT `fk_dealer_dealer_incentive_claim_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ADD CONSTRAINT `fk_dealer_performance_scorecard_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ADD CONSTRAINT `fk_dealer_performance_scorecard_primary_dealership_id` FOREIGN KEY (`primary_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ADD CONSTRAINT `fk_dealer_performance_scorecard_performance_dealership_id` FOREIGN KEY (`performance_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ADD CONSTRAINT `fk_dealer_csi_survey_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ADD CONSTRAINT `fk_dealer_csi_survey_csi_dealership_id` FOREIGN KEY (`csi_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ADD CONSTRAINT `fk_dealer_csi_survey_dealer_order_id` FOREIGN KEY (`dealer_order_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealer_order`(`dealer_order_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ADD CONSTRAINT `fk_dealer_csi_survey_csi_repair_order_id` FOREIGN KEY (`csi_repair_order_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealer_order`(`dealer_order_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ADD CONSTRAINT `fk_dealer_csi_survey_primary_dealership_id` FOREIGN KEY (`primary_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ADD CONSTRAINT `fk_dealer_service_capacity_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ADD CONSTRAINT `fk_dealer_service_capacity_service_dealer_dealership_id` FOREIGN KEY (`service_dealer_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ADD CONSTRAINT `fk_dealer_service_capacity_service_dealership_id` FOREIGN KEY (`service_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ADD CONSTRAINT `fk_dealer_floor_plan_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ADD CONSTRAINT `fk_dealer_floor_plan_primary_dealership_id` FOREIGN KEY (`primary_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ADD CONSTRAINT `fk_dealer_floor_plan_floor_dealership_id` FOREIGN KEY (`floor_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ADD CONSTRAINT `fk_dealer_demo_vehicle_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ADD CONSTRAINT `fk_dealer_demo_vehicle_primary_dealership_id` FOREIGN KEY (`primary_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ADD CONSTRAINT `fk_dealer_demo_vehicle_demo_dealership_id` FOREIGN KEY (`demo_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ADD CONSTRAINT `fk_dealer_dealer_test_drive_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ADD CONSTRAINT `fk_dealer_recall_completion_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ADD CONSTRAINT `fk_dealer_recall_completion_recall_dealer_dealership_id` FOREIGN KEY (`recall_dealer_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ADD CONSTRAINT `fk_dealer_recall_completion_recall_dealership_id` FOREIGN KEY (`recall_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ADD CONSTRAINT `fk_dealer_recall_completion_dealer_order_id` FOREIGN KEY (`dealer_order_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealer_order`(`dealer_order_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ADD CONSTRAINT `fk_dealer_dms_integration_log_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ADD CONSTRAINT `fk_dealer_dms_integration_log_primary_dealership_id` FOREIGN KEY (`primary_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ADD CONSTRAINT `fk_dealer_dms_integration_log_dms_dealership_id` FOREIGN KEY (`dms_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ADD CONSTRAINT `fk_dealer_facility_standard_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ADD CONSTRAINT `fk_dealer_facility_standard_facility_dealership_id` FOREIGN KEY (`facility_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ADD CONSTRAINT `fk_dealer_facility_standard_franchise_agreement_id` FOREIGN KEY (`franchise_agreement_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`franchise_agreement`(`franchise_agreement_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ADD CONSTRAINT `fk_dealer_facility_standard_primary_dealership_id` FOREIGN KEY (`primary_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ADD CONSTRAINT `fk_dealer_used_vehicle_appraisal_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ADD CONSTRAINT `fk_dealer_used_vehicle_appraisal_used_dealer_dealership_id` FOREIGN KEY (`used_dealer_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ADD CONSTRAINT `fk_dealer_used_vehicle_appraisal_used_dealership_id` FOREIGN KEY (`used_dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ADD CONSTRAINT `fk_dealer_dealership_quality_assessment_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ADD CONSTRAINT `fk_dealer_dealer_order_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ADD CONSTRAINT `fk_dealer_dealer_contact_dealership_id` FOREIGN KEY (`dealership_id`) REFERENCES `vibe_automotive_v1`.`dealer`.`dealership`(`dealership_id`);
 
 -- ========= TAGS =========
-ALTER SCHEMA `vibe_automotive_v1`.`dealer` SET TAGS ('dbx_pii_division' = 'business');
-ALTER SCHEMA `vibe_automotive_v1`.`dealer` SET TAGS ('dbx_pii_domain' = 'dealer');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` SET TAGS ('dbx_pii_subdomain' = 'network_management');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealership ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `account_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Billing Account Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `company_code_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Company Code Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `payment_term_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Payment Term Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_region_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Region Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `activation_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Network Activation Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `adas_certified` SET TAGS ('dbx_pii_business_glossary_term' = 'Advanced Driver Assistance Systems (ADAS) Certified Dealer Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Street Address Line 1');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Street Address Line 2');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `cdk_dealer_code` SET TAGS ('dbx_pii_business_glossary_term' = 'CDK Global Dealer Management System (DMS) Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `cdk_dealer_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{4,20}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `channel_classification` SET TAGS ('dbx_pii_business_glossary_term' = 'Sales Channel Classification');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `channel_classification` SET TAGS ('dbx_pii_value_regex' = 'retail|fleet|wholesale|online|agency|export');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `city` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer City');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `city` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `city` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `country_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Country Code (ISO 3166-1 Alpha-3)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `country_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `deactivation_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Network Deactivation Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{4,12}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Operational Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|suspended|pending_approval|terminated|under_review');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_tier` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Performance Tier');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_tier` SET TAGS ('dbx_pii_value_regex' = 'platinum|gold|silver|bronze|standard');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dms_go_live_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Go-Live Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Integration Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|pending_setup|error|suspended');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `ev_certified` SET TAGS ('dbx_pii_business_glossary_term' = 'Electric Vehicle (EV) Certified Dealer Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `ev_charger_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Electric Vehicle (EV) Charger Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_agreement_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_agreement_number` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_expiry_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Expiry Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Start Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_type` SET TAGS ('dbx_pii_value_regex' = 'oem_owned|independent_franchise|authorized_repairer|fleet_only|used_vehicle_only|satellite');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Geolocation Latitude');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `legal_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Legal Entity Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `legal_name` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Geolocation Longitude');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `lot_capacity` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Lot Vehicle Capacity');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `lot_capacity` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `market_region_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Market Region Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `market_region_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `new_vehicle_sales_capacity` SET TAGS ('dbx_pii_business_glossary_term' = 'New Vehicle Annual Sales Capacity');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `new_vehicle_sales_capacity` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `oem_brand_codes` SET TAGS ('dbx_pii_business_glossary_term' = 'Authorized OEM Brand Codes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `ownership_group_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Ownership Group Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `ownership_group_name` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `parts_warehouse_area_sqm` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Warehouse Area (Square Metres)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `pdi_certified` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Certified Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Postal Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9 -]{3,10}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_email` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Primary Email Address');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_email` SET TAGS ('dbx_pii_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_email` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_email` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_phone` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Primary Phone Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_phone` SET TAGS ('dbx_pii_value_regex' = '^+?[0-9s-().]{7,20}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_phone` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_phone` SET TAGS ('dbx_pii_pii_phone' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_email` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Principal Contact Email Address');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_email` SET TAGS ('dbx_pii_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_email` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_email` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Principal Contact Name');
+ALTER SCHEMA `vibe_automotive_v1`.`dealer` SET TAGS ('dbx_division' = 'business');
+ALTER SCHEMA `vibe_automotive_v1`.`dealer` SET TAGS ('dbx_domain' = 'dealer');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` SET TAGS ('dbx_subdomain' = 'network_management');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealership ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `account_id` SET TAGS ('dbx_business_glossary_term' = 'Billing Account Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `company_code_id` SET TAGS ('dbx_business_glossary_term' = 'Company Code Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `payment_term_id` SET TAGS ('dbx_business_glossary_term' = 'Payment Term Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_region_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Region Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `activation_date` SET TAGS ('dbx_business_glossary_term' = 'Dealer Network Activation Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `adas_certified` SET TAGS ('dbx_business_glossary_term' = 'Advanced Driver Assistance Systems (ADAS) Certified Dealer Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line1` SET TAGS ('dbx_business_glossary_term' = 'Dealer Street Address Line 1');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line1` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line2` SET TAGS ('dbx_business_glossary_term' = 'Dealer Street Address Line 2');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line2` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `cdk_dealer_code` SET TAGS ('dbx_business_glossary_term' = 'CDK Global Dealer Management System (DMS) Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `cdk_dealer_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,20}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `channel_classification` SET TAGS ('dbx_business_glossary_term' = 'Sales Channel Classification');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `channel_classification` SET TAGS ('dbx_value_regex' = 'retail|fleet|wholesale|online|agency|export');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `city` SET TAGS ('dbx_business_glossary_term' = 'Dealer City');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `city` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `city` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `country_code` SET TAGS ('dbx_business_glossary_term' = 'Country Code (ISO 3166-1 Alpha-3)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `deactivation_date` SET TAGS ('dbx_business_glossary_term' = 'Dealer Network Deactivation Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_code` SET TAGS ('dbx_business_glossary_term' = 'Dealer Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,12}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_status` SET TAGS ('dbx_business_glossary_term' = 'Dealer Operational Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_status` SET TAGS ('dbx_value_regex' = 'active|inactive|suspended|pending_approval|terminated|under_review');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_tier` SET TAGS ('dbx_business_glossary_term' = 'Dealer Performance Tier');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dealer_tier` SET TAGS ('dbx_value_regex' = 'platinum|gold|silver|bronze|standard');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dms_go_live_date` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Go-Live Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Integration Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending_setup|error|suspended');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `ev_certified` SET TAGS ('dbx_business_glossary_term' = 'Electric Vehicle (EV) Certified Dealer Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `ev_charger_count` SET TAGS ('dbx_business_glossary_term' = 'Electric Vehicle (EV) Charger Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_agreement_number` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_agreement_number` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_start_date` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_type` SET TAGS ('dbx_business_glossary_term' = 'Franchise Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `franchise_type` SET TAGS ('dbx_value_regex' = 'oem_owned|independent_franchise|authorized_repairer|fleet_only|used_vehicle_only|satellite');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `latitude` SET TAGS ('dbx_business_glossary_term' = 'Dealer Geolocation Latitude');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `latitude` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `legal_name` SET TAGS ('dbx_business_glossary_term' = 'Dealer Legal Entity Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `legal_name` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `longitude` SET TAGS ('dbx_business_glossary_term' = 'Dealer Geolocation Longitude');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `longitude` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `lot_capacity` SET TAGS ('dbx_business_glossary_term' = 'Dealer Lot Vehicle Capacity');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `lot_capacity` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `market_region_code` SET TAGS ('dbx_business_glossary_term' = 'Market Region Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `market_region_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `new_vehicle_sales_capacity` SET TAGS ('dbx_business_glossary_term' = 'New Vehicle Annual Sales Capacity');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `new_vehicle_sales_capacity` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `oem_brand_codes` SET TAGS ('dbx_business_glossary_term' = 'Authorized OEM Brand Codes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `ownership_group_name` SET TAGS ('dbx_business_glossary_term' = 'Dealer Ownership Group Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `ownership_group_name` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `parts_warehouse_area_sqm` SET TAGS ('dbx_business_glossary_term' = 'Parts Warehouse Area (Square Metres)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `pdi_certified` SET TAGS ('dbx_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Certified Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `postal_code` SET TAGS ('dbx_business_glossary_term' = 'Dealer Postal Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `postal_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9 -]{3,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `postal_code` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_email` SET TAGS ('dbx_business_glossary_term' = 'Dealer Primary Email Address');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_email` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_email` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_phone` SET TAGS ('dbx_business_glossary_term' = 'Dealer Primary Phone Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_phone` SET TAGS ('dbx_value_regex' = '^+?[0-9s-().]{7,20}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_phone` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `primary_phone` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_email` SET TAGS ('dbx_business_glossary_term' = 'Dealer Principal Contact Email Address');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_email` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_email` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_name` SET TAGS ('dbx_business_glossary_term' = 'Dealer Principal Contact Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_name` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_name` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `principal_contact_name` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `record_created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `record_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `sales_district_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Sales District Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `sales_district_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `sap_customer_number` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Customer Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `sap_customer_number` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{6,10}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `service_bay_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Bay Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `showroom_display_capacity` SET TAGS ('dbx_pii_business_glossary_term' = 'Showroom Display Vehicle Capacity');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `showroom_display_capacity` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `state_province_code` SET TAGS ('dbx_pii_business_glossary_term' = 'State or Province Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `state_province_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{2,5}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `trading_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Trading Name (DBA)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `used_vehicle_sales_capacity` SET TAGS ('dbx_pii_business_glossary_term' = 'Used Vehicle Annual Sales Capacity');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `used_vehicle_sales_capacity` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `warranty_authorized` SET TAGS ('dbx_pii_business_glossary_term' = 'OEM Warranty Repair Authorization Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `website_url` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Website URL');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `website_url` SET TAGS ('dbx_pii_value_regex' = '^https?://[^s]{3,255}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` SET TAGS ('dbx_pii_subdomain' = 'network_management');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `franchise_agreement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `primary_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Currency Code (ISO 4217)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_document_url` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Document URL');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_document_url` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_number` SET TAGS ('dbx_pii_value_regex' = '^FA-[0-9]{8}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_status` SET TAGS ('dbx_pii_value_regex' = 'draft|pending_approval|active|suspended|terminated|expired');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_type` SET TAGS ('dbx_pii_value_regex' = 'new_franchise|renewal|amendment|expansion|termination');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `allocation_priority_tier` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Allocation Priority Tier');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `allocation_priority_tier` SET TAGS ('dbx_pii_value_regex' = 'tier_1|tier_2|tier_3|tier_4|standard');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `authorized_nameplates` SET TAGS ('dbx_pii_business_glossary_term' = 'Authorized Vehicle Nameplates');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `authorized_vehicle_lines` SET TAGS ('dbx_pii_business_glossary_term' = 'Authorized Vehicle Lines');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `auto_renewal_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Auto-Renewal Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `certified_pre_owned_authorized_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Certified Pre-Owned (CPO) Authorized Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `commercial_fleet_authorized_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Commercial Fleet Sales Authorized Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `customer_satisfaction_target_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Satisfaction Target Score (NPS)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `dealer_signatory_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Signatory Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `dealer_signatory_name` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `digital_retailing_required_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Retailing Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `dms_integration_required_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Integration Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `effective_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Effective Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `ev_charging_infrastructure_required_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Electric Vehicle (EV) Charging Infrastructure Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `exclusive_territory_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Exclusive Territory Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `facility_investment_requirement_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Facility Investment Requirement Amount (CapEx)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `facility_investment_requirement_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `franchise_tier` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Tier');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `franchise_tier` SET TAGS ('dbx_pii_value_regex' = 'platinum|gold|silver|bronze|standard');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `governing_law_jurisdiction` SET TAGS ('dbx_pii_business_glossary_term' = 'Governing Law Jurisdiction');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `incentive_program_eligibility_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Incentive Program Eligibility Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Modified Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `minimum_sales_quota_annual` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Annual Sales Quota (Units)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `minimum_service_capacity` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Service Capacity (Vehicles per Month)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `minimum_service_capacity` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `notice_period_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Notice Period (Days)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `oem_signatory_name` SET TAGS ('dbx_pii_business_glossary_term' = 'OEM (Original Equipment Manufacturer) Signatory Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `oem_signatory_name` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `ownership_model` SET TAGS ('dbx_pii_business_glossary_term' = 'Ownership Model');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `ownership_model` SET TAGS ('dbx_pii_value_regex' = 'oem_owned|independent_franchise|joint_venture|corporate_store');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `parts_inventory_requirement_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Inventory Requirement Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `parts_inventory_requirement_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `performance_review_frequency` SET TAGS ('dbx_pii_business_glossary_term' = 'Performance Review Frequency');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `performance_review_frequency` SET TAGS ('dbx_pii_value_regex' = 'monthly|quarterly|semi_annual|annual');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `recall_service_authorized_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Recall Service Authorized Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `renewal_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Renewal Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `renewal_term_months` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Renewal Term (Months)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `signed_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Signed Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `termination_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Termination Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `termination_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement Termination Reason');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `territory_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Territory Description');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `territory_radius_km` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Territory Radius (Kilometers)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `training_certification_required_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Training Certification Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `warranty_administration_authorized_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Administration Authorized Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` SET TAGS ('dbx_pii_subdomain' = 'network_management');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` SET TAGS ('dbx_pii_ssot_reference' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` SET TAGS ('dbx_pii_subdomain' = 'network_management');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `dealer_certification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Certification Identifier (ID)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `obligation_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Obligation Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Identifier (ID)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `allocation_eligibility_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Eligibility Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `annual_maintenance_cost_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Annual Maintenance Cost Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `annual_maintenance_cost_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `audit_outcome` SET TAGS ('dbx_pii_business_glossary_term' = 'Audit Outcome');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `audit_outcome` SET TAGS ('dbx_pii_value_regex' = 'PASSED|PASSED_WITH_CONDITIONS|FAILED|NOT_APPLICABLE');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `audit_required_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Audit Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `audit_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Audit Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `authorized_vehicle_lines` SET TAGS ('dbx_pii_business_glossary_term' = 'Authorized Vehicle Lines');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Certification Level');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_level` SET TAGS ('dbx_pii_value_regex' = 'BRONZE|SILVER|GOLD|PLATINUM|ELITE|STANDARD');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Certification Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Certification Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{8,20}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Certification Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_status` SET TAGS ('dbx_pii_value_regex' = 'ACTIVE|EXPIRED|SUSPENDED|PENDING_RENEWAL|REVOKED|UNDER_REVIEW');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Certification Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_type` SET TAGS ('dbx_pii_value_regex' = 'EV_CERTIFIED|ADAS_SERVICE|LUXURY_BRAND|COMMERCIAL_VEHICLE|HYBRID_SPECIALIST|PERFORMANCE_TUNING');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Standard');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `cost_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Certification Cost Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `cost_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `effective_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `equipment_requirements` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment Requirements');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `expiry_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiry Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `facility_requirements` SET TAGS ('dbx_pii_business_glossary_term' = 'Facility Requirements');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `geographic_scope` SET TAGS ('dbx_pii_business_glossary_term' = 'Geographic Scope');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `geographic_scope` SET TAGS ('dbx_pii_value_regex' = 'GLOBAL|REGIONAL|NATIONAL|STATE_PROVINCIAL|LOCAL');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `incentive_eligibility_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Incentive Eligibility Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `issue_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Issue Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `issuing_body` SET TAGS ('dbx_pii_business_glossary_term' = 'Issuing Body');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `issuing_body_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Issuing Body Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `issuing_body_type` SET TAGS ('dbx_pii_value_regex' = 'OEM_CORPORATE|INDUSTRY_ASSOCIATION|REGULATORY_BODY|THIRD_PARTY_AUDITOR|REGIONAL_OEM');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `last_audit_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Audit Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Modified Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `last_renewal_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Renewal Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `minimum_certified_technicians` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Certified Technicians');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `next_audit_due_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Audit Due Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `next_renewal_due_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Renewal Due Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `personnel_requirements` SET TAGS ('dbx_pii_business_glossary_term' = 'Personnel Requirements');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `reinstatement_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Reinstatement Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `renewal_frequency_months` SET TAGS ('dbx_pii_business_glossary_term' = 'Renewal Frequency in Months');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `revocation_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Revocation Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `revocation_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Revocation Reason');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `suspension_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Suspension Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `suspension_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Suspension Reason');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `training_completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Training Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `training_required_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Training Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` SET TAGS ('dbx_pii_subdomain' = 'inventory_operations');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `vehicle_allocation_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Allocation ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `sku_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `vehicle_dealer_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `acceptance_deadline` SET TAGS ('dbx_pii_business_glossary_term' = 'Acceptance Deadline');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `acceptance_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Acceptance Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `accepted_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Accepted Quantity');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `actual_delivery_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Delivery Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_number` SET TAGS ('dbx_pii_value_regex' = '^ALLOC-[0-9]{4}-[0-9]{6}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_rule_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Rule Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_status` SET TAGS ('dbx_pii_value_regex' = 'pending|confirmed|accepted|rejected|cancelled|delivered');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_type` SET TAGS ('dbx_pii_value_regex' = 'standard|priority|constrained|fleet|demo|loaner');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `dealer_invoice_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Invoice Price');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `dealer_invoice_price` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `dms_reference_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Reference Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `estimated_delivery_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Estimated Delivery Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `hold_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Hold Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `incentive_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Incentive Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `incentive_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `incentive_program_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Incentive Program Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `is_customer_order` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Order Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `msrp` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `msrp` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `pdi_completed` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completed Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `pdi_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `port_of_entry_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Port of Entry Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `port_of_entry_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3,5}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `priority_tier` SET TAGS ('dbx_pii_business_glossary_term' = 'Priority Tier');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `priority_tier` SET TAGS ('dbx_pii_value_regex' = 'tier_1|tier_2|tier_3|tier_4');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `production_plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `production_plant_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,6}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `region_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Region Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `region_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{2,5}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `rejection_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Rejection Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `scheduled_production_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Scheduled Production Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `source_system_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Source System Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `source_system_code` SET TAGS ('dbx_pii_value_regex' = 'SAP_SD|CDK_DMS|SALESFORCE|MES|MANUAL');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `territory_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Sales Territory Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `territory_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `transport_mode` SET TAGS ('dbx_pii_business_glossary_term' = 'Transport Mode');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `transport_mode` SET TAGS ('dbx_pii_value_regex' = 'rail|truck|ship|compound');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` SET TAGS ('dbx_pii_subdomain' = 'network_management');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `allocation_rule_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Rule ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `dealer_incentive_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Incentive Program ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `superseded_by_rule_allocation_rule_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Superseded By Allocation Rule ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `allocation_basis` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Basis');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `allocation_basis` SET TAGS ('dbx_pii_value_regex' = 'retail_sales|wholesale_orders|days_supply|market_share|scorecard_rank');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `allocation_cycle` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Cycle');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `allocation_cycle` SET TAGS ('dbx_pii_value_regex' = 'weekly|biweekly|monthly|quarterly');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_value_regex' = 'pending|approved|rejected|under_review');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `approved_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `body_style` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Body Style');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `carryover_allowed` SET TAGS ('dbx_pii_business_glossary_term' = 'Carryover Allocation Allowed');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `conflict_resolution` SET TAGS ('dbx_pii_business_glossary_term' = 'Conflict Resolution Method');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `conflict_resolution` SET TAGS ('dbx_pii_value_regex' = 'highest_priority|lowest_priority|sum|average|manual');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `dealer_tier` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Tier');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `dealer_tier` SET TAGS ('dbx_pii_value_regex' = 'tier_1|tier_2|tier_3|all');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `eop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End of Production (EOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `external_rule_ref` SET TAGS ('dbx_pii_business_glossary_term' = 'External Rule Reference');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `franchise_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `franchise_type` SET TAGS ('dbx_pii_value_regex' = 'oem_owned|independent_franchise|dual_franchise|all');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `lookback_period_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lookback Period (Days)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `max_allocation_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Allocation Units');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `min_allocation_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Allocation Units');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `min_csi_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Customer Satisfaction Index (CSI) Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `min_scorecard_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Dealer Scorecard Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `model_mix_target_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Mix Target Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `nameplate_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Nameplate Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `override_allowed` SET TAGS ('dbx_pii_business_glossary_term' = 'Manual Override Allowed');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV|all');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `priority_weight` SET TAGS ('dbx_pii_business_glossary_term' = 'Priority Weight');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `region_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Sales Region Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `region_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Rule Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{3,30}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Rule Description');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Rule Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Rule Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_status` SET TAGS ('dbx_pii_value_regex' = 'draft|active|suspended|expired|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Rule Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_type` SET TAGS ('dbx_pii_value_regex' = 'volume_based|performance_based|geographic|model_mix|incentive_based|priority_based');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `sop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production (SOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `stackable` SET TAGS ('dbx_pii_business_glossary_term' = 'Rule Stackable Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `target_days_supply` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Days Supply');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `total_pool_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Allocation Pool Units');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Rule Version Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `zone_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Distribution Zone Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `zone_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` SET TAGS ('dbx_pii_subdomain' = 'inventory_operations');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `dealer_inventory_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Inventory ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `finished_vehicle_stock_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Finished Vehicle Stock Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Manager Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `sku_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `vehicle_build_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Build Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `acquisition_cost` SET TAGS ('dbx_pii_business_glossary_term' = 'Acquisition Cost');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `acquisition_cost` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `allocation_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'OEM Allocation Order Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `asking_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Asking Price');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `asking_price` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `body_style` SET TAGS ('dbx_pii_business_glossary_term' = 'Body Style');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `certified_pre_owned` SET TAGS ('dbx_pii_business_glossary_term' = 'Certified Pre-Owned (CPO) Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `days_on_lot` SET TAGS ('dbx_pii_business_glossary_term' = 'Days on Lot');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `dms_record_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'DMS Record ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `drivetrain` SET TAGS ('dbx_pii_business_glossary_term' = 'Drivetrain Configuration');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `drivetrain` SET TAGS ('dbx_pii_value_regex' = 'FWD|RWD|AWD|4WD');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `engine_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Engine Description');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `estimated_arrival_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Estimated Arrival Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `exterior_color_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Exterior Color Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `exterior_color_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Exterior Color Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `floor_plan_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Floor Plan Start Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `floor_plan_lender` SET TAGS ('dbx_pii_business_glossary_term' = 'Floor Plan Lender');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `floor_plan_lender` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `fuel_economy_city_mpg` SET TAGS ('dbx_pii_business_glossary_term' = 'City Fuel Economy (MPG)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `fuel_economy_highway_mpg` SET TAGS ('dbx_pii_business_glossary_term' = 'Highway Fuel Economy (MPG)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `in_service_date` SET TAGS ('dbx_pii_business_glossary_term' = 'In-Service Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `interior_color_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Interior Color Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `interior_color_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Interior Color Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `inventory_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `inventory_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `inventory_type` SET TAGS ('dbx_pii_value_regex' = 'new|used|certified_pre_owned|demo|loaner');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `invoice_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Invoice Price');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `invoice_price` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `last_price_update_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Price Update Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `location_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Location Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `msrp` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `msrp` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `odometer_reading` SET TAGS ('dbx_pii_business_glossary_term' = 'Odometer Reading (Miles)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `pdi_completed` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completed Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `pdi_completed_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `recall_campaign_number` SET TAGS ('dbx_pii_business_glossary_term' = 'NHTSA Recall Campaign Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `recall_hold` SET TAGS ('dbx_pii_business_glossary_term' = 'Recall Hold Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `received_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Received Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `record_created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `record_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `source_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Source Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `source_type` SET TAGS ('dbx_pii_value_regex' = 'factory_order|dealer_trade|auction|trade_in|fleet_return|lease_return');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `stock_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Stock Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Transmission Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_value_regex' = 'automatic|manual|CVT|DCT|single_speed');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `transport_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Transport Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `transport_status` SET TAGS ('dbx_pii_value_regex' = 'not_shipped|in_transit|delivered|rail|truck');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `window_sticker_url` SET TAGS ('dbx_pii_business_glossary_term' = 'Window Sticker URL (Monroney Label)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` SET TAGS ('dbx_pii_subdomain' = 'inventory_operations');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_inventory_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Inventory ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `primary_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `spare_parts_catalog_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Spare Parts Catalog Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `average_monthly_demand` SET TAGS ('dbx_pii_business_glossary_term' = 'Average Monthly Demand');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `bin_location` SET TAGS ('dbx_pii_business_glossary_term' = 'Bin Location');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `bin_location` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{1,20}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `core_charge_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Core Charge Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `dealer_cost_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Cost Price');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `dealer_cost_price` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `inventory_snapshot_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Snapshot Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `inventory_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `inventory_status` SET TAGS ('dbx_pii_value_regex' = 'active|discontinued|superseded|backordered|restricted|obsolete');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `is_core_part` SET TAGS ('dbx_pii_business_glossary_term' = 'Core Part Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `is_hazardous_material` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `is_serialized` SET TAGS ('dbx_pii_business_glossary_term' = 'Serialized Part Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `last_count_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Physical Count Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `last_receipt_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Receipt Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `last_sale_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Sale Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time Days');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `list_price` SET TAGS ('dbx_pii_business_glossary_term' = 'List Price');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `lost_sales_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Lost Sales Quantity');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `maximum_stock_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Stock Level');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `model_year_applicability` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY) Applicability');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `model_year_applicability` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}(-[0-9]{4})?$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `months_supply` SET TAGS ('dbx_pii_business_glossary_term' = 'Months Supply');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `oem_part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Original Equipment Manufacturer (OEM) Part Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `oem_part_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{4,25}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_classification` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Classification');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_classification` SET TAGS ('dbx_pii_value_regex' = 'mechanical|body|electrical|accessories|fluids|consumables');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_group_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Group Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_group_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `quantity_available` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity Available');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity On Hand');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `quantity_on_order` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity On Order');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `quantity_reserved` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity Reserved');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `recall_campaign_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Recall Campaign Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `recall_campaign_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{4,20}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `recall_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Recall Part Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `reorder_point` SET TAGS ('dbx_pii_business_glossary_term' = 'Reorder Point');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `reorder_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Reorder Quantity');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `retail_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Retail Price');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `sku` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Keeping Unit (SKU)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `sku` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{4,30}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `storage_condition` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Condition');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `storage_condition` SET TAGS ('dbx_pii_value_regex' = 'ambient|refrigerated|flammable|controlled|outdoor');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `superseded_by_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Superseded By Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `superseding_part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Superseding Part Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `superseding_part_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{4,25}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `supplier_part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Part Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `supplier_part_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{4,30}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `vehicle_model_applicability` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Applicability');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `warranty_eligible` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Eligible Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` SET TAGS ('dbx_pii_subdomain' = 'sales_transactions');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_sale_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Retail Sale ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `opportunity_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Opportunity Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Salesperson ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_customer_party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_dealer_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_salesperson_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Salesperson ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_salesperson_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_salesperson_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sku_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `apr` SET TAGS ('dbx_pii_business_glossary_term' = 'Annual Percentage Rate (APR)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `apr` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `back_end_gross` SET TAGS ('dbx_pii_business_glossary_term' = 'Back-End Gross Profit');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `back_end_gross` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `deal_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Deal Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `deal_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{4,20}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `deal_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Deal Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `deal_status` SET TAGS ('dbx_pii_value_regex' = 'draft|pending|funded|unwound|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `delivery_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Delivery Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `discount_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Discount Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `discount_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `dms_deal_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Deal ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `doc_fee` SET TAGS ('dbx_pii_business_glossary_term' = 'Documentation Fee');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `down_payment` SET TAGS ('dbx_pii_business_glossary_term' = 'Down Payment Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `down_payment` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `down_payment` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `fi_product_revenue` SET TAGS ('dbx_pii_business_glossary_term' = 'Finance and Insurance (F&I) Product Revenue');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `fi_product_revenue` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `finance_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Finance Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `finance_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `finance_amount` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `financing_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Financing Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `financing_type` SET TAGS ('dbx_pii_value_regex' = 'cash|retail_finance|lease|balloon');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `fleet_sale` SET TAGS ('dbx_pii_business_glossary_term' = 'Fleet Sale Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `front_end_gross` SET TAGS ('dbx_pii_business_glossary_term' = 'Front-End Gross Profit');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `front_end_gross` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `lender_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Lender Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `loan_term_months` SET TAGS ('dbx_pii_business_glossary_term' = 'Loan Term (Months)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `monthly_payment` SET TAGS ('dbx_pii_business_glossary_term' = 'Monthly Payment Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `monthly_payment` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `monthly_payment` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `msrp_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP) Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `msrp_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `oem_incentive_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'OEM Incentive Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `oem_incentive_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `oem_program_code` SET TAGS ('dbx_pii_business_glossary_term' = 'OEM Incentive Program Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `pdi_completed` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completed Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sale_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Sale Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sale_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Sale Price');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sale_price` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sale_price` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sales_tax_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Sales Tax Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `stock_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Stock Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_allowance` SET TAGS ('dbx_pii_business_glossary_term' = 'Trade-In Allowance');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_allowance` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_payoff_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Trade-In Payoff Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_payoff_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Trade-In Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `vehicle_condition` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Condition');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `vehicle_condition` SET TAGS ('dbx_pii_value_regex' = 'new|used|certified_pre_owned');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `warranty_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Start Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` SET TAGS ('dbx_pii_subdomain' = 'service_fulfillment');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` SET TAGS ('dbx_pii_consolidated_into' = 'field_services');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` SET TAGS ('dbx_pii_field_services_consolidation' = 'see_field_services_domain');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` SET TAGS ('dbx_pii_ssot_reference' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` SET TAGS ('dbx_pii_subdomain' = 'service_fulfillment');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` SET TAGS ('dbx_pii_consolidated_into' = 'field_services');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` SET TAGS ('dbx_pii_field_services_consolidation' = 'see_field_services_domain');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` SET TAGS ('dbx_pii_ssot_reference' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` SET TAGS ('dbx_pii_subdomain' = 'sales_transactions');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` SET TAGS ('dbx_pii_ssot_reference' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` SET TAGS ('dbx_pii_subdomain' = 'sales_transactions');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` SET TAGS ('dbx_pii_ssot_reference' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` SET TAGS ('dbx_pii_subdomain' = 'network_management');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `performance_scorecard_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Performance Scorecard ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `primary_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `comments` SET TAGS ('dbx_pii_business_glossary_term' = 'Comments');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `composite_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Composite Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `composite_score_benchmark` SET TAGS ('dbx_pii_business_glossary_term' = 'Composite Score Benchmark');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `csi_benchmark` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Satisfaction Index (CSI) Benchmark');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `csi_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Satisfaction Index (CSI) Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `days_supply` SET TAGS ('dbx_pii_business_glossary_term' = 'Days Supply');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `dms_integration_source` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Integration Source');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `dms_integration_source` SET TAGS ('dbx_pii_value_regex' = 'CDK_Global|Reynolds_Reynolds|Dealertrack|ADP|Other');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `facility_standards_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Facility Standards Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `fiscal_quarter` SET TAGS ('dbx_pii_business_glossary_term' = 'Fiscal Quarter');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Fiscal Year (FY)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `franchise_compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `franchise_compliance_status` SET TAGS ('dbx_pii_value_regex' = 'compliant|non_compliant|probation|warning');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `incentive_eligibility_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Incentive Eligibility Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `inventory_turn_rate` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Turn Rate');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Modified Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `market_share_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Market Share Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `new_vehicle_sales_actual` SET TAGS ('dbx_pii_business_glossary_term' = 'New Vehicle Sales Actual');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `new_vehicle_sales_attainment_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'New Vehicle Sales Attainment Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `new_vehicle_sales_objective` SET TAGS ('dbx_pii_business_glossary_term' = 'New Vehicle Sales Objective');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `nps_benchmark` SET TAGS ('dbx_pii_business_glossary_term' = 'Net Promoter Score (NPS) Benchmark');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `nps_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Net Promoter Score (NPS)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `parts_fill_rate_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Fill Rate Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `parts_revenue_actual` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Revenue Actual');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `parts_revenue_objective` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Revenue Objective');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `performance_tier` SET TAGS ('dbx_pii_business_glossary_term' = 'Performance Tier');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `performance_tier` SET TAGS ('dbx_pii_value_regex' = 'platinum|gold|silver|bronze|standard');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `period_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Period Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `period_type` SET TAGS ('dbx_pii_value_regex' = 'monthly|quarterly|annual');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `published_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Published Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `reviewer_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Reviewer Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `scorecard_period_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Scorecard Period End Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `scorecard_period_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Scorecard Period Start Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `scorecard_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Scorecard Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `scorecard_status` SET TAGS ('dbx_pii_value_regex' = 'draft|published|final|revised');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `service_absorption_rate_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Absorption Rate Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `service_revenue_actual` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Revenue Actual');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `service_revenue_objective` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Revenue Objective');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `training_compliance_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Training Compliance Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `used_vehicle_sales_actual` SET TAGS ('dbx_pii_business_glossary_term' = 'Used Vehicle Sales Actual');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `used_vehicle_sales_attainment_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Used Vehicle Sales Attainment Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `used_vehicle_sales_objective` SET TAGS ('dbx_pii_business_glossary_term' = 'Used Vehicle Sales Objective');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `warranty_claim_approval_rate_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Claim Approval Rate Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` SET TAGS ('dbx_pii_subdomain' = 'quality_compliance');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `csi_survey_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Satisfaction Index (CSI) Survey ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `dealer_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Order ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `csi_repair_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Repair Order (RO) ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `individual_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `primary_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `complaint_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Complaint Category');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `complaint_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Complaint Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `days_to_response` SET TAGS ('dbx_pii_business_glossary_term' = 'Days to Response');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `dealer_performance_impact_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Performance Impact Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `delivery_process_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Delivery Process Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `facility_cleanliness_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Facility Cleanliness Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `follow_up_completed_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Follow-Up Completed Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `follow_up_completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Follow-Up Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `follow_up_required_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Follow-Up Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `interaction_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Interaction Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `market_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Market Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `market_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `nps_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Net Promoter Score (NPS) Category');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `nps_category` SET TAGS ('dbx_pii_value_regex' = 'promoter|passive|detractor');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `nps_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Net Promoter Score (NPS)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `oem_program_compliant_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Original Equipment Manufacturer (OEM) Program Compliant Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `overall_satisfaction_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Overall Satisfaction Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `pricing_transparency_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Pricing Transparency Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `problem_resolution_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Problem Resolution Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `response_channel` SET TAGS ('dbx_pii_business_glossary_term' = 'Response Channel');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `sales_consultant_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Sales Consultant Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `sales_region_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Sales Region Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `sentiment_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Sentiment Category');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `sentiment_category` SET TAGS ('dbx_pii_value_regex' = 'positive|neutral|negative|mixed');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `sentiment_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Sentiment Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `service_advisor_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Advisor Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `service_quality_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Quality Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `service_timeliness_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Timeliness Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `staff_courtesy_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Staff Courtesy Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_completion_percentage` SET TAGS ('dbx_pii_business_glossary_term' = 'Survey Completion Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Survey Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_language_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Survey Language Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_language_code` SET TAGS ('dbx_pii_value_regex' = '^[a-z]{2}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_program_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Survey Program Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Survey Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_status` SET TAGS ('dbx_pii_value_regex' = 'completed|partial|abandoned|invalid');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Survey Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Survey Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_type` SET TAGS ('dbx_pii_value_regex' = 'sales_satisfaction|service_satisfaction|delivery_satisfaction|parts_satisfaction|general_satisfaction|pdi_satisfaction');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_vendor_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Survey Vendor Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vehicle_condition_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Condition Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `verbatim_comment` SET TAGS ('dbx_pii_business_glossary_term' = 'Verbatim Comment');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vin` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vin` SET TAGS ('dbx_pii_pii_identifier' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` SET TAGS ('dbx_pii_subdomain' = 'service_fulfillment');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` SET TAGS ('dbx_pii_field_services_consolidation' = 'see_field_services_domain');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `service_capacity_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Capacity ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `service_dealer_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `a_tech_headcount` SET TAGS ('dbx_pii_business_glossary_term' = 'A-Level Technician Headcount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `adas_certified_tech_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Advanced Driver Assistance Systems (ADAS) Certified Technician Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `adas_service_bays` SET TAGS ('dbx_pii_business_glossary_term' = 'Advanced Driver Assistance Systems (ADAS) Service Bays');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `available_labor_hours_per_day` SET TAGS ('dbx_pii_business_glossary_term' = 'Available Labor Hours Per Day');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `avg_ro_cycle_time_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Average Repair Order (RO) Cycle Time Hours');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `b_tech_headcount` SET TAGS ('dbx_pii_business_glossary_term' = 'B-Level Technician Headcount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `body_shop_bays` SET TAGS ('dbx_pii_business_glossary_term' = 'Body Shop Service Bays');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `body_shop_tech_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Body Shop Technician Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `c_tech_headcount` SET TAGS ('dbx_pii_business_glossary_term' = 'C-Level Technician Headcount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_config_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Capacity Configuration Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_config_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{6,12}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Capacity Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Capacity Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|seasonal|reduced|expanded|under_review');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `current_capacity_utilization_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Capacity Utilization Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `customer_pay_capacity_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Pay Capacity Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `diagnostic_equipment_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Diagnostic Equipment Level');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `diagnostic_equipment_level` SET TAGS ('dbx_pii_value_regex' = 'basic|standard|advanced|premium');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `dms_capacity_record_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Capacity Record ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `dms_system_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) System Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `dms_system_code` SET TAGS ('dbx_pii_value_regex' = 'CDK|REYNOLDS|DEALERTRACK|ADP|PBS|OTHER');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `ev_certified_tech_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Electric Vehicle (EV) Certified Technician Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `ev_service_bays` SET TAGS ('dbx_pii_business_glossary_term' = 'Electric Vehicle (EV) Service Bays');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `express_service_bays` SET TAGS ('dbx_pii_business_glossary_term' = 'Express Service Bays');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `general_service_bays` SET TAGS ('dbx_pii_business_glossary_term' = 'General Service Bays');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `has_mobile_service_capability` SET TAGS ('dbx_pii_business_glossary_term' = 'Has Mobile Service Capability');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `has_mobile_service_capability` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `has_mobile_service_capability` SET TAGS ('dbx_pii_pii_phone' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `hours_per_shift` SET TAGS ('dbx_pii_business_glossary_term' = 'Hours Per Shift');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `internal_capacity_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Internal Capacity Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `last_capacity_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Capacity Review Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `loaner_fleet_size` SET TAGS ('dbx_pii_business_glossary_term' = 'Loaner Fleet Size');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `loaner_fleet_utilization_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Loaner Fleet Utilization Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `max_daily_appointments` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Daily Appointments');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `mobile_service_technician_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Mobile Service Technician Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `mobile_service_technician_count` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `mobile_service_technician_count` SET TAGS ('dbx_pii_pii_phone' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `next_capacity_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Capacity Review Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `operating_days_per_week` SET TAGS ('dbx_pii_business_glossary_term' = 'Operating Days Per Week');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `parts_inventory_capacity_sqft` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Inventory Capacity Square Feet');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `shifts_per_day` SET TAGS ('dbx_pii_business_glossary_term' = 'Shifts Per Day');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `specialty_certifications` SET TAGS ('dbx_pii_business_glossary_term' = 'Specialty Certifications');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `target_capacity_utilization_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Capacity Utilization Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `total_service_bays` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Service Bays');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `total_technician_headcount` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Technician Headcount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `warranty_work_capacity_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Work Capacity Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` SET TAGS ('dbx_pii_subdomain' = 'inventory_operations');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `floor_plan_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Floor Plan ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `primary_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `sku_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `account_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Floor Plan Account Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `account_number` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `account_number` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `aged_inventory_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Aged Inventory Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `aging_threshold_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Aging Threshold Days');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `audit_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Audit Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `audit_status` SET TAGS ('dbx_pii_value_regex' = 'passed|failed|pending|not_required|exception');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `credit_line_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Credit Line Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `credit_line_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `curtailment_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Curtailment Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `curtailment_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `curtailment_due_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Curtailment Due Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `curtailment_paid_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Curtailment Paid Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `daily_interest_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Daily Interest Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `daily_interest_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `days_in_inventory` SET TAGS ('dbx_pii_business_glossary_term' = 'Days in Inventory');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `dealer_invoice_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Invoice Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `dealer_invoice_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `default_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Default Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `default_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Default Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `dms_floor_plan_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Floor Plan ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `financing_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Financing End Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `financing_institution_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Financing Institution Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `financing_institution_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Financing Institution Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `financing_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Financing Start Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `floor_plan_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Floor Plan Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `floor_plan_status` SET TAGS ('dbx_pii_value_regex' = 'active|paid_off|defaulted|suspended|pending_audit|curtailed');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `interest_rate_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Interest Rate Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `interest_rate_pct` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `last_audit_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Audit Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `msrp_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP) Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `next_audit_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Audit Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `oem_assistance_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Original Equipment Manufacturer (OEM) Assistance Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `oem_assistance_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `oem_assistance_program_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Original Equipment Manufacturer (OEM) Assistance Program Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `outstanding_balance_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Outstanding Balance Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `outstanding_balance_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `payoff_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Payoff Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `payoff_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `payoff_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Payoff Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `per_unit_floor_plan_cost` SET TAGS ('dbx_pii_business_glossary_term' = 'Per-Unit Floor Plan Cost');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `per_unit_floor_plan_cost` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `sap_document_number` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Document Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `total_interest_paid` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Interest Paid');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `total_interest_paid` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` SET TAGS ('dbx_pii_subdomain' = 'inventory_operations');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_vehicle_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Demo Vehicle ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `primary_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Assigned Salesperson ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Assigned Salesperson ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `sku_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `accident_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Accident Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `assigned_salesperson_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Assigned Salesperson Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `assigned_salesperson_name` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `assignment_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Demo Assignment Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `assignment_type` SET TAGS ('dbx_pii_value_regex' = 'salesperson|sales_manager|general_manager|showroom_floor|test_drive_pool');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `current_odometer_km` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Odometer Reading in Kilometers');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_designation_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Demo Designation Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Demo Program End Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_period_months` SET TAGS ('dbx_pii_business_glossary_term' = 'Demo Period Duration in Months');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Demo Program Start Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Demo Vehicle Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|retired|converted_to_sale|returned_to_stock|auctioned');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_usage_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Demo Usage Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_usage_type` SET TAGS ('dbx_pii_value_regex' = 'test_drive|loaner|executive_use|sales_staff_use|showroom_display');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `disposition_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Disposition Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `disposition_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Disposition Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `disposition_type` SET TAGS ('dbx_pii_value_regex' = 'converted_to_used_sale|returned_to_stock|auctioned|transferred_to_another_dealer|scrapped');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `floor_plan_interest_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Floor Plan Interest Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `floor_plan_interest_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `incentive_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'OEM Incentive Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `insurance_policy_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Insurance Policy Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `insurance_policy_number` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `mileage_allowance_km` SET TAGS ('dbx_pii_business_glossary_term' = 'Mileage Allowance in Kilometers');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `mileage_overage_km` SET TAGS ('dbx_pii_business_glossary_term' = 'Mileage Overage in Kilometers');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `odometer_at_designation_km` SET TAGS ('dbx_pii_business_glossary_term' = 'Odometer Reading at Designation in Kilometers');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `oem_program_code` SET TAGS ('dbx_pii_business_glossary_term' = 'OEM Demo Program Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `pdi_completed_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completed Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `pdi_completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `recall_campaign_numbers` SET TAGS ('dbx_pii_business_glossary_term' = 'Recall Campaign Numbers');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `sale_price_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Sale Price Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `service_record_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Record Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `stock_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Stock Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `test_drive_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Drive Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Transmission Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_value_regex' = 'manual|automatic|cvt|dct|amt');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` SET TAGS ('dbx_pii_subdomain' = 'sales_transactions');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `dealer_test_drive_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Primary Key for dealer_test_drive');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealership Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Drive Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Party Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` SET TAGS ('dbx_pii_subdomain' = 'service_fulfillment');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` SET TAGS ('dbx_pii_ssot_reference' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` SET TAGS ('dbx_pii_subdomain' = 'service_fulfillment');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` SET TAGS ('dbx_pii_ssot_reference' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` SET TAGS ('dbx_pii_subdomain' = 'service_fulfillment');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `recall_completion_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Recall Completion ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `recall_customer_party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `recall_dealer_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `dealer_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Repair Order (RO) ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Technician Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `campaign_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Campaign Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `campaign_type` SET TAGS ('dbx_pii_value_regex' = 'safety_recall|service_campaign|field_service_action|customer_satisfaction_program|emissions_recall|tsb');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `completion_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Recall Completion Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `completion_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Completion Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `completion_status` SET TAGS ('dbx_pii_value_regex' = 'completed|incomplete|in_progress|parts_pending|customer_declined|not_applicable');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `completion_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Completion Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `customer_notification_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Notification Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `customer_notification_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Notification Method');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `customer_notification_method` SET TAGS ('dbx_pii_value_regex' = 'email|sms|phone|mail|in_person');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `dms_transaction_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Transaction ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `labor_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Labor Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `labor_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Labor Hours');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `model` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `nameplate` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Nameplate');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `nhtsa_report_date` SET TAGS ('dbx_pii_business_glossary_term' = 'National Highway Traffic Safety Administration (NHTSA) Report Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `nhtsa_report_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'National Highway Traffic Safety Administration (NHTSA) Report Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `odometer_reading` SET TAGS ('dbx_pii_business_glossary_term' = 'Odometer Reading');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `odometer_unit` SET TAGS ('dbx_pii_business_glossary_term' = 'Odometer Unit');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `odometer_unit` SET TAGS ('dbx_pii_value_regex' = 'km|mi');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `parts_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `parts_quantity_list` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Quantity List');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `parts_used_list` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Used List');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `post_repair_inspection_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Post-Repair Inspection Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ice|hev|phev|bev|fcev');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `pre_repair_inspection_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Repair Inspection Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `quality_verification_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Verification Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `quality_verification_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Verification Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `quality_verifier_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Verifier Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `recall_campaign_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Recall Campaign Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `reimbursement_claim_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Reimbursement Claim Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `reimbursement_paid_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Reimbursement Paid Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `reimbursement_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Reimbursement Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `reimbursement_status` SET TAGS ('dbx_pii_value_regex' = 'pending|approved|paid|rejected|under_review');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `remedy_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Remedy Description');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `sublet_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Sublet Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `technician_certification_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Technician Certification Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `technician_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Technician Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `total_reimbursement_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Reimbursement Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` SET TAGS ('dbx_pii_subdomain' = 'quality_compliance');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_integration_log_id` SET TAGS ('dbx_pii_business_glossary_term' = 'DMS (Dealer Management System) Integration Log ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `primary_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `authentication_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Authentication Method');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `authentication_method` SET TAGS ('dbx_pii_value_regex' = 'oauth2|api_key|certificate|basic_auth');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `business_impact_severity` SET TAGS ('dbx_pii_business_glossary_term' = 'Business Impact Severity');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `business_impact_severity` SET TAGS ('dbx_pii_value_regex' = 'critical|high|medium|low|none');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `compression_enabled_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Compression Enabled Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `data_freshness_lag_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Data Freshness Lag in Minutes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dealer_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dealer_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_endpoint_url` SET TAGS ('dbx_pii_business_glossary_term' = 'DMS (Dealer Management System) Endpoint URL');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_endpoint_url` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_transaction_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'DMS (Dealer Management System) Transaction ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_version` SET TAGS ('dbx_pii_business_glossary_term' = 'DMS (Dealer Management System) Version');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `encryption_protocol` SET TAGS ('dbx_pii_business_glossary_term' = 'Encryption Protocol');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `encryption_protocol` SET TAGS ('dbx_pii_value_regex' = 'TLS_1_2|TLS_1_3|SSL_3_0');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `error_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Error Category');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `error_category` SET TAGS ('dbx_pii_value_regex' = 'connectivity|validation|timeout|authentication|data_format|business_rule');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `error_message` SET TAGS ('dbx_pii_business_glossary_term' = 'Error Message');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `escalation_required_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Escalation Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `escalation_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Escalation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `integration_batch_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Integration Batch ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Modified Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `max_retry_attempts` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Retry Attempts');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `next_retry_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Retry Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `oem_transaction_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'OEM (Original Equipment Manufacturer) Transaction ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `payload_size_kb` SET TAGS ('dbx_pii_business_glossary_term' = 'Payload Size in Kilobytes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `record_count_failed` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Count Failed');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `record_count_received` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Count Received');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `record_count_sent` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Count Sent');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `region_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Region Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `resolution_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Resolution Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `resolution_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Resolution Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `retry_attempt_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Retry Attempt Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sla_compliance_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'SLA (Service Level Agreement) Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sla_target_duration_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'SLA (Service Level Agreement) Target Duration in Seconds');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_duration_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Synchronization Duration in Seconds');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_event_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Synchronization Event Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_event_type` SET TAGS ('dbx_pii_value_regex' = 'inventory_push|ro_pull|sales_pull|parts_pull|customer_pull|warranty_push');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Synchronization Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_status` SET TAGS ('dbx_pii_value_regex' = 'success|partial|failed|pending|timeout');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Synchronization Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` SET TAGS ('dbx_pii_subdomain' = 'network_management');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `facility_standard_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Facility Standard ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Assessor Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `franchise_agreement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Agreement ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `primary_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `allocation_eligibility_impact_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Eligibility Impact Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Assessment Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Assessment Method');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_method` SET TAGS ('dbx_pii_value_regex' = 'on_site|remote|hybrid|photographic_evidence|self_assessment');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Assessment Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_report_url` SET TAGS ('dbx_pii_business_glossary_term' = 'Assessment Report URL');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Assessment Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_type` SET TAGS ('dbx_pii_value_regex' = 'initial|annual|renewal|spot_check|post_remediation|franchise_application');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessor_certification_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Assessor Certification Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessor_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Assessor Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `compliance_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_value_regex' = 'compliant|non_compliant|conditional|pending_review|remediation_required|waived');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `critical_deficiency_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Critical Deficiency Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `dealer_response_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Response Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `deficiency_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Deficiency Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `deficiency_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Deficiency Description');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_pii_business_glossary_term' = 'DMS (Dealer Management System) Integration Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_pii_value_regex' = 'synced|pending|failed|not_applicable');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `dms_last_sync_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'DMS (Dealer Management System) Last Sync Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `estimated_investment_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Estimated Investment Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `estimated_investment_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `franchise_renewal_impact_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Franchise Renewal Impact Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `incentive_eligibility_impact_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Incentive Eligibility Impact Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Modified Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `major_deficiency_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Major Deficiency Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `minor_deficiency_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Minor Deficiency Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `next_assessment_due_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Assessment Due Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `oem_reviewer_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'OEM (Original Equipment Manufacturer) Reviewer Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `passing_threshold_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Passing Threshold Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `photographic_evidence_url` SET TAGS ('dbx_pii_business_glossary_term' = 'Photographic Evidence URL');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Remediation Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_deadline` SET TAGS ('dbx_pii_business_glossary_term' = 'Remediation Deadline');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_required_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Remediation Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Remediation Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_status` SET TAGS ('dbx_pii_value_regex' = 'not_started|in_progress|completed|verified|overdue|extension_granted');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_verification_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Remediation Verification Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `standard_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Category');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `standard_category` SET TAGS ('dbx_pii_value_regex' = 'brand_identity|infrastructure|customer_experience|operational|technology');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `standard_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Facility Standard Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `waiver_expiry_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Waiver Expiry Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `waiver_granted_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Waiver Granted Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `waiver_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Waiver Reason');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` SET TAGS ('dbx_pii_subdomain' = 'sales_transactions');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `used_vehicle_appraisal_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Used Vehicle Appraisal ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Appraiser Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `used_customer_party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `used_dealer_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `accident_history_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Accident History Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Appraisal Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Appraisal Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_source_channel` SET TAGS ('dbx_pii_business_glossary_term' = 'Appraisal Source Channel');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_source_channel` SET TAGS ('dbx_pii_value_regex' = 'walk_in|appointment|online_submission|phone_inquiry|service_drive');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Appraisal Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_status` SET TAGS ('dbx_pii_value_regex' = 'pending|completed|accepted|declined|expired');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Appraisal Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_tool_used` SET TAGS ('dbx_pii_business_glossary_term' = 'Appraisal Tool Used');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_tool_used` SET TAGS ('dbx_pii_value_regex' = 'manheim_mmr|black_book|kbb|nada|galves|internal');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraised_value_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Appraised Value Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraiser_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Appraiser Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `customer_requested_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Requested Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `disposition_decision` SET TAGS ('dbx_pii_business_glossary_term' = 'Disposition Decision');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `disposition_decision` SET TAGS ('dbx_pii_value_regex' = 'accepted_trade|declined_trade|wholesale|retail_inventory|pending');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `equity_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Equity Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `equity_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `equity_amount` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `exterior_condition_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Exterior Condition Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `interior_condition_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Interior Condition Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `linked_deal_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Linked Deal Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `market_value_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Market Value Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `mechanical_condition_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Mechanical Condition Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `odometer_unit` SET TAGS ('dbx_pii_business_glossary_term' = 'Odometer Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `odometer_unit` SET TAGS ('dbx_pii_value_regex' = 'miles|kilometers');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `offer_expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Offer Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `payoff_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Loan Payoff Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `payoff_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `payoff_amount` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `reconditioning_cost_estimate` SET TAGS ('dbx_pii_business_glossary_term' = 'Reconditioning Cost Estimate');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `retail_estimate_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Retail Estimate Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `service_records_available_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Records Available Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `tire_condition` SET TAGS ('dbx_pii_business_glossary_term' = 'Tire Condition');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `tire_condition` SET TAGS ('dbx_pii_value_regex' = 'excellent|good|fair|poor|replacement_needed');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `title_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Title Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `title_status` SET TAGS ('dbx_pii_value_regex' = 'clean|salvage|rebuilt|lemon|flood|hail');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `trade_in_allowance_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Trade-In Allowance Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `vin` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `vin` SET TAGS ('dbx_pii_pii_identifier' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `wholesale_estimate_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Wholesale Estimate Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` SET TAGS ('dbx_pii_data_type' = 'association_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` SET TAGS ('dbx_pii_subdomain' = 'quality_compliance');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` SET TAGS ('dbx_pii_association_edges' = 'dealer.dealership,quality.quality_standard');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `dealership_quality_assessment_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealershipqualityassessment - Assessment Id');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealershipqualityassessment - Dealership Id');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `standard_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealershipqualityassessment - Quality Standard Id');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `assessment_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Assessment Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `assessment_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Assessment Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `compliance_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Score');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `deficiency_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Deficiency Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` SET TAGS ('dbx_pii_subdomain' = 'sales_transactions');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dealer_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Order ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `primary_party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `procurement_purchase_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Purchase Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `sku_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `actual_delivery_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Delivery Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `actual_ship_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Ship Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `allocation_pool_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Pool Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `body_style` SET TAGS ('dbx_pii_business_glossary_term' = 'Body Style');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `cancellation_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Cancellation Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `confirmed_delivery_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Confirmed Delivery Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `days_late` SET TAGS ('dbx_pii_business_glossary_term' = 'Days Late');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dealer_invoice_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Invoice Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dealer_invoice_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dms_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Order Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `estimated_ship_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Estimated Ship Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `exterior_color_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Exterior Color Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `hold_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `homologation_variant` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Variant');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `incentive_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Incentive Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `incentive_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `interior_color_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Interior Color Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `market_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Market Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `market_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `msrp_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP) Amount');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `msrp_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Order Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Order Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_source` SET TAGS ('dbx_pii_business_glossary_term' = 'Order Source');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_source` SET TAGS ('dbx_pii_value_regex' = 'dealer_portal|dms|edi|manual|api');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Order Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Order Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_type` SET TAGS ('dbx_pii_value_regex' = 'stock|retail|demo|fleet|courtesy');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `otd_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'On-Time Delivery (OTD) Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `pdi_completed_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completed Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `pdi_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `priority_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Order Priority Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `priority_code` SET TAGS ('dbx_pii_value_regex' = 'standard|priority|urgent|allocation');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `production_plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `production_week` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Week');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `production_week` SET TAGS ('dbx_pii_value_regex' = '^d{4}-W(0[1-9]|[1-4]d|5[0-3])$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `requested_delivery_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Requested Delivery Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `sales_region_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Sales Region Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `sap_sales_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Sales Order Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `shipping_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Shipping Method');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `shipping_method` SET TAGS ('dbx_pii_value_regex' = 'rail|truck|vessel|mixed');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Transmission Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_value_regex' = 'automatic|manual|CVT|DCT');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` SET TAGS ('dbx_pii_subdomain' = 'network_management');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `dealer_contact_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Contact Identifier (ID)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Identifier (ID)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `active_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Active Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `certification_expiry_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Certification Expiry Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `certification_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Certification Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `certification_status` SET TAGS ('dbx_pii_value_regex' = 'certified|in_progress|expired|not_required|not_certified');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `communication_preference` SET TAGS ('dbx_pii_business_glossary_term' = 'Communication Preference');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `communication_preference` SET TAGS ('dbx_pii_value_regex' = 'email|phone|mobile|fax|portal');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `contact_role` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Role');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `contact_role` SET TAGS ('dbx_pii_value_regex' = 'dealer_principal|general_manager|sales_manager|service_manager|parts_manager|fi_manager');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `data_source_system` SET TAGS ('dbx_pii_business_glossary_term' = 'Data Source System');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `dealer_portal_access_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Portal Access Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `department` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Department');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `department` SET TAGS ('dbx_pii_value_regex' = 'sales|service|parts|finance_insurance|administration|management');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `email_address` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Email Address');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `email_address` SET TAGS ('dbx_pii_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `email_address` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `email_address` SET TAGS ('dbx_pii_pii_email' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Emergency Contact Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `record_created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `record_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `sales_district_code` SET TAGS ('dbx_business_glossary_term' = 'Sales District Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `sales_district_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `sap_customer_number` SET TAGS ('dbx_business_glossary_term' = 'SAP Customer Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `sap_customer_number` SET TAGS ('dbx_value_regex' = '^[0-9]{6,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `service_bay_count` SET TAGS ('dbx_business_glossary_term' = 'Service Bay Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `showroom_display_capacity` SET TAGS ('dbx_business_glossary_term' = 'Showroom Display Vehicle Capacity');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `showroom_display_capacity` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `state_province_code` SET TAGS ('dbx_business_glossary_term' = 'State or Province Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `state_province_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{2,5}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `state_province_code` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `trading_name` SET TAGS ('dbx_business_glossary_term' = 'Dealer Trading Name (DBA)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `used_vehicle_sales_capacity` SET TAGS ('dbx_business_glossary_term' = 'Used Vehicle Annual Sales Capacity');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `used_vehicle_sales_capacity` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `warranty_authorized` SET TAGS ('dbx_business_glossary_term' = 'OEM Warranty Repair Authorization Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `website_url` SET TAGS ('dbx_business_glossary_term' = 'Dealer Website URL');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership` ALTER COLUMN `website_url` SET TAGS ('dbx_value_regex' = '^https?://[^s]{3,255}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` SET TAGS ('dbx_subdomain' = 'network_management');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `franchise_agreement_id` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `franchise_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_currency_code` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Currency Code (ISO 4217)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_document_url` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Document URL');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_document_url` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_name` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_number` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_number` SET TAGS ('dbx_value_regex' = '^FA-[0-9]{8}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_status` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_status` SET TAGS ('dbx_value_regex' = 'draft|pending_approval|active|suspended|terminated|expired');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_type` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `agreement_type` SET TAGS ('dbx_value_regex' = 'new_franchise|renewal|amendment|expansion|termination');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `allocation_priority_tier` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Allocation Priority Tier');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `allocation_priority_tier` SET TAGS ('dbx_value_regex' = 'tier_1|tier_2|tier_3|tier_4|standard');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `authorized_nameplates` SET TAGS ('dbx_business_glossary_term' = 'Authorized Vehicle Nameplates');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `authorized_vehicle_lines` SET TAGS ('dbx_business_glossary_term' = 'Authorized Vehicle Lines');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `auto_renewal_flag` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Auto-Renewal Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `certified_pre_owned_authorized_flag` SET TAGS ('dbx_business_glossary_term' = 'Certified Pre-Owned (CPO) Authorized Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `commercial_fleet_authorized_flag` SET TAGS ('dbx_business_glossary_term' = 'Commercial Fleet Sales Authorized Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `customer_satisfaction_target_score` SET TAGS ('dbx_business_glossary_term' = 'Customer Satisfaction Target Score (NPS)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `dealer_signatory_name` SET TAGS ('dbx_business_glossary_term' = 'Dealer Signatory Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `digital_retailing_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Digital Retailing Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `dms_integration_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Integration Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Effective Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `ev_charging_infrastructure_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Electric Vehicle (EV) Charging Infrastructure Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `exclusive_territory_flag` SET TAGS ('dbx_business_glossary_term' = 'Exclusive Territory Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `facility_investment_requirement_amount` SET TAGS ('dbx_business_glossary_term' = 'Facility Investment Requirement Amount (CapEx)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `facility_investment_requirement_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `franchise_tier` SET TAGS ('dbx_business_glossary_term' = 'Franchise Tier');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `franchise_tier` SET TAGS ('dbx_value_regex' = 'platinum|gold|silver|bronze|standard');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `governing_law_jurisdiction` SET TAGS ('dbx_business_glossary_term' = 'Governing Law Jurisdiction');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `incentive_program_eligibility_flag` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program Eligibility Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `minimum_sales_quota_annual` SET TAGS ('dbx_business_glossary_term' = 'Minimum Annual Sales Quota (Units)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `minimum_service_capacity` SET TAGS ('dbx_business_glossary_term' = 'Minimum Service Capacity (Vehicles per Month)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `minimum_service_capacity` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `notice_period_days` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Notice Period (Days)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `oem_signatory_name` SET TAGS ('dbx_business_glossary_term' = 'OEM (Original Equipment Manufacturer) Signatory Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `ownership_model` SET TAGS ('dbx_business_glossary_term' = 'Ownership Model');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `ownership_model` SET TAGS ('dbx_value_regex' = 'oem_owned|independent_franchise|joint_venture|corporate_store');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `parts_inventory_requirement_amount` SET TAGS ('dbx_business_glossary_term' = 'Parts Inventory Requirement Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `parts_inventory_requirement_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `performance_review_frequency` SET TAGS ('dbx_business_glossary_term' = 'Performance Review Frequency');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `performance_review_frequency` SET TAGS ('dbx_value_regex' = 'monthly|quarterly|semi_annual|annual');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `recall_service_authorized_flag` SET TAGS ('dbx_business_glossary_term' = 'Recall Service Authorized Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `renewal_date` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Renewal Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `renewal_term_months` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Renewal Term (Months)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `signed_date` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Signed Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `termination_date` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Termination Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `termination_reason` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Termination Reason');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `territory_description` SET TAGS ('dbx_business_glossary_term' = 'Franchise Territory Description');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `territory_radius_km` SET TAGS ('dbx_business_glossary_term' = 'Franchise Territory Radius (Kilometers)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `training_certification_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Training Certification Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`franchise_agreement` ALTER COLUMN `warranty_administration_authorized_flag` SET TAGS ('dbx_business_glossary_term' = 'Warranty Administration Authorized Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` SET TAGS ('dbx_subdomain' = 'network_management');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `dealer_territory_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Territory Identifier (ID)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `franchise_agreement_id` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement Identifier (ID)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `jurisdiction_id` SET TAGS ('dbx_business_glossary_term' = 'Jurisdiction Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Territory Manager Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Identifier (ID)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `allocation_quota_percentage` SET TAGS ('dbx_business_glossary_term' = 'Allocation Quota Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `city_list` SET TAGS ('dbx_business_glossary_term' = 'City List');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `city_list` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `competitive_intensity_rating` SET TAGS ('dbx_business_glossary_term' = 'Competitive Intensity Rating');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `competitive_intensity_rating` SET TAGS ('dbx_value_regex' = 'low|medium|high|very_high');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `country_code` SET TAGS ('dbx_business_glossary_term' = 'Country Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `county_region` SET TAGS ('dbx_business_glossary_term' = 'County or Region');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Integration Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_value_regex' = 'integrated|pending|failed|not_applicable');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `dms_last_sync_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Last Synchronization Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `geographic_boundary_description` SET TAGS ('dbx_business_glossary_term' = 'Geographic Boundary Description');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `household_count_estimate` SET TAGS ('dbx_business_glossary_term' = 'Household Count Estimate');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `incentive_program_eligibility_flag` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program Eligibility Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Modified Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `manager_email` SET TAGS ('dbx_business_glossary_term' = 'Territory Manager Email Address');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `manager_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `manager_email` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `manager_email` SET TAGS ('dbx_pii_email' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `manager_name` SET TAGS ('dbx_business_glossary_term' = 'Territory Manager Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `manager_name` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `manager_phone` SET TAGS ('dbx_business_glossary_term' = 'Territory Manager Phone Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `manager_phone` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `manager_phone` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `market_segment_classification` SET TAGS ('dbx_business_glossary_term' = 'Market Segment Classification');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `market_segment_classification` SET TAGS ('dbx_value_regex' = 'urban|suburban|rural|metro|mixed');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `modification_reason` SET TAGS ('dbx_business_glossary_term' = 'Modification Reason');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `next_review_date` SET TAGS ('dbx_business_glossary_term' = 'Next Review Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `overlap_allowed_flag` SET TAGS ('dbx_business_glossary_term' = 'Territory Overlap Allowed Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `overlap_rule_description` SET TAGS ('dbx_business_glossary_term' = 'Overlap Rule Description');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `performance_benchmark_group` SET TAGS ('dbx_business_glossary_term' = 'Performance Benchmark Group');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `population_estimate` SET TAGS ('dbx_business_glossary_term' = 'Population Estimate');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `postal_code_list` SET TAGS ('dbx_business_glossary_term' = 'Postal Code List');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `postal_code_list` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `postal_code_list` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `primary_area_of_responsibility` SET TAGS ('dbx_business_glossary_term' = 'Primary Area of Responsibility (PAR)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `sales_potential_index` SET TAGS ('dbx_business_glossary_term' = 'Sales Potential Index');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `special_program_notes` SET TAGS ('dbx_business_glossary_term' = 'Special Program Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `state_province_code` SET TAGS ('dbx_business_glossary_term' = 'State or Province Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `state_province_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{2,3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `state_province_code` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `territory_code` SET TAGS ('dbx_business_glossary_term' = 'Territory Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `territory_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{3,12}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `territory_name` SET TAGS ('dbx_business_glossary_term' = 'Territory Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `territory_status` SET TAGS ('dbx_business_glossary_term' = 'Territory Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `territory_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending|suspended|under_review|terminated');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `territory_type` SET TAGS ('dbx_business_glossary_term' = 'Territory Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `territory_type` SET TAGS ('dbx_value_regex' = 'exclusive|shared|open|primary|secondary|overlay');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_territory` ALTER COLUMN `vehicle_allocation_priority` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Allocation Priority');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` SET TAGS ('dbx_subdomain' = 'network_management');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `dealer_certification_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Certification Identifier (ID)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `obligation_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Obligation Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Identifier (ID)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `allocation_eligibility_flag` SET TAGS ('dbx_business_glossary_term' = 'Allocation Eligibility Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `annual_maintenance_cost_amount` SET TAGS ('dbx_business_glossary_term' = 'Annual Maintenance Cost Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `annual_maintenance_cost_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `audit_outcome` SET TAGS ('dbx_business_glossary_term' = 'Audit Outcome');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `audit_outcome` SET TAGS ('dbx_value_regex' = 'PASSED|PASSED_WITH_CONDITIONS|FAILED|NOT_APPLICABLE');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `audit_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Audit Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `audit_score` SET TAGS ('dbx_business_glossary_term' = 'Audit Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `authorized_vehicle_lines` SET TAGS ('dbx_business_glossary_term' = 'Authorized Vehicle Lines');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_level` SET TAGS ('dbx_business_glossary_term' = 'Certification Level');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_level` SET TAGS ('dbx_value_regex' = 'BRONZE|SILVER|GOLD|PLATINUM|ELITE|STANDARD');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_name` SET TAGS ('dbx_business_glossary_term' = 'Certification Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_number` SET TAGS ('dbx_business_glossary_term' = 'Certification Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,20}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_status` SET TAGS ('dbx_business_glossary_term' = 'Certification Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_status` SET TAGS ('dbx_value_regex' = 'ACTIVE|EXPIRED|SUSPENDED|PENDING_RENEWAL|REVOKED|UNDER_REVIEW');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_type` SET TAGS ('dbx_business_glossary_term' = 'Certification Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `certification_type` SET TAGS ('dbx_value_regex' = 'EV_CERTIFIED|ADAS_SERVICE|LUXURY_BRAND|COMMERCIAL_VEHICLE|HYBRID_SPECIALIST|PERFORMANCE_TUNING');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_business_glossary_term' = 'Compliance Standard');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `cost_amount` SET TAGS ('dbx_business_glossary_term' = 'Certification Cost Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `cost_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `equipment_requirements` SET TAGS ('dbx_business_glossary_term' = 'Equipment Requirements');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `facility_requirements` SET TAGS ('dbx_business_glossary_term' = 'Facility Requirements');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `geographic_scope` SET TAGS ('dbx_business_glossary_term' = 'Geographic Scope');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `geographic_scope` SET TAGS ('dbx_value_regex' = 'GLOBAL|REGIONAL|NATIONAL|STATE_PROVINCIAL|LOCAL');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `incentive_eligibility_flag` SET TAGS ('dbx_business_glossary_term' = 'Incentive Eligibility Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `issue_date` SET TAGS ('dbx_business_glossary_term' = 'Issue Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `issuing_body` SET TAGS ('dbx_business_glossary_term' = 'Issuing Body');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `issuing_body_type` SET TAGS ('dbx_business_glossary_term' = 'Issuing Body Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `issuing_body_type` SET TAGS ('dbx_value_regex' = 'OEM_CORPORATE|INDUSTRY_ASSOCIATION|REGULATORY_BODY|THIRD_PARTY_AUDITOR|REGIONAL_OEM');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `last_audit_date` SET TAGS ('dbx_business_glossary_term' = 'Last Audit Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Modified Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `last_renewal_date` SET TAGS ('dbx_business_glossary_term' = 'Last Renewal Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `minimum_certified_technicians` SET TAGS ('dbx_business_glossary_term' = 'Minimum Certified Technicians');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `next_audit_due_date` SET TAGS ('dbx_business_glossary_term' = 'Next Audit Due Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `next_renewal_due_date` SET TAGS ('dbx_business_glossary_term' = 'Next Renewal Due Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `personnel_requirements` SET TAGS ('dbx_business_glossary_term' = 'Personnel Requirements');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `reinstatement_date` SET TAGS ('dbx_business_glossary_term' = 'Reinstatement Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `renewal_frequency_months` SET TAGS ('dbx_business_glossary_term' = 'Renewal Frequency in Months');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `revocation_date` SET TAGS ('dbx_business_glossary_term' = 'Revocation Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `revocation_reason` SET TAGS ('dbx_business_glossary_term' = 'Revocation Reason');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `suspension_date` SET TAGS ('dbx_business_glossary_term' = 'Suspension Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `suspension_reason` SET TAGS ('dbx_business_glossary_term' = 'Suspension Reason');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `training_completion_date` SET TAGS ('dbx_business_glossary_term' = 'Training Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_certification` ALTER COLUMN `training_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Training Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` SET TAGS ('dbx_subdomain' = 'inventory_operations');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `vehicle_allocation_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Allocation ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `vehicle_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `acceptance_deadline` SET TAGS ('dbx_business_glossary_term' = 'Acceptance Deadline');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `acceptance_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Acceptance Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `accepted_quantity` SET TAGS ('dbx_business_glossary_term' = 'Accepted Quantity');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `actual_delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Actual Delivery Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_batch_number` SET TAGS ('dbx_business_glossary_term' = 'Allocation Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_date` SET TAGS ('dbx_business_glossary_term' = 'Allocation Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_number` SET TAGS ('dbx_business_glossary_term' = 'Allocation Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_number` SET TAGS ('dbx_value_regex' = '^ALLOC-[0-9]{4}-[0-9]{6}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_rule_code` SET TAGS ('dbx_business_glossary_term' = 'Allocation Rule Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_status` SET TAGS ('dbx_business_glossary_term' = 'Allocation Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_status` SET TAGS ('dbx_value_regex' = 'pending|confirmed|accepted|rejected|cancelled|delivered');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_type` SET TAGS ('dbx_business_glossary_term' = 'Allocation Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `allocation_type` SET TAGS ('dbx_value_regex' = 'standard|priority|constrained|fleet|demo|loaner');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `dealer_invoice_price` SET TAGS ('dbx_business_glossary_term' = 'Dealer Invoice Price');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `dealer_invoice_price` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `dms_reference_number` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Reference Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `estimated_delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Estimated Delivery Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `hold_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Hold Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `incentive_amount` SET TAGS ('dbx_business_glossary_term' = 'Incentive Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `incentive_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `incentive_program_code` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `is_customer_order` SET TAGS ('dbx_business_glossary_term' = 'Customer Order Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `msrp` SET TAGS ('dbx_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `msrp` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Allocation Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `pdi_completed` SET TAGS ('dbx_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completed Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `pdi_required` SET TAGS ('dbx_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `port_of_entry_code` SET TAGS ('dbx_business_glossary_term' = 'Port of Entry Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `port_of_entry_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3,5}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `priority_tier` SET TAGS ('dbx_business_glossary_term' = 'Priority Tier');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `priority_tier` SET TAGS ('dbx_value_regex' = 'tier_1|tier_2|tier_3|tier_4');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `production_plant_code` SET TAGS ('dbx_business_glossary_term' = 'Production Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `production_plant_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,6}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `region_code` SET TAGS ('dbx_business_glossary_term' = 'Region Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `region_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{2,5}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `rejection_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Rejection Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `scheduled_production_date` SET TAGS ('dbx_business_glossary_term' = 'Scheduled Production Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `source_system_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `source_system_code` SET TAGS ('dbx_value_regex' = 'SAP_SD|CDK_DMS|SALESFORCE|MES|MANUAL');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `territory_code` SET TAGS ('dbx_business_glossary_term' = 'Sales Territory Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `territory_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `transport_mode` SET TAGS ('dbx_business_glossary_term' = 'Transport Mode');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `transport_mode` SET TAGS ('dbx_value_regex' = 'rail|truck|ship|compound');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`vehicle_allocation` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` SET TAGS ('dbx_subdomain' = 'network_management');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `allocation_rule_id` SET TAGS ('dbx_business_glossary_term' = 'Allocation Rule ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `dealer_incentive_program_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Incentive Program ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `superseded_by_rule_allocation_rule_id` SET TAGS ('dbx_business_glossary_term' = 'Superseded By Allocation Rule ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `allocation_basis` SET TAGS ('dbx_business_glossary_term' = 'Allocation Basis');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `allocation_basis` SET TAGS ('dbx_value_regex' = 'retail_sales|wholesale_orders|days_supply|market_share|scorecard_rank');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `allocation_cycle` SET TAGS ('dbx_business_glossary_term' = 'Allocation Cycle');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `allocation_cycle` SET TAGS ('dbx_value_regex' = 'weekly|biweekly|monthly|quarterly');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected|under_review');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `approved_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `body_style` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Body Style');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `carryover_allowed` SET TAGS ('dbx_business_glossary_term' = 'Carryover Allocation Allowed');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `conflict_resolution` SET TAGS ('dbx_business_glossary_term' = 'Conflict Resolution Method');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `conflict_resolution` SET TAGS ('dbx_value_regex' = 'highest_priority|lowest_priority|sum|average|manual');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `dealer_tier` SET TAGS ('dbx_business_glossary_term' = 'Dealer Tier');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `dealer_tier` SET TAGS ('dbx_value_regex' = 'tier_1|tier_2|tier_3|all');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `eop_date` SET TAGS ('dbx_business_glossary_term' = 'End of Production (EOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `external_rule_ref` SET TAGS ('dbx_business_glossary_term' = 'External Rule Reference');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `franchise_type` SET TAGS ('dbx_business_glossary_term' = 'Franchise Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `franchise_type` SET TAGS ('dbx_value_regex' = 'oem_owned|independent_franchise|dual_franchise|all');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `lookback_period_days` SET TAGS ('dbx_business_glossary_term' = 'Lookback Period (Days)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `max_allocation_units` SET TAGS ('dbx_business_glossary_term' = 'Maximum Allocation Units');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `min_allocation_units` SET TAGS ('dbx_business_glossary_term' = 'Minimum Allocation Units');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `min_csi_score` SET TAGS ('dbx_business_glossary_term' = 'Minimum Customer Satisfaction Index (CSI) Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `min_scorecard_score` SET TAGS ('dbx_business_glossary_term' = 'Minimum Dealer Scorecard Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `model_mix_target_pct` SET TAGS ('dbx_business_glossary_term' = 'Model Mix Target Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `nameplate_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Nameplate Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `override_allowed` SET TAGS ('dbx_business_glossary_term' = 'Manual Override Allowed');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `plant_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV|all');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `priority_weight` SET TAGS ('dbx_business_glossary_term' = 'Priority Weight');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `region_code` SET TAGS ('dbx_business_glossary_term' = 'Sales Region Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `region_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_code` SET TAGS ('dbx_business_glossary_term' = 'Allocation Rule Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{3,30}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_description` SET TAGS ('dbx_business_glossary_term' = 'Allocation Rule Description');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_name` SET TAGS ('dbx_business_glossary_term' = 'Allocation Rule Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_status` SET TAGS ('dbx_business_glossary_term' = 'Allocation Rule Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_status` SET TAGS ('dbx_value_regex' = 'draft|active|suspended|expired|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_type` SET TAGS ('dbx_business_glossary_term' = 'Allocation Rule Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `rule_type` SET TAGS ('dbx_value_regex' = 'volume_based|performance_based|geographic|model_mix|incentive_based|priority_based');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `sop_date` SET TAGS ('dbx_business_glossary_term' = 'Start of Production (SOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `stackable` SET TAGS ('dbx_business_glossary_term' = 'Rule Stackable Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `target_days_supply` SET TAGS ('dbx_business_glossary_term' = 'Target Days Supply');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `total_pool_units` SET TAGS ('dbx_business_glossary_term' = 'Total Allocation Pool Units');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Rule Version Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `zone_code` SET TAGS ('dbx_business_glossary_term' = 'Distribution Zone Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`allocation_rule` ALTER COLUMN `zone_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` SET TAGS ('dbx_subdomain' = 'inventory_operations');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `dealer_inventory_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Inventory ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `finished_vehicle_stock_id` SET TAGS ('dbx_business_glossary_term' = 'Finished Vehicle Stock Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Manager Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `vehicle_build_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Build Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `acquisition_cost` SET TAGS ('dbx_business_glossary_term' = 'Acquisition Cost');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `acquisition_cost` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `allocation_order_number` SET TAGS ('dbx_business_glossary_term' = 'OEM Allocation Order Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `asking_price` SET TAGS ('dbx_business_glossary_term' = 'Current Asking Price');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `asking_price` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `body_style` SET TAGS ('dbx_business_glossary_term' = 'Body Style');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `certified_pre_owned` SET TAGS ('dbx_business_glossary_term' = 'Certified Pre-Owned (CPO) Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `days_on_lot` SET TAGS ('dbx_business_glossary_term' = 'Days on Lot');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `dms_record_reference` SET TAGS ('dbx_business_glossary_term' = 'DMS Record ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `drivetrain` SET TAGS ('dbx_business_glossary_term' = 'Drivetrain Configuration');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `drivetrain` SET TAGS ('dbx_value_regex' = 'FWD|RWD|AWD|4WD');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `engine_description` SET TAGS ('dbx_business_glossary_term' = 'Engine Description');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `estimated_arrival_date` SET TAGS ('dbx_business_glossary_term' = 'Estimated Arrival Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `exterior_color_code` SET TAGS ('dbx_business_glossary_term' = 'Exterior Color Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `exterior_color_name` SET TAGS ('dbx_business_glossary_term' = 'Exterior Color Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `floor_plan_date` SET TAGS ('dbx_business_glossary_term' = 'Floor Plan Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `floor_plan_lender` SET TAGS ('dbx_business_glossary_term' = 'Floor Plan Lender');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `floor_plan_lender` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `fuel_economy_city_mpg` SET TAGS ('dbx_business_glossary_term' = 'City Fuel Economy (MPG)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `fuel_economy_city_mpg` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `fuel_economy_highway_mpg` SET TAGS ('dbx_business_glossary_term' = 'Highway Fuel Economy (MPG)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `in_service_date` SET TAGS ('dbx_business_glossary_term' = 'In-Service Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `interior_color_code` SET TAGS ('dbx_business_glossary_term' = 'Interior Color Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `interior_color_name` SET TAGS ('dbx_business_glossary_term' = 'Interior Color Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `inventory_status` SET TAGS ('dbx_business_glossary_term' = 'Inventory Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `inventory_type` SET TAGS ('dbx_business_glossary_term' = 'Inventory Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `inventory_type` SET TAGS ('dbx_value_regex' = 'new|used|certified_pre_owned|demo|loaner');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `invoice_price` SET TAGS ('dbx_business_glossary_term' = 'Invoice Price');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `invoice_price` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `last_price_update_date` SET TAGS ('dbx_business_glossary_term' = 'Last Price Update Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `location_code` SET TAGS ('dbx_business_glossary_term' = 'Lot Location Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `msrp` SET TAGS ('dbx_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `msrp` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `odometer_reading` SET TAGS ('dbx_business_glossary_term' = 'Odometer Reading (Miles)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `pdi_completed` SET TAGS ('dbx_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completed Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `pdi_completed_date` SET TAGS ('dbx_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `recall_campaign_number` SET TAGS ('dbx_business_glossary_term' = 'NHTSA Recall Campaign Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `recall_hold` SET TAGS ('dbx_business_glossary_term' = 'Recall Hold Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `received_date` SET TAGS ('dbx_business_glossary_term' = 'Received Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `record_created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `record_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `source_type` SET TAGS ('dbx_business_glossary_term' = 'Inventory Source Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `source_type` SET TAGS ('dbx_value_regex' = 'factory_order|dealer_trade|auction|trade_in|fleet_return|lease_return');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `stock_number` SET TAGS ('dbx_business_glossary_term' = 'Dealer Stock Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `transmission_type` SET TAGS ('dbx_business_glossary_term' = 'Transmission Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `transmission_type` SET TAGS ('dbx_value_regex' = 'automatic|manual|CVT|DCT|single_speed');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `transport_status` SET TAGS ('dbx_business_glossary_term' = 'Transport Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `transport_status` SET TAGS ('dbx_value_regex' = 'not_shipped|in_transit|delivered|rail|truck');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_inventory` ALTER COLUMN `window_sticker_url` SET TAGS ('dbx_business_glossary_term' = 'Window Sticker URL (Monroney Label)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` SET TAGS ('dbx_subdomain' = 'inventory_operations');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_inventory_id` SET TAGS ('dbx_business_glossary_term' = 'Parts Inventory ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `spare_parts_catalog_id` SET TAGS ('dbx_business_glossary_term' = 'Spare Parts Catalog Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `average_monthly_demand` SET TAGS ('dbx_business_glossary_term' = 'Average Monthly Demand');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `bin_location` SET TAGS ('dbx_business_glossary_term' = 'Bin Location');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `bin_location` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{1,20}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `core_charge_amount` SET TAGS ('dbx_business_glossary_term' = 'Core Charge Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `dealer_cost_price` SET TAGS ('dbx_business_glossary_term' = 'Dealer Cost Price');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `dealer_cost_price` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `inventory_snapshot_date` SET TAGS ('dbx_business_glossary_term' = 'Inventory Snapshot Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `inventory_status` SET TAGS ('dbx_business_glossary_term' = 'Inventory Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `inventory_status` SET TAGS ('dbx_value_regex' = 'active|discontinued|superseded|backordered|restricted|obsolete');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `is_core_part` SET TAGS ('dbx_business_glossary_term' = 'Core Part Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `is_hazardous_material` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `is_serialized` SET TAGS ('dbx_business_glossary_term' = 'Serialized Part Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `last_count_date` SET TAGS ('dbx_business_glossary_term' = 'Last Physical Count Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `last_receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Last Receipt Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `last_sale_date` SET TAGS ('dbx_business_glossary_term' = 'Last Sale Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time Days');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `list_price` SET TAGS ('dbx_business_glossary_term' = 'List Price');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `lost_sales_quantity` SET TAGS ('dbx_business_glossary_term' = 'Lost Sales Quantity');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `maximum_stock_level` SET TAGS ('dbx_business_glossary_term' = 'Maximum Stock Level');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `model_year_applicability` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY) Applicability');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `model_year_applicability` SET TAGS ('dbx_value_regex' = '^[0-9]{4}(-[0-9]{4})?$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `months_supply` SET TAGS ('dbx_business_glossary_term' = 'Months Supply');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `oem_part_number` SET TAGS ('dbx_business_glossary_term' = 'Original Equipment Manufacturer (OEM) Part Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `oem_part_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{4,25}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_classification` SET TAGS ('dbx_business_glossary_term' = 'Parts Classification');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_classification` SET TAGS ('dbx_value_regex' = 'mechanical|body|electrical|accessories|fluids|consumables');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_group_code` SET TAGS ('dbx_business_glossary_term' = 'Parts Group Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `parts_group_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `quantity_available` SET TAGS ('dbx_business_glossary_term' = 'Quantity Available');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_business_glossary_term' = 'Quantity On Hand');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `quantity_on_order` SET TAGS ('dbx_business_glossary_term' = 'Quantity On Order');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `quantity_reserved` SET TAGS ('dbx_business_glossary_term' = 'Quantity Reserved');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `recall_campaign_number` SET TAGS ('dbx_business_glossary_term' = 'Recall Campaign Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `recall_campaign_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{4,20}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `recall_flag` SET TAGS ('dbx_business_glossary_term' = 'Recall Part Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `reorder_point` SET TAGS ('dbx_business_glossary_term' = 'Reorder Point');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `reorder_quantity` SET TAGS ('dbx_business_glossary_term' = 'Reorder Quantity');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `retail_price` SET TAGS ('dbx_business_glossary_term' = 'Retail Price');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{4,30}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `storage_condition` SET TAGS ('dbx_business_glossary_term' = 'Storage Condition');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `storage_condition` SET TAGS ('dbx_value_regex' = 'ambient|refrigerated|flammable|controlled|outdoor');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `superseded_by_date` SET TAGS ('dbx_business_glossary_term' = 'Superseded By Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `superseding_part_number` SET TAGS ('dbx_business_glossary_term' = 'Superseding Part Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `superseding_part_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{4,25}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `supplier_part_number` SET TAGS ('dbx_business_glossary_term' = 'Supplier Part Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `supplier_part_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{4,30}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `vehicle_model_applicability` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Applicability');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`parts_inventory` ALTER COLUMN `warranty_eligible` SET TAGS ('dbx_business_glossary_term' = 'Warranty Eligible Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` SET TAGS ('dbx_subdomain' = 'sales_performance');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_sale_id` SET TAGS ('dbx_business_glossary_term' = 'Retail Sale ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `opportunity_id` SET TAGS ('dbx_business_glossary_term' = 'Opportunity Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Salesperson ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_salesperson_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Salesperson ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_salesperson_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `retail_salesperson_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `apr` SET TAGS ('dbx_business_glossary_term' = 'Annual Percentage Rate (APR)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `apr` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `back_end_gross` SET TAGS ('dbx_business_glossary_term' = 'Back-End Gross Profit');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `back_end_gross` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `deal_number` SET TAGS ('dbx_business_glossary_term' = 'Deal Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `deal_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{4,20}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `deal_status` SET TAGS ('dbx_business_glossary_term' = 'Deal Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `deal_status` SET TAGS ('dbx_value_regex' = 'draft|pending|funded|unwound|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Delivery Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `discount_amount` SET TAGS ('dbx_business_glossary_term' = 'Discount Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `discount_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `dms_deal_reference` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Deal ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `doc_fee` SET TAGS ('dbx_business_glossary_term' = 'Documentation Fee');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `down_payment` SET TAGS ('dbx_business_glossary_term' = 'Down Payment Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `down_payment` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `down_payment` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `fi_product_revenue` SET TAGS ('dbx_business_glossary_term' = 'Finance and Insurance (F&I) Product Revenue');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `fi_product_revenue` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `finance_amount` SET TAGS ('dbx_business_glossary_term' = 'Finance Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `finance_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `finance_amount` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `financing_type` SET TAGS ('dbx_business_glossary_term' = 'Financing Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `financing_type` SET TAGS ('dbx_value_regex' = 'cash|retail_finance|lease|balloon');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `fleet_sale` SET TAGS ('dbx_business_glossary_term' = 'Fleet Sale Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `front_end_gross` SET TAGS ('dbx_business_glossary_term' = 'Front-End Gross Profit');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `front_end_gross` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `lender_name` SET TAGS ('dbx_business_glossary_term' = 'Lender Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `loan_term_months` SET TAGS ('dbx_business_glossary_term' = 'Loan Term (Months)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `monthly_payment` SET TAGS ('dbx_business_glossary_term' = 'Monthly Payment Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `monthly_payment` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `monthly_payment` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `msrp_amount` SET TAGS ('dbx_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP) Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `msrp_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `oem_incentive_amount` SET TAGS ('dbx_business_glossary_term' = 'OEM Incentive Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `oem_incentive_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `oem_program_code` SET TAGS ('dbx_business_glossary_term' = 'OEM Incentive Program Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `pdi_completed` SET TAGS ('dbx_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completed Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sale_date` SET TAGS ('dbx_business_glossary_term' = 'Sale Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sale_price` SET TAGS ('dbx_business_glossary_term' = 'Sale Price');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sale_price` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sale_price` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `sales_tax_amount` SET TAGS ('dbx_business_glossary_term' = 'Sales Tax Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `stock_number` SET TAGS ('dbx_business_glossary_term' = 'Dealer Stock Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_allowance` SET TAGS ('dbx_business_glossary_term' = 'Trade-In Allowance');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_allowance` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_payoff_amount` SET TAGS ('dbx_business_glossary_term' = 'Trade-In Payoff Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_payoff_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_vin` SET TAGS ('dbx_business_glossary_term' = 'Trade-In Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `trade_in_vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `vehicle_condition` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Condition');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `vehicle_condition` SET TAGS ('dbx_value_regex' = 'new|used|certified_pre_owned');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`retail_sale` ALTER COLUMN `warranty_start_date` SET TAGS ('dbx_business_glossary_term' = 'Warranty Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` SET TAGS ('dbx_subdomain' = 'service_execution');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ALTER COLUMN `dealer_service_appointment_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Key for dealer_service_appointment');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ALTER COLUMN `aftersales_service_appointment_id` SET TAGS ('dbx_business_glossary_term' = 'Aftersales Service Appointment Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealership Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Party Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Service Advisor Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ALTER COLUMN `test_event_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Test Event Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_service_appointment` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` SET TAGS ('dbx_subdomain' = 'service_execution');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` ALTER COLUMN `dealer_repair_order_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Key for dealer_repair_order');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` ALTER COLUMN `aftersales_repair_order_id` SET TAGS ('dbx_business_glossary_term' = 'Aftersales Repair Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` ALTER COLUMN `maintenance_order_id` SET TAGS ('dbx_business_glossary_term' = 'Maintenance Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Party Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Technician Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_repair_order` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` SET TAGS ('dbx_subdomain' = 'sales_performance');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `dealer_incentive_program_id` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `announcement_date` SET TAGS ('dbx_business_glossary_term' = 'Program Announcement Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Program Approval Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `dealer_tier_eligibility` SET TAGS ('dbx_business_glossary_term' = 'Dealer Tier Eligibility');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `dealer_tier_eligibility` SET TAGS ('dbx_value_regex' = 'all|platinum|gold|silver|bronze');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `dealer_type_eligibility` SET TAGS ('dbx_business_glossary_term' = 'Dealer Type Eligibility');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `dealer_type_eligibility` SET TAGS ('dbx_value_regex' = 'all|franchise|oem_owned|independent');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `dms_program_reference` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Program ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `dms_program_reference` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,50}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Program Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Program Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `eligible_dealer_count` SET TAGS ('dbx_business_glossary_term' = 'Eligible Dealer Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `eligible_nameplates` SET TAGS ('dbx_business_glossary_term' = 'Eligible Nameplates');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `eligible_powertrain_types` SET TAGS ('dbx_business_glossary_term' = 'Eligible Powertrain Types');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `eligible_powertrain_types` SET TAGS ('dbx_value_regex' = 'ICE|EV|HEV|PHEV|all');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `floor_plan_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Floor Plan Assistance Rate Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `floor_plan_rate_pct` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `max_payout_amount` SET TAGS ('dbx_business_glossary_term' = 'Maximum Program Payout Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `max_payout_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `measurement_period_type` SET TAGS ('dbx_business_glossary_term' = 'Measurement Period Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `measurement_period_type` SET TAGS ('dbx_value_regex' = 'monthly|quarterly|annual|custom');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `min_dealer_tenure_months` SET TAGS ('dbx_business_glossary_term' = 'Minimum Dealer Tenure Months');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^(19|20)d{2}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `oem_program_sponsor` SET TAGS ('dbx_business_glossary_term' = 'OEM Program Sponsor');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `payout_date` SET TAGS ('dbx_business_glossary_term' = 'Program Payout Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `payout_structure_type` SET TAGS ('dbx_business_glossary_term' = 'Payout Structure Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `payout_structure_type` SET TAGS ('dbx_value_regex' = 'flat_bonus|per_unit|percentage_of_msrp|percentage_of_invoice');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `performance_metric` SET TAGS ('dbx_business_glossary_term' = 'Performance Metric');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `performance_metric` SET TAGS ('dbx_value_regex' = 'units_sold|nps_score|csat_score|ev_units_sold|market_share_pct|pdi_compliance_rate');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `program_code` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `program_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{3,30}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `program_description` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program Description');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `program_manager_name` SET TAGS ('dbx_business_glossary_term' = 'Program Manager Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `program_manager_name` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `program_name` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `program_status` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `program_status` SET TAGS ('dbx_value_regex' = 'draft|active|suspended|closed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `program_type` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `program_type` SET TAGS ('dbx_value_regex' = 'volume_bonus|stair_step|csat_bonus|ev_adoption|floor_plan_assistance|market_representation');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `region_code` SET TAGS ('dbx_business_glossary_term' = 'OEM Sales Region Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `region_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `requires_pdi_compliance` SET TAGS ('dbx_business_glossary_term' = 'Requires Pre-Delivery Inspection (PDI) Compliance');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `requires_training_certification` SET TAGS ('dbx_business_glossary_term' = 'Requires Training Certification');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `retroactive_flag` SET TAGS ('dbx_business_glossary_term' = 'Retroactive Payout Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `salesforce_program_reference` SET TAGS ('dbx_business_glossary_term' = 'Salesforce Automotive Cloud Program ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `salesforce_program_reference` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9]{15,18}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `stackable_flag` SET TAGS ('dbx_business_glossary_term' = 'Stackable Program Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `terms_version` SET TAGS ('dbx_business_glossary_term' = 'Program Terms and Conditions Version');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `terms_version` SET TAGS ('dbx_value_regex' = '^vd+.d+$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `tier1_payout_amount` SET TAGS ('dbx_business_glossary_term' = 'Tier 1 Payout Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `tier1_payout_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `tier1_threshold` SET TAGS ('dbx_business_glossary_term' = 'Tier 1 Performance Threshold');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `tier2_payout_amount` SET TAGS ('dbx_business_glossary_term' = 'Tier 2 Payout Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `tier2_payout_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `tier2_threshold` SET TAGS ('dbx_business_glossary_term' = 'Tier 2 Performance Threshold');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `tier3_payout_amount` SET TAGS ('dbx_business_glossary_term' = 'Tier 3 Payout Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `tier3_payout_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `tier3_threshold` SET TAGS ('dbx_business_glossary_term' = 'Tier 3 Performance Threshold');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `tier_count` SET TAGS ('dbx_business_glossary_term' = 'Performance Tier Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `total_program_budget` SET TAGS ('dbx_business_glossary_term' = 'Total Program Budget');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_program` ALTER COLUMN `total_program_budget` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` SET TAGS ('dbx_subdomain' = 'sales_performance');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dealer_incentive_claim_id` SET TAGS ('dbx_business_glossary_term' = 'Incentive Claim ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dealer_incentive_program_id` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Reviewer Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `accrual_posted` SET TAGS ('dbx_business_glossary_term' = 'Accrual Posted Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `adjustment_amount` SET TAGS ('dbx_business_glossary_term' = 'Adjustment Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `adjustment_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `adjustment_reason` SET TAGS ('dbx_business_glossary_term' = 'Adjustment Reason');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `adjustment_reason` SET TAGS ('dbx_value_regex' = 'ineligible_units|duplicate_claim|missing_evidence|calculation_error|program_cap_exceeded|other');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `approved_amount` SET TAGS ('dbx_business_glossary_term' = 'Approved Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `approved_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `approved_units` SET TAGS ('dbx_business_glossary_term' = 'Approved Units');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claim_number` SET TAGS ('dbx_business_glossary_term' = 'Claim Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claim_number` SET TAGS ('dbx_value_regex' = '^CLM-[0-9]{4}-[0-9]{6}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claim_period_end_date` SET TAGS ('dbx_business_glossary_term' = 'Claim Period End Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claim_period_start_date` SET TAGS ('dbx_business_glossary_term' = 'Claim Period Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claim_status` SET TAGS ('dbx_business_glossary_term' = 'Claim Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claim_status` SET TAGS ('dbx_value_regex' = 'submitted|under_review|approved|rejected|paid|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claim_type` SET TAGS ('dbx_business_glossary_term' = 'Claim Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claimed_amount` SET TAGS ('dbx_business_glossary_term' = 'Claimed Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claimed_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claimed_metric_unit` SET TAGS ('dbx_business_glossary_term' = 'Claimed Metric Unit');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claimed_metric_unit` SET TAGS ('dbx_value_regex' = 'units|percentage|score|amount_usd|amount_local');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claimed_metric_value` SET TAGS ('dbx_business_glossary_term' = 'Claimed Metric Value');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `claimed_units` SET TAGS ('dbx_business_glossary_term' = 'Claimed Units');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `country_code` SET TAGS ('dbx_business_glossary_term' = 'Country Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dealer_contact_email` SET TAGS ('dbx_business_glossary_term' = 'Dealer Contact Email Address');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dealer_contact_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dealer_contact_email` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dealer_contact_email` SET TAGS ('dbx_pii_email' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dealer_contact_name` SET TAGS ('dbx_business_glossary_term' = 'Dealer Contact Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dealer_contact_name` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dealer_contact_name` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dispute_date` SET TAGS ('dbx_business_glossary_term' = 'Dispute Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dispute_flag` SET TAGS ('dbx_business_glossary_term' = 'Dispute Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dispute_resolution_notes` SET TAGS ('dbx_business_glossary_term' = 'Dispute Resolution Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `dms_claim_reference` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Claim Reference');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `evidence_document_ref` SET TAGS ('dbx_business_glossary_term' = 'Evidence Document Reference');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `evidence_verified` SET TAGS ('dbx_business_glossary_term' = 'Evidence Verified Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `gl_account_code` SET TAGS ('dbx_business_glossary_term' = 'General Ledger (GL) Account Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `paid_amount` SET TAGS ('dbx_business_glossary_term' = 'Paid Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `paid_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `payment_date` SET TAGS ('dbx_business_glossary_term' = 'Payment Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `payment_reference` SET TAGS ('dbx_business_glossary_term' = 'Payment Reference');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|EV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `program_quarter` SET TAGS ('dbx_business_glossary_term' = 'Program Quarter');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `program_quarter` SET TAGS ('dbx_value_regex' = 'Q1|Q2|Q3|Q4');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `program_year` SET TAGS ('dbx_business_glossary_term' = 'Program Year');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `region_code` SET TAGS ('dbx_business_glossary_term' = 'Region Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `rejection_reason` SET TAGS ('dbx_business_glossary_term' = 'Rejection Reason');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `review_date` SET TAGS ('dbx_business_glossary_term' = 'Review Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `sap_fi_document_number` SET TAGS ('dbx_business_glossary_term' = 'SAP Financial (FI) Document Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `submission_date` SET TAGS ('dbx_business_glossary_term' = 'Claim Submission Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_incentive_claim` ALTER COLUMN `vehicle_line_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Line Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` SET TAGS ('dbx_subdomain' = 'sales_performance');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `performance_scorecard_id` SET TAGS ('dbx_business_glossary_term' = 'Performance Scorecard ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `performance_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `comments` SET TAGS ('dbx_business_glossary_term' = 'Comments');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `composite_score` SET TAGS ('dbx_business_glossary_term' = 'Composite Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `composite_score_benchmark` SET TAGS ('dbx_business_glossary_term' = 'Composite Score Benchmark');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `csi_benchmark` SET TAGS ('dbx_business_glossary_term' = 'Customer Satisfaction Index (CSI) Benchmark');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `csi_score` SET TAGS ('dbx_business_glossary_term' = 'Customer Satisfaction Index (CSI) Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `days_supply` SET TAGS ('dbx_business_glossary_term' = 'Days Supply');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `dms_integration_source` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Integration Source');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `dms_integration_source` SET TAGS ('dbx_value_regex' = 'CDK_Global|Reynolds_Reynolds|Dealertrack|ADP|Other');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `facility_standards_score` SET TAGS ('dbx_business_glossary_term' = 'Facility Standards Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `fiscal_quarter` SET TAGS ('dbx_business_glossary_term' = 'Fiscal Quarter');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_business_glossary_term' = 'Fiscal Year (FY)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `franchise_compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Franchise Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `franchise_compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|probation|warning');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `incentive_eligibility_flag` SET TAGS ('dbx_business_glossary_term' = 'Incentive Eligibility Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `inventory_turn_rate` SET TAGS ('dbx_business_glossary_term' = 'Inventory Turn Rate');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Modified Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `market_share_pct` SET TAGS ('dbx_business_glossary_term' = 'Market Share Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `new_vehicle_sales_actual` SET TAGS ('dbx_business_glossary_term' = 'New Vehicle Sales Actual');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `new_vehicle_sales_attainment_pct` SET TAGS ('dbx_business_glossary_term' = 'New Vehicle Sales Attainment Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `new_vehicle_sales_objective` SET TAGS ('dbx_business_glossary_term' = 'New Vehicle Sales Objective');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `nps_benchmark` SET TAGS ('dbx_business_glossary_term' = 'Net Promoter Score (NPS) Benchmark');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `nps_score` SET TAGS ('dbx_business_glossary_term' = 'Net Promoter Score (NPS)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `parts_fill_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Parts Fill Rate Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `parts_revenue_actual` SET TAGS ('dbx_business_glossary_term' = 'Parts Revenue Actual');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `parts_revenue_objective` SET TAGS ('dbx_business_glossary_term' = 'Parts Revenue Objective');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `performance_tier` SET TAGS ('dbx_business_glossary_term' = 'Performance Tier');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `performance_tier` SET TAGS ('dbx_value_regex' = 'platinum|gold|silver|bronze|standard');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `period_type` SET TAGS ('dbx_business_glossary_term' = 'Period Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `period_type` SET TAGS ('dbx_value_regex' = 'monthly|quarterly|annual');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `published_date` SET TAGS ('dbx_business_glossary_term' = 'Published Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `reviewer_name` SET TAGS ('dbx_business_glossary_term' = 'Reviewer Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `scorecard_period_end_date` SET TAGS ('dbx_business_glossary_term' = 'Scorecard Period End Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `scorecard_period_start_date` SET TAGS ('dbx_business_glossary_term' = 'Scorecard Period Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `scorecard_status` SET TAGS ('dbx_business_glossary_term' = 'Scorecard Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `scorecard_status` SET TAGS ('dbx_value_regex' = 'draft|published|final|revised');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `service_absorption_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Service Absorption Rate Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `service_revenue_actual` SET TAGS ('dbx_business_glossary_term' = 'Service Revenue Actual');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `service_revenue_objective` SET TAGS ('dbx_business_glossary_term' = 'Service Revenue Objective');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `training_compliance_pct` SET TAGS ('dbx_business_glossary_term' = 'Training Compliance Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `used_vehicle_sales_actual` SET TAGS ('dbx_business_glossary_term' = 'Used Vehicle Sales Actual');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `used_vehicle_sales_attainment_pct` SET TAGS ('dbx_business_glossary_term' = 'Used Vehicle Sales Attainment Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `used_vehicle_sales_objective` SET TAGS ('dbx_business_glossary_term' = 'Used Vehicle Sales Objective');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`performance_scorecard` ALTER COLUMN `warranty_claim_approval_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Warranty Claim Approval Rate Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` SET TAGS ('dbx_subdomain' = 'sales_performance');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `csi_survey_id` SET TAGS ('dbx_business_glossary_term' = 'Customer Satisfaction Index (CSI) Survey ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `csi_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `dealer_order_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Order ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `csi_repair_order_id` SET TAGS ('dbx_business_glossary_term' = 'Repair Order (RO) ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `individual_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `complaint_category` SET TAGS ('dbx_business_glossary_term' = 'Complaint Category');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `complaint_flag` SET TAGS ('dbx_business_glossary_term' = 'Complaint Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `days_to_response` SET TAGS ('dbx_business_glossary_term' = 'Days to Response');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `dealer_performance_impact_flag` SET TAGS ('dbx_business_glossary_term' = 'Dealer Performance Impact Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `delivery_process_score` SET TAGS ('dbx_business_glossary_term' = 'Delivery Process Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `facility_cleanliness_score` SET TAGS ('dbx_business_glossary_term' = 'Facility Cleanliness Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `follow_up_completed_flag` SET TAGS ('dbx_business_glossary_term' = 'Follow-Up Completed Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `follow_up_completion_date` SET TAGS ('dbx_business_glossary_term' = 'Follow-Up Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `follow_up_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Follow-Up Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `interaction_date` SET TAGS ('dbx_business_glossary_term' = 'Interaction Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `market_code` SET TAGS ('dbx_business_glossary_term' = 'Market Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `market_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `nps_category` SET TAGS ('dbx_business_glossary_term' = 'Net Promoter Score (NPS) Category');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `nps_category` SET TAGS ('dbx_value_regex' = 'promoter|passive|detractor');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `nps_score` SET TAGS ('dbx_business_glossary_term' = 'Net Promoter Score (NPS)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `oem_program_compliant_flag` SET TAGS ('dbx_business_glossary_term' = 'Original Equipment Manufacturer (OEM) Program Compliant Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `overall_satisfaction_score` SET TAGS ('dbx_business_glossary_term' = 'Overall Satisfaction Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `pricing_transparency_score` SET TAGS ('dbx_business_glossary_term' = 'Pricing Transparency Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `problem_resolution_score` SET TAGS ('dbx_business_glossary_term' = 'Problem Resolution Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `response_channel` SET TAGS ('dbx_business_glossary_term' = 'Response Channel');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `sales_consultant_score` SET TAGS ('dbx_business_glossary_term' = 'Sales Consultant Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `sales_region_code` SET TAGS ('dbx_business_glossary_term' = 'Sales Region Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `sentiment_category` SET TAGS ('dbx_business_glossary_term' = 'Sentiment Category');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `sentiment_category` SET TAGS ('dbx_value_regex' = 'positive|neutral|negative|mixed');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `sentiment_score` SET TAGS ('dbx_business_glossary_term' = 'Sentiment Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `service_advisor_score` SET TAGS ('dbx_business_glossary_term' = 'Service Advisor Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `service_quality_score` SET TAGS ('dbx_business_glossary_term' = 'Service Quality Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `service_timeliness_score` SET TAGS ('dbx_business_glossary_term' = 'Service Timeliness Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `staff_courtesy_score` SET TAGS ('dbx_business_glossary_term' = 'Staff Courtesy Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_completion_percentage` SET TAGS ('dbx_business_glossary_term' = 'Survey Completion Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_date` SET TAGS ('dbx_business_glossary_term' = 'Survey Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_language_code` SET TAGS ('dbx_business_glossary_term' = 'Survey Language Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_language_code` SET TAGS ('dbx_value_regex' = '^[a-z]{2}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_program_code` SET TAGS ('dbx_business_glossary_term' = 'Survey Program Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_status` SET TAGS ('dbx_business_glossary_term' = 'Survey Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_status` SET TAGS ('dbx_value_regex' = 'completed|partial|abandoned|invalid');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Survey Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_type` SET TAGS ('dbx_business_glossary_term' = 'Survey Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_type` SET TAGS ('dbx_value_regex' = 'sales_satisfaction|service_satisfaction|delivery_satisfaction|parts_satisfaction|general_satisfaction|pdi_satisfaction');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `survey_vendor_code` SET TAGS ('dbx_business_glossary_term' = 'Survey Vendor Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vehicle_condition_score` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Condition Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `verbatim_comment` SET TAGS ('dbx_business_glossary_term' = 'Verbatim Comment');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vin` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`csi_survey` ALTER COLUMN `vin` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` SET TAGS ('dbx_subdomain' = 'service_execution');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `service_capacity_id` SET TAGS ('dbx_business_glossary_term' = 'Service Capacity ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `service_capacity_id` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `service_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `a_tech_headcount` SET TAGS ('dbx_business_glossary_term' = 'A-Level Technician Headcount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `adas_certified_tech_count` SET TAGS ('dbx_business_glossary_term' = 'Advanced Driver Assistance Systems (ADAS) Certified Technician Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `adas_service_bays` SET TAGS ('dbx_business_glossary_term' = 'Advanced Driver Assistance Systems (ADAS) Service Bays');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `available_labor_hours_per_day` SET TAGS ('dbx_business_glossary_term' = 'Available Labor Hours Per Day');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `avg_ro_cycle_time_hours` SET TAGS ('dbx_business_glossary_term' = 'Average Repair Order (RO) Cycle Time Hours');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `b_tech_headcount` SET TAGS ('dbx_business_glossary_term' = 'B-Level Technician Headcount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `body_shop_bays` SET TAGS ('dbx_business_glossary_term' = 'Body Shop Service Bays');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `body_shop_tech_count` SET TAGS ('dbx_business_glossary_term' = 'Body Shop Technician Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `c_tech_headcount` SET TAGS ('dbx_business_glossary_term' = 'C-Level Technician Headcount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_config_code` SET TAGS ('dbx_business_glossary_term' = 'Service Capacity Configuration Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_config_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{6,12}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_config_code` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_notes` SET TAGS ('dbx_business_glossary_term' = 'Service Capacity Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_notes` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_status` SET TAGS ('dbx_business_glossary_term' = 'Service Capacity Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_status` SET TAGS ('dbx_value_regex' = 'active|inactive|seasonal|reduced|expanded|under_review');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `capacity_status` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `current_capacity_utilization_pct` SET TAGS ('dbx_business_glossary_term' = 'Current Capacity Utilization Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `current_capacity_utilization_pct` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `customer_pay_capacity_pct` SET TAGS ('dbx_business_glossary_term' = 'Customer Pay Capacity Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `customer_pay_capacity_pct` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `diagnostic_equipment_level` SET TAGS ('dbx_business_glossary_term' = 'Diagnostic Equipment Level');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `diagnostic_equipment_level` SET TAGS ('dbx_value_regex' = 'basic|standard|advanced|premium');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `dms_capacity_record_reference` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Capacity Record ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `dms_capacity_record_reference` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `dms_system_code` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) System Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `dms_system_code` SET TAGS ('dbx_value_regex' = 'CDK|REYNOLDS|DEALERTRACK|ADP|PBS|OTHER');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Capacity Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Capacity Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `ev_certified_tech_count` SET TAGS ('dbx_business_glossary_term' = 'Electric Vehicle (EV) Certified Technician Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `ev_service_bays` SET TAGS ('dbx_business_glossary_term' = 'Electric Vehicle (EV) Service Bays');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `express_service_bays` SET TAGS ('dbx_business_glossary_term' = 'Express Service Bays');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `general_service_bays` SET TAGS ('dbx_business_glossary_term' = 'General Service Bays');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `has_mobile_service_capability` SET TAGS ('dbx_business_glossary_term' = 'Has Mobile Service Capability');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `has_mobile_service_capability` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `has_mobile_service_capability` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `hours_per_shift` SET TAGS ('dbx_business_glossary_term' = 'Hours Per Shift');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `internal_capacity_pct` SET TAGS ('dbx_business_glossary_term' = 'Internal Capacity Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `internal_capacity_pct` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `last_capacity_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Capacity Review Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `last_capacity_review_date` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `loaner_fleet_size` SET TAGS ('dbx_business_glossary_term' = 'Loaner Fleet Size');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `loaner_fleet_utilization_pct` SET TAGS ('dbx_business_glossary_term' = 'Loaner Fleet Utilization Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `max_daily_appointments` SET TAGS ('dbx_business_glossary_term' = 'Maximum Daily Appointments');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `mobile_service_technician_count` SET TAGS ('dbx_business_glossary_term' = 'Mobile Service Technician Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `mobile_service_technician_count` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `mobile_service_technician_count` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `next_capacity_review_date` SET TAGS ('dbx_business_glossary_term' = 'Next Capacity Review Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `next_capacity_review_date` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `operating_days_per_week` SET TAGS ('dbx_business_glossary_term' = 'Operating Days Per Week');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `parts_inventory_capacity_sqft` SET TAGS ('dbx_business_glossary_term' = 'Parts Inventory Capacity Square Feet');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `parts_inventory_capacity_sqft` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `shifts_per_day` SET TAGS ('dbx_business_glossary_term' = 'Shifts Per Day');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `specialty_certifications` SET TAGS ('dbx_business_glossary_term' = 'Specialty Certifications');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `target_capacity_utilization_pct` SET TAGS ('dbx_business_glossary_term' = 'Target Capacity Utilization Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `target_capacity_utilization_pct` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `total_service_bays` SET TAGS ('dbx_business_glossary_term' = 'Total Service Bays');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `total_technician_headcount` SET TAGS ('dbx_business_glossary_term' = 'Total Technician Headcount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `warranty_work_capacity_pct` SET TAGS ('dbx_business_glossary_term' = 'Warranty Work Capacity Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`service_capacity` ALTER COLUMN `warranty_work_capacity_pct` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` SET TAGS ('dbx_subdomain' = 'inventory_operations');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `floor_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Floor Plan ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `floor_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `account_number` SET TAGS ('dbx_business_glossary_term' = 'Floor Plan Account Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `account_number` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `account_number` SET TAGS ('dbx_pii_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `aged_inventory_flag` SET TAGS ('dbx_business_glossary_term' = 'Aged Inventory Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `aging_threshold_days` SET TAGS ('dbx_business_glossary_term' = 'Aging Threshold Days');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `audit_status` SET TAGS ('dbx_business_glossary_term' = 'Audit Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `audit_status` SET TAGS ('dbx_value_regex' = 'passed|failed|pending|not_required|exception');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `credit_line_amount` SET TAGS ('dbx_business_glossary_term' = 'Credit Line Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `credit_line_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `curtailment_amount` SET TAGS ('dbx_business_glossary_term' = 'Curtailment Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `curtailment_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `curtailment_due_date` SET TAGS ('dbx_business_glossary_term' = 'Curtailment Due Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `curtailment_paid_flag` SET TAGS ('dbx_business_glossary_term' = 'Curtailment Paid Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `daily_interest_amount` SET TAGS ('dbx_business_glossary_term' = 'Daily Interest Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `daily_interest_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `days_in_inventory` SET TAGS ('dbx_business_glossary_term' = 'Days in Inventory');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `dealer_invoice_amount` SET TAGS ('dbx_business_glossary_term' = 'Dealer Invoice Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `dealer_invoice_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `default_date` SET TAGS ('dbx_business_glossary_term' = 'Default Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `default_flag` SET TAGS ('dbx_business_glossary_term' = 'Default Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `dms_floor_plan_reference` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Floor Plan ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `financing_end_date` SET TAGS ('dbx_business_glossary_term' = 'Financing End Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `financing_institution_code` SET TAGS ('dbx_business_glossary_term' = 'Financing Institution Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `financing_institution_name` SET TAGS ('dbx_business_glossary_term' = 'Financing Institution Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `financing_start_date` SET TAGS ('dbx_business_glossary_term' = 'Financing Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `floor_plan_status` SET TAGS ('dbx_business_glossary_term' = 'Floor Plan Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `floor_plan_status` SET TAGS ('dbx_value_regex' = 'active|paid_off|defaulted|suspended|pending_audit|curtailed');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `interest_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Interest Rate Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `interest_rate_pct` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `last_audit_date` SET TAGS ('dbx_business_glossary_term' = 'Last Audit Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `msrp_amount` SET TAGS ('dbx_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP) Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `next_audit_date` SET TAGS ('dbx_business_glossary_term' = 'Next Audit Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `oem_assistance_amount` SET TAGS ('dbx_business_glossary_term' = 'Original Equipment Manufacturer (OEM) Assistance Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `oem_assistance_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `oem_assistance_program_code` SET TAGS ('dbx_business_glossary_term' = 'Original Equipment Manufacturer (OEM) Assistance Program Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `outstanding_balance_amount` SET TAGS ('dbx_business_glossary_term' = 'Outstanding Balance Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `outstanding_balance_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `payoff_amount` SET TAGS ('dbx_business_glossary_term' = 'Payoff Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `payoff_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `payoff_date` SET TAGS ('dbx_business_glossary_term' = 'Payoff Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `per_unit_floor_plan_cost` SET TAGS ('dbx_business_glossary_term' = 'Per-Unit Floor Plan Cost');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `per_unit_floor_plan_cost` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `sap_document_number` SET TAGS ('dbx_business_glossary_term' = 'SAP Document Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `total_interest_paid` SET TAGS ('dbx_business_glossary_term' = 'Total Interest Paid');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `total_interest_paid` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`floor_plan` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` SET TAGS ('dbx_subdomain' = 'inventory_operations');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Demo Vehicle ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned Salesperson ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `primary_demo_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned Salesperson ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `primary_demo_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `primary_demo_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `accident_count` SET TAGS ('dbx_business_glossary_term' = 'Accident Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `assigned_salesperson_name` SET TAGS ('dbx_business_glossary_term' = 'Assigned Salesperson Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `assigned_salesperson_name` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `assignment_type` SET TAGS ('dbx_business_glossary_term' = 'Demo Assignment Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `assignment_type` SET TAGS ('dbx_value_regex' = 'salesperson|sales_manager|general_manager|showroom_floor|test_drive_pool');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `current_odometer_km` SET TAGS ('dbx_business_glossary_term' = 'Current Odometer Reading in Kilometers');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_designation_date` SET TAGS ('dbx_business_glossary_term' = 'Demo Designation Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_end_date` SET TAGS ('dbx_business_glossary_term' = 'Demo Program End Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_period_months` SET TAGS ('dbx_business_glossary_term' = 'Demo Period Duration in Months');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_start_date` SET TAGS ('dbx_business_glossary_term' = 'Demo Program Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_status` SET TAGS ('dbx_business_glossary_term' = 'Demo Vehicle Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_status` SET TAGS ('dbx_value_regex' = 'active|inactive|retired|converted_to_sale|returned_to_stock|auctioned');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_usage_type` SET TAGS ('dbx_business_glossary_term' = 'Demo Usage Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `demo_usage_type` SET TAGS ('dbx_value_regex' = 'test_drive|loaner|executive_use|sales_staff_use|showroom_display');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `disposition_date` SET TAGS ('dbx_business_glossary_term' = 'Disposition Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `disposition_type` SET TAGS ('dbx_business_glossary_term' = 'Disposition Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `disposition_type` SET TAGS ('dbx_value_regex' = 'converted_to_used_sale|returned_to_stock|auctioned|transferred_to_another_dealer|scrapped');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `floor_plan_interest_amount` SET TAGS ('dbx_business_glossary_term' = 'Floor Plan Interest Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `floor_plan_interest_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `incentive_amount` SET TAGS ('dbx_business_glossary_term' = 'OEM Incentive Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `insurance_policy_number` SET TAGS ('dbx_business_glossary_term' = 'Insurance Policy Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `insurance_policy_number` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `mileage_allowance_km` SET TAGS ('dbx_business_glossary_term' = 'Mileage Allowance in Kilometers');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `mileage_overage_km` SET TAGS ('dbx_business_glossary_term' = 'Mileage Overage in Kilometers');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `odometer_at_designation_km` SET TAGS ('dbx_business_glossary_term' = 'Odometer Reading at Designation in Kilometers');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `oem_program_code` SET TAGS ('dbx_business_glossary_term' = 'OEM Demo Program Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `pdi_completed_flag` SET TAGS ('dbx_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completed Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `pdi_completion_date` SET TAGS ('dbx_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `recall_campaign_numbers` SET TAGS ('dbx_business_glossary_term' = 'Recall Campaign Numbers');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `sale_price_amount` SET TAGS ('dbx_business_glossary_term' = 'Sale Price Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `service_record_count` SET TAGS ('dbx_business_glossary_term' = 'Service Record Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `stock_number` SET TAGS ('dbx_business_glossary_term' = 'Dealer Stock Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `test_drive_count` SET TAGS ('dbx_business_glossary_term' = 'Test Drive Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `transmission_type` SET TAGS ('dbx_business_glossary_term' = 'Transmission Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `transmission_type` SET TAGS ('dbx_value_regex' = 'manual|automatic|cvt|dct|amt');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`demo_vehicle` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` SET TAGS ('dbx_subdomain' = 'sales_performance');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `dealer_test_drive_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Key for dealer_test_drive');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealership Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Test Drive Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_test_drive` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Party Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` SET TAGS ('dbx_subdomain' = 'service_execution');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` ALTER COLUMN `dealer_parts_order_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Key for dealer_parts_order');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` ALTER COLUMN `aftersales_parts_order_id` SET TAGS ('dbx_business_glossary_term' = 'Aftersales Parts Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` ALTER COLUMN `compliance_document_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Document Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_parts_order` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Party Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` SET TAGS ('dbx_subdomain' = 'service_execution');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` ALTER COLUMN `dealer_warranty_claim_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Key for dealer_warranty_claim');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` ALTER COLUMN `aftersales_warranty_claim_id` SET TAGS ('dbx_business_glossary_term' = 'Aftersales Warranty Claim Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Claim Processor Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Party Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_warranty_claim` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` SET TAGS ('dbx_subdomain' = 'service_execution');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `recall_completion_id` SET TAGS ('dbx_business_glossary_term' = 'Recall Completion ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `recall_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `recall_party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `dealer_order_id` SET TAGS ('dbx_business_glossary_term' = 'Repair Order (RO) ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Technician Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `campaign_type` SET TAGS ('dbx_business_glossary_term' = 'Campaign Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `campaign_type` SET TAGS ('dbx_value_regex' = 'safety_recall|service_campaign|field_service_action|customer_satisfaction_program|emissions_recall|tsb');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `completion_date` SET TAGS ('dbx_business_glossary_term' = 'Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `completion_number` SET TAGS ('dbx_business_glossary_term' = 'Recall Completion Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `completion_status` SET TAGS ('dbx_business_glossary_term' = 'Completion Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `completion_status` SET TAGS ('dbx_value_regex' = 'completed|incomplete|in_progress|parts_pending|customer_declined|not_applicable');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `completion_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Completion Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `customer_notification_date` SET TAGS ('dbx_business_glossary_term' = 'Customer Notification Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `customer_notification_method` SET TAGS ('dbx_business_glossary_term' = 'Customer Notification Method');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `customer_notification_method` SET TAGS ('dbx_value_regex' = 'email|sms|phone|mail|in_person');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `dms_transaction_reference` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Transaction ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `labor_amount` SET TAGS ('dbx_business_glossary_term' = 'Labor Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `labor_hours` SET TAGS ('dbx_business_glossary_term' = 'Labor Hours');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `model` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `nameplate` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Nameplate');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `nhtsa_report_date` SET TAGS ('dbx_business_glossary_term' = 'National Highway Traffic Safety Administration (NHTSA) Report Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `nhtsa_report_flag` SET TAGS ('dbx_business_glossary_term' = 'National Highway Traffic Safety Administration (NHTSA) Report Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `odometer_reading` SET TAGS ('dbx_business_glossary_term' = 'Odometer Reading');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `odometer_unit` SET TAGS ('dbx_business_glossary_term' = 'Odometer Unit');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `odometer_unit` SET TAGS ('dbx_value_regex' = 'km|mi');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `parts_amount` SET TAGS ('dbx_business_glossary_term' = 'Parts Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `parts_quantity_list` SET TAGS ('dbx_business_glossary_term' = 'Parts Quantity List');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `parts_used_list` SET TAGS ('dbx_business_glossary_term' = 'Parts Used List');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `post_repair_inspection_notes` SET TAGS ('dbx_business_glossary_term' = 'Post-Repair Inspection Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ice|hev|phev|bev|fcev');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `pre_repair_inspection_notes` SET TAGS ('dbx_business_glossary_term' = 'Pre-Repair Inspection Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `quality_verification_date` SET TAGS ('dbx_business_glossary_term' = 'Quality Verification Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `quality_verification_flag` SET TAGS ('dbx_business_glossary_term' = 'Quality Verification Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `quality_verifier_name` SET TAGS ('dbx_business_glossary_term' = 'Quality Verifier Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `recall_campaign_number` SET TAGS ('dbx_business_glossary_term' = 'Recall Campaign Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `reimbursement_claim_number` SET TAGS ('dbx_business_glossary_term' = 'Reimbursement Claim Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `reimbursement_paid_date` SET TAGS ('dbx_business_glossary_term' = 'Reimbursement Paid Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `reimbursement_status` SET TAGS ('dbx_business_glossary_term' = 'Reimbursement Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `reimbursement_status` SET TAGS ('dbx_value_regex' = 'pending|approved|paid|rejected|under_review');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `remedy_description` SET TAGS ('dbx_business_glossary_term' = 'Remedy Description');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `sublet_amount` SET TAGS ('dbx_business_glossary_term' = 'Sublet Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `technician_certification_number` SET TAGS ('dbx_business_glossary_term' = 'Technician Certification Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `technician_name` SET TAGS ('dbx_business_glossary_term' = 'Technician Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `total_reimbursement_amount` SET TAGS ('dbx_business_glossary_term' = 'Total Reimbursement Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`recall_completion` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` SET TAGS ('dbx_subdomain' = 'network_management');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_integration_log_id` SET TAGS ('dbx_business_glossary_term' = 'DMS (Dealer Management System) Integration Log ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `authentication_method` SET TAGS ('dbx_business_glossary_term' = 'Authentication Method');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `authentication_method` SET TAGS ('dbx_value_regex' = 'oauth2|api_key|certificate|basic_auth');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `business_impact_severity` SET TAGS ('dbx_business_glossary_term' = 'Business Impact Severity');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `business_impact_severity` SET TAGS ('dbx_value_regex' = 'critical|high|medium|low|none');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `compression_enabled_flag` SET TAGS ('dbx_business_glossary_term' = 'Compression Enabled Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `data_freshness_lag_minutes` SET TAGS ('dbx_business_glossary_term' = 'Data Freshness Lag in Minutes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dealer_code` SET TAGS ('dbx_business_glossary_term' = 'Dealer Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dealer_name` SET TAGS ('dbx_business_glossary_term' = 'Dealer Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_endpoint_url` SET TAGS ('dbx_business_glossary_term' = 'DMS (Dealer Management System) Endpoint URL');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_endpoint_url` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_transaction_reference` SET TAGS ('dbx_business_glossary_term' = 'DMS (Dealer Management System) Transaction ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `dms_version` SET TAGS ('dbx_business_glossary_term' = 'DMS (Dealer Management System) Version');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `encryption_protocol` SET TAGS ('dbx_business_glossary_term' = 'Encryption Protocol');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `encryption_protocol` SET TAGS ('dbx_value_regex' = 'TLS_1_2|TLS_1_3|SSL_3_0');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `error_category` SET TAGS ('dbx_business_glossary_term' = 'Error Category');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `error_category` SET TAGS ('dbx_value_regex' = 'connectivity|validation|timeout|authentication|data_format|business_rule');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `error_message` SET TAGS ('dbx_business_glossary_term' = 'Error Message');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `escalation_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Escalation Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `escalation_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Escalation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `integration_batch_reference` SET TAGS ('dbx_business_glossary_term' = 'Integration Batch ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Modified Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `max_retry_attempts` SET TAGS ('dbx_business_glossary_term' = 'Maximum Retry Attempts');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `next_retry_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Next Retry Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `oem_transaction_reference` SET TAGS ('dbx_business_glossary_term' = 'OEM (Original Equipment Manufacturer) Transaction ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `payload_size_kb` SET TAGS ('dbx_business_glossary_term' = 'Payload Size in Kilobytes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `record_count_failed` SET TAGS ('dbx_business_glossary_term' = 'Record Count Failed');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `record_count_received` SET TAGS ('dbx_business_glossary_term' = 'Record Count Received');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `record_count_sent` SET TAGS ('dbx_business_glossary_term' = 'Record Count Sent');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `region_code` SET TAGS ('dbx_business_glossary_term' = 'Region Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `resolution_notes` SET TAGS ('dbx_business_glossary_term' = 'Resolution Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `resolution_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Resolution Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `retry_attempt_number` SET TAGS ('dbx_business_glossary_term' = 'Retry Attempt Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sla_compliance_flag` SET TAGS ('dbx_business_glossary_term' = 'SLA (Service Level Agreement) Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sla_target_duration_seconds` SET TAGS ('dbx_business_glossary_term' = 'SLA (Service Level Agreement) Target Duration in Seconds');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_duration_seconds` SET TAGS ('dbx_business_glossary_term' = 'Synchronization Duration in Seconds');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_event_type` SET TAGS ('dbx_business_glossary_term' = 'Synchronization Event Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_event_type` SET TAGS ('dbx_value_regex' = 'inventory_push|ro_pull|sales_pull|parts_pull|customer_pull|warranty_push');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_status` SET TAGS ('dbx_business_glossary_term' = 'Synchronization Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_status` SET TAGS ('dbx_value_regex' = 'success|partial|failed|pending|timeout');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dms_integration_log` ALTER COLUMN `sync_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Synchronization Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` SET TAGS ('dbx_subdomain' = 'network_management');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `facility_standard_id` SET TAGS ('dbx_business_glossary_term' = 'Facility Standard ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Assessor Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `facility_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `franchise_agreement_id` SET TAGS ('dbx_business_glossary_term' = 'Franchise Agreement ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `allocation_eligibility_impact_flag` SET TAGS ('dbx_business_glossary_term' = 'Allocation Eligibility Impact Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_date` SET TAGS ('dbx_business_glossary_term' = 'Assessment Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_method` SET TAGS ('dbx_business_glossary_term' = 'Assessment Method');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_method` SET TAGS ('dbx_value_regex' = 'on_site|remote|hybrid|photographic_evidence|self_assessment');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_number` SET TAGS ('dbx_business_glossary_term' = 'Assessment Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_report_url` SET TAGS ('dbx_business_glossary_term' = 'Assessment Report URL');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_type` SET TAGS ('dbx_business_glossary_term' = 'Assessment Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessment_type` SET TAGS ('dbx_value_regex' = 'initial|annual|renewal|spot_check|post_remediation|franchise_application');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessor_certification_number` SET TAGS ('dbx_business_glossary_term' = 'Assessor Certification Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `assessor_name` SET TAGS ('dbx_business_glossary_term' = 'Assessor Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `compliance_score` SET TAGS ('dbx_business_glossary_term' = 'Compliance Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|conditional|pending_review|remediation_required|waived');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `critical_deficiency_count` SET TAGS ('dbx_business_glossary_term' = 'Critical Deficiency Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `dealer_response_notes` SET TAGS ('dbx_business_glossary_term' = 'Dealer Response Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `deficiency_count` SET TAGS ('dbx_business_glossary_term' = 'Deficiency Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `deficiency_description` SET TAGS ('dbx_business_glossary_term' = 'Deficiency Description');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_business_glossary_term' = 'DMS (Dealer Management System) Integration Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_value_regex' = 'synced|pending|failed|not_applicable');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `dms_last_sync_timestamp` SET TAGS ('dbx_business_glossary_term' = 'DMS (Dealer Management System) Last Sync Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `estimated_investment_amount` SET TAGS ('dbx_business_glossary_term' = 'Estimated Investment Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `estimated_investment_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `franchise_renewal_impact_flag` SET TAGS ('dbx_business_glossary_term' = 'Franchise Renewal Impact Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `incentive_eligibility_impact_flag` SET TAGS ('dbx_business_glossary_term' = 'Incentive Eligibility Impact Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Modified Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `major_deficiency_count` SET TAGS ('dbx_business_glossary_term' = 'Major Deficiency Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `minor_deficiency_count` SET TAGS ('dbx_business_glossary_term' = 'Minor Deficiency Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `next_assessment_due_date` SET TAGS ('dbx_business_glossary_term' = 'Next Assessment Due Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `oem_reviewer_notes` SET TAGS ('dbx_business_glossary_term' = 'OEM (Original Equipment Manufacturer) Reviewer Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `passing_threshold_score` SET TAGS ('dbx_business_glossary_term' = 'Passing Threshold Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `photographic_evidence_url` SET TAGS ('dbx_business_glossary_term' = 'Photographic Evidence URL');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_completion_date` SET TAGS ('dbx_business_glossary_term' = 'Remediation Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_deadline` SET TAGS ('dbx_business_glossary_term' = 'Remediation Deadline');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_required_flag` SET TAGS ('dbx_business_glossary_term' = 'Remediation Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_status` SET TAGS ('dbx_business_glossary_term' = 'Remediation Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_status` SET TAGS ('dbx_value_regex' = 'not_started|in_progress|completed|verified|overdue|extension_granted');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `remediation_verification_date` SET TAGS ('dbx_business_glossary_term' = 'Remediation Verification Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `standard_category` SET TAGS ('dbx_business_glossary_term' = 'Standard Category');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `standard_category` SET TAGS ('dbx_value_regex' = 'brand_identity|infrastructure|customer_experience|operational|technology');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `standard_type` SET TAGS ('dbx_business_glossary_term' = 'Facility Standard Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `waiver_expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Waiver Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `waiver_granted_flag` SET TAGS ('dbx_business_glossary_term' = 'Waiver Granted Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`facility_standard` ALTER COLUMN `waiver_reason` SET TAGS ('dbx_business_glossary_term' = 'Waiver Reason');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` SET TAGS ('dbx_subdomain' = 'inventory_operations');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `used_vehicle_appraisal_id` SET TAGS ('dbx_business_glossary_term' = 'Used Vehicle Appraisal ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Appraiser Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `used_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `used_party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `accident_history_flag` SET TAGS ('dbx_business_glossary_term' = 'Accident History Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_date` SET TAGS ('dbx_business_glossary_term' = 'Appraisal Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_number` SET TAGS ('dbx_business_glossary_term' = 'Appraisal Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_source_channel` SET TAGS ('dbx_business_glossary_term' = 'Appraisal Source Channel');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_source_channel` SET TAGS ('dbx_value_regex' = 'walk_in|appointment|online_submission|phone_inquiry|service_drive');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_status` SET TAGS ('dbx_business_glossary_term' = 'Appraisal Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_status` SET TAGS ('dbx_value_regex' = 'pending|completed|accepted|declined|expired');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Appraisal Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_tool_used` SET TAGS ('dbx_business_glossary_term' = 'Appraisal Tool Used');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraisal_tool_used` SET TAGS ('dbx_value_regex' = 'manheim_mmr|black_book|kbb|nada|galves|internal');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraised_value_amount` SET TAGS ('dbx_business_glossary_term' = 'Appraised Value Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `appraiser_name` SET TAGS ('dbx_business_glossary_term' = 'Appraiser Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `customer_requested_amount` SET TAGS ('dbx_business_glossary_term' = 'Customer Requested Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `disposition_decision` SET TAGS ('dbx_business_glossary_term' = 'Disposition Decision');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `disposition_decision` SET TAGS ('dbx_value_regex' = 'accepted_trade|declined_trade|wholesale|retail_inventory|pending');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `equity_amount` SET TAGS ('dbx_business_glossary_term' = 'Equity Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `equity_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `equity_amount` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `exterior_condition_notes` SET TAGS ('dbx_business_glossary_term' = 'Exterior Condition Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `interior_condition_notes` SET TAGS ('dbx_business_glossary_term' = 'Interior Condition Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `linked_deal_number` SET TAGS ('dbx_business_glossary_term' = 'Linked Deal Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `market_value_amount` SET TAGS ('dbx_business_glossary_term' = 'Market Value Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `mechanical_condition_notes` SET TAGS ('dbx_business_glossary_term' = 'Mechanical Condition Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `odometer_unit` SET TAGS ('dbx_business_glossary_term' = 'Odometer Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `odometer_unit` SET TAGS ('dbx_value_regex' = 'miles|kilometers');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `offer_expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Offer Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `payoff_amount` SET TAGS ('dbx_business_glossary_term' = 'Loan Payoff Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `payoff_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `payoff_amount` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `reconditioning_cost_estimate` SET TAGS ('dbx_business_glossary_term' = 'Reconditioning Cost Estimate');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `retail_estimate_amount` SET TAGS ('dbx_business_glossary_term' = 'Retail Estimate Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `service_records_available_flag` SET TAGS ('dbx_business_glossary_term' = 'Service Records Available Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `tire_condition` SET TAGS ('dbx_business_glossary_term' = 'Tire Condition');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `tire_condition` SET TAGS ('dbx_value_regex' = 'excellent|good|fair|poor|replacement_needed');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `title_status` SET TAGS ('dbx_business_glossary_term' = 'Title Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `title_status` SET TAGS ('dbx_value_regex' = 'clean|salvage|rebuilt|lemon|flood|hail');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `trade_in_allowance_amount` SET TAGS ('dbx_business_glossary_term' = 'Trade-In Allowance Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `vin` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `vin` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`used_vehicle_appraisal` ALTER COLUMN `wholesale_estimate_amount` SET TAGS ('dbx_business_glossary_term' = 'Wholesale Estimate Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` SET TAGS ('dbx_data_type' = 'association_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` SET TAGS ('dbx_subdomain' = 'service_execution');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` SET TAGS ('dbx_association_edges' = 'dealer.dealership,quality.quality_standard');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `dealership_quality_assessment_id` SET TAGS ('dbx_business_glossary_term' = 'Dealershipqualityassessment - Assessment Id');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealershipqualityassessment - Dealership Id');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `standard_id` SET TAGS ('dbx_business_glossary_term' = 'Dealershipqualityassessment - Quality Standard Id');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `assessment_date` SET TAGS ('dbx_business_glossary_term' = 'Assessment Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `assessment_type` SET TAGS ('dbx_business_glossary_term' = 'Assessment Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `compliance_score` SET TAGS ('dbx_business_glossary_term' = 'Compliance Score');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealership_quality_assessment` ALTER COLUMN `deficiency_count` SET TAGS ('dbx_business_glossary_term' = 'Deficiency Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` SET TAGS ('dbx_subdomain' = 'inventory_operations');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dealer_order_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Order ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dealer_party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `procurement_purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `actual_delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Actual Delivery Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `actual_ship_date` SET TAGS ('dbx_business_glossary_term' = 'Actual Ship Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `allocation_pool_code` SET TAGS ('dbx_business_glossary_term' = 'Allocation Pool Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `body_style` SET TAGS ('dbx_business_glossary_term' = 'Body Style');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `cancellation_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Cancellation Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `confirmed_delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Confirmed Delivery Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `days_late` SET TAGS ('dbx_business_glossary_term' = 'Days Late');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dealer_invoice_amount` SET TAGS ('dbx_business_glossary_term' = 'Dealer Invoice Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dealer_invoice_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `dms_order_number` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Order Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `estimated_ship_date` SET TAGS ('dbx_business_glossary_term' = 'Estimated Ship Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `exterior_color_code` SET TAGS ('dbx_business_glossary_term' = 'Exterior Color Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `hold_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Hold Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `homologation_variant` SET TAGS ('dbx_business_glossary_term' = 'Homologation Variant');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `incentive_amount` SET TAGS ('dbx_business_glossary_term' = 'Incentive Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `incentive_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `interior_color_code` SET TAGS ('dbx_business_glossary_term' = 'Interior Color Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `market_code` SET TAGS ('dbx_business_glossary_term' = 'Market Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `market_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `msrp_amount` SET TAGS ('dbx_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP) Amount');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `msrp_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Order Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_date` SET TAGS ('dbx_business_glossary_term' = 'Order Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_source` SET TAGS ('dbx_business_glossary_term' = 'Order Source');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_source` SET TAGS ('dbx_value_regex' = 'dealer_portal|dms|edi|manual|api');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_status` SET TAGS ('dbx_business_glossary_term' = 'Order Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_type` SET TAGS ('dbx_business_glossary_term' = 'Order Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `order_type` SET TAGS ('dbx_value_regex' = 'stock|retail|demo|fleet|courtesy');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `otd_flag` SET TAGS ('dbx_business_glossary_term' = 'On-Time Delivery (OTD) Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `pdi_completed_date` SET TAGS ('dbx_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Completed Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `pdi_required` SET TAGS ('dbx_business_glossary_term' = 'Pre-Delivery Inspection (PDI) Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `priority_code` SET TAGS ('dbx_business_glossary_term' = 'Order Priority Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `priority_code` SET TAGS ('dbx_value_regex' = 'standard|priority|urgent|allocation');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `production_plant_code` SET TAGS ('dbx_business_glossary_term' = 'Production Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `production_week` SET TAGS ('dbx_business_glossary_term' = 'Production Week');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `production_week` SET TAGS ('dbx_value_regex' = '^d{4}-W(0[1-9]|[1-4]d|5[0-3])$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `requested_delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Requested Delivery Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `sales_region_code` SET TAGS ('dbx_business_glossary_term' = 'Sales Region Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `sap_sales_order_number` SET TAGS ('dbx_business_glossary_term' = 'SAP Sales Order Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `shipping_method` SET TAGS ('dbx_business_glossary_term' = 'Shipping Method');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `shipping_method` SET TAGS ('dbx_value_regex' = 'rail|truck|vessel|mixed');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `transmission_type` SET TAGS ('dbx_business_glossary_term' = 'Transmission Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `transmission_type` SET TAGS ('dbx_value_regex' = 'automatic|manual|CVT|DCT');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_order` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` SET TAGS ('dbx_subdomain' = 'network_management');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `dealer_contact_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Contact Identifier (ID)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Identifier (ID)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `active_flag` SET TAGS ('dbx_business_glossary_term' = 'Active Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `certification_expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Certification Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `certification_status` SET TAGS ('dbx_business_glossary_term' = 'Contact Certification Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `certification_status` SET TAGS ('dbx_value_regex' = 'certified|in_progress|expired|not_required|not_certified');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `communication_preference` SET TAGS ('dbx_business_glossary_term' = 'Communication Preference');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `communication_preference` SET TAGS ('dbx_value_regex' = 'email|phone|mobile|fax|portal');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `contact_role` SET TAGS ('dbx_business_glossary_term' = 'Contact Role');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `contact_role` SET TAGS ('dbx_value_regex' = 'dealer_principal|general_manager|sales_manager|service_manager|parts_manager|fi_manager');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `data_source_system` SET TAGS ('dbx_business_glossary_term' = 'Data Source System');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `dealer_portal_access_flag` SET TAGS ('dbx_business_glossary_term' = 'Dealer Portal Access Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `department` SET TAGS ('dbx_business_glossary_term' = 'Contact Department');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `department` SET TAGS ('dbx_value_regex' = 'sales|service|parts|finance_insurance|administration|management');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `email_address` SET TAGS ('dbx_business_glossary_term' = 'Contact Email Address');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `email_address` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `email_address` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `email_address` SET TAGS ('dbx_pii_email' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_name` SET TAGS ('dbx_business_glossary_term' = 'Emergency Contact Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_name` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_name` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_name` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_phone` SET TAGS ('dbx_pii_business_glossary_term' = 'Emergency Contact Phone Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_phone` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_phone` SET TAGS ('dbx_pii_pii_phone' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `fax_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Fax Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `fax_number` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `fax_number` SET TAGS ('dbx_pii_pii_phone' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `first_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact First Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `first_name` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `first_name` SET TAGS ('dbx_pii_pii_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `hire_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Hire Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `job_title` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Job Title');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `language_preference` SET TAGS ('dbx_pii_business_glossary_term' = 'Language Preference');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `last_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Last Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `last_name` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `last_name` SET TAGS ('dbx_pii_pii_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `last_training_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Training Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `middle_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Middle Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `middle_name` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `middle_name` SET TAGS ('dbx_pii_pii_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `mobile_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Mobile Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `mobile_number` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `mobile_number` SET TAGS ('dbx_pii_pii_phone' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Phone Number');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_pii_phone' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `portal_last_login_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Portal Last Login Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `portal_user_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Portal User Identifier (ID)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `portal_user_code` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `portal_user_code` SET TAGS ('dbx_pii_pii_identifier' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `primary_contact_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Primary Contact Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `primary_contact_flag` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `tenure_years` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Tenure in Years');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `termination_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Termination Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `termination_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Termination Reason');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `termination_reason` SET TAGS ('dbx_pii_value_regex' = 'resignation|retirement|termination|transfer|other');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` SET TAGS ('dbx_pii_subdomain' = 'network_management');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `dealer_region_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Region ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `jurisdiction_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Jurisdiction Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `allocation_quota_percentage` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Quota Percentage');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `city_list` SET TAGS ('dbx_pii_business_glossary_term' = 'City List');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `competitive_intensity_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Competitive Intensity Rating');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `competitive_intensity_rating` SET TAGS ('dbx_pii_value_regex' = 'low|moderate|high|very_high');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `country_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Country Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `country_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `county_region_list` SET TAGS ('dbx_pii_business_glossary_term' = 'County or Region List');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `dealer_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Count');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `district_code` SET TAGS ('dbx_pii_business_glossary_term' = 'District Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `district_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `district_name` SET TAGS ('dbx_pii_business_glossary_term' = 'District Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Integration Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|pending|error');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `dms_last_sync_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Management System (DMS) Last Sync Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `geographic_boundary_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Geographic Boundary Description');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `household_count_estimate` SET TAGS ('dbx_pii_business_glossary_term' = 'Household Count Estimate');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `incentive_program_eligibility_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Incentive Program Eligibility Flag');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Modified Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `market_segment_classification` SET TAGS ('dbx_pii_business_glossary_term' = 'Market Segment Classification');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `market_segment_classification` SET TAGS ('dbx_pii_value_regex' = 'urban|suburban|rural|mixed');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `modification_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Modification Reason');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `next_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Review Date');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `performance_benchmark_group` SET TAGS ('dbx_pii_business_glossary_term' = 'Performance Benchmark Group');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `population_estimate` SET TAGS ('dbx_pii_business_glossary_term' = 'Population Estimate');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `postal_code_range` SET TAGS ('dbx_pii_business_glossary_term' = 'Postal Code Range');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `postal_code_range` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `postal_code_range` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Region Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Region Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Region Status');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|pending|consolidating|dissolved');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Region Type');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_type` SET TAGS ('dbx_pii_value_regex' = 'geographic|market|strategic|operational');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_email` SET TAGS ('dbx_pii_business_glossary_term' = 'Regional Manager Email Address');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_email` SET TAGS ('dbx_pii_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_phone` SET TAGS ('dbx_business_glossary_term' = 'Emergency Contact Phone Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_phone` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `emergency_contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `fax_number` SET TAGS ('dbx_business_glossary_term' = 'Contact Fax Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `fax_number` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `fax_number` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `first_name` SET TAGS ('dbx_business_glossary_term' = 'Contact First Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `first_name` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `first_name` SET TAGS ('dbx_pii_name' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `hire_date` SET TAGS ('dbx_business_glossary_term' = 'Contact Hire Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `job_title` SET TAGS ('dbx_business_glossary_term' = 'Contact Job Title');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `language_preference` SET TAGS ('dbx_business_glossary_term' = 'Language Preference');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `last_name` SET TAGS ('dbx_business_glossary_term' = 'Contact Last Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `last_name` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `last_name` SET TAGS ('dbx_pii_name' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `last_training_date` SET TAGS ('dbx_business_glossary_term' = 'Last Training Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `middle_name` SET TAGS ('dbx_business_glossary_term' = 'Contact Middle Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `middle_name` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `middle_name` SET TAGS ('dbx_pii_name' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `mobile_number` SET TAGS ('dbx_business_glossary_term' = 'Contact Mobile Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `mobile_number` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `mobile_number` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Contact Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `phone_number` SET TAGS ('dbx_business_glossary_term' = 'Contact Phone Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `phone_number` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `portal_last_login_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Portal Last Login Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `portal_user_code` SET TAGS ('dbx_business_glossary_term' = 'Portal User Identifier (ID)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `portal_user_code` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `portal_user_code` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `primary_contact_flag` SET TAGS ('dbx_business_glossary_term' = 'Primary Contact Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `tenure_years` SET TAGS ('dbx_business_glossary_term' = 'Contact Tenure in Years');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `termination_date` SET TAGS ('dbx_business_glossary_term' = 'Contact Termination Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `termination_reason` SET TAGS ('dbx_business_glossary_term' = 'Contact Termination Reason');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `termination_reason` SET TAGS ('dbx_value_regex' = 'resignation|retirement|termination|transfer|other');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_contact` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` SET TAGS ('dbx_subdomain' = 'network_management');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `dealer_region_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Region ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `jurisdiction_id` SET TAGS ('dbx_business_glossary_term' = 'Jurisdiction Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `allocation_quota_percentage` SET TAGS ('dbx_business_glossary_term' = 'Allocation Quota Percentage');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `city_list` SET TAGS ('dbx_business_glossary_term' = 'City List');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `city_list` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `competitive_intensity_rating` SET TAGS ('dbx_business_glossary_term' = 'Competitive Intensity Rating');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `competitive_intensity_rating` SET TAGS ('dbx_value_regex' = 'low|moderate|high|very_high');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `country_code` SET TAGS ('dbx_business_glossary_term' = 'Country Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `county_region_list` SET TAGS ('dbx_business_glossary_term' = 'County or Region List');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `dealer_count` SET TAGS ('dbx_business_glossary_term' = 'Dealer Count');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `district_code` SET TAGS ('dbx_business_glossary_term' = 'District Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `district_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `district_name` SET TAGS ('dbx_business_glossary_term' = 'District Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Integration Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `dms_integration_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending|error');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `dms_last_sync_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Dealer Management System (DMS) Last Sync Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `geographic_boundary_description` SET TAGS ('dbx_business_glossary_term' = 'Geographic Boundary Description');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `household_count_estimate` SET TAGS ('dbx_business_glossary_term' = 'Household Count Estimate');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `incentive_program_eligibility_flag` SET TAGS ('dbx_business_glossary_term' = 'Incentive Program Eligibility Flag');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Modified Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `market_segment_classification` SET TAGS ('dbx_business_glossary_term' = 'Market Segment Classification');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `market_segment_classification` SET TAGS ('dbx_value_regex' = 'urban|suburban|rural|mixed');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `modification_reason` SET TAGS ('dbx_business_glossary_term' = 'Modification Reason');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `next_review_date` SET TAGS ('dbx_business_glossary_term' = 'Next Review Date');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `performance_benchmark_group` SET TAGS ('dbx_business_glossary_term' = 'Performance Benchmark Group');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `population_estimate` SET TAGS ('dbx_business_glossary_term' = 'Population Estimate');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `postal_code_range` SET TAGS ('dbx_business_glossary_term' = 'Postal Code Range');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `postal_code_range` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `postal_code_range` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_code` SET TAGS ('dbx_business_glossary_term' = 'Region Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_name` SET TAGS ('dbx_business_glossary_term' = 'Region Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_status` SET TAGS ('dbx_business_glossary_term' = 'Region Status');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending|consolidating|dissolved');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_type` SET TAGS ('dbx_business_glossary_term' = 'Region Type');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `region_type` SET TAGS ('dbx_value_regex' = 'geographic|market|strategic|operational');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_email` SET TAGS ('dbx_business_glossary_term' = 'Regional Manager Email Address');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_email` SET TAGS ('dbx_value_regex' = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_email` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_email` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_email` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Regional Manager Name');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_phone` SET TAGS ('dbx_pii_business_glossary_term' = 'Regional Manager Phone Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_name` SET TAGS ('dbx_business_glossary_term' = 'Regional Manager Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_name` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_phone` SET TAGS ('dbx_business_glossary_term' = 'Regional Manager Phone Number');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_phone` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_phone` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `regional_manager_phone` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `sales_potential_index` SET TAGS ('dbx_pii_business_glossary_term' = 'Sales Potential Index');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `salesforce_region_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Salesforce Region ID');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `sap_sales_org_code` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Sales Organization Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `sap_sales_org_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `special_program_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Special Program Notes');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `state_province_list` SET TAGS ('dbx_pii_business_glossary_term' = 'State or Province List');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `vehicle_allocation_priority` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Allocation Priority');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `zone_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Zone Code');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `zone_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `zone_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Zone Name');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `sales_potential_index` SET TAGS ('dbx_business_glossary_term' = 'Sales Potential Index');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `salesforce_region_code` SET TAGS ('dbx_business_glossary_term' = 'Salesforce Region ID');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `sap_sales_org_code` SET TAGS ('dbx_business_glossary_term' = 'SAP Sales Organization Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `sap_sales_org_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `special_program_notes` SET TAGS ('dbx_business_glossary_term' = 'Special Program Notes');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `state_province_list` SET TAGS ('dbx_business_glossary_term' = 'State or Province List');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `state_province_list` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `vehicle_allocation_priority` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Allocation Priority');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `zone_code` SET TAGS ('dbx_business_glossary_term' = 'Zone Code');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `zone_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`dealer`.`dealer_region` ALTER COLUMN `zone_name` SET TAGS ('dbx_business_glossary_term' = 'Zone Name');

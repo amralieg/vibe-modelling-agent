@@ -1,5 +1,5 @@
 -- Schema for Domain: manufacturing | Business:  | Version: v2_ecm
--- Generated on: 2026-07-13 15:03:53
+-- Generated on: 2026-07-14 02:32:22
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_automotive_v1`.`manufacturing` COMMENT 'Core production and assembly operations across all manufacturing plants. Manages shop floor execution via MES (Manufacturing Execution System), work order scheduling, production line sequencing (JIS - Just-in-Sequence), WIP (Work in Progress) tracking, and build traceability. Includes stamping, body shop, paint, and final assembly processes. Integrates with AGV (Automated Guided Vehicle), PLC (Programmable Logic Controller), and SCADA systems for real-time production control.';
@@ -21,10 +21,8 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`plant` (
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the plant master record was first created in the system. Used for data lineage, audit trail, and record lifecycle management in the Databricks Silver Layer.',
     `currency_code` STRING COMMENT 'ISO 4217 three-letter currency code for the local currency used in plant-level financial reporting and cost accounting (e.g., USD, EUR, CNY). Used in SAP FI/CO for cost center reporting and CapEx tracking.. Valid values are `^[A-Z]{3}$`',
     `daily_capacity_units` STRING COMMENT 'Maximum number of vehicles or assemblies the plant can produce per day (Jobs Per Day - JPD). Derived from takt time and shift configuration. Used for daily production scheduling and MES throughput planning.',
-    `dummy_flag` BOOLEAN COMMENT 'Placeholder attribute to satisfy target entity touch',
     `eop_date` DATE COMMENT 'The official End of Production (EOP) date when the plant is scheduled to cease production of the current model or permanently close. Used for capacity planning, workforce transition, and asset disposal planning.',
     `epa_facility_code` STRING COMMENT 'EPA-assigned facility identifier for emissions and environmental compliance reporting. Required for CAFE (Corporate Average Fuel Economy) reporting and Clean Air Act compliance.. Valid values are `^[A-Z0-9]{1,20}$`',
-    `esg_tracking_enabled_flag` BOOLEAN COMMENT 'ESG/energy tracking linkage marker.',
     `floor_area_sqm` DECIMAL(18,2) COMMENT 'Total manufacturing floor area of the plant in square meters. Used for facility planning, CapEx allocation, insurance valuation, and ISO 14001 environmental footprint reporting.',
     `iatf_16949_certified` BOOLEAN COMMENT 'Indicates whether the plant holds a current IATF 16949 automotive quality management system certification. Mandatory for OEM supplier qualification and customer-specific requirements compliance.',
     `iso_14001_certified` BOOLEAN COMMENT 'Indicates whether the plant holds a current ISO 14001 Environmental Management System certification. Required for EPA compliance reporting and sustainability disclosures.',
@@ -49,7 +47,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`plant` (
     `scada_enabled` BOOLEAN COMMENT 'Indicates whether the plant operates a SCADA (Supervisory Control and Data Acquisition) system for real-time monitoring and control of manufacturing processes, utilities, and equipment.',
     `short_name` STRING COMMENT 'Abbreviated or commonly used name for the plant used in dashboards, shop floor displays, and internal communications (e.g., Detroit FA1).. Valid values are `^[A-Za-z0-9 ]{1,30}$`',
     `sop_date` DATE COMMENT 'The official Start of Production (SOP) date when the plant commenced or is scheduled to commence volume production. Critical milestone for capital planning, workforce ramp-up, and supplier readiness. Aligns with APQP phase-gate milestones.',
-    `ssot_governance_note` STRING COMMENT 'SSOT owner for plant entity. Other domains reference this via FK.',
     `state_province` STRING COMMENT 'State, province, or administrative subdivision where the plant is located (e.g., Michigan, Bavaria, Ontario). Used for local regulatory compliance, tax jurisdiction, and workforce reporting.',
     `takt_time_seconds` STRING COMMENT 'The rate at which vehicles must be produced to meet customer demand, expressed in seconds per unit. Calculated as available production time divided by customer demand rate. Fundamental to JIS (Just-in-Sequence) scheduling and line balancing in MES.',
     `time_zone` STRING COMMENT 'IANA time zone identifier for the plant location (e.g., America/Detroit, Europe/Berlin). Used for MES shift scheduling, production timestamp normalization, and cross-plant reporting in the Databricks lakehouse.',
@@ -57,7 +54,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`plant` (
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp when the plant master record was last modified. Used for change tracking, data synchronization between SAP S/4HANA and the Databricks lakehouse, and audit compliance.',
     `workforce_headcount` STRING COMMENT 'Total number of employees (direct and indirect labor) currently employed at the plant. Used for workforce planning, capacity analysis, and regulatory headcount reporting in SuccessFactors.',
     CONSTRAINT pk_plant PRIMARY KEY(`plant_id`)
-) COMMENT 'Master record for each manufacturing plant or assembly facility operated by Automotive. Captures plant identity, location, type (stamping, body shop, paint, final assembly, CKD/SKD), production capacity, SOP/EOP dates, plant code, and operational status. SSOT for plant-level identity referenced across MES, SAP PP, and logistics domains. [preservation_guardrail: verified]';
+) COMMENT 'Master record for each manufacturing plant or assembly facility operated by Automotive. Captures plant identity, location, type (stamping, body shop, paint, final assembly, CKD/SKD), production capacity, SOP/EOP dates, plant code, and operational status. SSOT for plant-level identity referenced across MES, SAP PP, and logistics domains.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` (
     `production_line_id` BIGINT COMMENT 'Unique surrogate identifier for each production line record within the manufacturing data platform. Serves as the primary key for the production_line entity. Role: MASTER_RESOURCE.',
@@ -74,7 +71,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` (
     `current_jph` DECIMAL(18,2) COMMENT 'The current actual or most recently measured throughput rate of the production line in Jobs Per Hour (JPH), reflecting real-world performance after accounting for constraints, model mix, and current configuration. Used to compare against designed_jph for capacity gap analysis and production scheduling.',
     `designed_jph` DECIMAL(18,2) COMMENT 'The engineered design throughput capacity of the production line expressed in Jobs Per Hour (JPH) — the number of vehicle units or assemblies the line is designed to produce per hour under optimal conditions. This is the nameplate capacity used for capacity planning, takt time calculation, and OEE baseline. Maps to MEASUREMENT_OR_VALUE category for MASTER_RESOURCE role.',
     `energy_consumption_kwh_per_unit` DECIMAL(18,2) COMMENT 'Average energy consumption of this production line in kilowatt-hours (kWh) per vehicle unit produced. Used for ISO 14001 environmental management reporting, carbon footprint calculation, energy efficiency benchmarking, and EPA/CARB manufacturing emissions compliance.',
-    `energy_metering_enabled_flag` BOOLEAN COMMENT 'ESG/energy tracking linkage marker.',
     `eop_date` DATE COMMENT 'The planned or actual End of Production (EOP) date for this production line — the date on which series production of the current vehicle program is scheduled to cease. Used for capacity reallocation planning, tooling disposition, and supply chain wind-down management. Nullable for lines with no defined EOP.',
     `floor_space_sqm` DECIMAL(18,2) COMMENT 'Total floor space occupied by this production line in square meters, including the line footprint, buffer zones, and material staging areas. Used for facility capacity planning, real estate cost allocation, and plant layout optimization.',
     `iatf_audit_status` STRING COMMENT 'Current IATF 16949 (International Automotive Task Force) quality management system audit status for this production line: compliant (no non-conformances), minor_nc (minor non-conformance identified), major_nc (major non-conformance — corrective action required), suspended (production suspended pending corrective action), or not_audited (not yet subject to IATF audit).. Valid values are `compliant|minor_nc|major_nc|suspended|not_audited`',
@@ -107,7 +103,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` (
     `vehicle_platform_code` STRING COMMENT 'The vehicle platform or architecture code that this production line is primarily configured to build (e.g., F-150 Gen14, GMT800, MEB). A single line may support multiple model variants on the same platform. Used for PLM integration with Siemens Teamcenter and production scheduling.',
     `weld_gun_count` STRING COMMENT 'Total number of resistance spot weld guns (robotic and manual) deployed on this production line. Applicable primarily to body shop lines. Used for weld quality management per IATF 16949, preventive maintenance scheduling in SAP PM, and SPC (Statistical Process Control) monitoring of weld quality.',
     CONSTRAINT pk_production_line PRIMARY KEY(`production_line_id`)
-) COMMENT 'Master record for each production line within a plant, including stamping lines, body shop lines, paint booths, and final assembly lines. Tracks line code, line type, designed throughput (JPH - Jobs Per Hour), current shift configuration, AGV integration flags, PLC/SCADA system references, and operational status. Owned by manufacturing as the SSOT for line-level capacity and configuration. [preservation_guardrail: verified]';
+) COMMENT 'Master record for each production line within a plant, including stamping lines, body shop lines, paint booths, and final assembly lines. Tracks line code, line type, designed throughput (JPH - Jobs Per Hour), current shift configuration, AGV integration flags, PLC/SCADA system references, and operational status. Owned by manufacturing as the SSOT for line-level capacity and configuration.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` (
     `work_center_id` BIGINT COMMENT 'Unique surrogate identifier for the work center (station) record within the manufacturing data platform. Primary key for the work_center master entity.',
@@ -160,7 +156,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` (
     `work_center_status` STRING COMMENT 'Current lifecycle status of the work center: active (in production use), inactive (temporarily not in use), under_maintenance (scheduled or unscheduled maintenance), decommissioned (permanently retired), or planned (not yet commissioned). Drives MES scheduling eligibility and capacity planning.. Valid values are `active|inactive|under_maintenance|decommissioned|planned`',
     `work_center_type` STRING COMMENT 'Classification of the work center by its operational mode: manual (human-operated), automated (machine-driven without robotics), robotic (robot arm/AGV-integrated), semi_automated (human-assisted automation), inspection (quality gate), or rework (defect correction station). Drives capacity planning and labor allocation.. Valid values are `manual|automated|robotic|semi_automated|inspection|rework`',
     CONSTRAINT pk_work_center PRIMARY KEY(`work_center_id`)
-) COMMENT 'Master record for individual work centers (stations) within a production line. Captures work center code, name, type (manual, automated, robotic), cycle time standard, takt time, capacity category, shift availability, and associated PLC/SCADA node identifiers. Supports JIS sequencing and MES shop floor execution at the station level. [preservation_guardrail: verified]';
+) COMMENT 'Master record for individual work centers (stations) within a production line. Captures work center code, name, type (manual, automated, robotic), cycle time standard, takt time, capacity category, shift availability, and associated PLC/SCADA node identifiers. Supports JIS sequencing and MES shop floor execution at the station level.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` (
     `production_order_id` BIGINT COMMENT 'Primary key for production_order',
@@ -170,6 +166,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` 
     `party_id` BIGINT COMMENT 'Foreign key linking to customer.party. Business justification: Order‑to‑customer linkage required for order fulfillment, warranty, and recall reports; manufacturers need to know which party placed each production order.',
     `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Production order cost posting uses a specific GL account; the order‑to‑GL link is required for the Production Order Cost Ledger report.',
     `homologation_record_id` BIGINT COMMENT 'Foreign key linking to compliance.homologation_record. Business justification: Production Order release process checks Homologation_Record to ensure model/year has regulatory approval before manufacturing starts.',
+    `mobility_fleet_account_id` BIGINT COMMENT 'Foreign key linking to mobility.mobility_fleet_account. Business justification: Required for fleet sales processing: link production order to the purchasing fleet account for order tracking, invoicing, and delivery coordination.',
     `opportunity_id` BIGINT COMMENT 'Foreign key linking to sales.opportunity. Business justification: Supports Opportunity‑to‑Production conversion analysis; ties each production order back to the sales opportunity that generated it.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant where this production order is executed. Corresponds to the SAP Plant (WERKS) organizational unit. Links to the plant master data product.',
     `procurement_supplier_id` BIGINT COMMENT 'Foreign key linking to procurement.supplier. Business justification: Enables Production Order Supplier Impact Analysis, identifying the primary supplier for critical components.',
@@ -220,7 +217,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` 
     `vin_range_start` STRING COMMENT 'The first VIN (Vehicle Identification Number) in the sequential range assigned to units produced under this order. VINs are 17-character alphanumeric identifiers conforming to ISO 3779. Used for build traceability, recall management, and regulatory reporting to NHTSA.. Valid values are `^[A-HJ-NPR-Z0-9]{17}$`',
     `wip_posting_flag` BOOLEAN COMMENT 'Indicates whether WIP (Work in Progress) costs have been calculated and posted to the financial ledger for this production order in the current period. True = WIP posted; False = WIP not yet posted. Used for period-end financial closing in SAP CO.',
     CONSTRAINT pk_production_order PRIMARY KEY(`production_order_id`)
-) COMMENT 'Core transactional record representing a manufacturing work order issued to produce a specific vehicle or sub-assembly. Captures order number, order type (vehicle build, sub-assembly, rework), planned and actual start/finish dates, target quantity, produced quantity, order status, priority, shift assignment, and MES order reference. Links to plant, production line, and vehicle configuration. SSOT for shop floor execution tracking in SAP PP and Apriso MES. [preservation_guardrail: verified]';
+) COMMENT 'Core transactional record representing a manufacturing work order issued to produce a specific vehicle or sub-assembly. Captures order number, order type (vehicle build, sub-assembly, rework), planned and actual start/finish dates, target quantity, produced quantity, order status, priority, shift assignment, and MES order reference. Links to plant, production line, and vehicle configuration. SSOT for shop floor execution tracking in SAP PP and Apriso MES.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` (
     `build_sequence_id` BIGINT COMMENT 'Unique surrogate identifier for the Just-in-Sequence (JIS) build sequence record in the Databricks Silver Layer. Primary key generated by the Apriso/Dassault MES sequencing module upon sequence creation.',
@@ -268,7 +265,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` (
     `vehicle_model_code` STRING COMMENT 'Alphanumeric code identifying the vehicle model (e.g., platform or nameplate code) to be assembled at this sequence position. Sourced from Teamcenter PLM product structure.',
     `vin` STRING COMMENT '17-character Vehicle Identification Number (VIN) assigned to the vehicle at this sequence position, conforming to ISO 3779 and NHTSA standards. May be pre-assigned at sequence creation or stamped during body shop operations. Critical for build traceability and regulatory compliance.. Valid values are `^[A-HJ-NPR-Z0-9]{17}$`',
     CONSTRAINT pk_build_sequence PRIMARY KEY(`build_sequence_id`)
-) COMMENT 'JIS (Just-in-Sequence) build sequence record defining the ordered sequence of vehicles to be assembled on a production line for a given shift or production run. Captures sequence number, planned build date, shift, line assignment, vehicle configuration reference (model, trim, powertrain, color), sequence status, and freeze timestamp. Critical for JIS supplier call-offs and AGV routing. Sourced from Apriso MES sequencing module. [preservation_guardrail: verified]';
+) COMMENT 'JIS (Just-in-Sequence) build sequence record defining the ordered sequence of vehicles to be assembled on a production line for a given shift or production run. Captures sequence number, planned build date, shift, line assignment, vehicle configuration reference (model, trim, powertrain, color), sequence status, and freeze timestamp. Critical for JIS supplier call-offs and AGV routing. Sourced from Apriso MES sequencing module.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` (
     `vehicle_build_id` BIGINT COMMENT 'Primary key for vehicle_build',
@@ -276,9 +273,11 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` (
     `connected_vehicle_id` BIGINT COMMENT 'Foreign key linking to mobility.connected_vehicle. Business justification: Required for OTA update management: associate each built vehicle with its connected vehicle record for remote diagnostics, firmware deployment, and compliance reporting.',
     `homologation_record_id` BIGINT COMMENT 'Foreign key linking to compliance.homologation_record. Business justification: Each built vehicle must be tied to its Homologation_Record for VIN‑level compliance verification and reporting.',
     `operator_team_id` BIGINT COMMENT 'Reference to the operator team or crew responsible for executing this vehicle build. Used for workforce productivity and quality traceability.',
+    `party_id` BIGINT COMMENT 'Foreign key linking to customer.party. Business justification: Warranty registration and post‑sale service depend on linking each built vehicle to its owning party; essential for service history and recall notifications.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant where this vehicle was assembled. Enables plant-level production reporting and capacity analysis.',
     `production_order_id` BIGINT COMMENT 'Reference to the SAP PP production order that authorized and scheduled this vehicle build. Links the build event to the manufacturing planning hierarchy.',
     `shift_id` BIGINT COMMENT 'Reference to the production shift during which this vehicle build was executed. Supports shift-level throughput and quality analysis.',
+    `shipment_id` BIGINT COMMENT 'Foreign key linking to logistics.shipment. Business justification: Outbound logistics scheduling uses the vehicle build record to assign the shipment that will transport the finished vehicle.',
     `vehicle_order_id` BIGINT COMMENT 'Foreign key linking to sales.vehicle_order. Business justification: Enables Build ↔ Delivery scheduling; associates each built vehicle with the sales order it fulfills for handover and logistics planning.',
     `vehicle_ownership_id` BIGINT COMMENT 'Foreign key linking to customer.vehicle_ownership. Business justification: Recall and ownership analytics require tying the build record to the ownership record that stores acquisition date, purchase price, and ownership number.',
     `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: VIN Registration Integration needed for warranty, recall, and regulatory reporting linking build record to VIN registry.',
@@ -322,7 +321,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` (
     `vehicle_model_code` STRING COMMENT 'Internal product/model code identifying the vehicle nameplate and variant being built (e.g., F150-XLT-4WD). Maps to the PLM product structure in Siemens Teamcenter. Used for BOM resolution and build sequence planning.',
     `vin` STRING COMMENT 'The globally unique 17-character Vehicle Identification Number (VIN) assigned to this vehicle unit at body-in-white or VIN stamping stage. Conforms to ISO 3779 / NHTSA VIN standard. SSOT for vehicle-level traceability across manufacturing, sales, and after-sales domains.. Valid values are `^[A-HJ-NPR-Z0-9]{17}$`',
     CONSTRAINT pk_vehicle_build PRIMARY KEY(`vehicle_build_id`)
-) COMMENT 'Transactional record capturing the actual build event for a single vehicle unit on the shop floor, from body-in-white through final assembly. Tracks VIN assignment, production order reference, actual start and completion timestamps per build stage (stamping, body shop, paint, trim, chassis, final), build status, shift, operator team, and any hold or rework flags. SSOT for vehicle-level build traceability and genealogy in the manufacturing domain. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record capturing the actual build event for a single vehicle unit on the shop floor, from body-in-white through final assembly. Tracks VIN assignment, production order reference, actual start and completion timestamps per build stage (stamping, body shop, paint, trim, chassis, final), build status, shift, operator team, and any hold or rework flags. SSOT for vehicle-level build traceability and genealogy in the manufacturing domain.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` (
     `build_stage_id` BIGINT COMMENT 'Unique surrogate identifier for each build stage record in the vehicle manufacturing process. Primary key for the build_stage reference master. [REFERENCE_LOOKUP role — canonical_skip_reason: This entity is a reference master defining standard build stages; per-role minimums for REFERENCE_LOOKUP are exempt, but all meaningful business attributes are still included for completeness.]',
@@ -373,15 +372,15 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` (
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to this build stage record. Used for change detection in ETL pipelines, audit trail maintenance, and engineering change management workflows per IATF 16949 documented information control.',
     `work_center_code` STRING COMMENT 'SAP S/4HANA work center identifier associated with this build stage. Links the build stage to capacity planning, cost center allocation, and production order routing in the ERP system. Enables integration between MES stage execution and SAP PP/CO modules.. Valid values are `^[A-Z0-9_]{2,20}$`',
     CONSTRAINT pk_build_stage PRIMARY KEY(`build_stage_id`)
-) COMMENT 'Reference master defining the standard build stages in the vehicle manufacturing process (e.g., Stamping, Body Shop, E-Coat, Paint, Trim-1, Chassis, Trim-2, Final, PDI). Captures stage code, stage name, sequence order, process area, standard cycle time, and applicable vehicle types. Used to structure vehicle_build traceability and production reporting. [preservation_guardrail: verified]';
+) COMMENT 'Reference master defining the standard build stages in the vehicle manufacturing process (e.g., Stamping, Body Shop, E-Coat, Paint, Trim-1, Chassis, Trim-2, Final, PDI). Captures stage code, stage name, sequence order, process area, standard cycle time, and applicable vehicle types. Used to structure vehicle_build traceability and production reporting.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` (
     `shop_floor_event_id` BIGINT COMMENT 'Unique surrogate identifier for each shop floor event record generated by MES, PLC, or SCADA systems during production operations.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant where the event occurred. Supports multi-plant OEE (Overall Equipment Effectiveness) analysis and regulatory reporting.',
-    `employee_id` BIGINT COMMENT 'Reference to the shop floor operator or technician who performed or acknowledged the event. Sourced from SuccessFactors workforce records.',
-    `equipment_registry_id` BIGINT COMMENT 'Identifier of the specific machine, robot, or automated equipment (e.g., welding robot, torque tool, paint gun, AGV unit) that generated or is associated with this event. Sourced from SAP PM equipment master.',
     `production_order_id` BIGINT COMMENT 'Reference to the SAP PP production order under which this shop floor event was generated. Links the event to the scheduled manufacturing work order.',
     `shift_id` BIGINT COMMENT 'Reference to the production shift during which this event was recorded. Enables shift-level OEE and throughput analysis.',
+    `employee_id` BIGINT COMMENT 'Reference to the shop floor operator or technician who performed or acknowledged the event. Sourced from SuccessFactors workforce records.',
+    `equipment_registry_id` BIGINT COMMENT 'Identifier of the specific machine, robot, or automated equipment (e.g., welding robot, torque tool, paint gun, AGV unit) that generated or is associated with this event. Sourced from SAP PM equipment master.',
     `shop_equipment_registry_id` BIGINT COMMENT 'Identifier of the specific machine, robot, or automated equipment (e.g., welding robot, torque tool, paint gun, AGV unit) that generated or is associated with this event. Sourced from SAP PM equipment master.',
     `shop_operator_employee_id` BIGINT COMMENT 'Reference to the shop floor operator or technician who performed or acknowledged the event. Sourced from SuccessFactors workforce records.',
     `tooling_registry_id` BIGINT COMMENT 'Identifier of the specific hand tool or automated tool (e.g., torque wrench, weld gun tip, drill bit) used during this event. Enables tool traceability for PPAP (Production Part Approval Process) and tool wear monitoring.',
@@ -425,7 +424,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` 
     `vehicle_model_code` STRING COMMENT 'Internal code identifying the vehicle model or platform being assembled (e.g., F-150, RAV4, Model-3-LR). Enables model-mix production analysis and JIS (Just-in-Sequence) validation.. Valid values are `^[A-Z0-9_-]{2,20}$`',
     `vin_number` STRING COMMENT '17-character Vehicle Identification Number of the vehicle unit being processed. Denormalized here for direct event-level traceability without requiring a join. Conforms to ISO 3779 and NHTSA 49 CFR Part 565.. Valid values are `^[A-HJ-NPR-Z0-9]{17}$`',
     CONSTRAINT pk_shop_floor_event PRIMARY KEY(`shop_floor_event_id`)
-) COMMENT 'Granular transactional record capturing real-time shop floor events generated by MES, PLC, and SCADA systems during production. Includes event type (station entry, station exit, torque confirmation, weld completion, paint cure, AGV arrival, hold trigger, alarm), event timestamp, work center, production order reference, VIN reference, operator ID, and event payload. Enables real-time production monitoring and OEE (Overall Equipment Effectiveness) calculation. [preservation_guardrail: verified]';
+) COMMENT 'Granular transactional record capturing real-time shop floor events generated by MES, PLC, and SCADA systems during production. Includes event type (station entry, station exit, torque confirmation, weld completion, paint cure, AGV arrival, hold trigger, alarm), event timestamp, work center, production order reference, VIN reference, operator ID, and event payload. Enables real-time production monitoring and OEE (Overall Equipment Effectiveness) calculation.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` (
     `wip_inventory_id` BIGINT COMMENT 'Unique surrogate identifier for each WIP inventory snapshot or movement record on the shop floor. Primary key for this entity.',
@@ -433,7 +432,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` (
     `inbound_shipment_id` BIGINT COMMENT 'Foreign key linking to supply.inbound_shipment. Business justification: WIP traceability requires linking inventory records to the inbound shipment that delivered the parts, supporting recall and quality investigations.',
     `part_master_id` BIGINT COMMENT 'Foreign key linking to engineering.part_master. Business justification: WIP inventory must reference the authoritative part master for quality, cost, and compliance checks.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant where this WIP item resides. Aligns with SAP organizational unit (Werk) for plant-level WIP visibility.',
-    `employee_id` BIGINT COMMENT 'Employee ID of the shop floor operator who last performed or confirmed an operation on this WIP item. Sourced from MES operator login. Supports operator-level quality traceability per IATF 16949.',
     `production_line_id` BIGINT COMMENT 'FK to manufacturing.production_line',
     `production_order_id` BIGINT COMMENT 'Reference to the SAP PP production order (Fertigungsauftrag) that authorized the manufacturing activity generating this WIP item. Links WIP to the planned production schedule.',
     `inspection_id` BIGINT COMMENT 'Reference to the quality inspection lot or inspection record associated with this WIP item when wip_status = awaiting_inspection or after inspection completion. Links to SAP QM inspection lot.',
@@ -441,6 +439,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` (
     `shift_id` BIGINT COMMENT 'FK to manufacturing.shift',
     `sku_master_id` BIGINT COMMENT 'Reference to the SAP material master record (Materialstamm) representing the sub-assembly, component, or vehicle body in this WIP record.',
     `storage_location_id` BIGINT COMMENT 'FK to inventory.storage_location',
+    `employee_id` BIGINT COMMENT 'Employee ID of the shop floor operator who last performed or confirmed an operation on this WIP item. Sourced from MES operator login. Supports operator-level quality traceability per IATF 16949.',
     `wip_operator_employee_id` BIGINT COMMENT 'Employee ID of the shop floor operator who last performed or confirmed an operation on this WIP item. Sourced from MES operator login. Supports operator-level quality traceability per IATF 16949.',
     `work_center_id` BIGINT COMMENT 'Reference to the specific work center (Arbeitsplatz) on the shop floor where the WIP item is currently being processed or staged. Supports JIS sequencing and real-time WIP location tracking.',
     `actual_cycle_time_sec` DECIMAL(18,2) COMMENT 'Actual time in seconds taken to complete the current operation on this WIP item, calculated from operation_start_timestamp to operation_end_timestamp. Compared against standard_cycle_time_sec for efficiency analysis.',
@@ -479,12 +478,12 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` (
     `wip_status` STRING COMMENT 'Current lifecycle status of the WIP item on the shop floor. in_process = actively being worked on; on_hold = paused pending resolution; awaiting_inspection = queued for quality gate; scrapped = condemned and removed from flow; completed = operation finished; rework = returned for corrective operations.. Valid values are `in_process|on_hold|awaiting_inspection|scrapped|completed|rework`',
     `wip_valuation_amount` DECIMAL(18,2) COMMENT 'Standard cost valuation of this WIP item in the plant currency, calculated based on the accumulated material and activity costs up to the current production stage. Used for WIP inventory valuation in SAP CO (Controlling) and financial reporting.',
     CONSTRAINT pk_wip_inventory PRIMARY KEY(`wip_inventory_id`)
-) COMMENT 'Snapshot and movement record for Work-in-Progress (WIP) inventory on the shop floor. Tracks WIP item identity, associated VIN or sub-assembly ID, current location (work center, buffer zone, AGV carrier), quantity, WIP status (in-process, on-hold, awaiting inspection, scrapped), entry and exit timestamps per location, and production order reference. Supports real-time WIP visibility and JIT material flow management. [preservation_guardrail: verified]';
+) COMMENT 'Snapshot and movement record for Work-in-Progress (WIP) inventory on the shop floor. Tracks WIP item identity, associated VIN or sub-assembly ID, current location (work center, buffer zone, AGV carrier), quantity, WIP status (in-process, on-hold, awaiting inspection, scrapped), entry and exit timestamps per location, and production order reference. Supports real-time WIP visibility and JIT material flow management.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` (
     `production_schedule_id` BIGINT COMMENT 'Unique surrogate identifier for the master production schedule (MPS) record in the Databricks Silver Layer. Primary key for this entity.',
     `billing_run_id` BIGINT COMMENT 'Reference to the SAP MRP (Material Requirements Planning) run that generated or last updated this production schedule. Enables traceability of schedule origin and supports re-planning analysis.',
-    `aftersales_nameplate_id` BIGINT COMMENT 'Foreign key linking to product.nameplate. Business justification: REQUIRED: Production schedules are often filtered by nameplate; nameplate‑level planning dashboards need this FK.',
+    `aftersales_nameplate_id` BIGINT COMMENT 'Foreign key linking to aftersales.aftersales_nameplate. Business justification: REQUIRED: Production schedules are often filtered by nameplate; nameplate‑level planning dashboards need this FK.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant where the scheduled production will occur. Corresponds to the SAP Plant organizational unit.',
     `production_line_id` BIGINT COMMENT 'Reference to the specific production line (e.g., final assembly, body shop, paint shop, stamping) within the plant where the scheduled build will take place.',
     `model_id` BIGINT COMMENT 'Reference to the vehicle model (e.g., sedan, SUV, truck, EV) being scheduled for production. Links to the vehicle master product record.',
@@ -527,7 +526,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedul
     `supplier_calloff_generated` BOOLEAN COMMENT 'Boolean flag indicating whether supplier delivery call-offs (JIT/JIS delivery schedules) have been generated and transmitted to suppliers based on this production schedule. True = call-offs sent; False = pending call-off generation.',
     `takt_time_seconds` STRING COMMENT 'Planned takt time in seconds per vehicle unit for this production schedule. Takt time = available production time divided by customer demand rate. Drives line balancing, AGV pacing, and JIS sequencing intervals.',
     CONSTRAINT pk_production_schedule PRIMARY KEY(`production_schedule_id`)
-) COMMENT 'Master production schedule (MPS) record defining planned vehicle production volumes by plant, production line, model, MY (Model Year), and time period (daily, weekly, monthly). Captures scheduled quantity, confirmed quantity, schedule version, freeze horizon, schedule status, and MRP run reference. Integrates with SAP PP MRP and supports capacity planning and supplier call-off generation. [preservation_guardrail: verified]';
+) COMMENT 'Master production schedule (MPS) record defining planned vehicle production volumes by plant, production line, model, MY (Model Year), and time period (daily, weekly, monthly). Captures scheduled quantity, confirmed quantity, schedule version, freeze horizon, schedule status, and MRP run reference. Integrates with SAP PP MRP and supports capacity planning and supplier call-off generation.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`shift` (
     `shift_id` BIGINT COMMENT 'Unique surrogate identifier for each shift definition record in the manufacturing plant reference master.',
@@ -574,14 +573,15 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`shift` (
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp when this shift definition record was last modified. Used for change tracking, data lineage, and incremental ETL processing in the Databricks Lakehouse silver layer.',
     `workforce_headcount_target` STRING COMMENT 'Planned number of direct production workers required for this shift. Used for workforce planning, labour cost budgeting, and integration with SuccessFactors workforce scheduling.',
     CONSTRAINT pk_shift PRIMARY KEY(`shift_id`)
-) COMMENT 'Reference master for production shift definitions at each plant and production line. Captures shift code, shift name (Day, Afternoon, Night, Weekend), planned start and end times, break schedule, planned production hours, and applicable plant and line assignments. Used for production order scheduling, OEE calculation, and workforce planning integration. [preservation_guardrail: verified]';
+) COMMENT 'Reference master for production shift definitions at each plant and production line. Captures shift code, shift name (Day, Afternoon, Night, Weekend), planned start and end times, break schedule, planned production hours, and applicable plant and line assignments. Used for production order scheduling, OEE calculation, and workforce planning integration.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` (
     `downtime_event_id` BIGINT COMMENT 'Unique surrogate identifier for each downtime event record in the manufacturing execution system. Primary key for the downtime_event data product.',
     `equipment_registry_id` BIGINT COMMENT 'Reference to the specific machine, robot, AGV (Automated Guided Vehicle), or equipment asset that experienced the downtime. Maps to SAP PM Equipment master record.',
+    `downtime_equipment_registry_id` BIGINT COMMENT 'Reference to the specific machine, robot, AGV (Automated Guided Vehicle), or equipment asset that experienced the downtime. Maps to SAP PM Equipment master record.',
+    `oee_daily_snapshot_id` BIGINT COMMENT 'Links this event to the pre-aggregated daily OEE snapshot for OEE analytics.',
     `org_unit_id` BIGINT COMMENT 'Reference to the maintenance, production, or quality team responsible for resolving the downtime event. Used for accountability tracking and response time analysis.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant where the downtime event occurred. Corresponds to the SAP Plant (Werk) organizational unit.',
-    `primary_equipment_registry_id` BIGINT COMMENT 'Reference to the specific machine, robot, AGV (Automated Guided Vehicle), or equipment asset that experienced the downtime. Maps to SAP PM Equipment master record.',
     `production_line_id` BIGINT COMMENT 'Reference to the production line (e.g., stamping line, body shop line, paint line, final assembly line) affected by the downtime event. Enables line-level OEE and throughput impact analysis.',
     `production_order_id` BIGINT COMMENT 'Reference to the SAP PP Production Order (Fertigungsauftrag) that was active or impacted at the time of the downtime event. Used to quantify production order impact and schedule deviation.',
     `employee_id` BIGINT COMMENT 'Reference to the employee (operator, technician, or supervisor) who initially reported or logged the downtime event in the MES or SAP system.',
@@ -622,12 +622,12 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` (
     `vehicle_model_code` STRING COMMENT 'The internal vehicle model or platform code (e.g., F-150, Silverado, Model 3 equivalent) being produced on the affected line at the time of the downtime event. Enables model-specific downtime analysis and supports PLM (Product Lifecycle Management) integration.',
     `work_order_number` STRING COMMENT 'The SAP PM maintenance work order number (Auftragsnummer) issued to address the downtime event. Distinct from the production order; this is the corrective or preventive maintenance order raised by the maintenance team in SAP PM.',
     CONSTRAINT pk_downtime_event PRIMARY KEY(`downtime_event_id`)
-) COMMENT 'Transactional record capturing unplanned and planned production downtime events at the work center or line level. Tracks downtime start and end timestamps, duration (minutes), downtime category (mechanical failure, tooling change, material shortage, quality hold, scheduled maintenance, changeover), affected work center, production order impact, and responsible team. Critical for OEE analysis and SCADA-integrated downtime reporting. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record capturing unplanned and planned production downtime events at the work center or line level. Tracks downtime start and end timestamps, duration (minutes), downtime category (mechanical failure, tooling change, material shortage, quality hold, scheduled maintenance, changeover), affected work center, production order impact, and responsible team. Critical for OEE analysis and SCADA-integrated downtime reporting.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` (
     `production_bom_id` BIGINT COMMENT 'Unique surrogate identifier for the manufacturing Bill of Materials (mBOM) record in the Databricks Silver Layer. Serves as the primary key for this entity.',
-    `model_id` BIGINT COMMENT 'Foreign key linking to vehicle.model. Business justification: BOM Management Report requires each BOM to be tied to a vehicle model to ensure correct component list per model.',
     `bom_id` BIGINT COMMENT 'Reference identifier linking this manufacturing BOM (mBOM) to the originating engineering BOM (eBOM) in Siemens Teamcenter PLM or PTC Windchill. Enables traceability from shop floor execution back to the engineering design intent. The eBOM-to-mBOM transformation is managed via the PLM-SAP integration.',
+    `model_id` BIGINT COMMENT 'Foreign key linking to vehicle.model. Business justification: BOM Management Report requires each BOM to be tied to a vehicle model to ensure correct component list per model.',
     `production_ebom_reference_bom_id` BIGINT COMMENT 'Reference identifier linking this manufacturing BOM (mBOM) to the originating engineering BOM (eBOM) in Siemens Teamcenter PLM or PTC Windchill. Enables traceability from shop floor execution back to the engineering design intent. The eBOM-to-mBOM transformation is managed via the PLM-SAP integration.',
     `approval_date` DATE COMMENT 'The date on which this manufacturing BOM received formal approval from the designated authority. Precedes the release_date in the BOM lifecycle workflow. Required for IATF 16949 documented information control.',
     `approved_by` STRING COMMENT 'User ID or employee identifier of the approving authority (e.g., Chief Engineer, Manufacturing Manager) who approved this BOM for production release. Distinct from released_by — approval may be a separate workflow step in Teamcenter PLM or SAP workflow.',
@@ -670,13 +670,57 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` (
     `vehicle_configuration_code` STRING COMMENT 'Code identifying the specific vehicle configuration (variant) for which this BOM is defined, including body style, drivetrain, trim level, and market variant (e.g., SUV-AWD-PREMIUM-NA). Used in SAP Variant Configuration (VC) to select the correct BOM components for a specific vehicle order.',
     `vehicle_model_code` STRING COMMENT 'Internal OEM code identifying the vehicle model (nameplate) for which this mBOM is defined (e.g., F150, RAV4, MODEL3). Used to associate the BOM with the correct vehicle program in PLM and SAP.',
     CONSTRAINT pk_production_bom PRIMARY KEY(`production_bom_id`)
-) COMMENT 'Manufacturing Bill of Materials (BOM) record representing the production-level BOM used on the shop floor for a specific vehicle configuration and model year. Distinct from the engineering BOM (eBOM) in the engineering domain — this is the manufacturing BOM (mBOM) as released to production. Captures BOM header (vehicle model, MY, plant, effectivity dates), BOM status, and reference to the engineering change order that authorized it. Managed via SAP PP and Teamcenter PLM BOM transfer. [preservation_guardrail: verified]';
+) COMMENT 'Manufacturing Bill of Materials (BOM) record representing the production-level BOM used on the shop floor for a specific vehicle configuration and model year. Distinct from the engineering BOM (eBOM) in the engineering domain — this is the manufacturing BOM (mBOM) as released to production. Captures BOM header (vehicle model, MY, plant, effectivity dates), BOM status, and reference to the engineering change order that authorized it. Managed via SAP PP and Teamcenter PLM BOM transfer.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` (
-    `manufacturing_bom_component_id` BIGINT COMMENT 'Primary key for local manufacturing_bom_component reference',
-    `engineering_bom_component_id` BIGINT COMMENT 'FK reference to SSOT engineering.engineering_bom_component',
+    `manufacturing_bom_component_id` BIGINT COMMENT 'Unique surrogate identifier for a single line-item record within a manufacturing Bill of Materials (BOM). Serves as the primary key for this entity in the Databricks Silver Layer.',
+    `engineering_bom_component_id` BIGINT COMMENT 'SSOT reference to engineering.engineering_bom_component (cross-domain duplicate reconciliation; engineering designated SSOT owner for bom_component).',
+    `model_id` BIGINT COMMENT 'Foreign key linking to vehicle.model. Business justification: Component Specification Process tracks components per vehicle model, enabling model‑specific quality and cost analysis.',
+    `part_master_id` BIGINT COMMENT 'Foreign key linking to engineering.part_master. Business justification: BOM components need a direct link to part_master for detailed specs; part_number/description are denormalized and will be removed.',
+    `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant or assembly facility where this BOM component is consumed. Determines plant-specific BOM validity and material availability.',
+    `vendor_id` BIGINT COMMENT 'Reference to the preferred or primary approved supplier for this component. Used in MRP source determination and JIT call-off scheduling to identify the default supply source.',
+    `production_bom_id` BIGINT COMMENT 'Reference to the parent BOM header to which this component line-item belongs. Links the component to its governing vehicle or sub-assembly BOM structure.',
+    `work_center_id` BIGINT COMMENT 'Reference to the shop floor work center (e.g., stamping, body shop, paint, final assembly station) where this component is installed or consumed during vehicle build.',
+    `alternate_part_group` STRING COMMENT 'Code identifying the alternate item group to which this component belongs in the BOM. Components within the same alternate group are interchangeable. Used in SAP BOM alternative item management for production flexibility.',
+    `alternate_part_number` STRING COMMENT 'OEM part number of an approved alternate or substitute component that can be used in place of the primary part when the primary is unavailable. Supports supply chain continuity and JIT material substitution.. Valid values are `^[A-Z0-9-]{3,30}$`',
+    `backflush_indicator` BOOLEAN COMMENT 'Indicates whether this component is backflushed (automatically goods-issued upon production order confirmation) rather than requiring a discrete goods movement transaction. True = backflush; False = manual goods issue required. Common for bulk and low-value components.',
+    `bom_level` STRING COMMENT 'Hierarchical depth of this component within the multi-level BOM structure. Level 0 is the finished vehicle; level 1 is a major assembly; deeper levels represent sub-assemblies and individual parts. Used for BOM explosion and cost rollup.',
+    `bulk_material_indicator` BOOLEAN COMMENT 'Flags this component as a bulk material (e.g., adhesives, lubricants, fasteners) that is issued to the production order without discrete picking or goods movement. Bulk materials are typically excluded from MRP individual requirements.',
+    `co_product_indicator` BOOLEAN COMMENT 'Flags this BOM item as a co-product or by-product that is produced alongside the primary output (e.g., stamping offcuts, recycled materials). Co-products receive a portion of the production order cost allocation.',
+    `commodity_code` STRING COMMENT 'Procurement commodity classification code grouping this component into a spend category (e.g., ELEC-ECU, BODY-STAMPING, POWERTRAIN-EV-BATTERY). Used in supply chain management (SCM), RFQ processes, and supplier performance reporting.',
+    `component_status` STRING COMMENT 'Current lifecycle status of this BOM component line. superseded indicates the part has been replaced by an alternate; pending_approval indicates the component is awaiting PPAP (Production Part Approval Process) sign-off before use in production.. Valid values are `active|superseded|obsolete|pending_approval|on_hold`',
+    `component_type` STRING COMMENT 'Classification of the BOM item indicating how it is sourced and consumed in the manufacturing process. phantom denotes a logical grouping with no physical stock; bulk_material denotes items issued without discrete picking. [ENUM-REF-CANDIDATE: raw_material|purchased_part|sub_assembly|phantom|co_product|bulk_material — promote to reference product]. Valid values are `raw_material|purchased_part|sub_assembly|phantom|co_product|bulk_material`',
+    `created_timestamp` TIMESTAMP COMMENT 'Timestamp when this BOM component record was first created in the source system (SAP or Teamcenter PLM). Provides audit trail for BOM change history and regulatory traceability.',
+    `currency_code` STRING COMMENT 'Three-letter ISO 4217 currency code for the standard cost value (e.g., USD, EUR, JPY). Enables multi-currency BOM cost analysis across global manufacturing plants.. Valid values are `^[A-Z]{3}$`',
+    `drawing_number` STRING COMMENT 'Reference to the CAD/CAE engineering drawing or 3D model document number associated with this component, as managed in CATIA/ENOVIA or PTC Windchill. Enables traceability from the manufacturing BOM back to the design definition.',
+    `drawing_revision` STRING COMMENT 'Revision level of the engineering drawing or CAD model applicable to this BOM component (e.g., A, B, 01). Ensures the correct design revision is used in production and supports PPAP documentation.. Valid values are `^[A-Z0-9]{1,5}$`',
+    `effectivity_end_date` DATE COMMENT 'Date after which this BOM component line is no longer valid and should be excluded from production builds. Null indicates an open-ended validity. Supports EOP (End of Production) transitions and engineering change cutover.',
+    `effectivity_start_date` DATE COMMENT 'Date from which this BOM component line is valid and should be included in production builds. Supports engineering change management and model year (MY) transitions. Components before this date are not called off.',
+    `engineering_change_number` STRING COMMENT 'Reference to the Engineering Change Notice (ECN) or Engineering Change Order (ECO) that introduced or last modified this BOM component line. Provides full traceability of design changes from PLM through to the manufacturing BOM.',
+    `fmea_reference` STRING COMMENT 'Document reference number for the Design FMEA (DFMEA) or Process FMEA (PFMEA) associated with this component. Supports APQP (Advanced Product Quality Planning) traceability and IATF 16949 risk management requirements.',
+    `hazardous_material_indicator` BOOLEAN COMMENT 'Flags this component as containing hazardous materials subject to regulatory controls (e.g., lead, cadmium, hexavalent chromium under EU ELV Directive, or lithium battery cells under UN 38.3). Triggers special handling, storage, and disposal procedures.',
+    `installation_sequence` STRING COMMENT 'Numeric sequence defining the order in which this component is installed relative to other components at the same work center. Critical for JIS (Just-in-Sequence) material call-offs and shop floor assembly instruction generation.',
+    `item_category` STRING COMMENT 'SAP BOM item category code indicating how the component is managed in inventory and procurement (e.g., stock item L, non-stock item N, variable-size item R). Drives material requirements planning (MRP) and goods movement behavior.. Valid values are `stock|non_stock|variable_size|document|text`',
+    `last_modified_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to this BOM component record in the source system. Used for incremental data loading, change detection, and BOM audit trail compliance.',
+    `lead_offset_days` STRING COMMENT 'Number of days before or after the parent order start date that this component must be available at the work center. Negative values indicate the component must arrive before the order start. Used in JIT/JIS scheduling and MRP net requirements calculation.',
+    `model_year` STRING COMMENT 'Four-digit vehicle model year (MY) for which this BOM component is applicable (e.g., 2025). Used to filter BOM components during model year changeover, SOP (Start of Production) planning, and regulatory homologation.. Valid values are `^[0-9]{4}$`',
+    `operation_number` STRING COMMENT 'Four-digit SAP routing operation number to which this BOM component is assigned. Links the component to the specific assembly step in the production routing, enabling shop floor assembly instruction generation and MES work order sequencing.. Valid values are `^[0-9]{4}$`',
+    `phantom_assembly_indicator` BOOLEAN COMMENT 'Indicates whether this component is a phantom assembly — a logical grouping used for BOM structuring that has no physical stock or production order. MRP explodes through phantom assemblies to plan the underlying components directly.',
+    `ppap_status` STRING COMMENT 'Current PPAP approval status for this component, indicating whether the supplier has received production part approval from the OEM quality team. Components without approved PPAP status cannot be used in series production. Aligns with IATF 16949 requirements.. Valid values are `not_required|submitted|approved|rejected|interim_approval`',
+    `priority_in_alt_group` STRING COMMENT 'Numeric priority rank of this component within its alternate item group. Lower numbers indicate higher preference. MRP uses this priority to determine which alternate to consume first when multiple substitutes are available.',
+    `quantity_per_vehicle` DECIMAL(18,2) COMMENT 'Number of units of this component required to build one complete vehicle or parent assembly. Supports fractional quantities for bulk materials (e.g., 0.5 litres of adhesive). Used in MRP material call-off calculations and JIT/JIS scheduling.',
+    `reach_svhc_indicator` BOOLEAN COMMENT 'Indicates whether this component contains a Substance of Very High Concern (SVHC) as defined under EU REACH Regulation (EC) No 1907/2006. Required for regulatory compliance reporting and customer disclosure obligations.',
+    `scrap_factor_pct` DECIMAL(18,2) COMMENT 'Expected percentage of this component that will be scrapped during the manufacturing process, expressed as a decimal percentage (e.g., 2.5000 = 2.5%). Used to inflate the planned component quantity in MRP to account for anticipated process losses. Supports PPM (Parts Per Million) defect tracking.',
+    `standard_cost` DECIMAL(18,2) COMMENT 'Standard cost per unit of this component in the plant currency, as maintained in the SAP material master cost estimate. Used in production order cost rollup, BOM cost analysis, and EBITDA reporting. Classified confidential as it contains sensitive pricing data.',
+    `supplier_part_number` STRING COMMENT 'The suppliers own part number for this component, as referenced in the PPAP documentation and supplier collaboration portal. Enables cross-reference between OEM part numbers and supplier catalogues for procurement and quality management.',
+    `supply_area` STRING COMMENT 'Designated production supply area or line-side storage location where this component is staged for consumption at the work center. Used in JIT/JIS material call-off and AGV (Automated Guided Vehicle) delivery routing.',
+    `unit_of_measure` STRING COMMENT 'ISO unit of measure code for the component quantity (e.g., EA for each, KG for kilogram, L for litre, M for metre, M2 for square metre). Aligns with SAP base unit of measure in the material master.. Valid values are `^[A-Z]{2,5}$`',
+    `usage_probability_pct` DECIMAL(18,2) COMMENT 'Probability (0–100%) that this component will actually be consumed in a given build, used for optional or variant-dependent components. Supports MRP planning for configurable vehicles where not every component is installed on every unit.',
+    `variant_condition` STRING COMMENT 'Boolean or characteristic-based condition expression that determines when this component is included in a configurable BOM (e.g., ENGINE_TYPE = V8 AND MARKET = USA). Used in SAP Variant Configuration and Teamcenter product configuration management.',
+    `vehicle_program_code` STRING COMMENT 'Internal OEM code identifying the vehicle program or platform to which this BOM component applies (e.g., F150-GEN14, EV-PLATFORM-X). Supports multi-platform BOM management and cross-program parts commonality analysis.',
+    `weight_kg` DECIMAL(18,2) COMMENT 'Net weight of a single unit of this component in kilograms. Used in vehicle weight calculations, CAFE (Corporate Average Fuel Economy) compliance modelling, NVH (Noise Vibration Harshness) analysis, and logistics planning.',
     CONSTRAINT pk_manufacturing_bom_component PRIMARY KEY(`manufacturing_bom_component_id`)
-) COMMENT 'Reference to SSOT owner engineering.engineering_bom_component. Line-item record within a manufacturing BOM representing a single component or sub-assembly required to build a vehicle. Captures component part number, description, quantity per vehicle, unit of measure, installation work center, installation sequence, alternative part references, effectivity start/end dates, and scrap factor. Supports JIT/JIS material call-offs and shop floor assembly instructions. [preservation_guardrail: verified]';
+) COMMENT 'Line-item record within a manufacturing BOM representing a single component or sub-assembly required to build a vehicle. Captures component part number, description, quantity per vehicle, unit of measure, installation work center, installation sequence, alternative part references, effectivity start/end dates, and scrap factor. Supports JIT/JIS material call-offs and shop floor assembly instructions.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` (
     `material_consumption_id` BIGINT COMMENT 'Unique surrogate identifier for each material consumption (goods issue) transaction record on the shop floor. Primary key of this table.',
@@ -724,7 +768,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumpti
     `vehicle_vin` STRING COMMENT 'The 17-character Vehicle Identification Number (VIN) of the vehicle being assembled when the material was consumed. Enables vehicle-level build traceability and recall management. Nullable for non-vehicle-specific consumption (e.g., consumables).. Valid values are `^[A-HJ-NPR-Z0-9]{17}$`',
     `wip_order_sequence` STRING COMMENT 'Sequential position of this consumption event within the production orders WIP (Work in Progress) processing sequence. Used for JIS (Just-in-Sequence) ordering analysis and shop floor flow traceability.',
     CONSTRAINT pk_material_consumption PRIMARY KEY(`material_consumption_id`)
-) COMMENT 'Transactional record capturing actual material consumption (goods issue) against a production order on the shop floor. Tracks consumed part number, quantity consumed, unit of measure, consumption timestamp, work center, production order reference, storage location, batch number, and variance from planned BOM quantity. Feeds SAP MM goods movement and cost accounting for production variance reporting. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record capturing actual material consumption (goods issue) against a production order on the shop floor. Tracks consumed part number, quantity consumed, unit of measure, consumption timestamp, work center, production order reference, storage location, batch number, and variance from planned BOM quantity. Feeds SAP MM goods movement and cost accounting for production variance reporting.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` (
     `rework_order_id` BIGINT COMMENT 'Unique surrogate identifier for the rework order record in the Databricks Silver Layer. Primary key for this entity.',
@@ -773,10 +817,11 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` (
     `vehicle_model_code` STRING COMMENT 'Internal product/model code identifying the vehicle nameplate or platform (e.g., truck, SUV, EV, HEV) associated with the rework order. Aligns with PLM product structure in Siemens Teamcenter.',
     `vin` STRING COMMENT '17-character Vehicle Identification Number (VIN) of the vehicle or vehicle body on which rework is being performed. Nullable for sub-assembly rework not yet associated with a VIN. Conforms to ISO 3779 standard.. Valid values are `^[A-HJ-NPR-Z0-9]{17}$`',
     CONSTRAINT pk_rework_order PRIMARY KEY(`rework_order_id`)
-) COMMENT 'Transactional record for rework or repair operations initiated on a vehicle or sub-assembly that failed an in-process quality check. Captures rework order number, originating production order, VIN reference, defect description, rework type (in-line repair, offline rework, teardown), assigned work center, planned and actual rework hours, rework status, and disposition (repaired, scrapped, concession). Integrates with quality domain defect records. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record for rework or repair operations initiated on a vehicle or sub-assembly that failed an in-process quality check. Captures rework order number, originating production order, VIN reference, defect description, rework type (in-line repair, offline rework, teardown), assigned work center, planned and actual rework hours, rework status, and disposition (repaired, scrapped, concession). Integrates with quality domain defect records.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` (
     `production_confirmation_id` BIGINT COMMENT 'Unique surrogate identifier for the production confirmation record in the Databricks Silver Layer. Primary key for this entity. Entity Role: TRANSACTION_HEADER — represents a discrete business event (completion of a production order or partial operation) with a clear lifecycle.',
+    `oee_daily_snapshot_id` BIGINT COMMENT 'Links this event to the pre-aggregated daily OEE snapshot for OEE analytics.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant where this production confirmation was posted. Enables plant-level production output reporting, capacity utilization analysis, and multi-plant benchmarking.',
     `employee_id` BIGINT COMMENT 'Reference to the production operator (employee/personnel number) who posted or was responsible for this confirmation. Used for traceability, quality accountability, and workforce productivity analysis. Maps to SAP HR personnel number (PERNR) or MES operator badge ID.',
     `production_operator_employee_id` BIGINT COMMENT 'Reference to the production operator (employee/personnel number) who posted or was responsible for this confirmation. Used for traceability, quality accountability, and workforce productivity analysis. Maps to SAP HR personnel number (PERNR) or MES operator badge ID.',
@@ -824,15 +869,16 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirm
     `vin` STRING COMMENT '17-character Vehicle Identification Number assigned to the vehicle unit confirmed in this production record. Populated for final assembly confirmations where a specific vehicle unit is produced. Null for sub-assembly or component-level confirmations. Enables full build traceability from production confirmation to vehicle delivery.. Valid values are `^[A-HJ-NPR-Z0-9]{17}$`',
     `yield_quantity` DECIMAL(18,2) COMMENT 'The confirmed good quantity (yield) produced in this confirmation, expressed in the base unit of measure of the material. Represents the number of units that passed quality inspection and are accepted into inventory. Maps to SAP PP field LMNGA (Yield Quantity). Core metric for production output reporting and OTD (On-Time Delivery) tracking.',
     CONSTRAINT pk_production_confirmation PRIMARY KEY(`production_confirmation_id`)
-) COMMENT 'Transactional record confirming the completion of a production order or a partial operation within a production order. Captures confirmation number, production order reference, confirmed quantity (yield and scrap), actual activity times (setup, machine, labor), confirmation timestamp, shift, work center, and operator. Triggers SAP PP order settlement and inventory goods receipt. SSOT for actual production output reporting. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record confirming the completion of a production order or a partial operation within a production order. Captures confirmation number, production order reference, confirmed quantity (yield and scrap), actual activity times (setup, machine, labor), confirmation timestamp, shift, work center, and operator. Triggers SAP PP order settlement and inventory goods receipt. SSOT for actual production output reporting.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` (
     `manufacturing_tooling_usage_id` BIGINT COMMENT 'Unique identifier for the manufacturing_tooling_usage data product (auto-inserted pre-linking).',
+    `asset_tooling_usage_id` BIGINT COMMENT 'SSOT reference to asset.asset_tooling_usage (cross-domain duplicate reconciliation; asset designated SSOT owner for tooling_usage).',
     `production_order_id` BIGINT COMMENT 'add column production_order_id (BIGINT) with FK to manufacturing.production_order.production_order_id - tooling usage occurs during specific production orders',
     `tooling_registry_id` BIGINT COMMENT 'add column tooling_registry_id (BIGINT) with FK to asset.tooling_registry.tooling_registry_id - manufacturing tooling usage must reference the specific tool from the asset registry',
     `work_center_id` BIGINT COMMENT 'FK to manufacturing.work_center',
     CONSTRAINT pk_manufacturing_tooling_usage PRIMARY KEY(`manufacturing_tooling_usage_id`)
-) COMMENT 'Transactional record tracking the usage of production tooling (dies, fixtures, jigs, welding guns, torque tools) against specific production orders and work centers. Captures tool ID, tool type, usage start and end timestamps, production order reference, work center, stroke count or cycle count, cumulative usage against tool life limit, and tool condition at usage. Supports predictive tooling maintenance and PPAP tooling traceability. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record tracking the usage of production tooling (dies, fixtures, jigs, welding guns, torque tools) against specific production orders and work centers. Captures tool ID, tool type, usage start and end timestamps, production order reference, work center, stroke count or cycle count, cumulative usage against tool life limit, and tool condition at usage. Supports predictive tooling maintenance and PPAP tooling traceability.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` (
     `process_parameter_id` BIGINT COMMENT 'Unique surrogate identifier for each process parameter reading record captured from PLC/SCADA systems during manufacturing operations.',
@@ -882,14 +928,14 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter`
     `vehicle_model_code` STRING COMMENT 'Internal vehicle model or platform code for the vehicle being built (e.g., F150, RAV4, MODEL_3). Supports model-level process capability analysis and SPC stratification.',
     `vin` STRING COMMENT '17-character Vehicle Identification Number (VIN) of the vehicle being processed at the time of this parameter reading. Enables full build traceability from process parameter to finished vehicle per NHTSA requirements.. Valid values are `^[A-HJ-NPR-Z0-9]{17}$`',
     CONSTRAINT pk_process_parameter PRIMARY KEY(`process_parameter_id`)
-) COMMENT 'Transactional record capturing actual process parameter readings collected from PLC/SCADA systems during manufacturing operations. Includes parameter type (weld current, weld time, torque value, paint film thickness, oven temperature, press force, adhesive bead width), measured value, upper and lower control limits (UCL/LCL), pass/fail status, timestamp, work center, production order, and VIN reference. Supports SPC (Statistical Process Control) and IATF 16949 process monitoring requirements. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record capturing actual process parameter readings collected from PLC/SCADA systems during manufacturing operations. Includes parameter type (weld current, weld time, torque value, paint film thickness, oven temperature, press force, adhesive bead width), measured value, upper and lower control limits (UCL/LCL), pass/fail status, timestamp, work center, production order, and VIN reference. Supports SPC (Statistical Process Control) and IATF 16949 process monitoring requirements.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` (
     `agv_movement_id` BIGINT COMMENT 'Unique surrogate identifier for each AGV movement event record on the shop floor. Primary key for the agv_movement data product.',
     `employee_id` BIGINT COMMENT 'The identifier of the shop floor operator or MES user who manually initiated, overrode, or acknowledged this AGV movement task. Null for fully automated movements with no human intervention. Supports operator accountability and manual override tracking.',
+    `agv_operator_employee_id` BIGINT COMMENT 'The identifier of the shop floor operator or MES user who manually initiated, overrode, or acknowledged this AGV movement task. Null for fully automated movements with no human intervention. Supports operator accountability and manual override tracking.',
     `agv_route_id` BIGINT COMMENT 'The predefined route identifier assigned to this movement by the AGV fleet management system. Routes define the physical path the AGV follows on the shop floor. Used for route utilization analysis, congestion detection, and route optimization.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant where this AGV movement occurred. Links to the plant master for facility-level reporting and fleet utilization analysis.',
-    `primary_employee_id` BIGINT COMMENT 'The identifier of the shop floor operator or MES user who manually initiated, overrode, or acknowledged this AGV movement task. Null for fully automated movements with no human intervention. Supports operator accountability and manual override tracking.',
     `shift_id` BIGINT COMMENT 'Reference to the production shift during which this AGV movement occurred. Enables shift-level fleet utilization reporting, throughput analysis, and comparison of AGV performance across shifts.',
     `work_center_id` BIGINT COMMENT 'Reference to the work center or production zone where the AGV movement was initiated or completed. Supports work center-level material flow analysis.',
     `agv_controller_code` STRING COMMENT 'Identifier of the AGV fleet management controller or traffic management system (e.g., a specific SCADA or AGV supervisor node) that dispatched and managed this movement. Supports multi-controller fleet architectures and fault isolation.',
@@ -926,14 +972,14 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` (
     `updated_timestamp` TIMESTAMP COMMENT 'The date and time when this AGV movement record was last modified, such as when a fault code was appended or movement status was updated to completed. Supports incremental data processing in the Databricks Silver layer.',
     `vin` STRING COMMENT 'The 17-character Vehicle Identification Number (VIN) of the vehicle being built when this AGV movement is directly associated with a specific vehicle build (e.g., transporting a body-in-white or sequenced component). Null for non-vehicle-specific movements such as bulk part replenishment. Enables build traceability per NHTSA requirements.. Valid values are `^[A-HJ-NPR-Z0-9]{17}$`',
     CONSTRAINT pk_agv_movement PRIMARY KEY(`agv_movement_id`)
-) COMMENT 'Transactional record capturing Automated Guided Vehicle (AGV) movement events on the shop floor. Tracks AGV unit ID, movement type (load, transport, unload, charge, idle), origin location, destination location, carried load (part number, VIN, carrier ID), movement start and end timestamps, route taken, and any fault or exception codes. Supports real-time material flow visibility and AGV fleet utilization reporting. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record capturing Automated Guided Vehicle (AGV) movement events on the shop floor. Tracks AGV unit ID, movement type (load, transport, unload, charge, idle), origin location, destination location, carried load (part number, VIN, carrier ID), movement start and end timestamps, route taken, and any fault or exception codes. Supports real-time material flow visibility and AGV fleet utilization reporting.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` (
     `capacity_plan_id` BIGINT COMMENT 'Unique surrogate identifier for each capacity plan record in the manufacturing domain. Primary key for the capacity_plan data product.',
     `work_center_id` BIGINT COMMENT 'Reference to the work center identified as the capacity bottleneck constraining overall line throughput during this planning period. Used to prioritize capacity improvement investments and focus S&OP constraint management.',
     `employee_id` BIGINT COMMENT 'Reference to the manufacturing or industrial engineering employee responsible for maintaining and updating this capacity plan. Supports accountability tracking in S&OP governance.',
+    `capacity_plan_owner_employee_id` BIGINT COMMENT 'Reference to the manufacturing or industrial engineering employee responsible for maintaining and updating this capacity plan. Supports accountability tracking in S&OP governance.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant for which this capacity plan is defined. Links to the manufacturing.plant master record.',
-    `primary_employee_id` BIGINT COMMENT 'Reference to the manufacturing or industrial engineering employee responsible for maintaining and updating this capacity plan. Supports accountability tracking in S&OP governance.',
     `production_line_id` BIGINT COMMENT 'Reference to the specific production line (e.g., final assembly line, body shop line, paint line) within the plant for which capacity is being planned. Links to the manufacturing.work_center or production line master.',
     `shift_id` BIGINT COMMENT 'Reference to the shift pattern (e.g., 1-shift, 2-shift, 3-shift) applied in this capacity plan. Shift pattern determines available production hours and directly impacts rated capacity calculation.',
     `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: Capacity planning aligns plant capacity with each vehicle program; capacity_plan needs vehicle_program reference.',
@@ -978,14 +1024,14 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` (
     `vehicle_model_code` STRING COMMENT 'Internal OEM (Original Equipment Manufacturer) code identifying the vehicle model or program (e.g., platform code, nameplate code) for which this capacity plan is prepared. Enables capacity planning at the model/program level.',
     `working_days` STRING COMMENT 'Number of scheduled working days in the planning period after excluding weekends, public holidays, and planned plant shutdowns. Used to compute daily production targets and available hours.',
     CONSTRAINT pk_capacity_plan PRIMARY KEY(`capacity_plan_id`)
-) COMMENT 'Master record for plant and line capacity planning, capturing planned production capacity by plant, production line, shift pattern, and planning period (weekly/monthly). Includes rated capacity (JPH × available hours), demonstrated capacity, capacity utilization percentage, bottleneck work center, planned overtime hours, and capacity plan version. Supports S&OP (Sales and Operations Planning) and capital investment decisions. [preservation_guardrail: verified]';
+) COMMENT 'Master record for plant and line capacity planning, capturing planned production capacity by plant, production line, shift pattern, and planning period (weekly/monthly). Includes rated capacity (JPH × available hours), demonstrated capacity, capacity utilization percentage, bottleneck work center, planned overtime hours, and capacity plan version. Supports S&OP (Sales and Operations Planning) and capital investment decisions.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` (
     `changeover_id` BIGINT COMMENT 'Unique surrogate identifier for each production line changeover event record in the manufacturing execution system.',
     `employee_id` BIGINT COMMENT 'Reference to the production supervisor or line manager who authorized and oversaw the changeover event. Supports accountability tracking and sign-off compliance per IATF 16949.',
+    `changeover_supervisor_employee_id` BIGINT COMMENT 'Reference to the production supervisor or line manager who authorized and oversaw the changeover event. Supports accountability tracking and sign-off compliance per IATF 16949.',
     `org_unit_id` BIGINT COMMENT 'Reference to the operator team or crew responsible for executing the changeover. Supports SMED (Single-Minute Exchange of Die) team performance analysis and workforce accountability.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant where the changeover event occurred.',
-    `primary_employee_id` BIGINT COMMENT 'Reference to the production supervisor or line manager who authorized and oversaw the changeover event. Supports accountability tracking and sign-off compliance per IATF 16949.',
     `production_line_id` BIGINT COMMENT 'Reference to the specific production or assembly line on which the changeover was performed.',
     `shift_id` BIGINT COMMENT 'Reference to the production shift during which the changeover event occurred. Used for shift-level performance reporting and labor attribution.',
     `actual_duration_minutes` STRING COMMENT 'Actual elapsed time in minutes from changeover start to completion. Core metric for SMED (Single-Minute Exchange of Die) analysis and OEE (Overall Equipment Effectiveness) calculations.',
@@ -1029,10 +1075,11 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` (
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp when the changeover record was last modified in the data platform. Supports audit trail, data lineage, and incremental load processing for the Databricks Lakehouse Silver Layer.',
     `variance_minutes` STRING COMMENT 'Difference in minutes between actual and planned changeover duration (actual_duration_minutes minus planned_duration_minutes). Positive value indicates overrun; negative indicates early completion. Key SMED (Single-Minute Exchange of Die) performance indicator.',
     CONSTRAINT pk_changeover PRIMARY KEY(`changeover_id`)
-) COMMENT 'Transactional record for production line changeover events when switching between vehicle models, body styles, or powertrain variants on a shared production line. Captures changeover type (model mix change, color change, tooling swap, line retooling), planned and actual changeover start/end times, duration, affected production line, changeover team, and production loss (units not produced). Supports SMED (Single-Minute Exchange of Die) improvement programs. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record for production line changeover events when switching between vehicle models, body styles, or powertrain variants on a shared production line. Captures changeover type (model mix change, color change, tooling swap, line retooling), planned and actual changeover start/end times, duration, affected production line, changeover team, and production loss (units not produced). Supports SMED (Single-Minute Exchange of Die) improvement programs.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` (
     `production_variant_id` BIGINT COMMENT 'Primary key for production_variant',
+    `rebate_agreement_id` BIGINT COMMENT 'Unique surrogate identifier for the production variant record. Primary key for the manufacturing-feasible variant definition. Role: MASTER_RESOURCE.',
     `homologation_record_id` BIGINT COMMENT 'Foreign key linking to compliance.homologation_record. Business justification: Variant definitions are approved via homologation; linking ensures variant builds only when approved.',
     `model_id` BIGINT COMMENT 'Foreign key linking to vehicle.model. Business justification: Variant Definition Process links each variant to its vehicle model for configuration management and regulatory compliance.',
     `plant_id` BIGINT COMMENT 'Reference to the manufacturing plant where this production variant is authorized to be built. Determines line compatibility, tooling availability, and regulatory homologation scope.',
@@ -1083,7 +1130,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant
     `vehicle_model_code` STRING COMMENT 'OEM (Original Equipment Manufacturer) internal model code identifying the vehicle platform or nameplate (e.g., F150, RAV4, MODEL3). Links the production variant to the vehicle program in PLM (Product Lifecycle Management) and SAP MM (Materials Management).. Valid values are `^[A-Z0-9]{2,10}$`',
     `wltp_range_km` DECIMAL(18,2) COMMENT 'Official WLTP (Worldwide Harmonised Light Vehicles Test Procedure) certified driving range in kilometres for BEV and PHEV variants. Null for ICE and HEV variants. Used for EU regulatory labelling, EPA range certification cross-reference, and consumer-facing range claims.',
     CONSTRAINT pk_production_variant PRIMARY KEY(`production_variant_id`)
-) COMMENT 'Reference master defining the valid production variants (option combinations) that can be built on a specific production line for a given model year. Captures variant code, model, MY, powertrain type (ICE, HEV, PHEV, BEV), body style, trim level, market destination, and line compatibility flags. Supports build sequence feasibility validation and JIS sequencing rules. Distinct from the commercial product catalog — this is the manufacturing-feasible variant definition. [preservation_guardrail: verified]';
+) COMMENT 'Reference master defining the valid production variants (option combinations) that can be built on a specific production line for a given model year. Captures variant code, model, MY, powertrain type (ICE, HEV, PHEV, BEV), body style, trim level, market destination, and line compatibility flags. Supports build sequence feasibility validation and JIS sequencing rules. Distinct from the commercial product catalog — this is the manufacturing-feasible variant definition.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` (
     `scrap_record_id` BIGINT COMMENT 'Unique surrogate identifier for each scrap record transaction in the manufacturing domain. Primary key for the scrap_record data product.',
@@ -1131,14 +1178,14 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` (
     `vin` STRING COMMENT '17-character Vehicle Identification Number (VIN) of the vehicle unit being scrapped, if the scrap event applies to a complete or partially assembled vehicle. Null for component-level scrap. Conforms to ISO 3779 VIN standard.. Valid values are `^[A-HJ-NPR-Z0-9]{17}$`',
     `weight_kg` DECIMAL(18,2) COMMENT 'Physical weight of the scrapped material in kilograms. Used for environmental reporting (ISO 14001 waste generation metrics), recycling tracking, and logistics planning for scrap removal.',
     CONSTRAINT pk_scrap_record PRIMARY KEY(`scrap_record_id`)
-) COMMENT 'Transactional record capturing scrapped materials, components, or vehicle units during the manufacturing process. Tracks scrap item (part number or VIN), scrap quantity, scrap reason code, scrap location (work center, process stage), production order reference, scrap value, disposal method, and authorization reference. Feeds SAP CO production variance accounting and quality PPM (Parts Per Million) defect rate reporting. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record capturing scrapped materials, components, or vehicle units during the manufacturing process. Tracks scrap item (part number or VIN), scrap quantity, scrap reason code, scrap location (work center, process stage), production order reference, scrap value, disposal method, and authorization reference. Feeds SAP CO production variance accounting and quality PPM (Parts Per Million) defect rate reporting.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` (
     `manufacturing_supply_agreement_id` BIGINT COMMENT 'Primary key for the SupplyAgreement association',
     `manufacturing_packaging_specification_id` BIGINT COMMENT 'Reference to the packaging spec used for shipments to this plant',
     `plant_id` BIGINT COMMENT 'Foreign key linking to the plant',
     `procurement_supplier_id` BIGINT COMMENT 'Foreign key linking to the supplier',
-    `procurement_supply_agreement_id` BIGINT COMMENT 'SSOT reference to procurement.procurement_supply_agreement (resolves cross-domain duplicate of supply_agreement).',
+    `procurement_supply_agreement_id` BIGINT COMMENT 'SSOT reference to procurement.procurement_supply_agreement (cross-domain duplicate reconciliation; procurement designated SSOT owner for supply_agreement).',
     `approval_date` DATE COMMENT 'Date the agreement was approved',
     `approval_status` STRING COMMENT 'Current approval status of the agreement (e.g., Approved, Pending)',
     `effective_end_date` DATE COMMENT 'Date the agreement expires or is terminated',
@@ -1151,7 +1198,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supp
     `quality_rating` STRING COMMENT 'Quality rating assigned to the supplier for this plant',
     `shipping_method` STRING COMMENT 'Preferred shipping method for deliveries',
     CONSTRAINT pk_manufacturing_supply_agreement PRIMARY KEY(`manufacturing_supply_agreement_id`)
-) COMMENT 'Represents the contractual agreement between a manufacturing plant and a supplier. Each record captures the specific terms that apply to that plant‑supplier pair, such as lead time, minimum order quantity, pricing, and quality requirements.. Existence Justification: Each manufacturing plant can source materials from multiple suppliers, and each supplier can serve multiple plants. The business manages these plant‑supplier links through contracts that capture lead times, minimum order quantities, pricing, and other terms. The relationship is actively created, updated, and tracked as a distinct agreement. [preservation_guardrail: verified]';
+) COMMENT 'Represents the contractual agreement between a manufacturing plant and a supplier. Each record captures the specific terms that apply to that plant‑supplier pair, such as lead time, minimum order quantity, pricing, and quality requirements.. Existence Justification: Each manufacturing plant can source materials from multiple suppliers, and each supplier can serve multiple plants. The business manages these plant‑supplier links through contracts that capture lead times, minimum order quantities, pricing, and other terms. The relationship is actively created, updated, and tracked as a distinct agreement.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` (
     `vehicle_mobility_subscription_id` BIGINT COMMENT 'Primary key for the VehicleMobilitySubscription association',
@@ -1163,18 +1210,18 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_s
     `subscription_start_date` DATE COMMENT 'Date when the vehicles subscription to the service begins',
     `vehicle_mobility_subscription_status` STRING COMMENT 'Current status of the subscription (e.g., active, suspended, cancelled)',
     CONSTRAINT pk_vehicle_mobility_subscription PRIMARY KEY(`vehicle_mobility_subscription_id`)
-) COMMENT 'Represents the contractual relationship between a vehicle build and a mobility service. Each record captures the period of subscription, billing details, status, and the service tier applicable to that vehicle.. Existence Justification: Each vehicle build can be subscribed to multiple mobility services (e.g., remote diagnostics, OTA updates) and each mobility service can be subscribed by many vehicle builds across the fleet. The subscription is an operational contract that is created, updated, and terminated by business users, and it carries its own attributes such as start/end dates, billing amount, and status. [preservation_guardrail: verified]';
+) COMMENT 'Represents the contractual relationship between a vehicle build and a mobility service. Each record captures the period of subscription, billing details, status, and the service tier applicable to that vehicle.. Existence Justification: Each vehicle build can be subscribed to multiple mobility services (e.g., remote diagnostics, OTA updates) and each mobility service can be subscribed by many vehicle builds across the fleet. The subscription is an operational contract that is created, updated, and terminated by business users, and it carries its own attributes such as start/end dates, billing amount, and status.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` (
     `compliance_certification_id` BIGINT COMMENT 'Primary key for the ComplianceCertification association',
-    `compliance_emissions_certification_id` BIGINT COMMENT 'SSOT reference to compliance.compliance_emissions_certification (resolves cross-domain duplicate of certification).',
+    `compliance_emissions_certification_id` BIGINT COMMENT 'SSOT reference to compliance.compliance_emissions_certification (cross-domain duplicate reconciliation; compliance designated SSOT owner for certification).',
     `production_order_id` BIGINT COMMENT 'Foreign key linking to the production order',
     `regulatory_requirement_id` BIGINT COMMENT 'Foreign key linking to the regulatory requirement',
     `certification_date` DATE COMMENT 'Date when the compliance was certified for this order‑requirement pair',
     `compliance_status` STRING COMMENT 'Current compliance status for this order‑requirement pair (e.g., Compliant, Non‑Compliant, Pending)',
     `evidence_document_path` STRING COMMENT 'File system or URL path to the evidence document supporting compliance',
     CONSTRAINT pk_compliance_certification PRIMARY KEY(`compliance_certification_id`)
-) COMMENT 'This association product records the compliance certification of a production order against a specific regulatory requirement. It captures the compliance status, supporting evidence document path, and the date the certification was achieved for each order‑requirement pair.. Existence Justification: Each production order must be verified against multiple regulatory requirements, and each regulatory requirement applies to many production orders. The compliance status, supporting evidence, and certification date are recorded for every order‑requirement pair, and quality engineers actively create, update, and delete these records as part of the manufacturing compliance process. [preservation_guardrail: verified]';
+) COMMENT 'This association product records the compliance certification of a production order against a specific regulatory requirement. It captures the compliance status, supporting evidence document path, and the date the certification was achieved for each order‑requirement pair.. Existence Justification: Each production order must be verified against multiple regulatory requirements, and each regulatory requirement applies to many production orders. The compliance status, supporting evidence, and certification date are recorded for every order‑requirement pair, and quality engineers actively create, update, and delete these records as part of the manufacturing compliance process.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` (
     `production_order_allocation_id` BIGINT COMMENT 'Primary key for the production_order_allocation association',
@@ -1186,12 +1233,13 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_a
     `allocation_type` STRING COMMENT 'Type of allocation (e.g., standard, expedited, special)',
     `priority_tier` STRING COMMENT 'Priority tier assigned to the allocation for fulfillment sequencing',
     CONSTRAINT pk_production_order_allocation PRIMARY KEY(`production_order_allocation_id`)
-) COMMENT 'Represents the allocation of a manufacturing production order to a dealership. Each record links one production order to one dealership and captures allocation-specific details such as allocation number, status, date, priority tier, and type.. Existence Justification: Production orders are work orders that generate vehicles, and the allocation process assigns portions of these orders to multiple dealerships for distribution. A single production order can be split across several dealerships, and each dealership receives many production orders over time. The allocation itself carries attributes such as allocation number, status, date, priority tier, and type, which are managed as a distinct business entity. [preservation_guardrail: verified]';
+) COMMENT 'Represents the allocation of a manufacturing production order to a dealership. Each record links one production order to one dealership and captures allocation-specific details such as allocation number, status, date, priority tier, and type.. Existence Justification: Production orders are work orders that generate vehicles, and the allocation process assigns portions of these orders to multiple dealerships for distribution. A single production order can be split across several dealerships, and each dealership receives many production orders over time. The allocation itself carries attributes such as allocation number, status, date, priority tier, and type, which are managed as a distinct business entity.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` (
     `agv_route_id` BIGINT COMMENT 'Primary key for agv_route',
     `agv_start_location_id` BIGINT COMMENT 'Identifier of the location where the AGV begins the route.',
     `reverse_agv_route_id` BIGINT COMMENT 'Self-referencing FK on agv_route (reverse_agv_route_id)',
+    `route_id` BIGINT COMMENT 'SSOT reference to logistics.route (cross-domain duplicate reconciliation; logistics designated SSOT owner for route).',
     `storage_location_id` BIGINT COMMENT 'Identifier of the location where the AGV ends the route.',
     `allowed_load_kg` DECIMAL(18,2) COMMENT 'Maximum load weight that can be safely transported on the route.',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the route record was first created in the system.',
@@ -1207,9 +1255,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` (
     `notes` STRING COMMENT 'Free‑form text for any supplemental information about the route.',
     `priority_level` STRING COMMENT 'Numeric priority (1 = highest) used by the scheduler to rank routes.',
     `route_category` STRING COMMENT 'Business priority category that influences scheduling and resource allocation.',
-    `route_code` STRING COMMENT 'Unique alphanumeric code assigned to the route for lookup and integration with MES.',
     `route_length_meters` DECIMAL(18,2) COMMENT 'Total physical length of the route measured in meters.',
-    `route_name` STRING COMMENT 'Human‑readable name of the AGV route used for display and reporting.',
     `route_type` STRING COMMENT 'Classification of the route purpose within the plant.',
     `route_version` STRING COMMENT 'Incremental version number tracking changes to the route definition.',
     `safety_rating` STRING COMMENT 'Safety classification based on risk assessment for the route.',
@@ -1217,7 +1263,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` (
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the route record.',
     `waypoint_count` STRING COMMENT 'Number of intermediate waypoints between start and end locations.',
     CONSTRAINT pk_agv_route PRIMARY KEY(`agv_route_id`)
-) COMMENT 'Master reference table for agv_route. Referenced by route_id. [preservation_guardrail: verified]';
+) COMMENT 'Master reference table for agv_route. Referenced by route_id.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`routing` (
     `routing_id` BIGINT COMMENT 'Primary key for routing',
@@ -1251,7 +1297,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`routing` (
     `work_center` STRING COMMENT 'Primary work‑center or cell where the routing is executed.',
     `created_by` STRING COMMENT 'User identifier who originally created the routing.',
     CONSTRAINT pk_routing PRIMARY KEY(`routing_id`)
-) COMMENT 'Master reference table for routing. Referenced by routing_id. [preservation_guardrail: verified]';
+) COMMENT 'Master reference table for routing. Referenced by routing_id.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` (
     `factory_calendar_id` BIGINT COMMENT 'Primary key for factory_calendar',
@@ -1277,7 +1323,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` 
     `version_number` STRING COMMENT 'Incremental version of the calendar for change management.',
     `week_number` STRING COMMENT 'ISO week number within the calendar year.',
     CONSTRAINT pk_factory_calendar PRIMARY KEY(`factory_calendar_id`)
-) COMMENT 'Master reference table for factory_calendar. Referenced by factory_calendar_id. [preservation_guardrail: verified]';
+) COMMENT 'Master reference table for factory_calendar. Referenced by factory_calendar_id.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` (
     `operator_team_id` BIGINT COMMENT 'Primary key for operator_team',
@@ -1308,129 +1354,12 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` (
     `updated_timestamp` TIMESTAMP COMMENT 'Date and time of the most recent modification to the team record.',
     `work_order_capacity_per_shift` STRING COMMENT 'Number of work orders the team can process in a standard shift.',
     CONSTRAINT pk_operator_team PRIMARY KEY(`operator_team_id`)
-) COMMENT 'Master reference table for operator_team. Referenced by operator_team_id. [preservation_guardrail: verified]';
-
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`energy_consumption_record` (
-    `energy_consumption_record_id` BIGINT COMMENT '',
-    `line_energy_meter_id` BIGINT COMMENT 'Source meter.',
-    `plant_id` BIGINT COMMENT '',
-    `production_line_id` BIGINT COMMENT '',
-    `cost_amount` DECIMAL(18,2) COMMENT '',
-    `created_timestamp` TIMESTAMP COMMENT '',
-    `currency_code` STRING COMMENT '',
-    `energy_consumed_kwh` DECIMAL(18,2) COMMENT '',
-    `energy_kwh` DECIMAL(18,2) COMMENT '',
-    `energy_source` STRING COMMENT '',
-    `energy_source_type` STRING COMMENT 'Electricity, gas, steam, renewable, etc.',
-    `measurement_date` DATE COMMENT '',
-    `period_date` DATE COMMENT 'Aggregation date.',
-    `reading_date` DATE COMMENT '',
-    `reading_end_timestamp` TIMESTAMP COMMENT 'Reading window end.',
-    `reading_start_timestamp` TIMESTAMP COMMENT 'Reading window start.',
-    `renewable_flag` BOOLEAN COMMENT 'Whether from renewable source.',
-    `renewable_share_pct` DECIMAL(18,2) COMMENT '',
-    CONSTRAINT pk_energy_consumption_record PRIMARY KEY(`energy_consumption_record_id`)
-) COMMENT 'Per-line and per-plant electrical energy consumption records for ESG and energy tracking. [preservation_guardrail: verified]';
-
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`co2_emission_record` (
-    `co2_emission_record_id` BIGINT COMMENT '',
-    `plant_id` BIGINT COMMENT '',
-    `production_line_id` BIGINT COMMENT '',
-    `calculation_method` STRING COMMENT 'Emission factor method.',
-    `co2_equivalent_kg` DECIMAL(18,2) COMMENT '',
-    `co2_kg` DECIMAL(18,2) COMMENT '',
-    `created_timestamp` TIMESTAMP COMMENT '',
-    `emission_factor` DECIMAL(18,2) COMMENT 'Applied emission factor.',
-    `emission_scope` STRING COMMENT '',
-    `emission_source` STRING COMMENT '',
-    `measurement_date` DATE COMMENT '',
-    `period_date` DATE COMMENT 'Aggregation date.',
-    `reading_date` DATE COMMENT '',
-    CONSTRAINT pk_co2_emission_record PRIMARY KEY(`co2_emission_record_id`)
-) COMMENT 'Plant and line CO2 emission records for CSRD/EU Taxonomy ESG reporting. [preservation_guardrail: verified]';
-
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`water_usage_record` (
-    `water_usage_record_id` BIGINT COMMENT '',
-    `plant_id` BIGINT COMMENT '',
-    `production_line_id` BIGINT COMMENT '',
-    `created_timestamp` TIMESTAMP COMMENT '',
-    `discharge_liters` DECIMAL(18,2) COMMENT 'Water discharged.',
-    `measurement_date` DATE COMMENT '',
-    `period_date` DATE COMMENT 'Aggregation date.',
-    `reading_date` DATE COMMENT '',
-    `recycled_flag` BOOLEAN COMMENT '',
-    `recycled_water_liters` DECIMAL(18,2) COMMENT '',
-    `water_consumed_liters` DECIMAL(18,2) COMMENT '',
-    `water_liters` DECIMAL(18,2) COMMENT '',
-    `water_source` STRING COMMENT '',
-    `water_source_type` STRING COMMENT 'Municipal, well, recycled, etc.',
-    CONSTRAINT pk_water_usage_record PRIMARY KEY(`water_usage_record_id`)
-) COMMENT 'Plant and line water usage records for ESG water stewardship reporting. [preservation_guardrail: verified]';
-
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` (
-    `line_energy_meter_id` BIGINT COMMENT '',
-    `plant_id` BIGINT COMMENT '',
-    `production_line_id` BIGINT COMMENT '',
-    `calibration_date` DATE COMMENT '',
-    `created_timestamp` TIMESTAMP COMMENT '',
-    `install_date` DATE COMMENT '',
-    `installation_date` DATE COMMENT 'Meter installation date.',
-    `last_calibration_date` DATE COMMENT 'Last calibration date.',
-    `measurement_unit` STRING COMMENT '',
-    `meter_code` STRING COMMENT '',
-    `meter_status` STRING COMMENT '',
-    `meter_type` STRING COMMENT '',
-    `scada_node_code` STRING COMMENT 'SCADA integration node.',
-    `unit_of_measure` STRING COMMENT 'Measurement unit.',
-    CONSTRAINT pk_line_energy_meter PRIMARY KEY(`line_energy_meter_id`)
-) COMMENT 'Physical energy meters installed per production line for granular energy metering. [preservation_guardrail: verified]';
-
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` (
-    `oee_daily_snapshot_id` BIGINT COMMENT '',
-    `plant_id` BIGINT COMMENT '',
-    `production_line_id` BIGINT COMMENT '',
-    `shift_id` BIGINT COMMENT 'Shift.',
-    `availability_pct` DECIMAL(18,2) COMMENT '',
-    `created_timestamp` TIMESTAMP COMMENT '',
-    `downtime_minutes` DECIMAL(18,2) COMMENT '',
-    `good_units` STRING COMMENT '',
-    `good_units_produced` STRING COMMENT 'Good units from production_confirmation.',
-    `oee_pct` DECIMAL(18,2) COMMENT '',
-    `performance_pct` DECIMAL(18,2) COMMENT '',
-    `planned_production_minutes` DECIMAL(18,2) COMMENT '',
-    `planned_production_time_minutes` DECIMAL(18,2) COMMENT 'Planned time.',
-    `quality_pct` DECIMAL(18,2) COMMENT '',
-    `snapshot_date` DATE COMMENT '',
-    `total_produced_units` STRING COMMENT '',
-    `total_units_produced` STRING COMMENT 'Units confirmed.',
-    `units_good` STRING COMMENT '',
-    `units_produced` STRING COMMENT '',
-    CONSTRAINT pk_oee_daily_snapshot PRIMARY KEY(`oee_daily_snapshot_id`)
-) COMMENT 'Pre-aggregated daily OEE snapshot (availability x performance x quality) derived from downtime_event and production_confirmation. [preservation_guardrail: verified]';
-
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` (
-    `equipment_effectiveness_metric_id` BIGINT COMMENT '',
-    `oee_daily_snapshot_id` BIGINT COMMENT '',
-    `plant_id` BIGINT COMMENT '',
-    `production_line_id` BIGINT COMMENT '',
-    `work_center_id` BIGINT COMMENT '',
-    `availability_pct` DECIMAL(18,2) COMMENT 'Availability.',
-    `created_timestamp` TIMESTAMP COMMENT '',
-    `metric_date` DATE COMMENT '',
-    `metric_name` STRING COMMENT '',
-    `metric_type` STRING COMMENT 'MTBF, MTTR, utilization, etc.',
-    `metric_unit` STRING COMMENT '',
-    `metric_value` DECIMAL(18,2) COMMENT '',
-    `performance_pct` DECIMAL(18,2) COMMENT 'Performance.',
-    `quality_pct` DECIMAL(18,2) COMMENT 'Quality.',
-    `unit_of_measure` STRING COMMENT '',
-    CONSTRAINT pk_equipment_effectiveness_metric PRIMARY KEY(`equipment_effectiveness_metric_id`)
-) COMMENT 'Equipment-level effectiveness metrics for OEE analytics. [preservation_guardrail: verified]';
+) COMMENT 'Master reference table for operator_team. Referenced by operator_team_id.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` (
     `manufacturing_packaging_specification_id` BIGINT COMMENT 'Primary key for packaging_specification',
     `packaging_specification_id` BIGINT COMMENT 'Self-referencing FK on packaging_specification (outer_packaging_specification_id)',
-    `packaging_specification_ssot_id` BIGINT COMMENT 'FK to SSOT owner engineering.packaging_specification for packaging_specification (resolves cross-domain duplicate).',
+    `packaging_specification_packaging_specification_id` BIGINT COMMENT 'SSOT reference to engineering.packaging_specification (cross-domain duplicate reconciliation; engineering designated SSOT owner for packaging_specification).',
     `vendor_id` BIGINT COMMENT 'FK to procurement.vendor',
     `packaging_vendor_id` BIGINT COMMENT 'Unique identifier of the packaging supplier.',
     `barcode_pattern` STRING COMMENT 'Pattern or format of the barcode (e.g., numeric length).',
@@ -1466,7 +1395,112 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_pack
     `weight_per_unit_kg` DECIMAL(18,2) COMMENT 'Weight of a single packaged unit.',
     `width_cm` DECIMAL(18,2) COMMENT 'External width of the package in centimeters.',
     CONSTRAINT pk_manufacturing_packaging_specification PRIMARY KEY(`manufacturing_packaging_specification_id`)
-) COMMENT 'Master reference table for packaging_specification. Referenced by packaging_specification_id. [preservation_guardrail: verified]';
+) COMMENT 'Master reference table for packaging_specification. Referenced by packaging_specification_id.';
+
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`energy_consumption_record` (
+    `energy_consumption_record_id` BIGINT COMMENT '',
+    `line_energy_meter_id` BIGINT COMMENT '',
+    `plant_id` BIGINT COMMENT '',
+    `production_line_id` BIGINT COMMENT '',
+    `cost_amount` DECIMAL(18,2) COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `currency_code` STRING COMMENT '',
+    `energy_kwh` DECIMAL(18,2) COMMENT '',
+    `energy_source` STRING COMMENT '',
+    `measurement_end_timestamp` TIMESTAMP COMMENT '',
+    `measurement_start_timestamp` TIMESTAMP COMMENT '',
+    `reading_date` DATE COMMENT '',
+    `renewable_flag` BOOLEAN COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
+    CONSTRAINT pk_energy_consumption_record PRIMARY KEY(`energy_consumption_record_id`)
+) COMMENT 'Energy consumption records per plant/line for ESG and energy tracking.';
+
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`co2_emission_record` (
+    `co2_emission_record_id` BIGINT COMMENT '',
+    `plant_id` BIGINT COMMENT '',
+    `production_line_id` BIGINT COMMENT '',
+    `calculation_method` STRING COMMENT '',
+    `co2_kg` DECIMAL(18,2) COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `emission_scope` STRING COMMENT '',
+    `emission_source` STRING COMMENT '',
+    `measurement_end_timestamp` TIMESTAMP COMMENT '',
+    `measurement_start_timestamp` TIMESTAMP COMMENT '',
+    `reading_date` DATE COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
+    CONSTRAINT pk_co2_emission_record PRIMARY KEY(`co2_emission_record_id`)
+) COMMENT 'CO2 emission records per plant/line for ESG carbon tracking.';
+
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`water_usage_record` (
+    `water_usage_record_id` BIGINT COMMENT '',
+    `plant_id` BIGINT COMMENT '',
+    `production_line_id` BIGINT COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `measurement_end_timestamp` TIMESTAMP COMMENT '',
+    `measurement_start_timestamp` TIMESTAMP COMMENT '',
+    `reading_date` DATE COMMENT '',
+    `recycled_flag` BOOLEAN COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
+    `water_liters` DECIMAL(18,2) COMMENT '',
+    `water_source` STRING COMMENT '',
+    CONSTRAINT pk_water_usage_record PRIMARY KEY(`water_usage_record_id`)
+) COMMENT 'Water usage records per plant/line for ESG water stewardship tracking.';
+
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` (
+    `line_energy_meter_id` BIGINT COMMENT '',
+    `plant_id` BIGINT COMMENT '',
+    `production_line_id` BIGINT COMMENT '',
+    `work_center_id` BIGINT COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `installation_date` DATE COMMENT '',
+    `last_calibration_date` DATE COMMENT '',
+    `meter_code` STRING COMMENT '',
+    `meter_status` STRING COMMENT '',
+    `meter_type` STRING COMMENT '',
+    `unit_of_measure` STRING COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
+    CONSTRAINT pk_line_energy_meter PRIMARY KEY(`line_energy_meter_id`)
+) COMMENT 'Energy meters installed on production lines for granular energy metering.';
+
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` (
+    `oee_daily_snapshot_id` BIGINT COMMENT '',
+    `plant_id` BIGINT COMMENT '',
+    `production_line_id` BIGINT COMMENT '',
+    `shift_id` BIGINT COMMENT '',
+    `work_center_id` BIGINT COMMENT '',
+    `availability_pct` DECIMAL(18,2) COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `downtime_minutes` DECIMAL(18,2) COMMENT '',
+    `good_units_produced` STRING COMMENT '',
+    `ideal_cycle_time_seconds` DECIMAL(18,2) COMMENT '',
+    `oee_pct` DECIMAL(18,2) COMMENT '',
+    `performance_pct` DECIMAL(18,2) COMMENT '',
+    `planned_production_time_minutes` DECIMAL(18,2) COMMENT '',
+    `quality_pct` DECIMAL(18,2) COMMENT '',
+    `scrap_units` STRING COMMENT '',
+    `snapshot_date` DATE COMMENT '',
+    `total_units_produced` STRING COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
+    CONSTRAINT pk_oee_daily_snapshot PRIMARY KEY(`oee_daily_snapshot_id`)
+) COMMENT 'Pre-aggregated daily OEE snapshot (availability x performance x quality) from downtime_event and production_confirmation.';
+
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` (
+    `equipment_effectiveness_metric_id` BIGINT COMMENT '',
+    `equipment_registry_id` BIGINT COMMENT '',
+    `plant_id` BIGINT COMMENT '',
+    `production_line_id` BIGINT COMMENT '',
+    `work_center_id` BIGINT COMMENT '',
+    `availability_pct` DECIMAL(18,2) COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `metric_date` DATE COMMENT '',
+    `mtbf_hours` DECIMAL(18,2) COMMENT '',
+    `mttr_hours` DECIMAL(18,2) COMMENT '',
+    `oee_pct` DECIMAL(18,2) COMMENT '',
+    `performance_pct` DECIMAL(18,2) COMMENT '',
+    `quality_pct` DECIMAL(18,2) COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
+    CONSTRAINT pk_equipment_effectiveness_metric PRIMARY KEY(`equipment_effectiveness_metric_id`)
+) COMMENT 'Equipment effectiveness metrics per equipment/work center for OEE analytics.';
 
 -- ========= FOREIGN KEYS =========
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ADD CONSTRAINT `fk_manufacturing_production_line_plant_id` FOREIGN KEY (`plant_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`plant`(`plant_id`);
@@ -1501,16 +1535,21 @@ ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ADD CONST
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ADD CONSTRAINT `fk_manufacturing_shift_factory_calendar_id` FOREIGN KEY (`factory_calendar_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`factory_calendar`(`factory_calendar_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ADD CONSTRAINT `fk_manufacturing_shift_plant_id` FOREIGN KEY (`plant_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`plant`(`plant_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ADD CONSTRAINT `fk_manufacturing_shift_production_line_id` FOREIGN KEY (`production_line_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_line`(`production_line_id`);
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ADD CONSTRAINT `fk_manufacturing_downtime_event_oee_daily_snapshot_id` FOREIGN KEY (`oee_daily_snapshot_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot`(`oee_daily_snapshot_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ADD CONSTRAINT `fk_manufacturing_downtime_event_plant_id` FOREIGN KEY (`plant_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`plant`(`plant_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ADD CONSTRAINT `fk_manufacturing_downtime_event_production_line_id` FOREIGN KEY (`production_line_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_line`(`production_line_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ADD CONSTRAINT `fk_manufacturing_downtime_event_production_order_id` FOREIGN KEY (`production_order_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_order`(`production_order_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ADD CONSTRAINT `fk_manufacturing_downtime_event_work_center_id` FOREIGN KEY (`work_center_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`work_center`(`work_center_id`);
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ADD CONSTRAINT `fk_manufacturing_manufacturing_bom_component_plant_id` FOREIGN KEY (`plant_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`plant`(`plant_id`);
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ADD CONSTRAINT `fk_manufacturing_manufacturing_bom_component_production_bom_id` FOREIGN KEY (`production_bom_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_bom`(`production_bom_id`);
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ADD CONSTRAINT `fk_manufacturing_manufacturing_bom_component_work_center_id` FOREIGN KEY (`work_center_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`work_center`(`work_center_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ADD CONSTRAINT `fk_manufacturing_material_consumption_plant_id` FOREIGN KEY (`plant_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`plant`(`plant_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ADD CONSTRAINT `fk_manufacturing_material_consumption_production_order_id` FOREIGN KEY (`production_order_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_order`(`production_order_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ADD CONSTRAINT `fk_manufacturing_material_consumption_work_center_id` FOREIGN KEY (`work_center_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`work_center`(`work_center_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ADD CONSTRAINT `fk_manufacturing_rework_order_plant_id` FOREIGN KEY (`plant_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`plant`(`plant_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ADD CONSTRAINT `fk_manufacturing_rework_order_production_order_id` FOREIGN KEY (`production_order_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_order`(`production_order_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ADD CONSTRAINT `fk_manufacturing_rework_order_work_center_id` FOREIGN KEY (`work_center_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`work_center`(`work_center_id`);
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ADD CONSTRAINT `fk_manufacturing_production_confirmation_oee_daily_snapshot_id` FOREIGN KEY (`oee_daily_snapshot_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot`(`oee_daily_snapshot_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ADD CONSTRAINT `fk_manufacturing_production_confirmation_plant_id` FOREIGN KEY (`plant_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`plant`(`plant_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ADD CONSTRAINT `fk_manufacturing_production_confirmation_reversed_confirmation_production_confirmation_id` FOREIGN KEY (`reversed_confirmation_production_confirmation_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_confirmation`(`production_confirmation_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ADD CONSTRAINT `fk_manufacturing_production_confirmation_shift_id` FOREIGN KEY (`shift_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`shift`(`shift_id`);
@@ -1560,1715 +1599,1704 @@ ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`water_usage_record` ADD CONSTR
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`water_usage_record` ADD CONSTRAINT `fk_manufacturing_water_usage_record_production_line_id` FOREIGN KEY (`production_line_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_line`(`production_line_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` ADD CONSTRAINT `fk_manufacturing_line_energy_meter_plant_id` FOREIGN KEY (`plant_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`plant`(`plant_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` ADD CONSTRAINT `fk_manufacturing_line_energy_meter_production_line_id` FOREIGN KEY (`production_line_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_line`(`production_line_id`);
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` ADD CONSTRAINT `fk_manufacturing_line_energy_meter_work_center_id` FOREIGN KEY (`work_center_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`work_center`(`work_center_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` ADD CONSTRAINT `fk_manufacturing_oee_daily_snapshot_plant_id` FOREIGN KEY (`plant_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`plant`(`plant_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` ADD CONSTRAINT `fk_manufacturing_oee_daily_snapshot_production_line_id` FOREIGN KEY (`production_line_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_line`(`production_line_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` ADD CONSTRAINT `fk_manufacturing_oee_daily_snapshot_shift_id` FOREIGN KEY (`shift_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`shift`(`shift_id`);
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` ADD CONSTRAINT `fk_manufacturing_equipment_effectiveness_metric_oee_daily_snapshot_id` FOREIGN KEY (`oee_daily_snapshot_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot`(`oee_daily_snapshot_id`);
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` ADD CONSTRAINT `fk_manufacturing_oee_daily_snapshot_work_center_id` FOREIGN KEY (`work_center_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`work_center`(`work_center_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` ADD CONSTRAINT `fk_manufacturing_equipment_effectiveness_metric_plant_id` FOREIGN KEY (`plant_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`plant`(`plant_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` ADD CONSTRAINT `fk_manufacturing_equipment_effectiveness_metric_production_line_id` FOREIGN KEY (`production_line_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`production_line`(`production_line_id`);
 ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` ADD CONSTRAINT `fk_manufacturing_equipment_effectiveness_metric_work_center_id` FOREIGN KEY (`work_center_id`) REFERENCES `vibe_automotive_v1`.`manufacturing`.`work_center`(`work_center_id`);
 
 -- ========= TAGS =========
-ALTER SCHEMA `vibe_automotive_v1`.`manufacturing` SET TAGS ('dbx_pii_division' = 'operations');
-ALTER SCHEMA `vibe_automotive_v1`.`manufacturing` SET TAGS ('dbx_pii_domain' = 'manufacturing');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `jurisdiction_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Jurisdiction Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Address Line 1');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Address Line 2');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `agv_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Automated Guided Vehicle (AGV) Enabled Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `annual_capacity_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Annual Production Capacity (Units)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `city` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant City');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `city` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `commissioning_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Commissioning Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `company_code` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Company Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `company_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,6}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{4,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `country_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Country Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `country_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `daily_capacity_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Daily Production Capacity (Units)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `eop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End of Production (EOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `epa_facility_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Environmental Protection Agency (EPA) Facility Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `epa_facility_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{1,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `floor_area_sqm` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Floor Area (Square Meters)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `iatf_16949_certified` SET TAGS ('dbx_pii_business_glossary_term' = 'IATF 16949 Automotive Quality Certification Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `iso_14001_certified` SET TAGS ('dbx_pii_business_glossary_term' = 'ISO 14001 Environmental Management Certification Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `iso_9001_certified` SET TAGS ('dbx_pii_business_glossary_term' = 'ISO 9001 Quality Management Certification Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Latitude');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Longitude');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `manager` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Manager Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `mes_plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Plant Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `mes_plant_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Za-z0-9_-]{1,50}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `model_year_current` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `model_year_current` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `plant_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `nhtsa_facility_code` SET TAGS ('dbx_pii_business_glossary_term' = 'National Highway Traffic Safety Administration (NHTSA) Facility Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `nhtsa_facility_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{1,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `number_of_assembly_lines` SET TAGS ('dbx_pii_business_glossary_term' = 'Number of Assembly Lines');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `number_of_shifts` SET TAGS ('dbx_pii_business_glossary_term' = 'Number of Production Shifts');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `operational_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Operational Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `operational_status` SET TAGS ('dbx_pii_value_regex' = 'active|idle|ramp_up|ramp_down|shutdown|decommissioned');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `ota_capable` SET TAGS ('dbx_pii_business_glossary_term' = 'Over-the-Air (OTA) Update Capable Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Phone Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_pii_phone' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `plant_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Postal Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `powertrain_types_produced` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Types Produced');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `powertrain_types_produced` SET TAGS ('dbx_pii_value_regex' = 'ice|ev|hev|phev|fcev|mixed');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `primary_vehicle_segment` SET TAGS ('dbx_pii_business_glossary_term' = 'Primary Vehicle Segment');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `region` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Region');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `scada_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Supervisory Control and Data Acquisition (SCADA) Enabled Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `short_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Short Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `short_name` SET TAGS ('dbx_pii_value_regex' = '^[A-Za-z0-9 ]{1,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `sop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production (SOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `state_province` SET TAGS ('dbx_pii_business_glossary_term' = 'State or Province');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `time_zone` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Time Zone');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `union_represented` SET TAGS ('dbx_pii_business_glossary_term' = 'Union Representation Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `workforce_headcount` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Workforce Headcount');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Line Manager Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Work Center Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `agv_integration_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Automated Guided Vehicle (AGV) Integration Enabled Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `automation_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Line Automation Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `automation_level` SET TAGS ('dbx_pii_value_regex' = 'manual|semi_automated|highly_automated|fully_automated');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `ckd_skd_capable` SET TAGS ('dbx_pii_business_glossary_term' = 'CKD/SKD Assembly Capability');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `ckd_skd_capable` SET TAGS ('dbx_pii_value_regex' = 'CKD|SKD|CBU|multi');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `conveyor_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Conveyor System Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `conveyor_type` SET TAGS ('dbx_pii_value_regex' = 'overhead_conveyor|floor_conveyor|skillet|agv_carrier|stationary|mixed');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `current_jph` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Actual Jobs Per Hour (JPH) Rate');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `designed_jph` SET TAGS ('dbx_pii_business_glossary_term' = 'Designed Jobs Per Hour (JPH) Throughput Rate');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `energy_consumption_kwh_per_unit` SET TAGS ('dbx_pii_business_glossary_term' = 'Energy Consumption per Unit (kWh)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `eop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End of Production (EOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `floor_space_sqm` SET TAGS ('dbx_pii_business_glossary_term' = 'Floor Space Area (Square Meters)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `iatf_audit_status` SET TAGS ('dbx_pii_business_glossary_term' = 'IATF 16949 Audit Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `iatf_audit_status` SET TAGS ('dbx_pii_value_regex' = 'compliant|minor_nc|major_nc|suspended|not_audited');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `jis_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-in-Sequence (JIS) Enabled Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `last_iatf_audit_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last IATF 16949 Audit Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `last_maintenance_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Planned Maintenance Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_length_meters` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Length (Meters)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Operational Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_status` SET TAGS ('dbx_pii_value_regex' = 'active|idle|maintenance|ramp_up|ramp_down|decommissioned');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `max_vehicle_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Vehicle Weight Capacity (kg)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `mes_line_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Line Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `mixed_model_capable` SET TAGS ('dbx_pii_business_glossary_term' = 'Mixed Model Production Capable Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `model_year_capability` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY) Capability Range');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `model_year_capability` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}(-[0-9]{4})?$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `next_maintenance_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Scheduled Maintenance Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `number_of_stations` SET TAGS ('dbx_pii_business_glossary_term' = 'Number of Work Stations');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `paint_booth_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Paint Booth Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `paint_booth_type` SET TAGS ('dbx_pii_value_regex' = 'waterborne|solventborne|powder_coat|none');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `plc_system_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Programmable Logic Controller (PLC) System Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `powertrain_type_capability` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type Capability');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `powertrain_type_capability` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV|multi');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `quality_gate_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Gate Count');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `robot_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Industrial Robot Count');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `safety_certification_expiry_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Certification Expiry Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `safety_certification_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Certification Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `safety_certification_status` SET TAGS ('dbx_pii_value_regex' = 'certified|expired|pending_renewal|not_required');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `scada_system_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Supervisory Control and Data Acquisition (SCADA) System Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `shift_configuration` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Configuration');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `shift_configuration` SET TAGS ('dbx_pii_value_regex' = '1_shift|2_shift|3_shift|4_shift_rotating');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `sop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production (SOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `vehicle_platform_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Platform Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `weld_gun_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Weld Gun Count');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Functional Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Supervisor ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_responsible_supervisor_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Supervisor ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_responsible_supervisor_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_responsible_supervisor_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `agv_integration_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Automated Guided Vehicle (AGV) Integration Enabled Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `automation_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Automation Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `automation_level` SET TAGS ('dbx_pii_value_regex' = 'fully_automated|highly_automated|semi_automated|manual|collaborative');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `available_capacity_hours_per_day` SET TAGS ('dbx_pii_business_glossary_term' = 'Available Capacity Hours Per Day');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `capacity_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Category');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `capacity_category` SET TAGS ('dbx_pii_value_regex' = 'bottleneck|standard|buffer|flexible');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center Category');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_category` SET TAGS ('dbx_pii_value_regex' = 'machine|labor|machine_labor|external');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `commissioning_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Commissioning Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `cycle_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Cycle Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `decommissioning_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Decommissioning Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `energy_consumption_kw` SET TAGS ('dbx_pii_business_glossary_term' = 'Energy Consumption (Kilowatts)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `floor_area_sqm` SET TAGS ('dbx_pii_business_glossary_term' = 'Floor Area (Square Meters)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `is_bottleneck` SET TAGS ('dbx_pii_business_glossary_term' = 'Bottleneck Station Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `is_jis_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-in-Sequence (JIS) Enabled Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `is_quality_gate` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Gate Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `labor_rate_per_hour` SET TAGS ('dbx_pii_business_glossary_term' = 'Labor Rate Per Hour');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `labor_rate_per_hour` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `last_calibration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Calibration Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `location_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Location Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `machine_rate_per_hour` SET TAGS ('dbx_pii_business_glossary_term' = 'Machine Rate Per Hour');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `machine_rate_per_hour` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `maintenance_strategy_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Maintenance Strategy Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `maintenance_strategy_code` SET TAGS ('dbx_pii_value_regex' = 'preventive|predictive|corrective|condition_based');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `mean_time_between_failures_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Mean Time Between Failures (MTBF) Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `mean_time_to_repair_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Mean Time to Repair (MTTR) Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `mes_work_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `next_calibration_due_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Calibration Due Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `number_of_shifts` SET TAGS ('dbx_pii_business_glossary_term' = 'Number of Shifts');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `number_of_workers` SET TAGS ('dbx_pii_business_glossary_term' = 'Number of Workers');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `overhead_rate_percent` SET TAGS ('dbx_pii_business_glossary_term' = 'Overhead Rate Percent');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `overhead_rate_percent` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `plc_node_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Programmable Logic Controller (PLC) Node ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `process_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Process Category');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `production_line_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `production_line_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `sap_work_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `scada_node_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Supervisory Control and Data Acquisition (SCADA) Node ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `setup_time_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Setup Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `shift_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `shift_model_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{1,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `standard_value_key` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Value Key');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `standard_value_key` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{1,6}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `teardown_time_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Teardown Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|under_maintenance|decommissioned|planned');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_type` SET TAGS ('dbx_pii_value_regex' = 'manual|automated|robotic|semi_automated|inspection|rework');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `configuration_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Configuration ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Party Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Gl Account Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `opportunity_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Opportunity Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `production_bom_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Profit Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `quote_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Quote Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `routing_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Routing ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Material ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `supply_purchase_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Purchase Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_cost` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Production Cost');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_cost` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_finish_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Production Finish Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_labor_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Labor Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_machine_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Machine Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Production Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `assembly_sequence_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Sequence Number (JIS)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `confirmed_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Confirmed Production Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `mes_order_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Order Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Creation Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{6,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_type` SET TAGS ('dbx_pii_value_regex' = 'vehicle_build|sub_assembly|rework|repair|prototype');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `planned_finish_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Production Finish Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `planned_labor_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Labor Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `planned_machine_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Machine Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `planned_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Production Start Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `ppap_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Part Approval Process (PPAP) Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `priority` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Priority');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `production_stage` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Stage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `production_stage` SET TAGS ('dbx_pii_value_regex' = 'stamping|body_shop|paint|final_assembly|powertrain|trim_chassis');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `quality_inspection_lot` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `release_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Release Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `rework_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `scrap_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `sop_indicator` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production (SOP) Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `standard_cost` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Production Cost');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `standard_cost` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `target_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Production Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `technical_completion_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Technical Completion Timestamp (TECO)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'EA|PC|SET|KG|L');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `vin_range_end` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN) Range End');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `vin_range_end` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `vin_range_start` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN) Range Start');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `vin_range_start` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `wip_posting_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Work in Progress (WIP) Posting Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `build_sequence_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Sequence ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `configuration_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Configuration ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `build_vehicle_config_configuration_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Configuration ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `actual_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Assembly End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `actual_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Assembly Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Stage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_pii_value_regex' = 'stamping|body_shop|paint|final_assembly|PDI');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `body_style_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Body Style Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `build_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `build_type` SET TAGS ('dbx_pii_value_regex' = 'retail|fleet|stock|pilot|homologation|press');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `customer_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer Order Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `dealer_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `destination_market_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Destination Market Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `destination_market_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `drive_configuration` SET TAGS ('dbx_pii_business_glossary_term' = 'Drive Configuration');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `drive_configuration` SET TAGS ('dbx_pii_value_regex' = 'FWD|RWD|AWD|4WD');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `exterior_color_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Exterior Color Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `freeze_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Sequence Freeze Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `interior_color_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Interior Color Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `is_frozen` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Sequence Frozen Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `is_priority_build` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Priority Build Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `jis_call_off_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-in-Sequence (JIS) Call-Off Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `mes_sequence_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'MES Sequence Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `option_package_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Option Package Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `planned_build_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Build Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `planned_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Assembly End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `planned_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Assembly Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `quality_hold_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Hold Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `regulatory_variant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Variant Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_change_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Sequence Change Reason');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-in-Sequence (JIS) Sequence Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_revision_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Sequence Revision Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_set_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Sequence Set Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Sequence Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_status` SET TAGS ('dbx_pii_value_regex' = 'planned|released|in_progress|completed|cancelled|on_hold');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Sequence Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_type` SET TAGS ('dbx_pii_value_regex' = 'initial|revised|emergency|resequenced');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Transmission Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_value_regex' = 'automatic|manual|CVT|DCT|single_speed');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `trim_level_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Trim Level Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vehicle_build_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Build Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_stage_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Stage Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `operator_team_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator Team ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Shift ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vehicle_ownership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Ownership Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `assembly_line_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Line Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `battery_serial_number` SET TAGS ('dbx_pii_business_glossary_term' = 'High-Voltage Battery Serial Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `body_shop_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Body Shop Stage End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `body_shop_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Body Shop Stage Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `body_style` SET TAGS ('dbx_pii_business_glossary_term' = 'Body Style');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `body_style` SET TAGS ('dbx_pii_value_regex' = 'sedan|suv|truck|van|coupe|convertible');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `bom_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Version');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Build End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_sequence_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Sequence Number (JIS)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Build Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_status` SET TAGS ('dbx_pii_value_regex' = 'in_progress|completed|on_hold|rework|scrapped|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_type` SET TAGS ('dbx_pii_value_regex' = 'standard|ckd|skd|pilot|prototype');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `chassis_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Chassis Assembly Stage End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `chassis_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Chassis Assembly Stage Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `end_of_line_test_result` SET TAGS ('dbx_pii_business_glossary_term' = 'End-of-Line (EOL) Test Result');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `end_of_line_test_result` SET TAGS ('dbx_pii_value_regex' = 'pass|fail|retest_required');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `engine_serial_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Engine Serial Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `final_assembly_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Final Assembly Stage End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `final_assembly_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Final Assembly Stage Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `hold_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Hold Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `hold_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Hold Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `homologation_market` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Market');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `paint_color_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Paint Color Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `paint_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Paint Stage End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `paint_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Paint Stage Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `quality_gate_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Gate Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `quality_gate_status` SET TAGS ('dbx_pii_value_regex' = 'pass|fail|conditional_pass|pending');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `rework_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Count');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `rework_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `scheduled_build_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Scheduled Build Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `sop_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production (SOP) Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `stamping_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Stamping Stage End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `stamping_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Stamping Stage Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `transmission_serial_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Transmission Serial Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `trim_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Trim Assembly Stage End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `trim_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Trim Assembly Stage Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `build_stage_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Stage ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supervisor Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `agv_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV (Automated Guided Vehicle) Enabled Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `applicable_vehicle_types` SET TAGS ('dbx_pii_business_glossary_term' = 'Applicable Vehicle Types');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `automation_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Automation Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `automation_level` SET TAGS ('dbx_pii_value_regex' = 'manual|semi-automated|fully-automated|robotic');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `buffer_capacity_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Buffer Capacity (Units)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `co2_emission_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard CO2 Emission (kg per Unit)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `control_plan_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Control Plan Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `control_plan_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{3,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `energy_consumption_kwh` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Energy Consumption (kWh per Unit)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `eop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'EOP (End of Production) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `fmea_reference_code` SET TAGS ('dbx_pii_business_glossary_term' = 'FMEA (Failure Mode and Effects Analysis) Reference Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `fmea_reference_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{3,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `hazmat_classification` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Materials (HazMat) Classification');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `hazmat_classification` SET TAGS ('dbx_pii_value_regex' = 'none|flammable|corrosive|toxic|oxidizer|environmental-hazard');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `iatf_process_category` SET TAGS ('dbx_pii_business_glossary_term' = 'IATF (International Automotive Task Force) Process Category');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `iatf_process_category` SET TAGS ('dbx_pii_value_regex' = 'special-characteristic|standard-process|critical-process|monitoring-only');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `is_quality_gate` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Gate Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `is_rework_eligible` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Eligible Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `labor_headcount_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Labor Headcount');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `max_temperature_c` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Process Temperature (Celsius)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `mes_stage_code` SET TAGS ('dbx_pii_business_glossary_term' = 'MES (Manufacturing Execution System) Stage ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `mes_stage_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `min_temperature_c` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Process Temperature (Celsius)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `model_year_applicability` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY) Applicability');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `model_year_applicability` SET TAGS ('dbx_pii_value_regex' = '^(MYd{4}(,MYd{4})*|ALL)$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `plant_area_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Area Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `plant_area_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_]{2,15}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `plc_program_code` SET TAGS ('dbx_pii_business_glossary_term' = 'PLC (Programmable Logic Controller) Program ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `plc_program_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{3,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `ppm_target` SET TAGS ('dbx_pii_business_glossary_term' = 'PPM (Parts Per Million) Defect Rate Target');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `preceding_stage_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Preceding Stage Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `preceding_stage_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `process_area` SET TAGS ('dbx_pii_business_glossary_term' = 'Process Area');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `quality_inspection_plan_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection Plan Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `quality_inspection_plan_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{3,25}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `safety_classification` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Classification');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `safety_classification` SET TAGS ('dbx_pii_value_regex' = 'standard|elevated-risk|critical-safety|restricted-access');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `sap_operation_code` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Operation Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `sap_operation_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{4,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `sequence_order` SET TAGS ('dbx_pii_business_glossary_term' = 'Stage Sequence Order');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `shift_pattern` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Pattern');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `shift_pattern` SET TAGS ('dbx_pii_value_regex' = 'single|double|triple|continuous');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `sop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'SOP (Start of Production) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `spc_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'SPC (Statistical Process Control) Enabled Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Stage Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Stage Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Stage Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Stage Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|pilot|suspended|decommissioned');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Stage Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_type` SET TAGS ('dbx_pii_value_regex' = 'assembly|fabrication|coating|inspection|testing|logistics');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `standard_cycle_time_sec` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Cycle Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `succeeding_stage_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Succeeding Stage Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `succeeding_stage_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `takt_time_sec` SET TAGS ('dbx_pii_business_glossary_term' = 'Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `work_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `work_center_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_floor_event_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Shop Floor Event ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment / Machine ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Shift ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_equipment_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment / Machine ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_operator_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_operator_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_operator_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `tooling_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Tool ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_tooling_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Tool ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN) ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `agv_unit_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Automated Guided Vehicle (AGV) Unit ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `agv_unit_code` SET TAGS ('dbx_pii_value_regex' = '^AGV-[A-Z0-9]{2,15}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `assembly_area` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Area');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Shop Floor Event Category');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_category` SET TAGS ('dbx_pii_value_regex' = 'production|quality|material|equipment|safety|logistics');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_duration_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Event Duration (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_payload` SET TAGS ('dbx_pii_business_glossary_term' = 'Event Payload (JSON)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_source_system` SET TAGS ('dbx_pii_business_glossary_term' = 'Event Source System');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Shop Floor Event Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_status` SET TAGS ('dbx_pii_value_regex' = 'open|confirmed|cancelled|on_hold|escalated');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Shop Floor Event Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Shop Floor Event Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `fault_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Fault / Alarm Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `fault_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `fault_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Fault / Alarm Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `hold_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Hold Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `hold_reason_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `is_rework` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `is_within_spec` SET TAGS ('dbx_pii_business_glossary_term' = 'Within Specification Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `lower_control_limit` SET TAGS ('dbx_pii_business_glossary_term' = 'Lower Control Limit (LCL)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `measured_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Measured Process Value');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `measured_value_unit` SET TAGS ('dbx_pii_business_glossary_term' = 'Measured Value Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `mes_event_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Event Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `mes_event_number` SET TAGS ('dbx_pii_value_regex' = '^MES-[A-Z0-9]{4,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `oee_loss_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Overall Equipment Effectiveness (OEE) Loss Category');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `oee_loss_category` SET TAGS ('dbx_pii_value_regex' = 'availability|performance|quality|no_loss');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `planned_cycle_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Cycle Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `process_step_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Process Step Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `process_step_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `production_line_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `production_line_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `program_number` SET TAGS ('dbx_pii_business_glossary_term' = 'PLC / Robot Program Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `program_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_.-]{2,40}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `quality_result` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Gate Result');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `quality_result` SET TAGS ('dbx_pii_value_regex' = 'pass|fail|rework|scrap|conditional_pass');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `rework_attempt_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Attempt Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `scrap_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `scrap_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `sequence_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-in-Sequence (JIS) Sequence Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `station_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Station Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `station_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `station_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Station Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `upper_control_limit` SET TAGS ('dbx_pii_business_glossary_term' = 'Upper Control Limit (UCL)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `vin_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `vin_number` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_inventory_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work-in-Progress (WIP) Inventory ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `inbound_shipment_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Inbound Shipment Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_internal' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `inspection_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `routing_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Routing ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_internal' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Material ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_internal' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_operator_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_operator_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_operator_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `actual_cycle_time_sec` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Cycle Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Stage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `bom_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Version');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `buffer_zone_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Buffer Zone Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `engineering_change_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change Number (ECN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `hold_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `inspection_result` SET TAGS ('dbx_pii_business_glossary_term' = 'Inspection Result');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `inspection_result` SET TAGS ('dbx_pii_value_regex' = 'pass|fail|conditional_pass|pending');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `is_rework_item` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Rework Item Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `location_entry_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Location Entry Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `location_exit_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Location Exit Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `mes_transaction_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Transaction ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `operation_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Operation End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `operation_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Operation Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `operation_number` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `operation_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Operation Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|EV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `priority_code` SET TAGS ('dbx_pii_business_glossary_term' = 'WIP Priority Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `priority_code` SET TAGS ('dbx_pii_value_regex' = 'NORMAL|HIGH|URGENT|EXPEDITE');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'WIP Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `record_created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `record_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `sap_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Production Order Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `sap_order_number` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{8,12}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `scheduled_completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Scheduled Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `scrap_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `sequence_number` SET TAGS ('dbx_pii_business_glossary_term' = 'JIS Sequence Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `snapshot_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'WIP Snapshot Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `standard_cycle_time_sec` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Cycle Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `sub_assembly_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Sub-Assembly ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `supplier_deviation_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Deviation Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UoM)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_record_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Work-in-Progress (WIP) Record Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_record_number` SET TAGS ('dbx_pii_value_regex' = '^WIP-[A-Z0-9]{3,6}-[0-9]{8}-[0-9]{6}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Work-in-Progress (WIP) Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_status` SET TAGS ('dbx_pii_value_regex' = 'in_process|on_hold|awaiting_inspection|scrapped|completed|rework');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_valuation_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'WIP Valuation Amount');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_valuation_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `production_schedule_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Schedule ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `billing_run_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Requirements Planning (MRP) Run ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `aftersales_nameplate_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Nameplate Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `model_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `actual_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Production Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Schedule Approved By');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Schedule Approval Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `assembly_process_stage` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Process Stage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `assembly_process_stage` SET TAGS ('dbx_pii_value_regex' = 'stamping|body_shop|paint|final_assembly|trim_chassis_final');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `available_capacity_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Available Production Capacity (Hours)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `body_style` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Body Style');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `body_style` SET TAGS ('dbx_pii_value_regex' = 'sedan|suv|truck|van|coupe|convertible');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `build_sequence_end` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Sequence End Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `build_sequence_start` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Sequence Start Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `build_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Build Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `build_type` SET TAGS ('dbx_pii_value_regex' = 'standard|ckd|skd|pilot|pre_series');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `calloff_transmission_time` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Call-Off Transmission Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `capacity_utilization_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Utilization Percentage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `confirmed_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Confirmed Production Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `eop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End of Production (EOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `fiscal_period` SET TAGS ('dbx_pii_business_glossary_term' = 'Fiscal Period');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Fiscal Year (FY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `freeze_horizon_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Schedule Freeze Horizon Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `is_frozen` SET TAGS ('dbx_pii_business_glossary_term' = 'Schedule Frozen Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `planned_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Production Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|EV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `regulatory_market` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Market / Destination Country');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_change_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Schedule Change Reason');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Schedule Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Schedule End Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Schedule Notes');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Master Production Schedule (MPS) Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_number` SET TAGS ('dbx_pii_value_regex' = '^MPS-[A-Z0-9]{3,10}-[0-9]{4}-[0-9]{6}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Schedule Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_status` SET TAGS ('dbx_pii_value_regex' = 'draft|released|frozen|in_execution|completed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Schedule Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_type` SET TAGS ('dbx_pii_value_regex' = 'daily|weekly|monthly');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Schedule Version Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `scheduled_end_time` SET TAGS ('dbx_pii_business_glossary_term' = 'Scheduled Production End Time');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `scheduled_start_time` SET TAGS ('dbx_pii_business_glossary_term' = 'Scheduled Production Start Time');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `shift_pattern` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Shift Pattern');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `shift_pattern` SET TAGS ('dbx_pii_value_regex' = 'single|double|triple|weekend');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `sop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production (SOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `supplier_calloff_generated` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Call-Off Generated Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `factory_calendar_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Factory Calendar ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `agv_active` SET TAGS ('dbx_pii_business_glossary_term' = 'Automated Guided Vehicle (AGV) Active Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `break_duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Break Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `break_schedule` SET TAGS ('dbx_pii_business_glossary_term' = 'Break Schedule Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `day_of_week_mask` SET TAGS ('dbx_pii_business_glossary_term' = 'Day of Week Mask');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `day_of_week_mask` SET TAGS ('dbx_pii_value_regex' = '^[01]{7}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `effective_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Effective Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `energy_consumption_target_kwh` SET TAGS ('dbx_pii_business_glossary_term' = 'Energy Consumption Target (kWh)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `eop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End of Production (EOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `expiry_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Expiry Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `gross_shift_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Gross Shift Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `handover_duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Handover Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `is_template` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Template Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `mes_shift_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Shift ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `mes_shift_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{1,50}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `number_of_breaks` SET TAGS ('dbx_pii_business_glossary_term' = 'Number of Scheduled Breaks');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `oee_target_percent` SET TAGS ('dbx_pii_business_glossary_term' = 'Overall Equipment Effectiveness (OEE) Target Percentage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `overtime_eligible` SET TAGS ('dbx_pii_business_glossary_term' = 'Overtime Eligible Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `pattern_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Pattern Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `pattern_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `planned_end_time` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Shift End Time');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `planned_production_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Production Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `planned_start_time` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Shift Start Time');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `premium_pay_rate` SET TAGS ('dbx_pii_business_glossary_term' = 'Premium Pay Rate Multiplier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `premium_pay_rate` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `production_model` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Shift Model');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `production_model` SET TAGS ('dbx_pii_value_regex' = 'single_shift|two_shift|three_shift|four_shift_continental');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `quality_inspection_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `sap_shift_code` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Shift Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `sap_shift_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_]{1,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `scada_zone_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Supervisory Control and Data Acquisition (SCADA) Zone Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `scada_zone_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{2,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `sequence_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Sequence Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|suspended|draft');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_type` SET TAGS ('dbx_pii_value_regex' = 'day|afternoon|night|weekend|overtime|shutdown');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `sop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production (SOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `supervisor_role_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Supervisor Role Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `supervisor_role_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_]{2,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `target_takt_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `target_units_per_shift` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Units Per Shift');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `timezone_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Timezone Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `workforce_headcount_target` SET TAGS ('dbx_pii_business_glossary_term' = 'Workforce Headcount Target');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_event_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Event ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Team ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `primary_equipment_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Reported By Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `affected_process_area` SET TAGS ('dbx_pii_business_glossary_term' = 'Affected Process Area');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `corrective_action_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Corrective Action Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code (ISO 4217)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Category');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_category` SET TAGS ('dbx_pii_value_regex' = 'mechanical_failure|tooling_change|material_shortage|quality_hold|scheduled_maintenance|changeover');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_type` SET TAGS ('dbx_pii_value_regex' = 'planned|unplanned');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `escalation_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Escalation Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `escalation_level` SET TAGS ('dbx_pii_value_regex' = 'none|supervisor|manager|plant_director');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Event Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Event Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Event Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_number` SET TAGS ('dbx_pii_value_regex' = '^DT-[0-9]{4}-[0-9]{6}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Event Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_status` SET TAGS ('dbx_pii_value_regex' = 'open|in_progress|resolved|closed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `failure_mode_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Failure Mode Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `fault_location_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Fault Location Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `is_quality_hold_triggered` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Quality Hold Triggered Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `is_repeat_failure` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Repeat Failure Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `is_safety_related` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Safety Related Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `maintenance_cost_local` SET TAGS ('dbx_pii_business_glossary_term' = 'Maintenance Cost (Local Currency)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `maintenance_cost_local` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `notification_number` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP PM Notification Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `oee_availability_loss_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'OEE Availability Loss Percentage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|EV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `production_loss_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Loss Units');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `resolution_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Resolution Notes');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `root_cause_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Root Cause Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `scada_alarm_code` SET TAGS ('dbx_pii_business_glossary_term' = 'SCADA Alarm Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `shift_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Shift Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `shift_code` SET TAGS ('dbx_pii_value_regex' = 'shift_1|shift_2|shift_3|weekend');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `spare_parts_consumed` SET TAGS ('dbx_pii_business_glossary_term' = 'Spare Parts Consumed Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `time_to_repair_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Time to Repair (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `time_to_respond_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Time to Respond (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `work_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Maintenance Work Order Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` SET TAGS ('dbx_pii_subdomain' = 'material_planning');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `production_bom_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Bill of Materials (BOM) ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `model_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Bill of Materials (eBOM) Reference ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `production_ebom_reference_bom_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Bill of Materials (eBOM) Reference ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Approval Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Approved By (User ID)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `apqp_phase` SET TAGS ('dbx_pii_business_glossary_term' = 'Advanced Product Quality Planning (APQP) Phase');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `apqp_phase` SET TAGS ('dbx_pii_value_regex' = 'phase_1|phase_2|phase_3|phase_4|phase_5');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `assembly_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `assembly_type` SET TAGS ('dbx_pii_value_regex' = 'CBU|CKD|SKD');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `base_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Base Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `base_unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Base Unit of Measure (UoM)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_alternative` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Alternative Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_level` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Level (Depth)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_status` SET TAGS ('dbx_pii_value_regex' = 'draft|released|frozen|superseded|obsolete');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_type` SET TAGS ('dbx_pii_value_regex' = 'production|phantom|sales|spare_parts|co_product');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_usage` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Usage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_usage` SET TAGS ('dbx_pii_value_regex' = 'production|engineering|universal|plant_maintenance|sales');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Version');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `change_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Change Reason');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `component_count` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Component Count');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `eco_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change Order (ECO) Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `effectivity_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Effectivity End Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `effectivity_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Effectivity Start Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `eop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End of Production (EOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `homologation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `homologation_status` SET TAGS ('dbx_pii_value_regex' = 'pending|in_progress|approved|rejected|expired');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `is_configurable` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Configurable BOM Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `is_phantom_assembly` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Phantom Assembly Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Modified Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `material_number` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Material Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `ppap_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Part Approval Process (PPAP) Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `ppap_status` SET TAGS ('dbx_pii_value_regex' = 'not_required|pending|submitted|approved|rejected');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `predecessor_bom_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Predecessor BOM Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `production_line_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `regulatory_market_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Market Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `release_date` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Release Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `released_by` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Released By (User ID)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `revision_level` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Revision Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `routing_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Routing Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `routing_number` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `routing_number` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `sop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production (SOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `superseded_by_bom_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Superseded By BOM Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `vehicle_configuration_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Configuration Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` SET TAGS ('dbx_pii_subdomain' = 'material_planning');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` SET TAGS ('dbx_pii_ssot_reference' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` SET TAGS ('dbx_pii_subdomain' = 'material_planning');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `material_consumption_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Consumption ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Confirmed By Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Material ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `assembly_station_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Station Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `bom_item_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Item Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `bom_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Version');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `consumption_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Consumption Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `consumption_status` SET TAGS ('dbx_pii_value_regex' = 'posted|reversed|blocked|pending');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `consumption_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Consumption Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `cost_variance_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Variance Amount');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `cost_variance_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `goods_movement_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Goods Movement Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `goods_movement_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Goods Movement Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `material_cost_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Cost Amount');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `material_cost_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `mes_transaction_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Transaction ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `operation_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Operation Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `original_goods_movement_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Original Goods Movement Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `planned_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Quantity (BOM)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `posting_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Posting Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|EV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `production_line_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `quality_inspection_lot` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection Lot');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `quantity_consumed` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity Consumed');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `quantity_variance` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity Variance');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `reversal_indicator` SET TAGS ('dbx_pii_business_glossary_term' = 'Reversal Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `scrap_indicator` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `scrap_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `shift_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `shift_code` SET TAGS ('dbx_pii_value_regex' = 'DAY|AFTERNOON|NIGHT');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `source_system_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Source System Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `source_system_code` SET TAGS ('dbx_pii_value_regex' = 'SAP_MM|MES_APRISO|SAP_PP|MANUAL');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `supplier_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UoM)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `variance_percentage` SET TAGS ('dbx_pii_business_glossary_term' = 'Variance Percentage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `vehicle_vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `vehicle_vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `wip_order_sequence` SET TAGS ('dbx_pii_business_glossary_term' = 'Work in Progress (WIP) Order Sequence');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` SET TAGS ('dbx_pii_subdomain' = 'material_planning');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Order ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `defect_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Defect ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Assigned Technician ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `actual_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Rework End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `actual_rework_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Rework Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `actual_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Rework Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `assembly_stage_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Stage Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `bom_component_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Component Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `corrective_action_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Corrective Action Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `defect_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Defect Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `defect_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `defect_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Defect Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `defect_location_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Defect Location Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `detection_method_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Detection Method Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `detection_method_code` SET TAGS ('dbx_pii_value_regex' = 'visual_inspection|automated_gauge|functional_test|audit_check|customer_feedback');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `detection_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Defect Detection Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `disposition_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Disposition Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `disposition_code` SET TAGS ('dbx_pii_value_regex' = 'repaired|scrapped|concession|use_as_is|return_to_supplier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `inspection_point_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Inspection Point Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `is_regulatory_hold` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Hold Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `is_safety_related` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety-Related Defect Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `line_stoppage_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Stoppage Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `planned_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Rework End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `planned_rework_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Rework Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `planned_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Rework Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Priority Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_value_regex' = 'critical|high|medium|low');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `production_line_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `re_inspection_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Re-Inspection Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `re_inspection_result` SET TAGS ('dbx_pii_business_glossary_term' = 'Re-Inspection Result');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `re_inspection_result` SET TAGS ('dbx_pii_value_regex' = 'pass|fail|conditional_pass|pending');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_attempt_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Attempt Count');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_instruction_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Instruction Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_labor_cost` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Labor Cost');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_labor_cost` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_material_cost` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Material Cost');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_material_cost` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Order Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_order_number` SET TAGS ('dbx_pii_value_regex' = '^RWK-[A-Z]{3}-[0-9]{4}-[0-9]{6}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_order_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Order Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_order_status` SET TAGS ('dbx_pii_value_regex' = 'open|in_progress|on_hold|completed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_type` SET TAGS ('dbx_pii_value_regex' = 'inline_repair|offline_rework|teardown|subassembly_rework|cosmetic_repair');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `root_cause_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Root Cause Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `scrap_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `source_system_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Source System Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `source_system_code` SET TAGS ('dbx_pii_value_regex' = 'SAP_QM|MES_APRISO|MES_DASSAULT|MANUAL');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_confirmation_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Confirmation ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_operator_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_operator_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_operator_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `reversed_confirmation_production_confirmation_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Reversed Confirmation ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `activity_type_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Activity Type Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `activity_type_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{4,6}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Stage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `base_unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Base Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{1,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_entry_mode` SET TAGS ('dbx_pii_business_glossary_term' = 'Confirmation Entry Mode');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_entry_mode` SET TAGS ('dbx_pii_value_regex' = 'manual|automatic|mes_interface|backflush');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Confirmation Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{10,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Confirmation Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_status` SET TAGS ('dbx_pii_value_regex' = 'created|posted|reversed|cancelled|partial|final');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Confirmation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Confirmation Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_type` SET TAGS ('dbx_pii_value_regex' = 'partial|final|automatic|milestone|reversal');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{4,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `downtime_duration_min` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `downtime_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `downtime_reason_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `final_confirmation_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Final Confirmation Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `goods_receipt_posted_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Goods Receipt Posted Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `labor_time_actual_min` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Labor Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `labor_time_planned_min` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Labor Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `machine_time_actual_min` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Machine Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `machine_time_planned_min` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Machine Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `material_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `material_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{1,40}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `mes_confirmation_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Confirmation Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `mes_confirmation_reference` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{1,50}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `operation_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Operation Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `operation_number` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `order_settlement_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Settlement Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `order_settlement_status` SET TAGS ('dbx_pii_value_regex' = 'pending|settled|partially_settled|not_required');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `posting_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Posting Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_order_number` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{8,12}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `quality_inspection_lot` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `quality_inspection_lot` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{12}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `reversal_indicator` SET TAGS ('dbx_pii_business_glossary_term' = 'Reversal Indicator');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `rework_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Rework Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `scrap_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `scrap_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `scrap_reason_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `setup_time_actual_min` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Setup Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `setup_time_planned_min` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Setup Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `storage_location_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `storage_location_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `takt_time_actual_sec` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `teardown_time_actual_min` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Teardown Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `yield_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Yield Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` SET TAGS ('dbx_pii_subdomain' = 'material_planning');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` ALTER COLUMN `manufacturing_tooling_usage_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Primary Key for manufacturing_tooling_usage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_internal' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_parameter_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Process Parameter ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment / Machine ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_equipment_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment / Machine ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_operator_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_operator_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_operator_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `tooling_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Tool ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_tooling_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Tool ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `vehicle_build_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Build ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Stage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `control_plan_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Control Plan Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `control_plan_revision` SET TAGS ('dbx_pii_business_glossary_term' = 'Control Plan Revision Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `data_collection_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Data Collection Method');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `data_collection_method` SET TAGS ('dbx_pii_value_regex' = 'automatic|semi_automatic|manual');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `deviation_from_nominal` SET TAGS ('dbx_pii_business_glossary_term' = 'Deviation from Nominal Value');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `gauge_calibration_due_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Gauge Calibration Due Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `is_out_of_control` SET TAGS ('dbx_pii_business_glossary_term' = 'Statistical Process Control (SPC) Out-of-Control Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `lower_control_limit` SET TAGS ('dbx_pii_business_glossary_term' = 'Lower Control Limit (LCL)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `lower_spec_limit` SET TAGS ('dbx_pii_business_glossary_term' = 'Lower Specification Limit (LSL)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `measured_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Measured Process Parameter Value');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `measurement_system_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Measurement System ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `mes_transaction_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Transaction ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `nominal_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Nominal (Target) Process Parameter Value');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `non_conformance_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Non-Conformance Report (NCR) Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `parameter_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Process Parameter Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `parameter_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_]{3,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `parameter_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Process Parameter Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `parameter_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Process Parameter Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `pass_fail_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Process Parameter Pass/Fail Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `pass_fail_status` SET TAGS ('dbx_pii_value_regex' = 'pass|fail|warning|rework_required|inconclusive');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `plc_tag_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Programmable Logic Controller (PLC) Tag ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `reaction_plan_triggered` SET TAGS ('dbx_pii_business_glossary_term' = 'Reaction Plan Triggered Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `reading_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Process Parameter Reading Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `record_created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `record_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `sample_number` SET TAGS ('dbx_pii_business_glossary_term' = 'SPC Sample Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `scada_system_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Supervisory Control and Data Acquisition (SCADA) System ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `shift_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Shift Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `shift_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{1,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `spc_rule_violated` SET TAGS ('dbx_pii_business_glossary_term' = 'Statistical Process Control (SPC) Rule Violated');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `subgroup_number` SET TAGS ('dbx_pii_business_glossary_term' = 'SPC Subgroup ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `upper_control_limit` SET TAGS ('dbx_pii_business_glossary_term' = 'Upper Control Limit (UCL)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `upper_spec_limit` SET TAGS ('dbx_pii_business_glossary_term' = 'Upper Specification Limit (USL)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_movement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Automated Guided Vehicle (AGV) Movement ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_route_id` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Route ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_controller_code` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Fleet Controller ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_unit_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Automated Guided Vehicle (AGV) Unit ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_unit_code` SET TAGS ('dbx_pii_value_regex' = '^AGV-[A-Z0-9]{3,12}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Stage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_pii_value_regex' = 'stamping|body_shop|paint|trim|chassis|final_assembly');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `average_speed_mps` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Average Speed (Metres per Second)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `battery_level_end_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Battery Level at Movement End (Percentage)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `battery_level_start_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Battery Level at Movement Start (Percentage)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `destination_location_code` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Destination Location Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `destination_location_name` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Destination Location Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `distance_travelled_m` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Distance Travelled (Metres)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `fault_code` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Fault Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `fault_description` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Fault Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `fault_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Fault Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `is_manual_override` SET TAGS ('dbx_pii_business_glossary_term' = 'Manual Override Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `jis_call_off_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-in-Sequence (JIS) Call-Off Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `load_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Load Weight (Kilograms)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `mes_task_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Task ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Movement End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Movement Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_status` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Movement Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_status` SET TAGS ('dbx_pii_value_regex' = 'in_progress|completed|aborted|faulted|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_type` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Movement Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_type` SET TAGS ('dbx_pii_value_regex' = 'load|transport|unload|charge|idle|fault');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `origin_location_code` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Origin Location Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `origin_location_name` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Origin Location Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `part_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `planned_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Planned Movement End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `planned_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Planned Movement Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Movement Priority Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_value_regex' = 'critical|high|normal|low');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `quantity_transported` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity Transported');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `route_deviation_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Route Deviation Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `source_system_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Source System ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Plan ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Bottleneck Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plan Owner ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plan Owner ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `available_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Available Production Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `bottleneck_constraint_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Bottleneck Constraint Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_gap_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Gap Units');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Plan Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_type` SET TAGS ('dbx_pii_value_regex' = 'rough_cut|detailed|constraint_based|what_if');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_utilization_percent` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Utilization Percentage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capex_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Capital Expenditure (CapEx) Amount');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capex_amount` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capex_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Capital Expenditure (CapEx) Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `changeover_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Changeover Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `daily_production_target` SET TAGS ('dbx_pii_business_glossary_term' = 'Daily Production Target (Units)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `demonstrated_capacity_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Demonstrated Capacity Units');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `eop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End of Production (EOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Fiscal Year (FY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_pii_value_regex' = '^FY[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `headcount_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Headcount Required');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `is_bottleneck_constrained` SET TAGS ('dbx_pii_business_glossary_term' = 'Bottleneck Constrained Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `number_of_shifts` SET TAGS ('dbx_pii_business_glossary_term' = 'Number of Shifts');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Plan End Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Plan Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_number` SET TAGS ('dbx_pii_value_regex' = '^CP-[A-Z0-9]{3,6}-[0-9]{4}-[0-9]{2}-[0-9]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Plan Start Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Plan Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_status` SET TAGS ('dbx_pii_value_regex' = 'draft|submitted|approved|active|superseded|archived');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Plan Version');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_version` SET TAGS ('dbx_pii_value_regex' = '^v[0-9]{1,3}.[0-9]{1,2}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planned_downtime_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Downtime Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planned_maintenance_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Maintenance Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planned_overtime_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Overtime Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planned_production_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Production Units');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planning_period_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Planning Period Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planning_period_type` SET TAGS ('dbx_pii_value_regex' = 'weekly|monthly|quarterly|annual');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planning_scenario` SET TAGS ('dbx_pii_business_glossary_term' = 'Planning Scenario');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planning_scenario` SET TAGS ('dbx_pii_value_regex' = 'base|optimistic|pessimistic|stretch');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `rated_capacity_jph` SET TAGS ('dbx_pii_business_glossary_term' = 'Rated Capacity Jobs Per Hour (JPH)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `rated_capacity_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Rated Capacity Units');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `sap_capacity_plan_code` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Capacity Plan ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `sop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production (SOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `working_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Working Days');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Changeover ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supervisor ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Changeover Team ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supervisor ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `shift_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `actual_duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Changeover Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `actual_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Changeover End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `actual_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Changeover Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `agv_intervention_required` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV (Automated Guided Vehicle) Intervention Required');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Stage');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_pii_value_regex' = 'stamping|body_shop|paint|trim|chassis|final_assembly');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Changeover Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_number` SET TAGS ('dbx_pii_value_regex' = '^CO-[A-Z0-9]{3,6}-[0-9]{8}-[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Changeover Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_status` SET TAGS ('dbx_pii_value_regex' = 'scheduled|in_progress|completed|cancelled|aborted');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Changeover Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_type` SET TAGS ('dbx_pii_value_regex' = 'model_mix_change|color_change|tooling_swap|line_retooling|powertrain_variant|body_style_change');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `delay_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Changeover Delay Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `external_elements_duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'External Changeover Elements Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `first_good_unit_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'First Good Unit Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_body_style_code` SET TAGS ('dbx_pii_business_glossary_term' = 'From Body Style Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_body_style_code` SET TAGS ('dbx_pii_value_regex' = 'sedan|suv|truck|coupe|hatchback|van');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_exterior_color_code` SET TAGS ('dbx_pii_business_glossary_term' = 'From Exterior Color Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'From Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'From Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `internal_elements_duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Internal Changeover Elements Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `is_planned` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Planned Changeover');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `is_smed_target` SET TAGS ('dbx_pii_business_glossary_term' = 'Is SMED (Single-Minute Exchange of Die) Target');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `line_verification_duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Line Verification Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `mes_changeover_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'MES (Manufacturing Execution System) Changeover Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_value_regex' = '^[0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `planned_duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Changeover Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `planned_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Changeover End Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `planned_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Changeover Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `production_loss_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Loss Units');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `quality_gate_passed` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Gate Passed');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Changeover Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `reason_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Changeover Reason Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `sap_order_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Production Order Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `scrap_units_during_changeover` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Units During Changeover');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_body_style_code` SET TAGS ('dbx_pii_business_glossary_term' = 'To Body Style Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_body_style_code` SET TAGS ('dbx_pii_value_regex' = 'sedan|suv|truck|coupe|hatchback|van');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_exterior_color_code` SET TAGS ('dbx_pii_business_glossary_term' = 'To Exterior Color Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'To Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'To Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `tooling_change_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Tooling Change Required');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `tooling_setup_duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Tooling Setup Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `variance_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Changeover Duration Variance (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` SET TAGS ('dbx_pii_subdomain' = 'material_planning');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `production_variant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Variant Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `model_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `production_bom_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `routing_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Routing ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `adas_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Advanced Driver Assistance Systems (ADAS) Automation Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `adas_level` SET TAGS ('dbx_pii_value_regex' = 'L0|L1|L2|L2_PLUS|L3');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `assembly_complexity_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Complexity Score');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `battery_capacity_kwh` SET TAGS ('dbx_pii_business_glossary_term' = 'Battery Capacity (kWh)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `body_style_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Body Style Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `body_style_code` SET TAGS ('dbx_pii_value_regex' = 'SEDAN|SUV|TRUCK|COUPE|HATCHBACK|MINIVAN');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `co2_emission_g_per_km` SET TAGS ('dbx_pii_business_glossary_term' = 'CO2 Emission (g/km)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `destination_market_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Destination Market Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `destination_market_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `drive_configuration` SET TAGS ('dbx_pii_business_glossary_term' = 'Drive Configuration');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `drive_configuration` SET TAGS ('dbx_pii_value_regex' = 'FWD|RWD|AWD|4WD');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `engine_displacement_cc` SET TAGS ('dbx_pii_business_glossary_term' = 'Engine Displacement (cc)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `engineering_change_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `engineering_change_level` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{1,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `eop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End of Production (EOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `fuel_economy_mpg` SET TAGS ('dbx_pii_business_glossary_term' = 'Fuel Economy (MPG)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `gross_vehicle_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Gross Vehicle Weight (kg)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `hand_of_drive` SET TAGS ('dbx_pii_business_glossary_term' = 'Hand of Drive');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `hand_of_drive` SET TAGS ('dbx_pii_value_regex' = 'LHD|RHD');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `homologation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `homologation_status` SET TAGS ('dbx_pii_value_regex' = 'PENDING|CERTIFIED|CONDITIONAL|EXPIRED|NOT_REQUIRED');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `is_ckd_eligible` SET TAGS ('dbx_pii_business_glossary_term' = 'Completely Knocked Down (CKD) Eligibility Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `is_jis_eligible` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-in-Sequence (JIS) Eligibility Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `is_line_compatible` SET TAGS ('dbx_pii_business_glossary_term' = 'Line Compatibility Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `is_ota_capable` SET TAGS ('dbx_pii_business_glossary_term' = 'Over-the-Air (OTA) Update Capable Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `max_consecutive_builds` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Consecutive Builds');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `mes_variant_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Variant Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `mes_variant_reference` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{3,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `ncap_safety_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'New Car Assessment Programme (NCAP) Safety Rating');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `ncap_safety_rating` SET TAGS ('dbx_pii_value_regex' = '1_STAR|2_STAR|3_STAR|4_STAR|5_STAR|NOT_RATED');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `option_package_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Option Package Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `option_package_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,15}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `paint_process_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Paint Process Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `paint_process_type` SET TAGS ('dbx_pii_value_regex' = 'STANDARD|METALLIC|PEARL|MATTE|TWO_TONE');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `ppap_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Part Approval Process (PPAP) Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `ppap_status` SET TAGS ('dbx_pii_value_regex' = 'NOT_REQUIRED|PENDING|SUBMITTED|APPROVED|REJECTED');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `regulatory_region` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Region');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `regulatory_region` SET TAGS ('dbx_pii_value_regex' = 'NAFTA|EU|APAC|LATAM|MEA|CHINA');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `sap_material_number` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Material Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `sap_material_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{8,18}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `sop_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production (SOP) Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `standard_build_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Build Hours');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Takt Time (Seconds)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `teamcenter_variant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Siemens Teamcenter PLM Variant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `teamcenter_variant_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9-]{5,30}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Transmission Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_value_regex' = 'AUTOMATIC|MANUAL|CVT|DCT|SINGLE_SPEED');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `trim_level_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Trim Level Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `trim_level_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{1,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `v2x_capable` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle-to-Everything (V2X) Communication Capable Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `variant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Variant Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `variant_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{4,20}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `variant_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Variant Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `variant_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Variant Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `variant_status` SET TAGS ('dbx_pii_value_regex' = 'ACTIVE|INACTIVE|PLANNED|DISCONTINUED|ON_HOLD');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,10}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `wltp_range_km` SET TAGS ('dbx_pii_business_glossary_term' = 'Worldwide Harmonised Light Vehicles Test Procedure (WLTP) Range (km)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Record ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Authorizing Employee ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `defect_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Defect ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `work_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `assembly_stage_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Stage Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `bom_component_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials (BOM) Component Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `co2_impact_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Carbon Dioxide (CO2) Impact (kg)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `corrective_action_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Corrective Action Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `detection_method_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Detection Method Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `disposal_method_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Disposal Method Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `disposal_method_code` SET TAGS ('dbx_pii_value_regex' = 'RECYCLE|LANDFILL|REWORK|RETURN_SUPPLIER|INCINERATE|RESALE');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `disposal_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Disposal Authorization Reference');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `inspection_point_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Inspection Point Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `is_hazardous_material` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `is_safety_related` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety-Related Component Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `is_warranty_relevant` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Relevance Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `mes_transaction_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Execution System (MES) Transaction ID');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `ppm_contribution` SET TAGS ('dbx_pii_business_glossary_term' = 'Parts Per Million (PPM) Defect Contribution');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `production_line_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `root_cause_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Root Cause Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `salvage_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Salvage Value');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `salvage_value` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `sap_movement_type` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Goods Movement Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `sap_movement_type` SET TAGS ('dbx_pii_value_regex' = '551|552|553|554');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `sap_posting_document_number` SET TAGS ('dbx_pii_business_glossary_term' = 'SAP Financial Posting Document Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Category');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_category` SET TAGS ('dbx_pii_value_regex' = 'process|material|design|tooling|supplier|operator_error');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_document_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Document Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_document_number` SET TAGS ('dbx_pii_value_regex' = '^SCR-[0-9]{4}-[0-9]{8}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Quantity');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_reason_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Reason Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Record Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_status` SET TAGS ('dbx_pii_value_regex' = 'pending|confirmed|disposed|reversed|under_review');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Event Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Value');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_value` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `shift_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `shift_code` SET TAGS ('dbx_pii_value_regex' = 'D|A|N|E');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `supplier_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UoM)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Weight (kg)');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` SET TAGS ('dbx_pii_data_type' = 'association_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` SET TAGS ('dbx_pii_subdomain' = 'supplier_integration');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` SET TAGS ('dbx_pii_association_edges' = 'manufacturing.plant,procurement.supplier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `manufacturing_supply_agreement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplyagreement - Supply Agreement Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `manufacturing_packaging_specification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Packaging Spec');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplyagreement - Plant Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplyagreement - Supplier Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `freight_terms` SET TAGS ('dbx_pii_business_glossary_term' = 'Freight Terms');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `is_preferred_supplier` SET TAGS ('dbx_pii_business_glossary_term' = 'Preferred Supplier Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `manufacturing_supply_agreement_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Agreement Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `minimum_order_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Order Qty');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `quality_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Rating');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `shipping_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Shipping Method');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` SET TAGS ('dbx_pii_data_type' = 'association_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` SET TAGS ('dbx_pii_subdomain' = 'supplier_integration');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` SET TAGS ('dbx_pii_association_edges' = 'manufacturing.vehicle_build,mobility.mobility_service');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `vehicle_mobility_subscription_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehiclemobilitysubscription - Vehicle Mobility Subscription Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `mobility_service_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehiclemobilitysubscription - Mobility Service Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `service_tier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Tier Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `vehicle_build_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehiclemobilitysubscription - Vehicle Build Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `billing_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Billing Amount');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `subscription_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Subscription End Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `subscription_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Subscription Start Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `vehicle_mobility_subscription_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Subscription Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` SET TAGS ('dbx_pii_data_type' = 'association_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` SET TAGS ('dbx_pii_subdomain' = 'supplier_integration');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` SET TAGS ('dbx_pii_association_edges' = 'manufacturing.production_order,compliance.regulatory_requirement');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `compliance_certification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliancecertification - Compliance Certification Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliancecertification - Production Order Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `regulatory_requirement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliancecertification - Regulatory Requirement Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `certification_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Certification Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `evidence_document_path` SET TAGS ('dbx_pii_business_glossary_term' = 'Evidence Document');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` SET TAGS ('dbx_pii_data_type' = 'association_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` SET TAGS ('dbx_pii_subdomain' = 'supplier_integration');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` SET TAGS ('dbx_pii_association_edges' = 'manufacturing.production_order,dealer.dealership');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `production_order_allocation_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Allocation - Allocation Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Allocation - Dealership Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order Allocation - Production Order Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `allocation_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `allocation_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `allocation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `allocation_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `priority_tier` SET TAGS ('dbx_pii_business_glossary_term' = 'Priority Tier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `agv_route_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Agv Route Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `agv_start_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Start Location Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `reverse_agv_route_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Reverse Agv Route Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `reverse_agv_route_id` SET TAGS ('dbx_pii_self_ref_fk' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'End Location Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `allowed_load_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Allowed Load Kg');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `energy_consumption_kwh_per_cycle` SET TAGS ('dbx_pii_business_glossary_term' = 'Energy Consumption Kwh Per Cycle');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `estimated_cycle_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Estimated Cycle Time Seconds');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `is_bidirectional` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Bidirectional');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `is_dynamic_route` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Dynamic Route');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `last_inspection_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Inspection Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `maintenance_window` SET TAGS ('dbx_pii_business_glossary_term' = 'Maintenance Window');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `max_speed_m_per_s` SET TAGS ('dbx_pii_business_glossary_term' = 'Max Speed M Per S');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Priority Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `route_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Route Category');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `route_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Route Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `route_length_meters` SET TAGS ('dbx_pii_business_glossary_term' = 'Route Length Meters');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `route_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Route Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `route_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Route Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `route_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Route Version');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `safety_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Rating');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `agv_route_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `waypoint_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Waypoint Count');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` SET TAGS ('dbx_pii_subdomain' = 'material_planning');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `routing_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Routing Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `alternate_routing_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Alternate Routing Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `alternate_routing_id` SET TAGS ('dbx_pii_self_ref_fk' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `change_approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Approved By');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `change_approved_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Approved Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `change_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Reason');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `routing_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Routing Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Standard');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `routing_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `is_default` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Default');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `material_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `operation_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Operation Count');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `product_family` SET TAGS ('dbx_pii_business_glossary_term' = 'Product Family');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `quality_check_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Check Required');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `reviewed_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Reviewed By');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `route_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Route Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `routing_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Routing Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `routing_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Routing Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `safety_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `total_cycle_time_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Cycle Time Minutes');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `work_center` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Center');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `factory_calendar_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Factory Calendar Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `base_factory_calendar_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Base Factory Calendar Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `base_factory_calendar_id` SET TAGS ('dbx_pii_self_ref_fk' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `calendar_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Calendar Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `calendar_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Calendar Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `calendar_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Calendar Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `day_of_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Day Of Year');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `factory_calendar_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Fiscal Year');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `is_holiday` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Holiday');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `is_work_day` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Work Day');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `plant_location` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Location');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `shift_pattern` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift Pattern');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `factory_calendar_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `timezone` SET TAGS ('dbx_pii_business_glossary_term' = 'Timezone');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `week_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Week Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `operator_team_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Operator Team Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Employee Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Location Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `parent_operator_team_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Parent Operator Team Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `parent_operator_team_id` SET TAGS ('dbx_pii_self_ref_fk' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `production_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `average_cycle_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Average Cycle Time Seconds');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `average_experience_years` SET TAGS ('dbx_pii_business_glossary_term' = 'Average Experience Years');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `operator_team_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `downtime_minutes_last_month` SET TAGS ('dbx_pii_business_glossary_term' = 'Downtime Minutes Last Month');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `is_overtime_allowed` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Overtime Allowed');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `last_safety_audit_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Safety Audit Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `member_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Member Count');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `operator_team_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `overtime_rate_multiplier` SET TAGS ('dbx_pii_business_glossary_term' = 'Overtime Rate Multiplier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `quality_defect_rate_pct` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Defect Rate Pct');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `safety_training_completed` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Training Completed');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `shift` SET TAGS ('dbx_pii_business_glossary_term' = 'Shift');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `skill_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Skill Level');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `operator_team_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `team_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Team Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `team_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Team Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `total_output_units_last_month` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Output Units Last Month');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `work_order_capacity_per_shift` SET TAGS ('dbx_pii_business_glossary_term' = 'Work Order Capacity Per Shift');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`energy_consumption_record` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`energy_consumption_record` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`energy_consumption_record` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`energy_consumption_record` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`co2_emission_record` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`co2_emission_record` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`co2_emission_record` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`co2_emission_record` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`water_usage_record` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`water_usage_record` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`water_usage_record` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`water_usage_record` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` SET TAGS ('dbx_pii_subdomain' = 'facility_management');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` SET TAGS ('dbx_pii_subdomain' = 'execution_control');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` SET TAGS ('dbx_pii_subdomain' = 'material_planning');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Packaging Specification Identifier');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_specification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Outer Packaging Specification Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_specification_id` SET TAGS ('dbx_pii_self_ref_fk' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `vendor_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Vendor Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `vendor_id` SET TAGS ('dbx_pii_internal' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_vendor_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vendor Id');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `barcode_pattern` SET TAGS ('dbx_pii_business_glossary_term' = 'Barcode Pattern');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `barcode_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Barcode Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Code');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `default_package_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Default Package Weight Kg');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Description');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `disposal_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Disposal Method');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `height_cm` SET TAGS ('dbx_pii_business_glossary_term' = 'Height Cm');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `length_cm` SET TAGS ('dbx_pii_business_glossary_term' = 'Length Cm');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `material_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `max_load_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Max Load Kg');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Name');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_color` SET TAGS ('dbx_pii_business_glossary_term' = 'Packaging Color');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_cost_usd` SET TAGS ('dbx_pii_business_glossary_term' = 'Packaging Cost Usd');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_shape` SET TAGS ('dbx_pii_business_glossary_term' = 'Packaging Shape');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `recyclable_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Recyclable Flag');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `regulatory_compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Status');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `temperature_range_c` SET TAGS ('dbx_pii_business_glossary_term' = 'Temperature Range C');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Type');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `units_per_carton` SET TAGS ('dbx_pii_business_glossary_term' = 'Units Per Carton');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `units_per_pallet` SET TAGS ('dbx_pii_business_glossary_term' = 'Units Per Pallet');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `volume_per_unit_cubic_m` SET TAGS ('dbx_pii_business_glossary_term' = 'Volume Per Unit Cubic M');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `weight_per_unit_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight Per Unit Kg');
-ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `width_cm` SET TAGS ('dbx_pii_business_glossary_term' = 'Width Cm');
+ALTER SCHEMA `vibe_automotive_v1`.`manufacturing` SET TAGS ('dbx_division' = 'operations');
+ALTER SCHEMA `vibe_automotive_v1`.`manufacturing` SET TAGS ('dbx_domain' = 'manufacturing');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `jurisdiction_id` SET TAGS ('dbx_business_glossary_term' = 'Jurisdiction Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line1` SET TAGS ('dbx_business_glossary_term' = 'Plant Address Line 1');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line1` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line2` SET TAGS ('dbx_business_glossary_term' = 'Plant Address Line 2');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line2` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `agv_enabled` SET TAGS ('dbx_business_glossary_term' = 'Automated Guided Vehicle (AGV) Enabled Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `annual_capacity_units` SET TAGS ('dbx_business_glossary_term' = 'Annual Production Capacity (Units)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `annual_capacity_units` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `city` SET TAGS ('dbx_business_glossary_term' = 'Plant City');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `city` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `plant_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `commissioning_date` SET TAGS ('dbx_business_glossary_term' = 'Plant Commissioning Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `company_code` SET TAGS ('dbx_business_glossary_term' = 'SAP Company Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `company_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,6}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `country_code` SET TAGS ('dbx_business_glossary_term' = 'Country Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `daily_capacity_units` SET TAGS ('dbx_business_glossary_term' = 'Daily Production Capacity (Units)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `daily_capacity_units` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `eop_date` SET TAGS ('dbx_business_glossary_term' = 'End of Production (EOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `epa_facility_code` SET TAGS ('dbx_business_glossary_term' = 'Environmental Protection Agency (EPA) Facility Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `epa_facility_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `floor_area_sqm` SET TAGS ('dbx_business_glossary_term' = 'Plant Floor Area (Square Meters)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `iatf_16949_certified` SET TAGS ('dbx_business_glossary_term' = 'IATF 16949 Automotive Quality Certification Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `iso_14001_certified` SET TAGS ('dbx_business_glossary_term' = 'ISO 14001 Environmental Management Certification Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `iso_9001_certified` SET TAGS ('dbx_business_glossary_term' = 'ISO 9001 Quality Management Certification Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `latitude` SET TAGS ('dbx_business_glossary_term' = 'Plant Latitude');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `latitude` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `longitude` SET TAGS ('dbx_business_glossary_term' = 'Plant Longitude');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `longitude` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `manager` SET TAGS ('dbx_business_glossary_term' = 'Plant Manager Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `mes_plant_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Plant Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `mes_plant_code` SET TAGS ('dbx_value_regex' = '^[A-Za-z0-9_-]{1,50}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `model_year_current` SET TAGS ('dbx_business_glossary_term' = 'Current Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `model_year_current` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `plant_name` SET TAGS ('dbx_business_glossary_term' = 'Plant Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `nhtsa_facility_code` SET TAGS ('dbx_business_glossary_term' = 'National Highway Traffic Safety Administration (NHTSA) Facility Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `nhtsa_facility_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `number_of_assembly_lines` SET TAGS ('dbx_business_glossary_term' = 'Number of Assembly Lines');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `number_of_shifts` SET TAGS ('dbx_business_glossary_term' = 'Number of Production Shifts');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `operational_status` SET TAGS ('dbx_business_glossary_term' = 'Plant Operational Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `operational_status` SET TAGS ('dbx_value_regex' = 'active|idle|ramp_up|ramp_down|shutdown|decommissioned');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `ota_capable` SET TAGS ('dbx_business_glossary_term' = 'Over-the-Air (OTA) Update Capable Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `phone_number` SET TAGS ('dbx_business_glossary_term' = 'Plant Phone Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `phone_number` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `phone_number` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `plant_type` SET TAGS ('dbx_business_glossary_term' = 'Plant Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `postal_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Postal Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `postal_code` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `powertrain_types_produced` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Types Produced');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `powertrain_types_produced` SET TAGS ('dbx_value_regex' = 'ice|ev|hev|phev|fcev|mixed');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `primary_vehicle_segment` SET TAGS ('dbx_business_glossary_term' = 'Primary Vehicle Segment');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `region` SET TAGS ('dbx_business_glossary_term' = 'Plant Region');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `scada_enabled` SET TAGS ('dbx_business_glossary_term' = 'Supervisory Control and Data Acquisition (SCADA) Enabled Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `short_name` SET TAGS ('dbx_business_glossary_term' = 'Plant Short Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `short_name` SET TAGS ('dbx_value_regex' = '^[A-Za-z0-9 ]{1,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `sop_date` SET TAGS ('dbx_business_glossary_term' = 'Start of Production (SOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `state_province` SET TAGS ('dbx_business_glossary_term' = 'State or Province');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `state_province` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `time_zone` SET TAGS ('dbx_business_glossary_term' = 'Plant Time Zone');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `union_represented` SET TAGS ('dbx_business_glossary_term' = 'Union Representation Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`plant` ALTER COLUMN `workforce_headcount` SET TAGS ('dbx_business_glossary_term' = 'Plant Workforce Headcount');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Line Manager Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'SAP Work Center Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `agv_integration_enabled` SET TAGS ('dbx_business_glossary_term' = 'Automated Guided Vehicle (AGV) Integration Enabled Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `automation_level` SET TAGS ('dbx_business_glossary_term' = 'Line Automation Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `automation_level` SET TAGS ('dbx_value_regex' = 'manual|semi_automated|highly_automated|fully_automated');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `ckd_skd_capable` SET TAGS ('dbx_business_glossary_term' = 'CKD/SKD Assembly Capability');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `ckd_skd_capable` SET TAGS ('dbx_value_regex' = 'CKD|SKD|CBU|multi');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `conveyor_type` SET TAGS ('dbx_business_glossary_term' = 'Conveyor System Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `conveyor_type` SET TAGS ('dbx_value_regex' = 'overhead_conveyor|floor_conveyor|skillet|agv_carrier|stationary|mixed');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `current_jph` SET TAGS ('dbx_business_glossary_term' = 'Current Actual Jobs Per Hour (JPH) Rate');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `designed_jph` SET TAGS ('dbx_business_glossary_term' = 'Designed Jobs Per Hour (JPH) Throughput Rate');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `energy_consumption_kwh_per_unit` SET TAGS ('dbx_business_glossary_term' = 'Energy Consumption per Unit (kWh)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `eop_date` SET TAGS ('dbx_business_glossary_term' = 'End of Production (EOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `floor_space_sqm` SET TAGS ('dbx_business_glossary_term' = 'Floor Space Area (Square Meters)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `iatf_audit_status` SET TAGS ('dbx_business_glossary_term' = 'IATF 16949 Audit Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `iatf_audit_status` SET TAGS ('dbx_value_regex' = 'compliant|minor_nc|major_nc|suspended|not_audited');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `jis_enabled` SET TAGS ('dbx_business_glossary_term' = 'Just-in-Sequence (JIS) Enabled Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `last_iatf_audit_date` SET TAGS ('dbx_business_glossary_term' = 'Last IATF 16949 Audit Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `last_maintenance_date` SET TAGS ('dbx_business_glossary_term' = 'Last Planned Maintenance Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_code` SET TAGS ('dbx_business_glossary_term' = 'Production Line Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_length_meters` SET TAGS ('dbx_business_glossary_term' = 'Production Line Length (Meters)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_name` SET TAGS ('dbx_business_glossary_term' = 'Production Line Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_status` SET TAGS ('dbx_business_glossary_term' = 'Production Line Operational Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_status` SET TAGS ('dbx_value_regex' = 'active|idle|maintenance|ramp_up|ramp_down|decommissioned');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `line_type` SET TAGS ('dbx_business_glossary_term' = 'Production Line Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `max_vehicle_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Maximum Vehicle Weight Capacity (kg)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `mes_line_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Line Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `mixed_model_capable` SET TAGS ('dbx_business_glossary_term' = 'Mixed Model Production Capable Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `model_year_capability` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY) Capability Range');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `model_year_capability` SET TAGS ('dbx_value_regex' = '^[0-9]{4}(-[0-9]{4})?$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `next_maintenance_date` SET TAGS ('dbx_business_glossary_term' = 'Next Scheduled Maintenance Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `number_of_stations` SET TAGS ('dbx_business_glossary_term' = 'Number of Work Stations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `paint_booth_type` SET TAGS ('dbx_business_glossary_term' = 'Paint Booth Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `paint_booth_type` SET TAGS ('dbx_value_regex' = 'waterborne|solventborne|powder_coat|none');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `plc_system_reference` SET TAGS ('dbx_business_glossary_term' = 'Programmable Logic Controller (PLC) System Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `powertrain_type_capability` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type Capability');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `powertrain_type_capability` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV|multi');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `quality_gate_count` SET TAGS ('dbx_business_glossary_term' = 'Quality Gate Count');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `robot_count` SET TAGS ('dbx_business_glossary_term' = 'Industrial Robot Count');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `safety_certification_expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Safety Certification Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `safety_certification_status` SET TAGS ('dbx_business_glossary_term' = 'Safety Certification Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `safety_certification_status` SET TAGS ('dbx_value_regex' = 'certified|expired|pending_renewal|not_required');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `scada_system_reference` SET TAGS ('dbx_business_glossary_term' = 'Supervisory Control and Data Acquisition (SCADA) System Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `shift_configuration` SET TAGS ('dbx_business_glossary_term' = 'Shift Configuration');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `shift_configuration` SET TAGS ('dbx_value_regex' = '1_shift|2_shift|3_shift|4_shift_rotating');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `sop_date` SET TAGS ('dbx_business_glossary_term' = 'Start of Production (SOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `vehicle_platform_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Platform Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_line` ALTER COLUMN `weld_gun_count` SET TAGS ('dbx_business_glossary_term' = 'Weld Gun Count');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_business_glossary_term' = 'Functional Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Supervisor ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_responsible_supervisor_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Supervisor ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_responsible_supervisor_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_responsible_supervisor_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `agv_integration_enabled` SET TAGS ('dbx_business_glossary_term' = 'Automated Guided Vehicle (AGV) Integration Enabled Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `automation_level` SET TAGS ('dbx_business_glossary_term' = 'Automation Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `automation_level` SET TAGS ('dbx_value_regex' = 'fully_automated|highly_automated|semi_automated|manual|collaborative');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `available_capacity_hours_per_day` SET TAGS ('dbx_business_glossary_term' = 'Available Capacity Hours Per Day');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `available_capacity_hours_per_day` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `capacity_category` SET TAGS ('dbx_business_glossary_term' = 'Capacity Category');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `capacity_category` SET TAGS ('dbx_value_regex' = 'bottleneck|standard|buffer|flexible');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `capacity_category` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_category` SET TAGS ('dbx_business_glossary_term' = 'Work Center Category');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_category` SET TAGS ('dbx_value_regex' = 'machine|labor|machine_labor|external');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_code` SET TAGS ('dbx_business_glossary_term' = 'Work Center Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `commissioning_date` SET TAGS ('dbx_business_glossary_term' = 'Commissioning Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `cycle_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Cycle Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `decommissioning_date` SET TAGS ('dbx_business_glossary_term' = 'Decommissioning Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_description` SET TAGS ('dbx_business_glossary_term' = 'Work Center Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `energy_consumption_kw` SET TAGS ('dbx_business_glossary_term' = 'Energy Consumption (Kilowatts)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `floor_area_sqm` SET TAGS ('dbx_business_glossary_term' = 'Floor Area (Square Meters)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `is_bottleneck` SET TAGS ('dbx_business_glossary_term' = 'Bottleneck Station Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `is_jis_enabled` SET TAGS ('dbx_business_glossary_term' = 'Just-in-Sequence (JIS) Enabled Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `is_quality_gate` SET TAGS ('dbx_business_glossary_term' = 'Quality Gate Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `labor_rate_per_hour` SET TAGS ('dbx_business_glossary_term' = 'Labor Rate Per Hour');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `labor_rate_per_hour` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `last_calibration_date` SET TAGS ('dbx_business_glossary_term' = 'Last Calibration Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `location_description` SET TAGS ('dbx_business_glossary_term' = 'Location Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `machine_rate_per_hour` SET TAGS ('dbx_business_glossary_term' = 'Machine Rate Per Hour');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `machine_rate_per_hour` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `maintenance_strategy_code` SET TAGS ('dbx_business_glossary_term' = 'Maintenance Strategy Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `maintenance_strategy_code` SET TAGS ('dbx_value_regex' = 'preventive|predictive|corrective|condition_based');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `mean_time_between_failures_hours` SET TAGS ('dbx_business_glossary_term' = 'Mean Time Between Failures (MTBF) Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `mean_time_to_repair_hours` SET TAGS ('dbx_business_glossary_term' = 'Mean Time to Repair (MTTR) Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `mes_work_center_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_name` SET TAGS ('dbx_business_glossary_term' = 'Work Center Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `next_calibration_due_date` SET TAGS ('dbx_business_glossary_term' = 'Next Calibration Due Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `number_of_shifts` SET TAGS ('dbx_business_glossary_term' = 'Number of Shifts');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `number_of_workers` SET TAGS ('dbx_business_glossary_term' = 'Number of Workers');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `overhead_rate_percent` SET TAGS ('dbx_business_glossary_term' = 'Overhead Rate Percent');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `overhead_rate_percent` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `plant_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `plc_node_code` SET TAGS ('dbx_business_glossary_term' = 'Programmable Logic Controller (PLC) Node ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `process_category` SET TAGS ('dbx_business_glossary_term' = 'Process Category');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `production_line_code` SET TAGS ('dbx_business_glossary_term' = 'Production Line Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `production_line_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `sap_work_center_code` SET TAGS ('dbx_business_glossary_term' = 'SAP Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `scada_node_code` SET TAGS ('dbx_business_glossary_term' = 'Supervisory Control and Data Acquisition (SCADA) Node ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `setup_time_minutes` SET TAGS ('dbx_business_glossary_term' = 'Setup Time (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `shift_model_code` SET TAGS ('dbx_business_glossary_term' = 'Shift Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `shift_model_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `standard_value_key` SET TAGS ('dbx_business_glossary_term' = 'Standard Value Key');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `standard_value_key` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,6}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `teardown_time_minutes` SET TAGS ('dbx_business_glossary_term' = 'Teardown Time (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_status` SET TAGS ('dbx_business_glossary_term' = 'Work Center Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_status` SET TAGS ('dbx_value_regex' = 'active|inactive|under_maintenance|decommissioned|planned');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_type` SET TAGS ('dbx_business_glossary_term' = 'Work Center Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`work_center` ALTER COLUMN `work_center_type` SET TAGS ('dbx_value_regex' = 'manual|automated|robotic|semi_automated|inspection|rework');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `configuration_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Configuration ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Created By Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer Party Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `mobility_fleet_account_id` SET TAGS ('dbx_business_glossary_term' = 'Fleet Account Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `opportunity_id` SET TAGS ('dbx_business_glossary_term' = 'Opportunity Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `production_bom_id` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `quote_id` SET TAGS ('dbx_business_glossary_term' = 'Quote Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `routing_id` SET TAGS ('dbx_business_glossary_term' = 'Production Routing ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `shift_id` SET TAGS ('dbx_business_glossary_term' = 'Shift ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Material ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `supply_purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_cost` SET TAGS ('dbx_business_glossary_term' = 'Actual Production Cost');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_cost` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_finish_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Production Finish Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_labor_hours` SET TAGS ('dbx_business_glossary_term' = 'Actual Labor Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_machine_hours` SET TAGS ('dbx_business_glossary_term' = 'Actual Machine Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `actual_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Production Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `assembly_sequence_number` SET TAGS ('dbx_business_glossary_term' = 'Assembly Sequence Number (JIS)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `confirmed_quantity` SET TAGS ('dbx_business_glossary_term' = 'Confirmed Production Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `mes_order_reference` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Order Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_date` SET TAGS ('dbx_business_glossary_term' = 'Production Order Creation Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_description` SET TAGS ('dbx_business_glossary_term' = 'Production Order Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_number` SET TAGS ('dbx_business_glossary_term' = 'Production Order Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{6,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_status` SET TAGS ('dbx_business_glossary_term' = 'Production Order Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_type` SET TAGS ('dbx_business_glossary_term' = 'Production Order Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `order_type` SET TAGS ('dbx_value_regex' = 'vehicle_build|sub_assembly|rework|repair|prototype');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `planned_finish_date` SET TAGS ('dbx_business_glossary_term' = 'Planned Production Finish Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `planned_labor_hours` SET TAGS ('dbx_business_glossary_term' = 'Planned Labor Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `planned_machine_hours` SET TAGS ('dbx_business_glossary_term' = 'Planned Machine Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `planned_start_date` SET TAGS ('dbx_business_glossary_term' = 'Planned Production Start Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `ppap_required` SET TAGS ('dbx_business_glossary_term' = 'Production Part Approval Process (PPAP) Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `priority` SET TAGS ('dbx_business_glossary_term' = 'Production Order Priority');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `production_stage` SET TAGS ('dbx_business_glossary_term' = 'Production Stage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `production_stage` SET TAGS ('dbx_value_regex' = 'stamping|body_shop|paint|final_assembly|powertrain|trim_chassis');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `quality_inspection_lot` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `release_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Production Order Release Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `rework_quantity` SET TAGS ('dbx_business_glossary_term' = 'Rework Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `scrap_quantity` SET TAGS ('dbx_business_glossary_term' = 'Scrap Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `sop_indicator` SET TAGS ('dbx_business_glossary_term' = 'Start of Production (SOP) Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `standard_cost` SET TAGS ('dbx_business_glossary_term' = 'Standard Production Cost');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `standard_cost` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `target_quantity` SET TAGS ('dbx_business_glossary_term' = 'Target Production Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `technical_completion_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Technical Completion Timestamp (TECO)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|PC|SET|KG|L');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `vin_range_end` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN) Range End');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `vin_range_end` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `vin_range_start` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN) Range Start');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `vin_range_start` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order` ALTER COLUMN `wip_posting_flag` SET TAGS ('dbx_business_glossary_term' = 'Work in Progress (WIP) Posting Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `build_sequence_id` SET TAGS ('dbx_business_glossary_term' = 'Build Sequence ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `configuration_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Configuration ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `build_vehicle_config_configuration_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Configuration ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `shift_id` SET TAGS ('dbx_business_glossary_term' = 'Shift ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `actual_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Assembly End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `actual_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Assembly Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_business_glossary_term' = 'Assembly Stage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_value_regex' = 'stamping|body_shop|paint|final_assembly|PDI');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `body_style_code` SET TAGS ('dbx_business_glossary_term' = 'Body Style Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `build_type` SET TAGS ('dbx_business_glossary_term' = 'Build Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `build_type` SET TAGS ('dbx_value_regex' = 'retail|fleet|stock|pilot|homologation|press');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `customer_order_number` SET TAGS ('dbx_business_glossary_term' = 'Customer Order Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `dealer_code` SET TAGS ('dbx_business_glossary_term' = 'Dealer Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `destination_market_code` SET TAGS ('dbx_business_glossary_term' = 'Destination Market Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `destination_market_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `drive_configuration` SET TAGS ('dbx_business_glossary_term' = 'Drive Configuration');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `drive_configuration` SET TAGS ('dbx_value_regex' = 'FWD|RWD|AWD|4WD');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `exterior_color_code` SET TAGS ('dbx_business_glossary_term' = 'Exterior Color Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `freeze_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Sequence Freeze Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `interior_color_code` SET TAGS ('dbx_business_glossary_term' = 'Interior Color Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `is_frozen` SET TAGS ('dbx_business_glossary_term' = 'Is Sequence Frozen Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `is_priority_build` SET TAGS ('dbx_business_glossary_term' = 'Is Priority Build Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `jis_call_off_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Just-in-Sequence (JIS) Call-Off Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `mes_sequence_reference` SET TAGS ('dbx_business_glossary_term' = 'MES Sequence Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `option_package_code` SET TAGS ('dbx_business_glossary_term' = 'Option Package Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `planned_build_date` SET TAGS ('dbx_business_glossary_term' = 'Planned Build Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `planned_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Planned Assembly End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `planned_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Planned Assembly Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `quality_hold_flag` SET TAGS ('dbx_business_glossary_term' = 'Quality Hold Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `regulatory_variant_code` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Variant Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_change_reason` SET TAGS ('dbx_business_glossary_term' = 'Sequence Change Reason');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_number` SET TAGS ('dbx_business_glossary_term' = 'Just-in-Sequence (JIS) Sequence Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_revision_number` SET TAGS ('dbx_business_glossary_term' = 'Sequence Revision Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_set_number` SET TAGS ('dbx_business_glossary_term' = 'Sequence Set Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_status` SET TAGS ('dbx_business_glossary_term' = 'Build Sequence Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_status` SET TAGS ('dbx_value_regex' = 'planned|released|in_progress|completed|cancelled|on_hold');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_type` SET TAGS ('dbx_business_glossary_term' = 'Sequence Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `sequence_type` SET TAGS ('dbx_value_regex' = 'initial|revised|emergency|resequenced');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `transmission_type` SET TAGS ('dbx_business_glossary_term' = 'Transmission Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `transmission_type` SET TAGS ('dbx_value_regex' = 'automatic|manual|CVT|DCT|single_speed');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `trim_level_code` SET TAGS ('dbx_business_glossary_term' = 'Trim Level Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_sequence` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vehicle_build_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Build Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_stage_id` SET TAGS ('dbx_business_glossary_term' = 'Build Stage Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `operator_team_id` SET TAGS ('dbx_business_glossary_term' = 'Operator Team ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Owner Party Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `shift_id` SET TAGS ('dbx_business_glossary_term' = 'Production Shift ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `shipment_id` SET TAGS ('dbx_business_glossary_term' = 'Shipment Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vehicle_ownership_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Ownership Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `assembly_line_code` SET TAGS ('dbx_business_glossary_term' = 'Assembly Line Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `battery_serial_number` SET TAGS ('dbx_business_glossary_term' = 'High-Voltage Battery Serial Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `body_shop_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Body Shop Stage End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `body_shop_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Body Shop Stage Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `body_style` SET TAGS ('dbx_business_glossary_term' = 'Body Style');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `body_style` SET TAGS ('dbx_value_regex' = 'sedan|suv|truck|van|coupe|convertible');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `bom_version` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Version');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Build End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_sequence_number` SET TAGS ('dbx_business_glossary_term' = 'Build Sequence Number (JIS)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Build Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_status` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Build Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_status` SET TAGS ('dbx_value_regex' = 'in_progress|completed|on_hold|rework|scrapped|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_type` SET TAGS ('dbx_business_glossary_term' = 'Build Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `build_type` SET TAGS ('dbx_value_regex' = 'standard|ckd|skd|pilot|prototype');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `chassis_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Chassis Assembly Stage End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `chassis_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Chassis Assembly Stage Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `end_of_line_test_result` SET TAGS ('dbx_business_glossary_term' = 'End-of-Line (EOL) Test Result');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `end_of_line_test_result` SET TAGS ('dbx_value_regex' = 'pass|fail|retest_required');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `engine_serial_number` SET TAGS ('dbx_business_glossary_term' = 'Engine Serial Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `final_assembly_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Final Assembly Stage End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `final_assembly_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Final Assembly Stage Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `hold_flag` SET TAGS ('dbx_business_glossary_term' = 'Build Hold Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `hold_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Build Hold Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `homologation_market` SET TAGS ('dbx_business_glossary_term' = 'Homologation Market');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `paint_color_code` SET TAGS ('dbx_business_glossary_term' = 'Paint Color Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `paint_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Paint Stage End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `paint_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Paint Stage Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `quality_gate_status` SET TAGS ('dbx_business_glossary_term' = 'Quality Gate Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `quality_gate_status` SET TAGS ('dbx_value_regex' = 'pass|fail|conditional_pass|pending');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `rework_count` SET TAGS ('dbx_business_glossary_term' = 'Rework Count');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `rework_flag` SET TAGS ('dbx_business_glossary_term' = 'Rework Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `scheduled_build_date` SET TAGS ('dbx_business_glossary_term' = 'Scheduled Build Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `sop_flag` SET TAGS ('dbx_business_glossary_term' = 'Start of Production (SOP) Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `stamping_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Stamping Stage End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `stamping_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Stamping Stage Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `transmission_serial_number` SET TAGS ('dbx_business_glossary_term' = 'Transmission Serial Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `trim_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Trim Assembly Stage End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `trim_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Trim Assembly Stage Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_build` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `build_stage_id` SET TAGS ('dbx_business_glossary_term' = 'Build Stage ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Supervisor Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `agv_enabled` SET TAGS ('dbx_business_glossary_term' = 'AGV (Automated Guided Vehicle) Enabled Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `applicable_vehicle_types` SET TAGS ('dbx_business_glossary_term' = 'Applicable Vehicle Types');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `automation_level` SET TAGS ('dbx_business_glossary_term' = 'Automation Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `automation_level` SET TAGS ('dbx_value_regex' = 'manual|semi-automated|fully-automated|robotic');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `buffer_capacity_units` SET TAGS ('dbx_business_glossary_term' = 'Buffer Capacity (Units)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `buffer_capacity_units` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `co2_emission_kg` SET TAGS ('dbx_business_glossary_term' = 'Standard CO2 Emission (kg per Unit)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `control_plan_code` SET TAGS ('dbx_business_glossary_term' = 'Control Plan Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `control_plan_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{3,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `energy_consumption_kwh` SET TAGS ('dbx_business_glossary_term' = 'Standard Energy Consumption (kWh per Unit)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `eop_date` SET TAGS ('dbx_business_glossary_term' = 'EOP (End of Production) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `fmea_reference_code` SET TAGS ('dbx_business_glossary_term' = 'FMEA (Failure Mode and Effects Analysis) Reference Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `fmea_reference_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{3,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `hazmat_classification` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Materials (HazMat) Classification');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `hazmat_classification` SET TAGS ('dbx_value_regex' = 'none|flammable|corrosive|toxic|oxidizer|environmental-hazard');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `iatf_process_category` SET TAGS ('dbx_business_glossary_term' = 'IATF (International Automotive Task Force) Process Category');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `iatf_process_category` SET TAGS ('dbx_value_regex' = 'special-characteristic|standard-process|critical-process|monitoring-only');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `is_quality_gate` SET TAGS ('dbx_business_glossary_term' = 'Quality Gate Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `is_rework_eligible` SET TAGS ('dbx_business_glossary_term' = 'Rework Eligible Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `labor_headcount_standard` SET TAGS ('dbx_business_glossary_term' = 'Standard Labor Headcount');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `max_temperature_c` SET TAGS ('dbx_business_glossary_term' = 'Maximum Process Temperature (Celsius)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `mes_stage_code` SET TAGS ('dbx_business_glossary_term' = 'MES (Manufacturing Execution System) Stage ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `mes_stage_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `min_temperature_c` SET TAGS ('dbx_business_glossary_term' = 'Minimum Process Temperature (Celsius)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `model_year_applicability` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY) Applicability');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `model_year_applicability` SET TAGS ('dbx_value_regex' = '^(MYd{4}(,MYd{4})*|ALL)$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `plant_area_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Area Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `plant_area_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,15}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `plc_program_code` SET TAGS ('dbx_business_glossary_term' = 'PLC (Programmable Logic Controller) Program ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `plc_program_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{3,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `ppm_target` SET TAGS ('dbx_business_glossary_term' = 'PPM (Parts Per Million) Defect Rate Target');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `preceding_stage_code` SET TAGS ('dbx_business_glossary_term' = 'Preceding Stage Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `preceding_stage_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `process_area` SET TAGS ('dbx_business_glossary_term' = 'Process Area');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `quality_inspection_plan_code` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Plan Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `quality_inspection_plan_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{3,25}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `safety_classification` SET TAGS ('dbx_business_glossary_term' = 'Safety Classification');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `safety_classification` SET TAGS ('dbx_value_regex' = 'standard|elevated-risk|critical-safety|restricted-access');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `sap_operation_code` SET TAGS ('dbx_business_glossary_term' = 'SAP Operation Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `sap_operation_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `sequence_order` SET TAGS ('dbx_business_glossary_term' = 'Stage Sequence Order');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `shift_pattern` SET TAGS ('dbx_business_glossary_term' = 'Shift Pattern');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `shift_pattern` SET TAGS ('dbx_value_regex' = 'single|double|triple|continuous');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `sop_date` SET TAGS ('dbx_business_glossary_term' = 'SOP (Start of Production) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `spc_enabled` SET TAGS ('dbx_business_glossary_term' = 'SPC (Statistical Process Control) Enabled Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_code` SET TAGS ('dbx_business_glossary_term' = 'Build Stage Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_description` SET TAGS ('dbx_business_glossary_term' = 'Build Stage Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_name` SET TAGS ('dbx_business_glossary_term' = 'Build Stage Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_status` SET TAGS ('dbx_business_glossary_term' = 'Build Stage Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pilot|suspended|decommissioned');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_type` SET TAGS ('dbx_business_glossary_term' = 'Build Stage Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `stage_type` SET TAGS ('dbx_value_regex' = 'assembly|fabrication|coating|inspection|testing|logistics');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `standard_cycle_time_sec` SET TAGS ('dbx_business_glossary_term' = 'Standard Cycle Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `succeeding_stage_code` SET TAGS ('dbx_business_glossary_term' = 'Succeeding Stage Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `succeeding_stage_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `takt_time_sec` SET TAGS ('dbx_business_glossary_term' = 'Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `work_center_code` SET TAGS ('dbx_business_glossary_term' = 'Work Center Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`build_stage` ALTER COLUMN `work_center_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_floor_event_id` SET TAGS ('dbx_business_glossary_term' = 'Shop Floor Event ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shift_id` SET TAGS ('dbx_business_glossary_term' = 'Production Shift ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Operator ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment / Machine ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_equipment_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment / Machine ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_operator_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Operator ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_operator_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_operator_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `tooling_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Production Tool ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `shop_tooling_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Production Tool ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN) ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `agv_unit_code` SET TAGS ('dbx_business_glossary_term' = 'Automated Guided Vehicle (AGV) Unit ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `agv_unit_code` SET TAGS ('dbx_value_regex' = '^AGV-[A-Z0-9]{2,15}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `assembly_area` SET TAGS ('dbx_business_glossary_term' = 'Assembly Area');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_category` SET TAGS ('dbx_business_glossary_term' = 'Shop Floor Event Category');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_category` SET TAGS ('dbx_value_regex' = 'production|quality|material|equipment|safety|logistics');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_duration_seconds` SET TAGS ('dbx_business_glossary_term' = 'Event Duration (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_payload` SET TAGS ('dbx_business_glossary_term' = 'Event Payload (JSON)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_source_system` SET TAGS ('dbx_business_glossary_term' = 'Event Source System');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_status` SET TAGS ('dbx_business_glossary_term' = 'Shop Floor Event Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_status` SET TAGS ('dbx_value_regex' = 'open|confirmed|cancelled|on_hold|escalated');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Shop Floor Event Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `event_type` SET TAGS ('dbx_business_glossary_term' = 'Shop Floor Event Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `fault_code` SET TAGS ('dbx_business_glossary_term' = 'Fault / Alarm Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `fault_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `fault_description` SET TAGS ('dbx_business_glossary_term' = 'Fault / Alarm Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `hold_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Production Hold Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `hold_reason_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `is_rework` SET TAGS ('dbx_business_glossary_term' = 'Rework Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `is_within_spec` SET TAGS ('dbx_business_glossary_term' = 'Within Specification Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `lower_control_limit` SET TAGS ('dbx_business_glossary_term' = 'Lower Control Limit (LCL)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `measured_value` SET TAGS ('dbx_business_glossary_term' = 'Measured Process Value');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `measured_value_unit` SET TAGS ('dbx_business_glossary_term' = 'Measured Value Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `mes_event_number` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Event Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `mes_event_number` SET TAGS ('dbx_value_regex' = '^MES-[A-Z0-9]{4,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `oee_loss_category` SET TAGS ('dbx_business_glossary_term' = 'Overall Equipment Effectiveness (OEE) Loss Category');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `oee_loss_category` SET TAGS ('dbx_value_regex' = 'availability|performance|quality|no_loss');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `planned_cycle_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Planned Cycle Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `process_step_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Process Step Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `process_step_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `production_line_code` SET TAGS ('dbx_business_glossary_term' = 'Production Line Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `production_line_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `program_number` SET TAGS ('dbx_business_glossary_term' = 'PLC / Robot Program Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `program_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_.-]{2,40}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `quality_result` SET TAGS ('dbx_business_glossary_term' = 'Quality Gate Result');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `quality_result` SET TAGS ('dbx_value_regex' = 'pass|fail|rework|scrap|conditional_pass');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `rework_attempt_number` SET TAGS ('dbx_business_glossary_term' = 'Rework Attempt Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `scrap_code` SET TAGS ('dbx_business_glossary_term' = 'Scrap Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `scrap_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `sequence_number` SET TAGS ('dbx_business_glossary_term' = 'Just-in-Sequence (JIS) Sequence Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `station_code` SET TAGS ('dbx_business_glossary_term' = 'Work Station Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `station_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `station_name` SET TAGS ('dbx_business_glossary_term' = 'Work Station Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `upper_control_limit` SET TAGS ('dbx_business_glossary_term' = 'Upper Control Limit (UCL)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `vin_number` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shop_floor_event` ALTER COLUMN `vin_number` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_inventory_id` SET TAGS ('dbx_business_glossary_term' = 'Work-in-Progress (WIP) Inventory ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `inbound_shipment_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Shipment Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `production_line_id` SET TAGS ('dbx_internal' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `inspection_id` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `routing_id` SET TAGS ('dbx_business_glossary_term' = 'Routing ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `shift_id` SET TAGS ('dbx_business_glossary_term' = 'Shift Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `shift_id` SET TAGS ('dbx_internal' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Material ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_internal' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Operator Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_operator_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Operator Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_operator_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_operator_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `actual_cycle_time_sec` SET TAGS ('dbx_business_glossary_term' = 'Actual Cycle Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_business_glossary_term' = 'Assembly Stage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `bom_version` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Version');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `buffer_zone_code` SET TAGS ('dbx_business_glossary_term' = 'Buffer Zone Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `engineering_change_number` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Number (ECN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `hold_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Hold Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `inspection_result` SET TAGS ('dbx_business_glossary_term' = 'Inspection Result');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `inspection_result` SET TAGS ('dbx_value_regex' = 'pass|fail|conditional_pass|pending');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `is_rework_item` SET TAGS ('dbx_business_glossary_term' = 'Is Rework Item Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `location_entry_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Location Entry Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `location_exit_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Location Exit Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `mes_transaction_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Transaction ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `operation_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Operation End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `operation_number` SET TAGS ('dbx_business_glossary_term' = 'Operation Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `operation_number` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `operation_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Operation Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|EV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `priority_code` SET TAGS ('dbx_business_glossary_term' = 'WIP Priority Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `priority_code` SET TAGS ('dbx_value_regex' = 'NORMAL|HIGH|URGENT|EXPEDITE');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `quantity` SET TAGS ('dbx_business_glossary_term' = 'WIP Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `record_created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `record_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `sap_order_number` SET TAGS ('dbx_business_glossary_term' = 'SAP Production Order Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `sap_order_number` SET TAGS ('dbx_value_regex' = '^[0-9]{8,12}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `scheduled_completion_date` SET TAGS ('dbx_business_glossary_term' = 'Scheduled Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `scrap_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Scrap Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `sequence_number` SET TAGS ('dbx_business_glossary_term' = 'JIS Sequence Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `snapshot_timestamp` SET TAGS ('dbx_business_glossary_term' = 'WIP Snapshot Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `standard_cycle_time_sec` SET TAGS ('dbx_business_glossary_term' = 'Standard Cycle Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `sub_assembly_number` SET TAGS ('dbx_business_glossary_term' = 'Sub-Assembly ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `supplier_deviation_number` SET TAGS ('dbx_business_glossary_term' = 'Supplier Deviation Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UoM)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_record_number` SET TAGS ('dbx_business_glossary_term' = 'Work-in-Progress (WIP) Record Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_record_number` SET TAGS ('dbx_value_regex' = '^WIP-[A-Z0-9]{3,6}-[0-9]{8}-[0-9]{6}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_status` SET TAGS ('dbx_business_glossary_term' = 'Work-in-Progress (WIP) Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_status` SET TAGS ('dbx_value_regex' = 'in_process|on_hold|awaiting_inspection|scrapped|completed|rework');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_valuation_amount` SET TAGS ('dbx_business_glossary_term' = 'WIP Valuation Amount');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`wip_inventory` ALTER COLUMN `wip_valuation_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `production_schedule_id` SET TAGS ('dbx_business_glossary_term' = 'Production Schedule ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `billing_run_id` SET TAGS ('dbx_business_glossary_term' = 'Material Requirements Planning (MRP) Run ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `aftersales_nameplate_id` SET TAGS ('dbx_business_glossary_term' = 'Nameplate Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `model_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `actual_quantity` SET TAGS ('dbx_business_glossary_term' = 'Actual Production Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Schedule Approved By');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Schedule Approval Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `assembly_process_stage` SET TAGS ('dbx_business_glossary_term' = 'Assembly Process Stage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `assembly_process_stage` SET TAGS ('dbx_value_regex' = 'stamping|body_shop|paint|final_assembly|trim_chassis_final');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `available_capacity_hours` SET TAGS ('dbx_business_glossary_term' = 'Available Production Capacity (Hours)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `available_capacity_hours` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `body_style` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Body Style');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `body_style` SET TAGS ('dbx_value_regex' = 'sedan|suv|truck|van|coupe|convertible');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `build_sequence_end` SET TAGS ('dbx_business_glossary_term' = 'Build Sequence End Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `build_sequence_start` SET TAGS ('dbx_business_glossary_term' = 'Build Sequence Start Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `build_type` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Build Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `build_type` SET TAGS ('dbx_value_regex' = 'standard|ckd|skd|pilot|pre_series');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `calloff_transmission_time` SET TAGS ('dbx_business_glossary_term' = 'Supplier Call-Off Transmission Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `capacity_utilization_pct` SET TAGS ('dbx_business_glossary_term' = 'Capacity Utilization Percentage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `capacity_utilization_pct` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `confirmed_quantity` SET TAGS ('dbx_business_glossary_term' = 'Confirmed Production Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `eop_date` SET TAGS ('dbx_business_glossary_term' = 'End of Production (EOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `fiscal_period` SET TAGS ('dbx_business_glossary_term' = 'Fiscal Period');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_business_glossary_term' = 'Fiscal Year (FY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `freeze_horizon_date` SET TAGS ('dbx_business_glossary_term' = 'Schedule Freeze Horizon Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `is_frozen` SET TAGS ('dbx_business_glossary_term' = 'Schedule Frozen Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `planned_quantity` SET TAGS ('dbx_business_glossary_term' = 'Planned Production Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|EV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `regulatory_market` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Market / Destination Country');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_change_reason` SET TAGS ('dbx_business_glossary_term' = 'Schedule Change Reason');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_date` SET TAGS ('dbx_business_glossary_term' = 'Production Schedule Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_end_date` SET TAGS ('dbx_business_glossary_term' = 'Production Schedule End Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_notes` SET TAGS ('dbx_business_glossary_term' = 'Production Schedule Notes');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_number` SET TAGS ('dbx_business_glossary_term' = 'Master Production Schedule (MPS) Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_number` SET TAGS ('dbx_value_regex' = '^MPS-[A-Z0-9]{3,10}-[0-9]{4}-[0-9]{6}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_status` SET TAGS ('dbx_business_glossary_term' = 'Production Schedule Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_status` SET TAGS ('dbx_value_regex' = 'draft|released|frozen|in_execution|completed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_type` SET TAGS ('dbx_business_glossary_term' = 'Production Schedule Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_type` SET TAGS ('dbx_value_regex' = 'daily|weekly|monthly');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `schedule_version` SET TAGS ('dbx_business_glossary_term' = 'Schedule Version Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `scheduled_end_time` SET TAGS ('dbx_business_glossary_term' = 'Scheduled Production End Time');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `scheduled_start_time` SET TAGS ('dbx_business_glossary_term' = 'Scheduled Production Start Time');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `shift_pattern` SET TAGS ('dbx_business_glossary_term' = 'Production Shift Pattern');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `shift_pattern` SET TAGS ('dbx_value_regex' = 'single|double|triple|weekend');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `sop_date` SET TAGS ('dbx_business_glossary_term' = 'Start of Production (SOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `supplier_calloff_generated` SET TAGS ('dbx_business_glossary_term' = 'Supplier Call-Off Generated Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_schedule` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_id` SET TAGS ('dbx_business_glossary_term' = 'Shift ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `factory_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Factory Calendar ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `agv_active` SET TAGS ('dbx_business_glossary_term' = 'Automated Guided Vehicle (AGV) Active Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `break_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Total Break Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `break_schedule` SET TAGS ('dbx_business_glossary_term' = 'Break Schedule Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_code` SET TAGS ('dbx_business_glossary_term' = 'Shift Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `day_of_week_mask` SET TAGS ('dbx_business_glossary_term' = 'Day of Week Mask');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `day_of_week_mask` SET TAGS ('dbx_value_regex' = '^[01]{7}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_description` SET TAGS ('dbx_business_glossary_term' = 'Shift Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Shift Effective Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `energy_consumption_target_kwh` SET TAGS ('dbx_business_glossary_term' = 'Energy Consumption Target (kWh)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `eop_date` SET TAGS ('dbx_business_glossary_term' = 'End of Production (EOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Shift Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `gross_shift_hours` SET TAGS ('dbx_business_glossary_term' = 'Gross Shift Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `handover_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Shift Handover Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `is_template` SET TAGS ('dbx_business_glossary_term' = 'Shift Template Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `mes_shift_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Shift ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `mes_shift_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,50}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_name` SET TAGS ('dbx_business_glossary_term' = 'Shift Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `number_of_breaks` SET TAGS ('dbx_business_glossary_term' = 'Number of Scheduled Breaks');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `oee_target_percent` SET TAGS ('dbx_business_glossary_term' = 'Overall Equipment Effectiveness (OEE) Target Percentage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `overtime_eligible` SET TAGS ('dbx_business_glossary_term' = 'Overtime Eligible Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `pattern_code` SET TAGS ('dbx_business_glossary_term' = 'Shift Pattern Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `pattern_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `planned_end_time` SET TAGS ('dbx_business_glossary_term' = 'Planned Shift End Time');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `planned_production_hours` SET TAGS ('dbx_business_glossary_term' = 'Planned Production Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `planned_start_time` SET TAGS ('dbx_business_glossary_term' = 'Planned Shift Start Time');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `premium_pay_rate` SET TAGS ('dbx_business_glossary_term' = 'Premium Pay Rate Multiplier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `premium_pay_rate` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `production_model` SET TAGS ('dbx_business_glossary_term' = 'Production Shift Model');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `production_model` SET TAGS ('dbx_value_regex' = 'single_shift|two_shift|three_shift|four_shift_continental');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `quality_inspection_required` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `sap_shift_code` SET TAGS ('dbx_business_glossary_term' = 'SAP Shift Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `sap_shift_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{1,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `scada_zone_code` SET TAGS ('dbx_business_glossary_term' = 'Supervisory Control and Data Acquisition (SCADA) Zone Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `scada_zone_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{2,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `sequence_number` SET TAGS ('dbx_business_glossary_term' = 'Shift Sequence Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_status` SET TAGS ('dbx_business_glossary_term' = 'Shift Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_status` SET TAGS ('dbx_value_regex' = 'active|inactive|suspended|draft');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_type` SET TAGS ('dbx_business_glossary_term' = 'Shift Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `shift_type` SET TAGS ('dbx_value_regex' = 'day|afternoon|night|weekend|overtime|shutdown');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `sop_date` SET TAGS ('dbx_business_glossary_term' = 'Start of Production (SOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `supervisor_role_code` SET TAGS ('dbx_business_glossary_term' = 'Shift Supervisor Role Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `supervisor_role_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{2,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `target_takt_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Target Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `target_units_per_shift` SET TAGS ('dbx_business_glossary_term' = 'Target Units Per Shift');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `timezone_code` SET TAGS ('dbx_business_glossary_term' = 'Shift Timezone Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`shift` ALTER COLUMN `workforce_headcount_target` SET TAGS ('dbx_business_glossary_term' = 'Workforce Headcount Target');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_event_id` SET TAGS ('dbx_business_glossary_term' = 'Downtime Event ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_equipment_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Team ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Reported By Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `affected_process_area` SET TAGS ('dbx_business_glossary_term' = 'Affected Process Area');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `corrective_action_code` SET TAGS ('dbx_business_glossary_term' = 'Corrective Action Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_category` SET TAGS ('dbx_business_glossary_term' = 'Downtime Category');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_category` SET TAGS ('dbx_value_regex' = 'mechanical_failure|tooling_change|material_shortage|quality_hold|scheduled_maintenance|changeover');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_type` SET TAGS ('dbx_business_glossary_term' = 'Downtime Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `downtime_type` SET TAGS ('dbx_value_regex' = 'planned|unplanned');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Downtime Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Downtime End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `escalation_level` SET TAGS ('dbx_business_glossary_term' = 'Escalation Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `escalation_level` SET TAGS ('dbx_value_regex' = 'none|supervisor|manager|plant_director');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_date` SET TAGS ('dbx_business_glossary_term' = 'Downtime Event Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_description` SET TAGS ('dbx_business_glossary_term' = 'Downtime Event Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_number` SET TAGS ('dbx_business_glossary_term' = 'Downtime Event Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_number` SET TAGS ('dbx_value_regex' = '^DT-[0-9]{4}-[0-9]{6}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_status` SET TAGS ('dbx_business_glossary_term' = 'Downtime Event Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `event_status` SET TAGS ('dbx_value_regex' = 'open|in_progress|resolved|closed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `failure_mode_code` SET TAGS ('dbx_business_glossary_term' = 'Failure Mode Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `fault_location_code` SET TAGS ('dbx_business_glossary_term' = 'Fault Location Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `is_quality_hold_triggered` SET TAGS ('dbx_business_glossary_term' = 'Is Quality Hold Triggered Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `is_repeat_failure` SET TAGS ('dbx_business_glossary_term' = 'Is Repeat Failure Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `is_safety_related` SET TAGS ('dbx_business_glossary_term' = 'Is Safety Related Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `maintenance_cost_local` SET TAGS ('dbx_business_glossary_term' = 'Maintenance Cost (Local Currency)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `maintenance_cost_local` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `notification_number` SET TAGS ('dbx_business_glossary_term' = 'SAP PM Notification Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `oee_availability_loss_pct` SET TAGS ('dbx_business_glossary_term' = 'OEE Availability Loss Percentage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|EV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `production_loss_units` SET TAGS ('dbx_business_glossary_term' = 'Production Loss Units');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `resolution_notes` SET TAGS ('dbx_business_glossary_term' = 'Resolution Notes');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `root_cause_code` SET TAGS ('dbx_business_glossary_term' = 'Root Cause Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `scada_alarm_code` SET TAGS ('dbx_business_glossary_term' = 'SCADA Alarm Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `shift_code` SET TAGS ('dbx_business_glossary_term' = 'Production Shift Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `shift_code` SET TAGS ('dbx_value_regex' = 'shift_1|shift_2|shift_3|weekend');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `spare_parts_consumed` SET TAGS ('dbx_business_glossary_term' = 'Spare Parts Consumed Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Downtime Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `time_to_repair_minutes` SET TAGS ('dbx_business_glossary_term' = 'Time to Repair (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `time_to_respond_minutes` SET TAGS ('dbx_business_glossary_term' = 'Time to Respond (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`downtime_event` ALTER COLUMN `work_order_number` SET TAGS ('dbx_business_glossary_term' = 'Maintenance Work Order Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` SET TAGS ('dbx_subdomain' = 'material_planning');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `production_bom_id` SET TAGS ('dbx_business_glossary_term' = 'Production Bill of Materials (BOM) ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Bill of Materials (eBOM) Reference ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_id` SET TAGS ('dbx_source_attribute' = 'bom_id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `model_id` SET TAGS ('dbx_business_glossary_term' = 'Model Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `production_ebom_reference_bom_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Bill of Materials (eBOM) Reference ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'BOM Approval Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'BOM Approved By (User ID)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `apqp_phase` SET TAGS ('dbx_business_glossary_term' = 'Advanced Product Quality Planning (APQP) Phase');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `apqp_phase` SET TAGS ('dbx_value_regex' = 'phase_1|phase_2|phase_3|phase_4|phase_5');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `assembly_type` SET TAGS ('dbx_business_glossary_term' = 'Assembly Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `assembly_type` SET TAGS ('dbx_value_regex' = 'CBU|CKD|SKD');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `base_quantity` SET TAGS ('dbx_business_glossary_term' = 'BOM Base Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `base_unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Base Unit of Measure (UoM)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_alternative` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Alternative Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_description` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_level` SET TAGS ('dbx_business_glossary_term' = 'BOM Level (Depth)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_status` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_status` SET TAGS ('dbx_value_regex' = 'draft|released|frozen|superseded|obsolete');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_type` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_type` SET TAGS ('dbx_value_regex' = 'production|phantom|sales|spare_parts|co_product');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_usage` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Usage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_usage` SET TAGS ('dbx_value_regex' = 'production|engineering|universal|plant_maintenance|sales');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `bom_version` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Version');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `change_reason` SET TAGS ('dbx_business_glossary_term' = 'BOM Change Reason');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `component_count` SET TAGS ('dbx_business_glossary_term' = 'BOM Component Count');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `eco_number` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Order (ECO) Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `effectivity_end_date` SET TAGS ('dbx_business_glossary_term' = 'BOM Effectivity End Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `effectivity_start_date` SET TAGS ('dbx_business_glossary_term' = 'BOM Effectivity Start Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `eop_date` SET TAGS ('dbx_business_glossary_term' = 'End of Production (EOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `homologation_status` SET TAGS ('dbx_business_glossary_term' = 'Homologation Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `homologation_status` SET TAGS ('dbx_value_regex' = 'pending|in_progress|approved|rejected|expired');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `is_configurable` SET TAGS ('dbx_business_glossary_term' = 'Is Configurable BOM Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `is_phantom_assembly` SET TAGS ('dbx_business_glossary_term' = 'Is Phantom Assembly Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `material_number` SET TAGS ('dbx_business_glossary_term' = 'SAP Material Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `ppap_status` SET TAGS ('dbx_business_glossary_term' = 'Production Part Approval Process (PPAP) Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `ppap_status` SET TAGS ('dbx_value_regex' = 'not_required|pending|submitted|approved|rejected');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `predecessor_bom_number` SET TAGS ('dbx_business_glossary_term' = 'Predecessor BOM Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `production_line_code` SET TAGS ('dbx_business_glossary_term' = 'Production Line Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `regulatory_market_code` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Market Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `release_date` SET TAGS ('dbx_business_glossary_term' = 'BOM Release Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `released_by` SET TAGS ('dbx_business_glossary_term' = 'BOM Released By (User ID)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `revision_level` SET TAGS ('dbx_business_glossary_term' = 'BOM Revision Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `routing_number` SET TAGS ('dbx_business_glossary_term' = 'Production Routing Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `routing_number` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `routing_number` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `sop_date` SET TAGS ('dbx_business_glossary_term' = 'Start of Production (SOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `superseded_by_bom_number` SET TAGS ('dbx_business_glossary_term' = 'Superseded By BOM Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `vehicle_configuration_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Configuration Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_bom` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` SET TAGS ('dbx_subdomain' = 'material_planning');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `manufacturing_bom_component_id` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Component ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `model_id` SET TAGS ('dbx_business_glossary_term' = 'Model Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Preferred Vendor ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `production_bom_id` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Installation Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `alternate_part_group` SET TAGS ('dbx_business_glossary_term' = 'Alternate Part Group Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `alternate_part_number` SET TAGS ('dbx_business_glossary_term' = 'Alternate Part Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `alternate_part_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{3,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `backflush_indicator` SET TAGS ('dbx_business_glossary_term' = 'Backflush Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `bom_level` SET TAGS ('dbx_business_glossary_term' = 'BOM Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `bulk_material_indicator` SET TAGS ('dbx_business_glossary_term' = 'Bulk Material Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `co_product_indicator` SET TAGS ('dbx_business_glossary_term' = 'Co-Product Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `commodity_code` SET TAGS ('dbx_business_glossary_term' = 'Commodity Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `component_status` SET TAGS ('dbx_business_glossary_term' = 'BOM Component Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `component_status` SET TAGS ('dbx_value_regex' = 'active|superseded|obsolete|pending_approval|on_hold');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `component_type` SET TAGS ('dbx_business_glossary_term' = 'BOM Component Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `component_type` SET TAGS ('dbx_value_regex' = 'raw_material|purchased_part|sub_assembly|phantom|co_product|bulk_material');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `drawing_number` SET TAGS ('dbx_business_glossary_term' = 'Engineering Drawing Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `drawing_revision` SET TAGS ('dbx_business_glossary_term' = 'Engineering Drawing Revision');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `drawing_revision` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,5}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `effectivity_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effectivity End Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `effectivity_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effectivity Start Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `engineering_change_number` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Number (ECN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `fmea_reference` SET TAGS ('dbx_business_glossary_term' = 'Failure Mode and Effects Analysis (FMEA) Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `hazardous_material_indicator` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `installation_sequence` SET TAGS ('dbx_business_glossary_term' = 'Installation Sequence Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `item_category` SET TAGS ('dbx_business_glossary_term' = 'BOM Item Category');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `item_category` SET TAGS ('dbx_value_regex' = 'stock|non_stock|variable_size|document|text');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `last_modified_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `lead_offset_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time Offset Days');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `operation_number` SET TAGS ('dbx_business_glossary_term' = 'Routing Operation Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `operation_number` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `phantom_assembly_indicator` SET TAGS ('dbx_business_glossary_term' = 'Phantom Assembly Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `ppap_status` SET TAGS ('dbx_business_glossary_term' = 'Production Part Approval Process (PPAP) Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `ppap_status` SET TAGS ('dbx_value_regex' = 'not_required|submitted|approved|rejected|interim_approval');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `priority_in_alt_group` SET TAGS ('dbx_business_glossary_term' = 'Priority in Alternate Group');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `quantity_per_vehicle` SET TAGS ('dbx_business_glossary_term' = 'Quantity Per Vehicle');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `reach_svhc_indicator` SET TAGS ('dbx_business_glossary_term' = 'REACH Substance of Very High Concern (SVHC) Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `scrap_factor_pct` SET TAGS ('dbx_business_glossary_term' = 'Scrap Factor Percentage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `standard_cost` SET TAGS ('dbx_business_glossary_term' = 'Standard Cost');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `standard_cost` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `supplier_part_number` SET TAGS ('dbx_business_glossary_term' = 'Supplier Part Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `supply_area` SET TAGS ('dbx_business_glossary_term' = 'Supply Area (Production Supply Area)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UoM)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = '^[A-Z]{2,5}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `usage_probability_pct` SET TAGS ('dbx_business_glossary_term' = 'Usage Probability Percentage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `variant_condition` SET TAGS ('dbx_business_glossary_term' = 'Variant Condition (Configuration Condition)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `vehicle_program_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_bom_component` ALTER COLUMN `weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Component Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` SET TAGS ('dbx_subdomain' = 'material_planning');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `material_consumption_id` SET TAGS ('dbx_business_glossary_term' = 'Material Consumption ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Confirmed By Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `inbound_part_id` SET TAGS ('dbx_business_glossary_term' = 'Inbound Part Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Material ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `assembly_station_code` SET TAGS ('dbx_business_glossary_term' = 'Assembly Station Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `bom_item_number` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Item Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `bom_version` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Version');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `consumption_status` SET TAGS ('dbx_business_glossary_term' = 'Consumption Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `consumption_status` SET TAGS ('dbx_value_regex' = 'posted|reversed|blocked|pending');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `consumption_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Consumption Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `cost_variance_amount` SET TAGS ('dbx_business_glossary_term' = 'Cost Variance Amount');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `cost_variance_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `goods_movement_number` SET TAGS ('dbx_business_glossary_term' = 'Goods Movement Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `goods_movement_type` SET TAGS ('dbx_business_glossary_term' = 'Goods Movement Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `material_cost_amount` SET TAGS ('dbx_business_glossary_term' = 'Material Cost Amount');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `material_cost_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `mes_transaction_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Transaction ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `operation_number` SET TAGS ('dbx_business_glossary_term' = 'Operation Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `original_goods_movement_number` SET TAGS ('dbx_business_glossary_term' = 'Original Goods Movement Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `planned_quantity` SET TAGS ('dbx_business_glossary_term' = 'Planned Quantity (BOM)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `posting_date` SET TAGS ('dbx_business_glossary_term' = 'Posting Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|EV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `production_line_code` SET TAGS ('dbx_business_glossary_term' = 'Production Line Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `quality_inspection_lot` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Lot');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `quantity_consumed` SET TAGS ('dbx_business_glossary_term' = 'Quantity Consumed');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `quantity_variance` SET TAGS ('dbx_business_glossary_term' = 'Quantity Variance');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `reversal_indicator` SET TAGS ('dbx_business_glossary_term' = 'Reversal Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `scrap_indicator` SET TAGS ('dbx_business_glossary_term' = 'Scrap Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `scrap_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Scrap Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `serial_number` SET TAGS ('dbx_business_glossary_term' = 'Serial Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `shift_code` SET TAGS ('dbx_business_glossary_term' = 'Shift Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `shift_code` SET TAGS ('dbx_value_regex' = 'DAY|AFTERNOON|NIGHT');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `source_system_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `source_system_code` SET TAGS ('dbx_value_regex' = 'SAP_MM|MES_APRISO|SAP_PP|MANUAL');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `supplier_number` SET TAGS ('dbx_business_glossary_term' = 'Supplier Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UoM)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `variance_percentage` SET TAGS ('dbx_business_glossary_term' = 'Variance Percentage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `vehicle_vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `vehicle_vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`material_consumption` ALTER COLUMN `wip_order_sequence` SET TAGS ('dbx_business_glossary_term' = 'Work in Progress (WIP) Order Sequence');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_order_id` SET TAGS ('dbx_business_glossary_term' = 'Rework Order ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `defect_record_id` SET TAGS ('dbx_business_glossary_term' = 'Quality Defect ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned Technician ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `actual_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Rework End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `actual_rework_hours` SET TAGS ('dbx_business_glossary_term' = 'Actual Rework Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `actual_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Rework Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `assembly_stage_code` SET TAGS ('dbx_business_glossary_term' = 'Assembly Stage Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `bom_component_number` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Component Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `corrective_action_reference` SET TAGS ('dbx_business_glossary_term' = 'Corrective Action Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `defect_code` SET TAGS ('dbx_business_glossary_term' = 'Defect Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `defect_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `defect_description` SET TAGS ('dbx_business_glossary_term' = 'Defect Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `defect_location_code` SET TAGS ('dbx_business_glossary_term' = 'Defect Location Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `detection_method_code` SET TAGS ('dbx_business_glossary_term' = 'Detection Method Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `detection_method_code` SET TAGS ('dbx_value_regex' = 'visual_inspection|automated_gauge|functional_test|audit_check|customer_feedback');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `detection_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Defect Detection Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `disposition_code` SET TAGS ('dbx_business_glossary_term' = 'Disposition Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `disposition_code` SET TAGS ('dbx_value_regex' = 'repaired|scrapped|concession|use_as_is|return_to_supplier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `inspection_point_code` SET TAGS ('dbx_business_glossary_term' = 'Inspection Point Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `is_regulatory_hold` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Hold Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `is_safety_related` SET TAGS ('dbx_business_glossary_term' = 'Safety-Related Defect Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `line_stoppage_flag` SET TAGS ('dbx_business_glossary_term' = 'Production Line Stoppage Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `planned_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Planned Rework End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `planned_rework_hours` SET TAGS ('dbx_business_glossary_term' = 'Planned Rework Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `planned_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Planned Rework Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `priority_level` SET TAGS ('dbx_business_glossary_term' = 'Rework Priority Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `priority_level` SET TAGS ('dbx_value_regex' = 'critical|high|medium|low');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `production_line_code` SET TAGS ('dbx_business_glossary_term' = 'Production Line Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `re_inspection_required` SET TAGS ('dbx_business_glossary_term' = 'Re-Inspection Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `re_inspection_result` SET TAGS ('dbx_business_glossary_term' = 'Re-Inspection Result');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `re_inspection_result` SET TAGS ('dbx_value_regex' = 'pass|fail|conditional_pass|pending');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_attempt_count` SET TAGS ('dbx_business_glossary_term' = 'Rework Attempt Count');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_instruction_reference` SET TAGS ('dbx_business_glossary_term' = 'Rework Instruction Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_labor_cost` SET TAGS ('dbx_business_glossary_term' = 'Rework Labor Cost');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_labor_cost` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_material_cost` SET TAGS ('dbx_business_glossary_term' = 'Rework Material Cost');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_material_cost` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_order_number` SET TAGS ('dbx_business_glossary_term' = 'Rework Order Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_order_number` SET TAGS ('dbx_value_regex' = '^RWK-[A-Z]{3}-[0-9]{4}-[0-9]{6}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_order_status` SET TAGS ('dbx_business_glossary_term' = 'Rework Order Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_order_status` SET TAGS ('dbx_value_regex' = 'open|in_progress|on_hold|completed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_type` SET TAGS ('dbx_business_glossary_term' = 'Rework Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `rework_type` SET TAGS ('dbx_value_regex' = 'inline_repair|offline_rework|teardown|subassembly_rework|cosmetic_repair');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `root_cause_code` SET TAGS ('dbx_business_glossary_term' = 'Root Cause Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `scrap_quantity` SET TAGS ('dbx_business_glossary_term' = 'Scrap Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `source_system_code` SET TAGS ('dbx_business_glossary_term' = 'Source System Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `source_system_code` SET TAGS ('dbx_value_regex' = 'SAP_QM|MES_APRISO|MES_DASSAULT|MANUAL');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`rework_order` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_confirmation_id` SET TAGS ('dbx_business_glossary_term' = 'Production Confirmation ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Operator ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_operator_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Operator ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_operator_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_operator_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `reversed_confirmation_production_confirmation_id` SET TAGS ('dbx_business_glossary_term' = 'Reversed Confirmation ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `shift_id` SET TAGS ('dbx_business_glossary_term' = 'Shift ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `activity_type_code` SET TAGS ('dbx_business_glossary_term' = 'Activity Type Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `activity_type_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,6}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_business_glossary_term' = 'Assembly Stage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `base_unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Base Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `batch_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{1,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_entry_mode` SET TAGS ('dbx_business_glossary_term' = 'Confirmation Entry Mode');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_entry_mode` SET TAGS ('dbx_value_regex' = 'manual|automatic|mes_interface|backflush');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_number` SET TAGS ('dbx_business_glossary_term' = 'Production Confirmation Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{10,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_status` SET TAGS ('dbx_business_glossary_term' = 'Production Confirmation Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_status` SET TAGS ('dbx_value_regex' = 'created|posted|reversed|cancelled|partial|final');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Production Confirmation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_type` SET TAGS ('dbx_business_glossary_term' = 'Production Confirmation Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `confirmation_type` SET TAGS ('dbx_value_regex' = 'partial|final|automatic|milestone|reversal');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `downtime_duration_min` SET TAGS ('dbx_business_glossary_term' = 'Downtime Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `downtime_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Downtime Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `downtime_reason_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `final_confirmation_flag` SET TAGS ('dbx_business_glossary_term' = 'Final Confirmation Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `goods_receipt_posted_flag` SET TAGS ('dbx_business_glossary_term' = 'Goods Receipt Posted Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `labor_time_actual_min` SET TAGS ('dbx_business_glossary_term' = 'Actual Labor Time (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `labor_time_planned_min` SET TAGS ('dbx_business_glossary_term' = 'Planned Labor Time (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `machine_time_actual_min` SET TAGS ('dbx_business_glossary_term' = 'Actual Machine Time (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `machine_time_planned_min` SET TAGS ('dbx_business_glossary_term' = 'Planned Machine Time (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `material_number` SET TAGS ('dbx_business_glossary_term' = 'Material Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `material_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{1,40}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `mes_confirmation_reference` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Confirmation Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `mes_confirmation_reference` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{1,50}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `operation_number` SET TAGS ('dbx_business_glossary_term' = 'Operation Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `operation_number` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `order_settlement_status` SET TAGS ('dbx_business_glossary_term' = 'Production Order Settlement Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `order_settlement_status` SET TAGS ('dbx_value_regex' = 'pending|settled|partially_settled|not_required');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `posting_date` SET TAGS ('dbx_business_glossary_term' = 'Posting Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_order_number` SET TAGS ('dbx_business_glossary_term' = 'Production Order Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `production_order_number` SET TAGS ('dbx_value_regex' = '^[0-9]{8,12}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `quality_inspection_lot` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `quality_inspection_lot` SET TAGS ('dbx_value_regex' = '^[0-9]{12}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `reversal_indicator` SET TAGS ('dbx_business_glossary_term' = 'Reversal Indicator');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `rework_quantity` SET TAGS ('dbx_business_glossary_term' = 'Rework Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `scrap_quantity` SET TAGS ('dbx_business_glossary_term' = 'Scrap Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `scrap_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Scrap Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `scrap_reason_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `setup_time_actual_min` SET TAGS ('dbx_business_glossary_term' = 'Actual Setup Time (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `setup_time_planned_min` SET TAGS ('dbx_business_glossary_term' = 'Planned Setup Time (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `storage_location_code` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `storage_location_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `takt_time_actual_sec` SET TAGS ('dbx_business_glossary_term' = 'Actual Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `teardown_time_actual_min` SET TAGS ('dbx_business_glossary_term' = 'Actual Teardown Time (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_confirmation` ALTER COLUMN `yield_quantity` SET TAGS ('dbx_business_glossary_term' = 'Yield Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` SET TAGS ('dbx_subdomain' = 'material_planning');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` ALTER COLUMN `manufacturing_tooling_usage_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Key for manufacturing_tooling_usage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_tooling_usage` ALTER COLUMN `work_center_id` SET TAGS ('dbx_internal' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_parameter_id` SET TAGS ('dbx_business_glossary_term' = 'Process Parameter ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Operator Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment / Machine ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_equipment_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment / Machine ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_operator_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Operator Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_operator_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_operator_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `tooling_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Tool ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `process_tooling_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Tool ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `vehicle_build_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Build ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_business_glossary_term' = 'Assembly Stage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `control_plan_number` SET TAGS ('dbx_business_glossary_term' = 'Control Plan Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `control_plan_revision` SET TAGS ('dbx_business_glossary_term' = 'Control Plan Revision Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `data_collection_method` SET TAGS ('dbx_business_glossary_term' = 'Data Collection Method');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `data_collection_method` SET TAGS ('dbx_value_regex' = 'automatic|semi_automatic|manual');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `deviation_from_nominal` SET TAGS ('dbx_business_glossary_term' = 'Deviation from Nominal Value');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `gauge_calibration_due_date` SET TAGS ('dbx_business_glossary_term' = 'Gauge Calibration Due Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `is_out_of_control` SET TAGS ('dbx_business_glossary_term' = 'Statistical Process Control (SPC) Out-of-Control Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `lower_control_limit` SET TAGS ('dbx_business_glossary_term' = 'Lower Control Limit (LCL)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `lower_spec_limit` SET TAGS ('dbx_business_glossary_term' = 'Lower Specification Limit (LSL)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `measured_value` SET TAGS ('dbx_business_glossary_term' = 'Measured Process Parameter Value');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `measurement_system_code` SET TAGS ('dbx_business_glossary_term' = 'Measurement System ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `mes_transaction_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Transaction ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `nominal_value` SET TAGS ('dbx_business_glossary_term' = 'Nominal (Target) Process Parameter Value');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `non_conformance_number` SET TAGS ('dbx_business_glossary_term' = 'Non-Conformance Report (NCR) Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `parameter_code` SET TAGS ('dbx_business_glossary_term' = 'Process Parameter Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `parameter_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_]{3,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `parameter_name` SET TAGS ('dbx_business_glossary_term' = 'Process Parameter Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `parameter_type` SET TAGS ('dbx_business_glossary_term' = 'Process Parameter Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `pass_fail_status` SET TAGS ('dbx_business_glossary_term' = 'Process Parameter Pass/Fail Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `pass_fail_status` SET TAGS ('dbx_value_regex' = 'pass|fail|warning|rework_required|inconclusive');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `plc_tag_code` SET TAGS ('dbx_business_glossary_term' = 'Programmable Logic Controller (PLC) Tag ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `reaction_plan_triggered` SET TAGS ('dbx_business_glossary_term' = 'Reaction Plan Triggered Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `reading_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Process Parameter Reading Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `record_created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `record_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `sample_number` SET TAGS ('dbx_business_glossary_term' = 'SPC Sample Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `scada_system_code` SET TAGS ('dbx_business_glossary_term' = 'Supervisory Control and Data Acquisition (SCADA) System ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `shift_code` SET TAGS ('dbx_business_glossary_term' = 'Production Shift Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `shift_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `spc_rule_violated` SET TAGS ('dbx_business_glossary_term' = 'Statistical Process Control (SPC) Rule Violated');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `subgroup_number` SET TAGS ('dbx_business_glossary_term' = 'SPC Subgroup ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `upper_control_limit` SET TAGS ('dbx_business_glossary_term' = 'Upper Control Limit (UCL)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `upper_spec_limit` SET TAGS ('dbx_business_glossary_term' = 'Upper Specification Limit (USL)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`process_parameter` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_movement_id` SET TAGS ('dbx_business_glossary_term' = 'Automated Guided Vehicle (AGV) Movement ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Operator ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_operator_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Operator ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_operator_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_operator_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_route_id` SET TAGS ('dbx_business_glossary_term' = 'AGV Route ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `shift_id` SET TAGS ('dbx_business_glossary_term' = 'Shift ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_controller_code` SET TAGS ('dbx_business_glossary_term' = 'AGV Fleet Controller ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_unit_code` SET TAGS ('dbx_business_glossary_term' = 'Automated Guided Vehicle (AGV) Unit ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `agv_unit_code` SET TAGS ('dbx_value_regex' = '^AGV-[A-Z0-9]{3,12}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_business_glossary_term' = 'Assembly Stage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_value_regex' = 'stamping|body_shop|paint|trim|chassis|final_assembly');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `average_speed_mps` SET TAGS ('dbx_business_glossary_term' = 'AGV Average Speed (Metres per Second)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `battery_level_end_pct` SET TAGS ('dbx_business_glossary_term' = 'AGV Battery Level at Movement End (Percentage)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `battery_level_start_pct` SET TAGS ('dbx_business_glossary_term' = 'AGV Battery Level at Movement Start (Percentage)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `destination_location_code` SET TAGS ('dbx_business_glossary_term' = 'AGV Destination Location Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `destination_location_name` SET TAGS ('dbx_business_glossary_term' = 'AGV Destination Location Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `distance_travelled_m` SET TAGS ('dbx_business_glossary_term' = 'AGV Distance Travelled (Metres)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `fault_code` SET TAGS ('dbx_business_glossary_term' = 'AGV Fault Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `fault_description` SET TAGS ('dbx_business_glossary_term' = 'AGV Fault Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `fault_timestamp` SET TAGS ('dbx_business_glossary_term' = 'AGV Fault Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `is_manual_override` SET TAGS ('dbx_business_glossary_term' = 'Manual Override Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `jis_call_off_flag` SET TAGS ('dbx_business_glossary_term' = 'Just-in-Sequence (JIS) Call-Off Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `load_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'AGV Load Weight (Kilograms)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `mes_task_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Task ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'AGV Movement End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'AGV Movement Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_status` SET TAGS ('dbx_business_glossary_term' = 'AGV Movement Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_status` SET TAGS ('dbx_value_regex' = 'in_progress|completed|aborted|faulted|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_type` SET TAGS ('dbx_business_glossary_term' = 'AGV Movement Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `movement_type` SET TAGS ('dbx_value_regex' = 'load|transport|unload|charge|idle|fault');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `origin_location_code` SET TAGS ('dbx_business_glossary_term' = 'AGV Origin Location Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `origin_location_name` SET TAGS ('dbx_business_glossary_term' = 'AGV Origin Location Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `part_description` SET TAGS ('dbx_business_glossary_term' = 'Part Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `part_number` SET TAGS ('dbx_business_glossary_term' = 'Part Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `planned_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'AGV Planned Movement End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `planned_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'AGV Planned Movement Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `priority_level` SET TAGS ('dbx_business_glossary_term' = 'AGV Movement Priority Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `priority_level` SET TAGS ('dbx_value_regex' = 'critical|high|normal|low');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `quantity_transported` SET TAGS ('dbx_business_glossary_term' = 'Quantity Transported');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `route_deviation_flag` SET TAGS ('dbx_business_glossary_term' = 'AGV Route Deviation Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `source_system_code` SET TAGS ('dbx_business_glossary_term' = 'Source System ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_movement` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Capacity Plan ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_id` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Bottleneck Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Plan Owner ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_owner_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Plan Owner ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_owner_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_owner_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `shift_id` SET TAGS ('dbx_business_glossary_term' = 'Shift ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `available_hours` SET TAGS ('dbx_business_glossary_term' = 'Available Production Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `bottleneck_constraint_description` SET TAGS ('dbx_business_glossary_term' = 'Bottleneck Constraint Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_gap_units` SET TAGS ('dbx_business_glossary_term' = 'Capacity Gap Units');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_gap_units` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_type` SET TAGS ('dbx_business_glossary_term' = 'Capacity Plan Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_type` SET TAGS ('dbx_value_regex' = 'rough_cut|detailed|constraint_based|what_if');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_plan_type` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_utilization_percent` SET TAGS ('dbx_business_glossary_term' = 'Capacity Utilization Percentage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capacity_utilization_percent` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capex_amount` SET TAGS ('dbx_business_glossary_term' = 'Capital Expenditure (CapEx) Amount');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capex_amount` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `capex_required` SET TAGS ('dbx_business_glossary_term' = 'Capital Expenditure (CapEx) Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `changeover_hours` SET TAGS ('dbx_business_glossary_term' = 'Changeover Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `daily_production_target` SET TAGS ('dbx_business_glossary_term' = 'Daily Production Target (Units)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `demonstrated_capacity_units` SET TAGS ('dbx_business_glossary_term' = 'Demonstrated Capacity Units');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `demonstrated_capacity_units` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `eop_date` SET TAGS ('dbx_business_glossary_term' = 'End of Production (EOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_business_glossary_term' = 'Fiscal Year (FY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_value_regex' = '^FY[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `headcount_required` SET TAGS ('dbx_business_glossary_term' = 'Headcount Required');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `is_bottleneck_constrained` SET TAGS ('dbx_business_glossary_term' = 'Bottleneck Constrained Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `number_of_shifts` SET TAGS ('dbx_business_glossary_term' = 'Number of Shifts');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_end_date` SET TAGS ('dbx_business_glossary_term' = 'Capacity Plan End Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_number` SET TAGS ('dbx_business_glossary_term' = 'Capacity Plan Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_number` SET TAGS ('dbx_value_regex' = '^CP-[A-Z0-9]{3,6}-[0-9]{4}-[0-9]{2}-[0-9]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_start_date` SET TAGS ('dbx_business_glossary_term' = 'Capacity Plan Start Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_status` SET TAGS ('dbx_business_glossary_term' = 'Capacity Plan Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_status` SET TAGS ('dbx_value_regex' = 'draft|submitted|approved|active|superseded|archived');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_version` SET TAGS ('dbx_business_glossary_term' = 'Capacity Plan Version');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `plan_version` SET TAGS ('dbx_value_regex' = '^v[0-9]{1,3}.[0-9]{1,2}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planned_downtime_hours` SET TAGS ('dbx_business_glossary_term' = 'Planned Downtime Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planned_maintenance_hours` SET TAGS ('dbx_business_glossary_term' = 'Planned Maintenance Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planned_overtime_hours` SET TAGS ('dbx_business_glossary_term' = 'Planned Overtime Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planned_production_units` SET TAGS ('dbx_business_glossary_term' = 'Planned Production Units');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planning_period_type` SET TAGS ('dbx_business_glossary_term' = 'Planning Period Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planning_period_type` SET TAGS ('dbx_value_regex' = 'weekly|monthly|quarterly|annual');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planning_scenario` SET TAGS ('dbx_business_glossary_term' = 'Planning Scenario');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `planning_scenario` SET TAGS ('dbx_value_regex' = 'base|optimistic|pessimistic|stretch');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `rated_capacity_jph` SET TAGS ('dbx_business_glossary_term' = 'Rated Capacity Jobs Per Hour (JPH)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `rated_capacity_jph` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `rated_capacity_units` SET TAGS ('dbx_business_glossary_term' = 'Rated Capacity Units');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `rated_capacity_units` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `sap_capacity_plan_code` SET TAGS ('dbx_business_glossary_term' = 'SAP Capacity Plan ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `sap_capacity_plan_code` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `sop_date` SET TAGS ('dbx_business_glossary_term' = 'Start of Production (SOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`capacity_plan` ALTER COLUMN `working_days` SET TAGS ('dbx_business_glossary_term' = 'Working Days');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_id` SET TAGS ('dbx_business_glossary_term' = 'Changeover ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Supervisor ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_supervisor_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Supervisor ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_supervisor_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_supervisor_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `org_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Changeover Team ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `shift_id` SET TAGS ('dbx_business_glossary_term' = 'Shift ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `actual_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Actual Changeover Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `actual_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Changeover End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `actual_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Changeover Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `agv_intervention_required` SET TAGS ('dbx_business_glossary_term' = 'AGV (Automated Guided Vehicle) Intervention Required');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_business_glossary_term' = 'Assembly Stage');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `assembly_stage` SET TAGS ('dbx_value_regex' = 'stamping|body_shop|paint|trim|chassis|final_assembly');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_number` SET TAGS ('dbx_business_glossary_term' = 'Changeover Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_number` SET TAGS ('dbx_value_regex' = '^CO-[A-Z0-9]{3,6}-[0-9]{8}-[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_status` SET TAGS ('dbx_business_glossary_term' = 'Changeover Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_status` SET TAGS ('dbx_value_regex' = 'scheduled|in_progress|completed|cancelled|aborted');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_type` SET TAGS ('dbx_business_glossary_term' = 'Changeover Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `changeover_type` SET TAGS ('dbx_value_regex' = 'model_mix_change|color_change|tooling_swap|line_retooling|powertrain_variant|body_style_change');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `delay_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Changeover Delay Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `external_elements_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'External Changeover Elements Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `first_good_unit_timestamp` SET TAGS ('dbx_business_glossary_term' = 'First Good Unit Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_body_style_code` SET TAGS ('dbx_business_glossary_term' = 'From Body Style Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_body_style_code` SET TAGS ('dbx_value_regex' = 'sedan|suv|truck|coupe|hatchback|van');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_exterior_color_code` SET TAGS ('dbx_business_glossary_term' = 'From Exterior Color Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'From Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `from_vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'From Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `internal_elements_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Internal Changeover Elements Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `is_planned` SET TAGS ('dbx_business_glossary_term' = 'Is Planned Changeover');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `is_smed_target` SET TAGS ('dbx_business_glossary_term' = 'Is SMED (Single-Minute Exchange of Die) Target');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `line_verification_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Line Verification Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `mes_changeover_reference` SET TAGS ('dbx_business_glossary_term' = 'MES (Manufacturing Execution System) Changeover Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `model_year` SET TAGS ('dbx_value_regex' = '^[0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `planned_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Planned Changeover Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `planned_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Planned Changeover End Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `planned_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Planned Changeover Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `production_loss_units` SET TAGS ('dbx_business_glossary_term' = 'Production Loss Units');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `quality_gate_passed` SET TAGS ('dbx_business_glossary_term' = 'Quality Gate Passed');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `reason_code` SET TAGS ('dbx_business_glossary_term' = 'Changeover Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `reason_description` SET TAGS ('dbx_business_glossary_term' = 'Changeover Reason Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `sap_order_reference` SET TAGS ('dbx_business_glossary_term' = 'SAP Production Order Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `scrap_units_during_changeover` SET TAGS ('dbx_business_glossary_term' = 'Scrap Units During Changeover');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_body_style_code` SET TAGS ('dbx_business_glossary_term' = 'To Body Style Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_body_style_code` SET TAGS ('dbx_value_regex' = 'sedan|suv|truck|coupe|hatchback|van');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_exterior_color_code` SET TAGS ('dbx_business_glossary_term' = 'To Exterior Color Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'To Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `to_vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'To Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `tooling_change_required` SET TAGS ('dbx_business_glossary_term' = 'Tooling Change Required');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `tooling_setup_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Tooling Setup Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`changeover` ALTER COLUMN `variance_minutes` SET TAGS ('dbx_business_glossary_term' = 'Changeover Duration Variance (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `production_variant_id` SET TAGS ('dbx_business_glossary_term' = 'Production Variant Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `rebate_agreement_id` SET TAGS ('dbx_business_glossary_term' = 'Production Variant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `model_id` SET TAGS ('dbx_business_glossary_term' = 'Model Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `production_bom_id` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `routing_id` SET TAGS ('dbx_business_glossary_term' = 'Production Routing ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `adas_level` SET TAGS ('dbx_business_glossary_term' = 'Advanced Driver Assistance Systems (ADAS) Automation Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `adas_level` SET TAGS ('dbx_value_regex' = 'L0|L1|L2|L2_PLUS|L3');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `assembly_complexity_score` SET TAGS ('dbx_business_glossary_term' = 'Assembly Complexity Score');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `battery_capacity_kwh` SET TAGS ('dbx_business_glossary_term' = 'Battery Capacity (kWh)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `battery_capacity_kwh` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `body_style_code` SET TAGS ('dbx_business_glossary_term' = 'Body Style Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `body_style_code` SET TAGS ('dbx_value_regex' = 'SEDAN|SUV|TRUCK|COUPE|HATCHBACK|MINIVAN');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `co2_emission_g_per_km` SET TAGS ('dbx_business_glossary_term' = 'CO2 Emission (g/km)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `destination_market_code` SET TAGS ('dbx_business_glossary_term' = 'Destination Market Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `destination_market_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `drive_configuration` SET TAGS ('dbx_business_glossary_term' = 'Drive Configuration');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `drive_configuration` SET TAGS ('dbx_value_regex' = 'FWD|RWD|AWD|4WD');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `engine_displacement_cc` SET TAGS ('dbx_business_glossary_term' = 'Engine Displacement (cc)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `engineering_change_level` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `engineering_change_level` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `eop_date` SET TAGS ('dbx_business_glossary_term' = 'End of Production (EOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `fuel_economy_mpg` SET TAGS ('dbx_business_glossary_term' = 'Fuel Economy (MPG)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `gross_vehicle_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Gross Vehicle Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `hand_of_drive` SET TAGS ('dbx_business_glossary_term' = 'Hand of Drive');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `hand_of_drive` SET TAGS ('dbx_value_regex' = 'LHD|RHD');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `homologation_status` SET TAGS ('dbx_business_glossary_term' = 'Homologation Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `homologation_status` SET TAGS ('dbx_value_regex' = 'PENDING|CERTIFIED|CONDITIONAL|EXPIRED|NOT_REQUIRED');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `is_ckd_eligible` SET TAGS ('dbx_business_glossary_term' = 'Completely Knocked Down (CKD) Eligibility Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `is_jis_eligible` SET TAGS ('dbx_business_glossary_term' = 'Just-in-Sequence (JIS) Eligibility Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `is_line_compatible` SET TAGS ('dbx_business_glossary_term' = 'Line Compatibility Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `is_ota_capable` SET TAGS ('dbx_business_glossary_term' = 'Over-the-Air (OTA) Update Capable Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `max_consecutive_builds` SET TAGS ('dbx_business_glossary_term' = 'Maximum Consecutive Builds');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `mes_variant_reference` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Variant Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `mes_variant_reference` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{3,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `ncap_safety_rating` SET TAGS ('dbx_business_glossary_term' = 'New Car Assessment Programme (NCAP) Safety Rating');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `ncap_safety_rating` SET TAGS ('dbx_value_regex' = '1_STAR|2_STAR|3_STAR|4_STAR|5_STAR|NOT_RATED');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `option_package_code` SET TAGS ('dbx_business_glossary_term' = 'Option Package Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `option_package_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,15}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `paint_process_type` SET TAGS ('dbx_business_glossary_term' = 'Paint Process Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `paint_process_type` SET TAGS ('dbx_value_regex' = 'STANDARD|METALLIC|PEARL|MATTE|TWO_TONE');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `ppap_status` SET TAGS ('dbx_business_glossary_term' = 'Production Part Approval Process (PPAP) Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `ppap_status` SET TAGS ('dbx_value_regex' = 'NOT_REQUIRED|PENDING|SUBMITTED|APPROVED|REJECTED');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `regulatory_region` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Region');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `regulatory_region` SET TAGS ('dbx_value_regex' = 'NAFTA|EU|APAC|LATAM|MEA|CHINA');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `sap_material_number` SET TAGS ('dbx_business_glossary_term' = 'SAP Material Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `sap_material_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{8,18}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `sop_date` SET TAGS ('dbx_business_glossary_term' = 'Start of Production (SOP) Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `standard_build_hours` SET TAGS ('dbx_business_glossary_term' = 'Standard Build Hours');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `takt_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Takt Time (Seconds)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `teamcenter_variant_code` SET TAGS ('dbx_business_glossary_term' = 'Siemens Teamcenter PLM Variant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `teamcenter_variant_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9-]{5,30}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `transmission_type` SET TAGS ('dbx_business_glossary_term' = 'Transmission Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `transmission_type` SET TAGS ('dbx_value_regex' = 'AUTOMATIC|MANUAL|CVT|DCT|SINGLE_SPEED');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `trim_level_code` SET TAGS ('dbx_business_glossary_term' = 'Trim Level Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `trim_level_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `v2x_capable` SET TAGS ('dbx_business_glossary_term' = 'Vehicle-to-Everything (V2X) Communication Capable Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `variant_code` SET TAGS ('dbx_business_glossary_term' = 'Production Variant Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `variant_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4,20}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `variant_name` SET TAGS ('dbx_business_glossary_term' = 'Production Variant Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `variant_status` SET TAGS ('dbx_business_glossary_term' = 'Production Variant Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `variant_status` SET TAGS ('dbx_value_regex' = 'ACTIVE|INACTIVE|PLANNED|DISCONTINUED|ON_HOLD');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,10}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_variant` ALTER COLUMN `wltp_range_km` SET TAGS ('dbx_business_glossary_term' = 'Worldwide Harmonised Light Vehicles Test Procedure (WLTP) Range (km)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` SET TAGS ('dbx_subdomain' = 'material_planning');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_record_id` SET TAGS ('dbx_business_glossary_term' = 'Scrap Record ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Authorizing Employee ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `defect_record_id` SET TAGS ('dbx_business_glossary_term' = 'Quality Defect ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `work_center_id` SET TAGS ('dbx_business_glossary_term' = 'Work Center ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `assembly_stage_code` SET TAGS ('dbx_business_glossary_term' = 'Assembly Stage Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `bom_component_number` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials (BOM) Component Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `co2_impact_kg` SET TAGS ('dbx_business_glossary_term' = 'Carbon Dioxide (CO2) Impact (kg)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `corrective_action_reference` SET TAGS ('dbx_business_glossary_term' = 'Corrective Action Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `detection_method_code` SET TAGS ('dbx_business_glossary_term' = 'Detection Method Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `disposal_method_code` SET TAGS ('dbx_business_glossary_term' = 'Disposal Method Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `disposal_method_code` SET TAGS ('dbx_value_regex' = 'RECYCLE|LANDFILL|REWORK|RETURN_SUPPLIER|INCINERATE|RESALE');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `disposal_reference` SET TAGS ('dbx_business_glossary_term' = 'Disposal Authorization Reference');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `inspection_point_code` SET TAGS ('dbx_business_glossary_term' = 'Inspection Point Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `is_hazardous_material` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `is_safety_related` SET TAGS ('dbx_business_glossary_term' = 'Safety-Related Component Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `is_warranty_relevant` SET TAGS ('dbx_business_glossary_term' = 'Warranty Relevance Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `mes_transaction_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Execution System (MES) Transaction ID');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `part_number` SET TAGS ('dbx_business_glossary_term' = 'Part Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `ppm_contribution` SET TAGS ('dbx_business_glossary_term' = 'Parts Per Million (PPM) Defect Contribution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `production_line_code` SET TAGS ('dbx_business_glossary_term' = 'Production Line Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `root_cause_code` SET TAGS ('dbx_business_glossary_term' = 'Root Cause Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `salvage_value` SET TAGS ('dbx_business_glossary_term' = 'Salvage Value');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `salvage_value` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `sap_movement_type` SET TAGS ('dbx_business_glossary_term' = 'SAP Goods Movement Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `sap_movement_type` SET TAGS ('dbx_value_regex' = '551|552|553|554');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `sap_posting_document_number` SET TAGS ('dbx_business_glossary_term' = 'SAP Financial Posting Document Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_category` SET TAGS ('dbx_business_glossary_term' = 'Scrap Category');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_category` SET TAGS ('dbx_value_regex' = 'process|material|design|tooling|supplier|operator_error');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_document_number` SET TAGS ('dbx_business_glossary_term' = 'Scrap Document Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_document_number` SET TAGS ('dbx_value_regex' = '^SCR-[0-9]{4}-[0-9]{8}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_quantity` SET TAGS ('dbx_business_glossary_term' = 'Scrap Quantity');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Scrap Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_reason_description` SET TAGS ('dbx_business_glossary_term' = 'Scrap Reason Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_status` SET TAGS ('dbx_business_glossary_term' = 'Scrap Record Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_status` SET TAGS ('dbx_value_regex' = 'pending|confirmed|disposed|reversed|under_review');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Scrap Event Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_value` SET TAGS ('dbx_business_glossary_term' = 'Scrap Value');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `scrap_value` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `shift_code` SET TAGS ('dbx_business_glossary_term' = 'Shift Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `shift_code` SET TAGS ('dbx_value_regex' = 'D|A|N|E');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `supplier_code` SET TAGS ('dbx_business_glossary_term' = 'Supplier Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UoM)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `vehicle_model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`scrap_record` ALTER COLUMN `weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Scrap Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` SET TAGS ('dbx_data_type' = 'association_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` SET TAGS ('dbx_subdomain' = 'material_planning');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` SET TAGS ('dbx_association_edges' = 'manufacturing.plant,procurement.supplier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `manufacturing_supply_agreement_id` SET TAGS ('dbx_business_glossary_term' = 'Supplyagreement - Supply Agreement Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `manufacturing_packaging_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Packaging Spec');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Supplyagreement - Plant Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplyagreement - Supplier Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `freight_terms` SET TAGS ('dbx_business_glossary_term' = 'Freight Terms');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `is_preferred_supplier` SET TAGS ('dbx_business_glossary_term' = 'Preferred Supplier Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `manufacturing_supply_agreement_status` SET TAGS ('dbx_business_glossary_term' = 'Agreement Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `minimum_order_quantity` SET TAGS ('dbx_business_glossary_term' = 'Minimum Order Qty');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `quality_rating` SET TAGS ('dbx_business_glossary_term' = 'Quality Rating');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_supply_agreement` ALTER COLUMN `shipping_method` SET TAGS ('dbx_business_glossary_term' = 'Shipping Method');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` SET TAGS ('dbx_data_type' = 'association_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` SET TAGS ('dbx_subdomain' = 'contractual_relationships');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` SET TAGS ('dbx_association_edges' = 'manufacturing.vehicle_build,mobility.mobility_service');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `vehicle_mobility_subscription_id` SET TAGS ('dbx_business_glossary_term' = 'Vehiclemobilitysubscription - Vehicle Mobility Subscription Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `mobility_service_id` SET TAGS ('dbx_business_glossary_term' = 'Vehiclemobilitysubscription - Mobility Service Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `service_tier_id` SET TAGS ('dbx_business_glossary_term' = 'Service Tier Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `vehicle_build_id` SET TAGS ('dbx_business_glossary_term' = 'Vehiclemobilitysubscription - Vehicle Build Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `billing_amount` SET TAGS ('dbx_business_glossary_term' = 'Billing Amount');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `subscription_end_date` SET TAGS ('dbx_business_glossary_term' = 'Subscription End Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `subscription_start_date` SET TAGS ('dbx_business_glossary_term' = 'Subscription Start Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`vehicle_mobility_subscription` ALTER COLUMN `vehicle_mobility_subscription_status` SET TAGS ('dbx_business_glossary_term' = 'Subscription Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` SET TAGS ('dbx_data_type' = 'association_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` SET TAGS ('dbx_subdomain' = 'contractual_relationships');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` SET TAGS ('dbx_association_edges' = 'manufacturing.production_order,compliance.regulatory_requirement');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `compliance_certification_id` SET TAGS ('dbx_business_glossary_term' = 'Compliancecertification - Compliance Certification Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Compliancecertification - Production Order Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `regulatory_requirement_id` SET TAGS ('dbx_business_glossary_term' = 'Compliancecertification - Regulatory Requirement Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `certification_date` SET TAGS ('dbx_business_glossary_term' = 'Certification Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`compliance_certification` ALTER COLUMN `evidence_document_path` SET TAGS ('dbx_business_glossary_term' = 'Evidence Document');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` SET TAGS ('dbx_data_type' = 'association_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` SET TAGS ('dbx_subdomain' = 'contractual_relationships');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` SET TAGS ('dbx_association_edges' = 'manufacturing.production_order,dealer.dealership');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `production_order_allocation_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order Allocation - Allocation Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order Allocation - Dealership Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order Allocation - Production Order Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `allocation_date` SET TAGS ('dbx_business_glossary_term' = 'Allocation Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `allocation_number` SET TAGS ('dbx_business_glossary_term' = 'Allocation Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `allocation_status` SET TAGS ('dbx_business_glossary_term' = 'Allocation Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `allocation_type` SET TAGS ('dbx_business_glossary_term' = 'Allocation Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`production_order_allocation` ALTER COLUMN `priority_tier` SET TAGS ('dbx_business_glossary_term' = 'Priority Tier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `agv_route_id` SET TAGS ('dbx_business_glossary_term' = 'Agv Route Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `agv_start_location_id` SET TAGS ('dbx_business_glossary_term' = 'Start Location Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `reverse_agv_route_id` SET TAGS ('dbx_business_glossary_term' = 'Reverse Agv Route Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `reverse_agv_route_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'End Location Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `allowed_load_kg` SET TAGS ('dbx_business_glossary_term' = 'Allowed Load Kg');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `energy_consumption_kwh_per_cycle` SET TAGS ('dbx_business_glossary_term' = 'Energy Consumption Kwh Per Cycle');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `estimated_cycle_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Estimated Cycle Time Seconds');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `is_bidirectional` SET TAGS ('dbx_business_glossary_term' = 'Is Bidirectional');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `is_dynamic_route` SET TAGS ('dbx_business_glossary_term' = 'Is Dynamic Route');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `last_inspection_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Inspection Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `maintenance_window` SET TAGS ('dbx_business_glossary_term' = 'Maintenance Window');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `max_speed_m_per_s` SET TAGS ('dbx_business_glossary_term' = 'Max Speed M Per S');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `priority_level` SET TAGS ('dbx_business_glossary_term' = 'Priority Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `route_category` SET TAGS ('dbx_business_glossary_term' = 'Route Category');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `route_length_meters` SET TAGS ('dbx_business_glossary_term' = 'Route Length Meters');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `route_type` SET TAGS ('dbx_business_glossary_term' = 'Route Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `route_version` SET TAGS ('dbx_business_glossary_term' = 'Route Version');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `safety_rating` SET TAGS ('dbx_business_glossary_term' = 'Safety Rating');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `agv_route_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`agv_route` ALTER COLUMN `waypoint_count` SET TAGS ('dbx_business_glossary_term' = 'Waypoint Count');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` SET TAGS ('dbx_subdomain' = 'material_planning');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `routing_id` SET TAGS ('dbx_business_glossary_term' = 'Routing Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `alternate_routing_id` SET TAGS ('dbx_business_glossary_term' = 'Alternate Routing Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `alternate_routing_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `change_approved_by` SET TAGS ('dbx_business_glossary_term' = 'Change Approved By');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `change_approved_date` SET TAGS ('dbx_business_glossary_term' = 'Change Approved Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `change_reason` SET TAGS ('dbx_business_glossary_term' = 'Change Reason');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `routing_code` SET TAGS ('dbx_business_glossary_term' = 'Routing Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_business_glossary_term' = 'Compliance Standard');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `routing_description` SET TAGS ('dbx_business_glossary_term' = 'Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `is_default` SET TAGS ('dbx_business_glossary_term' = 'Is Default');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `material_type` SET TAGS ('dbx_business_glossary_term' = 'Material Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `operation_count` SET TAGS ('dbx_business_glossary_term' = 'Operation Count');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `product_family` SET TAGS ('dbx_business_glossary_term' = 'Product Family');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `quality_check_required` SET TAGS ('dbx_business_glossary_term' = 'Quality Check Required');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `reviewed_by` SET TAGS ('dbx_business_glossary_term' = 'Reviewed By');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `route_name` SET TAGS ('dbx_business_glossary_term' = 'Route Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `routing_status` SET TAGS ('dbx_business_glossary_term' = 'Routing Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `routing_type` SET TAGS ('dbx_business_glossary_term' = 'Routing Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `safety_level` SET TAGS ('dbx_business_glossary_term' = 'Safety Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `total_cycle_time_minutes` SET TAGS ('dbx_business_glossary_term' = 'Total Cycle Time Minutes');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `updated_by` SET TAGS ('dbx_business_glossary_term' = 'Updated By');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `work_center` SET TAGS ('dbx_business_glossary_term' = 'Work Center');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`routing` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Created By');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `factory_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Factory Calendar Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `base_factory_calendar_id` SET TAGS ('dbx_business_glossary_term' = 'Base Factory Calendar Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `base_factory_calendar_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `calendar_code` SET TAGS ('dbx_business_glossary_term' = 'Calendar Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `calendar_name` SET TAGS ('dbx_business_glossary_term' = 'Calendar Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `calendar_type` SET TAGS ('dbx_business_glossary_term' = 'Calendar Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `day_of_year` SET TAGS ('dbx_business_glossary_term' = 'Day Of Year');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `factory_calendar_description` SET TAGS ('dbx_business_glossary_term' = 'Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `end_date` SET TAGS ('dbx_business_glossary_term' = 'End Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_business_glossary_term' = 'Fiscal Year');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `is_holiday` SET TAGS ('dbx_business_glossary_term' = 'Is Holiday');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `is_work_day` SET TAGS ('dbx_business_glossary_term' = 'Is Work Day');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `plant_location` SET TAGS ('dbx_business_glossary_term' = 'Plant Location');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `shift_pattern` SET TAGS ('dbx_business_glossary_term' = 'Shift Pattern');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `start_date` SET TAGS ('dbx_business_glossary_term' = 'Start Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `factory_calendar_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `timezone` SET TAGS ('dbx_business_glossary_term' = 'Timezone');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`factory_calendar` ALTER COLUMN `week_number` SET TAGS ('dbx_business_glossary_term' = 'Week Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `operator_team_id` SET TAGS ('dbx_business_glossary_term' = 'Operator Team Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Employee Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_business_glossary_term' = 'Location Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `parent_operator_team_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Operator Team Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `parent_operator_team_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `production_line_id` SET TAGS ('dbx_business_glossary_term' = 'Production Line Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `average_cycle_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'Average Cycle Time Seconds');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `average_experience_years` SET TAGS ('dbx_business_glossary_term' = 'Average Experience Years');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `operator_team_description` SET TAGS ('dbx_business_glossary_term' = 'Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `downtime_minutes_last_month` SET TAGS ('dbx_business_glossary_term' = 'Downtime Minutes Last Month');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `is_overtime_allowed` SET TAGS ('dbx_business_glossary_term' = 'Is Overtime Allowed');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `last_safety_audit_date` SET TAGS ('dbx_business_glossary_term' = 'Last Safety Audit Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `member_count` SET TAGS ('dbx_business_glossary_term' = 'Member Count');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `operator_team_name` SET TAGS ('dbx_business_glossary_term' = 'Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `overtime_rate_multiplier` SET TAGS ('dbx_business_glossary_term' = 'Overtime Rate Multiplier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `quality_defect_rate_pct` SET TAGS ('dbx_business_glossary_term' = 'Quality Defect Rate Pct');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `safety_training_completed` SET TAGS ('dbx_business_glossary_term' = 'Safety Training Completed');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `shift` SET TAGS ('dbx_business_glossary_term' = 'Shift');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `skill_level` SET TAGS ('dbx_business_glossary_term' = 'Skill Level');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `operator_team_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `team_code` SET TAGS ('dbx_business_glossary_term' = 'Team Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `team_type` SET TAGS ('dbx_business_glossary_term' = 'Team Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `total_output_units_last_month` SET TAGS ('dbx_business_glossary_term' = 'Total Output Units Last Month');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `work_order_capacity_per_shift` SET TAGS ('dbx_business_glossary_term' = 'Work Order Capacity Per Shift');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`operator_team` ALTER COLUMN `work_order_capacity_per_shift` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` SET TAGS ('dbx_subdomain' = 'material_planning');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Packaging Specification Identifier');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Outer Packaging Specification Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_specification_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Vendor Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `vendor_id` SET TAGS ('dbx_internal' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_vendor_id` SET TAGS ('dbx_business_glossary_term' = 'Vendor Id');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `barcode_pattern` SET TAGS ('dbx_business_glossary_term' = 'Barcode Pattern');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `barcode_type` SET TAGS ('dbx_business_glossary_term' = 'Barcode Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_code` SET TAGS ('dbx_business_glossary_term' = 'Code');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `default_package_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Default Package Weight Kg');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_description` SET TAGS ('dbx_business_glossary_term' = 'Description');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `disposal_method` SET TAGS ('dbx_business_glossary_term' = 'Disposal Method');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `height_cm` SET TAGS ('dbx_business_glossary_term' = 'Height Cm');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `length_cm` SET TAGS ('dbx_business_glossary_term' = 'Length Cm');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `material_type` SET TAGS ('dbx_business_glossary_term' = 'Material Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `max_load_kg` SET TAGS ('dbx_business_glossary_term' = 'Max Load Kg');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_name` SET TAGS ('dbx_business_glossary_term' = 'Name');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_color` SET TAGS ('dbx_business_glossary_term' = 'Packaging Color');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_cost_usd` SET TAGS ('dbx_business_glossary_term' = 'Packaging Cost Usd');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `packaging_shape` SET TAGS ('dbx_business_glossary_term' = 'Packaging Shape');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `recyclable_flag` SET TAGS ('dbx_business_glossary_term' = 'Recyclable Flag');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `regulatory_compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `temperature_range_c` SET TAGS ('dbx_business_glossary_term' = 'Temperature Range C');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `manufacturing_packaging_specification_type` SET TAGS ('dbx_business_glossary_term' = 'Type');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `units_per_carton` SET TAGS ('dbx_business_glossary_term' = 'Units Per Carton');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `units_per_pallet` SET TAGS ('dbx_business_glossary_term' = 'Units Per Pallet');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `volume_per_unit_cubic_m` SET TAGS ('dbx_business_glossary_term' = 'Volume Per Unit Cubic M');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `weight_per_unit_kg` SET TAGS ('dbx_business_glossary_term' = 'Weight Per Unit Kg');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`manufacturing_packaging_specification` ALTER COLUMN `width_cm` SET TAGS ('dbx_business_glossary_term' = 'Width Cm');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`energy_consumption_record` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`energy_consumption_record` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`co2_emission_record` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`co2_emission_record` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`water_usage_record` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`water_usage_record` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`line_energy_meter` SET TAGS ('dbx_subdomain' = 'facility_operations');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`oee_daily_snapshot` SET TAGS ('dbx_subdomain' = 'build_execution');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`manufacturing`.`equipment_effectiveness_metric` SET TAGS ('dbx_subdomain' = 'build_execution');

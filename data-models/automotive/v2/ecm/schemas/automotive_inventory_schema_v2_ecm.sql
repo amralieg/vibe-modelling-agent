@@ -1,5 +1,5 @@
 -- Schema for Domain: inventory | Business:  | Version: v2_ecm
--- Generated on: 2026-07-13 15:03:52
+-- Generated on: 2026-07-14 02:32:21
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_automotive_v1`.`inventory` COMMENT 'Inventory management for raw materials, components, WIP (Work in Progress), finished goods, and service parts across plants, warehouses, and dealer networks. Manages stock levels, inventory movements, cycle counting, MRP (Material Requirements Planning) execution, and SKU master data. Tracks inventory accuracy, turnover rates, obsolescence, and safety stock levels. Includes warehouse management (SAP WM), lot traceability, and serialized inventory for high-value components (ECU, batteries).';
@@ -53,7 +53,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`sku_master` (
     `weight_kg` DECIMAL(18,2) COMMENT 'Net weight of a single unit of the SKU in kilograms.',
     `width_cm` DECIMAL(18,2) COMMENT 'Width dimension of the SKU in centimeters.',
     CONSTRAINT pk_sku_master PRIMARY KEY(`sku_master_id`)
-) COMMENT 'SSOT for all Stock Keeping Unit (SKU) definitions across the enterprise. Owns the material master record for raw materials, production components, WIP sub-assemblies, finished vehicles, and service parts. Aligned with SAP MM material master (MARA/MARC). Captures SKU identity, classification, unit of measure, weight/dimensions, hazardous material flags, shelf-life, and MRP planning parameters. Referenced by all inventory movement and stock transactions. [preservation_guardrail: verified]';
+) COMMENT 'SSOT for all Stock Keeping Unit (SKU) definitions across the enterprise. Owns the material master record for raw materials, production components, WIP sub-assemblies, finished vehicles, and service parts. Aligned with SAP MM material master (MARA/MARC). Captures SKU identity, classification, unit of measure, weight/dimensions, hazardous material flags, shelf-life, and MRP planning parameters. Referenced by all inventory movement and stock transactions.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`storage_location` (
     `storage_location_id` BIGINT COMMENT 'Unique surrogate key for the storage location.',
@@ -96,7 +96,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`storage_location` (
     `used_capacity_percentage` DECIMAL(18,2) COMMENT 'Current utilization of the location expressed as a percentage of total capacity.',
     `zone` STRING COMMENT 'Logical zone within the warehouse (e.g., receiving, bulk, cold).',
     CONSTRAINT pk_storage_location PRIMARY KEY(`storage_location_id`)
-) COMMENT 'Master record for all physical and logical storage locations within plants, warehouses, distribution centers, and dealer parts depots. Captures location hierarchy (plant → warehouse → storage type → storage bin), location type (bulk, rack, floor, cold-chain), capacity constraints, and WM (Warehouse Management) configuration. Aligned with SAP WM storage location and bin master. Enables precise bin-level inventory tracking and AGV routing. [preservation_guardrail: verified]';
+) COMMENT 'Master record for all physical and logical storage locations within plants, warehouses, distribution centers, and dealer parts depots. Captures location hierarchy (plant → warehouse → storage type → storage bin), location type (bulk, rack, floor, cold-chain), capacity constraints, and WM (Warehouse Management) configuration. Aligned with SAP WM storage location and bin master. Enables precise bin-level inventory tracking and AGV routing.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` (
     `stock_balance_id` BIGINT COMMENT 'System-generated unique identifier for each stock balance record.',
@@ -133,7 +133,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` (
     `valuation_price` DECIMAL(18,2) COMMENT 'Monetary value per unit for the material based on the valuation type.',
     `valuation_type` STRING COMMENT 'Method used for inventory valuation.. Valid values are `standard|moving_average|fifo|lifo`',
     CONSTRAINT pk_stock_balance PRIMARY KEY(`stock_balance_id`)
-) COMMENT 'Current on-hand stock balance snapshot for each SKU at each storage location, plant, and valuation area. Captures unrestricted stock, quality inspection stock, blocked stock, consignment stock, in-transit stock, and safety stock levels. Aligned with SAP MM stock overview (MMBE / MARD). Supports MRP execution, inventory turnover analysis, and obsolescence monitoring. Updated by every goods movement transaction. [preservation_guardrail: verified]';
+) COMMENT 'Current on-hand stock balance snapshot for each SKU at each storage location, plant, and valuation area. Captures unrestricted stock, quality inspection stock, blocked stock, consignment stock, in-transit stock, and safety stock levels. Aligned with SAP MM stock overview (MMBE / MARD). Supports MRP execution, inventory turnover analysis, and obsolescence monitoring. Updated by every goods movement transaction.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` (
     `goods_movement_id` BIGINT COMMENT 'Unique identifier for each goods movement transaction.',
@@ -142,10 +142,10 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` (
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Goods movement postings require a cost‑center for internal cost allocation; finance cost_center is the authoritative source for reporting.',
     `party_id` BIGINT COMMENT 'Identifier of the customer for goods issue movements.',
     `employee_id` BIGINT COMMENT 'Identifier of the system user who posted the movement.',
+    `goods_party_id` BIGINT COMMENT 'Identifier of the customer for goods issue movements.',
+    `goods_posted_by_user_employee_id` BIGINT COMMENT 'Identifier of the system user who posted the movement.',
     `movement_type_id` BIGINT COMMENT 'Foreign key linking to inventory.inventory_movement_type. Business justification: Add FK to standardize movement type lookup, remove redundant free‑text column, and give inventory_movement_type an inbound reference.',
     `part_master_id` BIGINT COMMENT 'Identifier of the material or component being moved.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the system user who posted the movement.',
-    `primary_party_id` BIGINT COMMENT 'Identifier of the customer for goods issue movements.',
     `procurement_purchase_order_id` BIGINT COMMENT 'Identifier of the purchase order associated with a goods receipt.',
     `procurement_supplier_id` BIGINT COMMENT 'Identifier of the supplier for goods receipt movements.',
     `production_order_id` BIGINT COMMENT 'Identifier of the production order linked to the movement.',
@@ -181,20 +181,19 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` (
     `valuation_type` STRING COMMENT 'Inventory valuation method used for this movement.. Valid values are `Standard|MovingAverage|FIFO|LIFO`',
     `warehouse_number` STRING COMMENT 'Identifier of the warehouse where the movement occurs.',
     CONSTRAINT pk_goods_movement PRIMARY KEY(`goods_movement_id`)
-) COMMENT 'Transactional record of every inventory movement event including goods receipts (GR), goods issues (GI), stock transfers, returns, and scrapping. Aligned with SAP MM material document (MSEG/MKPF). Captures movement type, quantity, source and destination storage locations, reference document (purchase order, production order, delivery), posting date, and batch/serial number. Provides full audit trail for lot traceability and IATF 16949 compliance. [preservation_guardrail: verified]';
+) COMMENT 'Transactional record of every inventory movement event including goods receipts (GR), goods issues (GI), stock transfers, returns, and scrapping. Aligned with SAP MM material document (MSEG/MKPF). Captures movement type, quantity, source and destination storage locations, reference document (purchase order, production order, delivery), posting date, and batch/serial number. Provides full audit trail for lot traceability and IATF 16949 compliance.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` (
     `stock_transfer_order_id` BIGINT COMMENT 'Unique identifier for the stock transfer order.',
     `storage_bin_id` BIGINT COMMENT 'Warehouse bin where the material will be placed.',
     `plant_id` BIGINT COMMENT 'Identifier of the plant receiving the stock.',
     `employee_id` BIGINT COMMENT 'Employee responsible for picking the material.',
-    `primary_stock_employee_id` BIGINT COMMENT 'Employee responsible for picking the material.',
     `source_bin_id` BIGINT COMMENT 'Warehouse bin from which the material is taken.',
     `source_plant_id` BIGINT COMMENT 'Identifier of the plant where stock is sourced.',
     `stock_created_by_user_employee_id` BIGINT COMMENT 'User identifier of the person who created the transfer order.',
+    `stock_employee_id` BIGINT COMMENT 'Employee responsible for picking the material.',
     `stock_updated_by_user_employee_id` BIGINT COMMENT 'User identifier of the last person who modified the transfer order.',
     `tertiary_stock_updated_by_user_employee_id` BIGINT COMMENT 'User identifier of the last person who modified the transfer order.',
-    `vehicle_order_id` BIGINT COMMENT 'Foreign key linking to sales.vehicle_order. Business justification: Transfer order creation is driven by a vehicle order; linking them supports the Transfer Order Planning report used in production logistics.',
     `agv_code` BIGINT COMMENT 'Identifier of the AGV assigned to execute the transfer.',
     `batch_number` STRING COMMENT 'Batch identifier for the material batch being moved.',
     `confirmation_status` STRING COMMENT 'Result of the confirmation step before execution.. Valid values are `pending|confirmed|rejected`',
@@ -225,12 +224,12 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` 
     `transfer_type` STRING COMMENT 'Category of stock movement represented by the order.. Valid values are `plant_to_plant|plant_to_warehouse|warehouse_to_warehouse|replenishment|return|adjustment`',
     `unit_of_measure` STRING COMMENT 'Measurement unit for the transfer quantity.. Valid values are `EA|KG|L|M|BOX|PACK`',
     CONSTRAINT pk_stock_transfer_order PRIMARY KEY(`stock_transfer_order_id`)
-) COMMENT 'Warehouse Management transfer order governing the physical movement of stock between storage bins, storage types, or plants. Aligned with SAP WM transfer order (LT0A). Captures source and destination bin, transfer quantity, movement reason, AGV assignment, picker assignment, confirmation status, and execution timestamps. Supports JIT/JIS sequencing for line-side replenishment and inter-plant stock balancing. [preservation_guardrail: verified]';
+) COMMENT 'Warehouse Management transfer order governing the physical movement of stock between storage bins, storage types, or plants. Aligned with SAP WM transfer order (LT0A). Captures source and destination bin, transfer quantity, movement reason, AGV assignment, picker assignment, confirmation status, and execution timestamps. Supports JIT/JIS sequencing for line-side replenishment and inter-plant stock balancing.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` (
     `mrp_requirement_id` BIGINT COMMENT 'System-generated unique identifier for the MRP requirement record.',
     `employee_id` BIGINT COMMENT 'Identifier of the internal planner or user who created/maintained the requirement.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the internal planner or user who created/maintained the requirement.',
+    `mrp_planner_employee_id` BIGINT COMMENT 'Identifier of the internal planner or user who created/maintained the requirement.',
     `procurement_supplier_id` BIGINT COMMENT 'Identifier of the preferred supplier for the material, if known.',
     `regulatory_requirement_id` BIGINT COMMENT 'Foreign key linking to compliance.regulatory_requirement. Business justification: Planning under regulation: MRP calculations consider mandatory regulatory constraints for material planning.',
     `storage_location_id` BIGINT COMMENT 'Foreign key linking to inventory.storage_location. Business justification: Link MRP requirement to storage_location for proper location tracking',
@@ -256,13 +255,13 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` (
     `source_of_supply` STRING COMMENT 'Indicates whether the material will be sourced internally or from external suppliers.. Valid values are `internal|external`',
     `unit_of_measure` STRING COMMENT 'Measurement unit for the required quantity.. Valid values are `EA|KG|L|M`',
     CONSTRAINT pk_mrp_requirement PRIMARY KEY(`mrp_requirement_id`)
-) COMMENT 'MRP (Material Requirements Planning) planned requirement record generated by SAP MRP run (MD04/MD05). Captures dependent and independent demand requirements for each SKU, planned order proposals, reorder points, lot sizes, lead times, and exception messages. Drives procurement requisitions and production orders. Supports safety stock calculation, demand smoothing, and supply gap analysis across the manufacturing network. [preservation_guardrail: verified]';
+) COMMENT 'MRP (Material Requirements Planning) planned requirement record generated by SAP MRP run (MD04/MD05). Captures dependent and independent demand requirements for each SKU, planned order proposals, reorder points, lot sizes, lead times, and exception messages. Drives procurement requisitions and production orders. Supports safety stock calculation, demand smoothing, and supply gap analysis across the manufacturing network.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` (
     `cycle_count_id` BIGINT COMMENT 'System-generated unique identifier for the physical inventory cycle count event.',
     `employee_id` BIGINT COMMENT 'Employee who performed the physical count.',
+    `cycle_employee_id` BIGINT COMMENT 'Employee who performed the physical count.',
     `plant_id` BIGINT COMMENT 'Manufacturing plant where the inventory is stored.',
-    `primary_employee_id` BIGINT COMMENT 'Employee who performed the physical count.',
     `sku_id` BIGINT COMMENT 'Reference to the master SKU (product) being counted.',
     `storage_location_id` BIGINT COMMENT 'Reference to the physical storage location (warehouse, plant, or depot) where the count took place.',
     `abc_classification` STRING COMMENT 'ABC inventory classification driving count frequency.. Valid values are `A|B|C`',
@@ -304,14 +303,12 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` (
     `variance_quantity` DECIMAL(18,2) COMMENT 'Difference between counted and book quantities (counted - book).',
     `variance_reason` STRING COMMENT 'Narrative explanation for any observed variance.',
     CONSTRAINT pk_cycle_count PRIMARY KEY(`cycle_count_id`)
-) COMMENT 'Physical inventory cycle count event record for a specific SKU at a specific storage location. Aligned with SAP MM physical inventory document (MI01/MI07). Captures count date, counted quantity, book quantity, variance quantity, variance percentage, count status (planned, counted, posted, approved), counter identity, and recount flag. Supports inventory accuracy KPIs, ABC classification-driven count frequency, and IATF 16949 inventory control requirements. [preservation_guardrail: verified]';
+) COMMENT 'Physical inventory cycle count event record for a specific SKU at a specific storage location. Aligned with SAP MM physical inventory document (MI01/MI07). Captures count date, counted quantity, book quantity, variance quantity, variance percentage, count status (planned, counted, posted, approved), counter identity, and recount flag. Supports inventory accuracy KPIs, ABC classification-driven count frequency, and IATF 16949 inventory control requirements.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`batch_record` (
     `batch_record_id` BIGINT COMMENT 'System-generated unique identifier for the batch record.',
-    `compliance_document_id` BIGINT COMMENT 'Foreign key linking to compliance.compliance_document. Business justification: Batch certification: each production batch must reference the compliance document proving it meets standards.',
     `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: batch_record describes a material batch; linking to sku_master consolidates material master data.',
     `storage_location_id` BIGINT COMMENT 'Foreign key linking to inventory.storage_location. Business justification: Normalize batch record location; replace string with FK to storage_location',
-    `vehicle_order_id` BIGINT COMMENT 'Foreign key linking to sales.vehicle_order. Business justification: Regulatory batch traceability mandates associating each batch with the vehicle order it supplies, required for the Batch‑to‑Vehicle compliance report.',
     `batch_classification` STRING COMMENT 'Category describing the type of batch.. Valid values are `raw|component|finished|service`',
     `batch_name` STRING COMMENT 'Human‑readable name or description for the batch.',
     `batch_number` STRING COMMENT 'External business identifier assigned to the batch by the manufacturer.',
@@ -339,7 +336,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`batch_record` (
     `unit_of_measure` STRING COMMENT 'Unit in which the batch quantity is measured.. Valid values are `kg|l|pcs|m|cm|g`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the batch record.',
     CONSTRAINT pk_batch_record PRIMARY KEY(`batch_record_id`)
-) COMMENT 'Lot/batch master record for materials managed with batch traceability, including production components, chemicals, raw materials, and serialized high-value parts. Aligned with SAP MM batch master (MCH1/MCHA). Captures batch number, manufacturing date, expiry date, supplier lot reference, quality inspection status, batch classification characteristics (e.g., material grade, tensile strength), and restricted-use flags. Mandatory for IATF 16949 lot traceability and recall readiness. [preservation_guardrail: verified]';
+) COMMENT 'Lot/batch master record for materials managed with batch traceability, including production components, chemicals, raw materials, and serialized high-value parts. Aligned with SAP MM batch master (MCH1/MCHA). Captures batch number, manufacturing date, expiry date, supplier lot reference, quality inspection status, batch classification characteristics (e.g., material grade, tensile strength), and restricted-use flags. Mandatory for IATF 16949 lot traceability and recall readiness.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` (
     `serialized_unit_id` BIGINT COMMENT 'Unique surrogate key for the serialized unit record.',
@@ -379,7 +376,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` (
     `warranty_start_date` DATE COMMENT 'Date when the warranty coverage for the unit begins.',
     `weight_kg` DECIMAL(18,2) COMMENT 'Physical weight of the component.',
     CONSTRAINT pk_serialized_unit PRIMARY KEY(`serialized_unit_id`)
-) COMMENT 'Serialized inventory record for high-value, individually tracked components such as ECUs (Electronic Control Units), EV battery packs, ADAS sensor modules, and transmission assemblies. Captures serial number, parent SKU, current stock status, current storage location, installation status (in-stock, installed-in-vehicle, returned, scrapped), VIN association when installed, and warranty start date. Supports end-to-end component traceability from goods receipt through vehicle assembly to field service. [preservation_guardrail: verified]';
+) COMMENT 'Serialized inventory record for high-value, individually tracked components such as ECUs (Electronic Control Units), EV battery packs, ADAS sensor modules, and transmission assemblies. Captures serial number, parent SKU, current stock status, current storage location, installation status (in-stock, installed-in-vehicle, returned, scrapped), VIN association when installed, and warranty start date. Supports end-to-end component traceability from goods receipt through vehicle assembly to field service.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` (
     `wip_order_stock_id` BIGINT COMMENT 'Unique surrogate identifier for each WIP order stock line record.',
@@ -408,19 +405,18 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` (
     `updated_timestamp` TIMESTAMP COMMENT 'Date‑time of the most recent modification to the WIP line record.',
     `wip_order_stock_status` STRING COMMENT 'Current lifecycle state of the WIP line.. Valid values are `open|closed|released|cancelled|pending|completed`',
     CONSTRAINT pk_wip_order_stock PRIMARY KEY(`wip_order_stock_id`)
-) COMMENT 'Work-in-Progress (WIP) inventory record tracking components and sub-assemblies staged or consumed against a specific production order on the shop floor. Aligned with SAP PP production order component stock (CO11N/COGI). Captures production order reference, operation sequence, component SKU, required quantity, issued quantity, backflush status, scrap quantity, and staging location. Provides real-time WIP visibility for MES integration and production cost accounting. [preservation_guardrail: verified]';
+) COMMENT 'Work-in-Progress (WIP) inventory record tracking components and sub-assemblies staged or consumed against a specific production order on the shop floor. Aligned with SAP PP production order component stock (CO11N/COGI). Captures production order reference, operation sequence, component SKU, required quantity, issued quantity, backflush status, scrap quantity, and staging location. Provides real-time WIP visibility for MES integration and production cost accounting.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` (
     `finished_vehicle_stock_id` BIGINT COMMENT 'System-generated unique identifier for each finished vehicle stock record.',
     `employee_id` BIGINT COMMENT 'Foreign key linking to workforce.employee. Business justification: Dealer sales assignment report tracks which sales rep is responsible for each finished vehicle allocation.',
     `connected_vehicle_id` BIGINT COMMENT 'Foreign key linking to mobility.connected_vehicle. Business justification: Fleet management and OTA update processes require joining inventory vehicle records with connected‑vehicle telemetry for status and compliance reporting.',
     `dealership_id` BIGINT COMMENT 'Identifier of the dealer to which the vehicle is allocated.',
+    `finished_dealership_id` BIGINT COMMENT 'Identifier of the dealer to which the vehicle is allocated.',
     `homologation_record_id` BIGINT COMMENT 'Foreign key linking to compliance.homologation_record. Business justification: Vehicle approval: link each finished VIN to its homologation record required for market entry.',
     `invoice_id` BIGINT COMMENT 'Foreign key linking to billing.invoice. Business justification: Vehicle sales invoicing requires linking each finished vehicle (VIN) to its sales invoice for reconciliation of inventory and revenue.',
-    `primary_dealership_id` BIGINT COMMENT 'Identifier of the dealer to which the vehicle is allocated.',
     `profit_center_id` BIGINT COMMENT 'Foreign key linking to finance.profit_center. Business justification: Vehicle profitability analysis attributes each finished vehicle to a profit center for margin reporting.',
     `vehicle_order_id` BIGINT COMMENT 'Foreign key linking to sales.vehicle_order. Business justification: Allocation report requires linking each finished vehicle to the specific sales order it fulfills, enabling real‑time order fulfillment tracking.',
-    `vehicle_ownership_id` BIGINT COMMENT 'Foreign key linking to customer.vehicle_ownership. Business justification: Delivery & Warranty Management report needs to tie each stocked VIN to its owning customer record.',
     `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: Supports dealership allocation and program performance reports linking finished vehicles back to their engineering program.',
     `vin_registry_id` BIGINT COMMENT 'Foreign key linking to vehicle.vin_registry. Business justification: Needed for Finished Vehicle Stock report linking each inventory vehicle to its VIN registry for warranty, recall, and regulatory compliance.',
     `aging_days` STRING COMMENT 'Number of days the vehicle has been in its current status.',
@@ -451,7 +447,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock
     `warranty_end_date` DATE COMMENT 'Date when the vehicle warranty period expires.',
     `warranty_start_date` DATE COMMENT 'Date when the vehicle warranty period begins.',
     CONSTRAINT pk_finished_vehicle_stock PRIMARY KEY(`finished_vehicle_stock_id`)
-) COMMENT 'Finished vehicle inventory record tracking completed vehicles from end-of-line (EOL) through PDI (Pre-Delivery Inspection), compound storage, and dealer allocation. Captures VIN, model/trim/color configuration, plant of manufacture, current compound or yard location, stock status (in-production, PDI-pending, PDI-complete, allocated, in-transit, delivered), hold codes, and aging days. Bridges manufacturing and logistics domains for vehicle order fulfillment. [preservation_guardrail: verified]';
+) COMMENT 'Finished vehicle inventory record tracking completed vehicles from end-of-line (EOL) through PDI (Pre-Delivery Inspection), compound storage, and dealer allocation. Captures VIN, model/trim/color configuration, plant of manufacture, current compound or yard location, stock status (in-production, PDI-pending, PDI-complete, allocated, in-transit, delivered), hold codes, and aging days. Bridges manufacturing and logistics domains for vehicle order fulfillment.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` (
     `service_parts_stock_id` BIGINT COMMENT 'Unique identifier for the service parts stock record.',
@@ -494,7 +490,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` (
     `warranty_expiration_date` DATE COMMENT 'Date when the parts warranty coverage ends.',
     `warranty_status` STRING COMMENT 'Current warranty coverage status of the part.. Valid values are `in_warranty|out_of_warranty`',
     CONSTRAINT pk_service_parts_stock PRIMARY KEY(`service_parts_stock_id`)
-) COMMENT 'After-sales service parts inventory record tracking spare parts and accessories across the central parts distribution center (PDC), regional warehouses, and dealer parts rooms. Captures part number, supersession chain, current stock level by location, min/max replenishment levels, fill rate, backorder quantity, and obsolescence classification. Supports dealer parts ordering, warranty repair fulfillment, and TSB (Technical Service Bulletin) parts pre-positioning. [preservation_guardrail: verified]';
+) COMMENT 'After-sales service parts inventory record tracking spare parts and accessories across the central parts distribution center (PDC), regional warehouses, and dealer parts rooms. Captures part number, supersession chain, current stock level by location, min/max replenishment levels, fill rate, backorder quantity, and obsolescence classification. Supports dealer parts ordering, warranty repair fulfillment, and TSB (Technical Service Bulletin) parts pre-positioning.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` (
     `replenishment_order_id` BIGINT COMMENT 'Unique identifier for the replenishment order.',
@@ -533,7 +529,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` (
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to the replenishment order record.',
     `created_by` STRING COMMENT 'User identifier who initially created the replenishment order record.',
     CONSTRAINT pk_replenishment_order PRIMARY KEY(`replenishment_order_id`)
-) COMMENT 'Internal replenishment order triggering stock movement from a supplying storage location (warehouse, supermarket, PDC) to a consuming location (line-side, assembly station, dealer parts room). Captures replenishment type (kanban, min-max, JIT pull, JIS sequence), trigger source, requested SKU and quantity, source and destination locations, priority, requested delivery time, and fulfillment status. Supports lean manufacturing pull systems and dealer parts replenishment cycles. [preservation_guardrail: verified]';
+) COMMENT 'Internal replenishment order triggering stock movement from a supplying storage location (warehouse, supermarket, PDC) to a consuming location (line-side, assembly station, dealer parts room). Captures replenishment type (kanban, min-max, JIT pull, JIS sequence), trigger source, requested SKU and quantity, source and destination locations, priority, requested delivery time, and fulfillment status. Supports lean manufacturing pull systems and dealer parts replenishment cycles.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` (
     `consignment_stock_id` BIGINT COMMENT 'Unique surrogate key for each consignment stock record.',
@@ -572,11 +568,10 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` (
     `valuation_currency` STRING COMMENT 'ISO 4217 currency code for the valuation amount.. Valid values are `USD|EUR|JPY|GBP|CNY|CHF`',
     `valuation_method` STRING COMMENT 'Method used to calculate the monetary value of the consigned stock.. Valid values are `standard_cost|moving_average|fifo|lifo`',
     CONSTRAINT pk_consignment_stock PRIMARY KEY(`consignment_stock_id`)
-) COMMENT 'Consignment inventory record for supplier-owned stock held at Automotive plant premises but not yet invoiced. Aligned with SAP MM consignment stock management (MBLB). Captures supplier, consignment SKU, quantity on-hand at each location, consumption postings, settlement-due quantity, and aging. Supports JIT/JIS supplier consignment programs, reduces working capital, and triggers automatic settlement upon consumption. [preservation_guardrail: verified]';
+) COMMENT 'Consignment inventory record for supplier-owned stock held at Automotive plant premises but not yet invoiced. Aligned with SAP MM consignment stock management (MBLB). Captures supplier, consignment SKU, quantity on-hand at each location, consumption postings, settlement-due quantity, and aging. Supports JIT/JIS supplier consignment programs, reduces working capital, and triggers automatic settlement upon consumption.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` (
     `inventory_valuation_id` BIGINT COMMENT 'System generated unique identifier for each inventory valuation record.',
-    `asset_valuation_id` BIGINT COMMENT 'SSOT reference to asset.asset_valuation (resolves cross-domain duplicate of valuation).',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Inventory valuation reports are posted to a specific cost center for budgeting and variance analysis.',
     `gl_account_id` BIGINT COMMENT 'Foreign key linking to finance.gl_account. Business justification: Valuation amounts must be posted to a GL account; linking ensures correct ledger posting.',
     `profit_center_id` BIGINT COMMENT 'Foreign key linking to finance.profit_center. Business justification: Profitability of inventory valuation is tracked per profit center to support P&L reporting.',
@@ -602,7 +597,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` (
     `valuation_status` STRING COMMENT 'Current processing state of the valuation record.. Valid values are `draft|in_progress|finalized|reversed`',
     `write_down_amount` DECIMAL(18,2) COMMENT 'Financial amount to be written down from inventory value due to obsolescence or impairment.',
     CONSTRAINT pk_inventory_valuation PRIMARY KEY(`inventory_valuation_id`)
-) COMMENT 'Inventory valuation record capturing the financial value of stock by SKU, plant, and valuation area. Aligned with SAP MM/CO material valuation (MBEW). Captures valuation class, price control (standard vs. moving average), standard price, moving average price, total stock value, price variance, and last valuation date. Supports COGS calculation, inventory write-down for obsolescence, and financial reporting under IFRS/US GAAP. [preservation_guardrail: verified]';
+) COMMENT 'Inventory valuation record capturing the financial value of stock by SKU, plant, and valuation area. Aligned with SAP MM/CO material valuation (MBEW). Captures valuation class, price control (standard vs. moving average), standard price, moving average price, total stock value, price variance, and last valuation date. Supports COGS calculation, inventory write-down for obsolescence, and financial reporting under IFRS/US GAAP.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` (
     `safety_stock_policy_id` BIGINT COMMENT 'System-generated unique identifier for the safety stock policy record.',
@@ -629,7 +624,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` (
     `service_level_target` DECIMAL(18,2) COMMENT 'Desired fill‑rate or service level expressed as a percentage.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to the policy record.',
     CONSTRAINT pk_safety_stock_policy PRIMARY KEY(`safety_stock_policy_id`)
-) COMMENT 'Safety stock and reorder point policy record defining the minimum stock buffer for each SKU at each plant/location to protect against demand variability and supply disruptions. Captures safety stock quantity, reorder point, maximum stock level, replenishment lead time, demand variability factor, service level target, review cycle, and last recalculation date. Drives MRP safety stock parameters and supports supply chain resilience planning. [preservation_guardrail: verified]';
+) COMMENT 'Safety stock and reorder point policy record defining the minimum stock buffer for each SKU at each plant/location to protect against demand variability and supply disruptions. Captures safety stock quantity, reorder point, maximum stock level, replenishment lead time, demand variability factor, service level target, review cycle, and last recalculation date. Drives MRP safety stock parameters and supports supply chain resilience planning.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` (
     `abc_xyz_classification_id` BIGINT COMMENT 'Surrogate primary key for the ABC/XYZ classification record.',
@@ -650,7 +645,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the classification record.',
     `xyz_class` STRING COMMENT 'XYZ class based on demand variability.. Valid values are `X|Y|Z`',
     CONSTRAINT pk_abc_xyz_classification PRIMARY KEY(`abc_xyz_classification_id`)
-) COMMENT 'ABC/XYZ inventory classification record assigning each SKU a consumption value class (A=high value, B=medium, C=low) and demand variability class (X=stable, Y=variable, Z=irregular). Captures classification date, ABC class, XYZ class, annual consumption value, consumption frequency, classification method, and next review date. Drives cycle count frequency, safety stock policy, and obsolescence review prioritization per IATF 16949 inventory control best practices. [preservation_guardrail: verified]';
+) COMMENT 'ABC/XYZ inventory classification record assigning each SKU a consumption value class (A=high value, B=medium, C=low) and demand variability class (X=stable, Y=variable, Z=irregular). Captures classification date, ABC class, XYZ class, annual consumption value, consumption frequency, classification method, and next review date. Drives cycle count frequency, safety stock policy, and obsolescence review prioritization per IATF 16949 inventory control best practices.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` (
     `obsolescence_review_id` BIGINT COMMENT 'System-generated unique identifier for the obsolescence review record.',
@@ -687,7 +682,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` (
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to the review record.',
     `valuation_price` DECIMAL(18,2) COMMENT 'Standard unit price used for inventory valuation calculations.',
     CONSTRAINT pk_obsolescence_review PRIMARY KEY(`obsolescence_review_id`)
-) COMMENT 'Inventory obsolescence review record assessing slow-moving and excess stock for write-down or disposal decisions. Captures SKU, location, stock quantity, last movement date, days-since-last-movement, EOP (End of Production) flag, estimated write-down value, recommended disposition (continue holding, markdown, scrap, return-to-supplier, donate), reviewer identity, and approval status. Supports periodic inventory health reviews and financial provisioning for obsolete stock. [preservation_guardrail: verified]';
+) COMMENT 'Inventory obsolescence review record assessing slow-moving and excess stock for write-down or disposal decisions. Captures SKU, location, stock quantity, last movement date, days-since-last-movement, EOP (End of Production) flag, estimated write-down value, recommended disposition (continue holding, markdown, scrap, return-to-supplier, donate), reviewer identity, and approval status. Supports periodic inventory health reviews and financial provisioning for obsolete stock.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` (
     `kanban_card_id` BIGINT COMMENT 'System-generated unique identifier for the kanban card record.',
@@ -722,13 +717,13 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` (
     `unit_of_measure` STRING COMMENT 'Unit of measure for the quantity fields (e.g., pieces, kilograms).. Valid values are `pcs|kg|liter|meter`',
     `version_number` STRING COMMENT 'Incremental version of the kanban record for change tracking.',
     CONSTRAINT pk_kanban_card PRIMARY KEY(`kanban_card_id`)
-) COMMENT 'Kanban card master record governing pull-based replenishment signals for line-side and supermarket inventory in lean manufacturing environments. Captures kanban card number, associated SKU, supply area, consuming work center, container quantity, number of cards in circulation, replenishment strategy (internal, external, in-house production), kanban status (empty, in-transit, full), and signal method (physical, electronic, barcode). Supports JIT/JIS production systems and reduces WIP inventory. [preservation_guardrail: verified]';
+) COMMENT 'Kanban card master record governing pull-based replenishment signals for line-side and supermarket inventory in lean manufacturing environments. Captures kanban card number, associated SKU, supply area, consuming work center, container quantity, number of cards in circulation, replenishment strategy (internal, external, in-house production), kanban status (empty, in-transit, full), and signal method (physical, electronic, barcode). Supports JIT/JIS production systems and reduces WIP inventory.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` (
     `ckd_skd_kit_id` BIGINT COMMENT 'System-generated unique identifier for the CKD/SKD kit record.',
-    `employee_id` BIGINT COMMENT 'Identifier of the user who last modified the kit record.',
+    `employee_id` BIGINT COMMENT 'Identifier of the user who created the kit record.',
+    `ckd_updated_by_user_employee_id` BIGINT COMMENT 'Identifier of the user who last modified the kit record.',
     `primary_ckd_employee_id` BIGINT COMMENT 'Identifier of the user who created the kit record.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the user who created the kit record.',
     `procurement_supplier_id` BIGINT COMMENT 'FK to procurement.supplier',
     `model_id` BIGINT COMMENT 'Foreign key linking to vehicle.model. Business justification: CKD kit planning requires associating each kit with the vehicle model it assembles, used in production scheduling and customs documentation.',
     `vehicle_order_id` BIGINT COMMENT 'Foreign key linking to sales.vehicle_order. Business justification: CKD/SKD kits are shipped per vehicle order; linking enables the Kit‑to‑Order allocation dashboard used by assembly planners.',
@@ -774,17 +769,17 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` (
     `valuation_amount` DECIMAL(18,2) COMMENT 'Monetary valuation of the kit for accounting and customs purposes.',
     `valuation_currency` STRING COMMENT 'ISO 4217 currency code of the valuation amount.',
     CONSTRAINT pk_ckd_skd_kit PRIMARY KEY(`ckd_skd_kit_id`)
-) COMMENT 'CKD (Completely Knocked Down) and SKD (Semi Knocked Down) kit inventory record for vehicles and assemblies exported to overseas assembly plants. Captures kit number, target assembly plant, kit BOM reference, packing list, container assignment, export documentation reference, kit completeness status, missing parts list, and customs valuation. Supports international manufacturing operations, transfer pricing, and customs compliance for cross-border kit shipments. [preservation_guardrail: verified]';
+) COMMENT 'CKD (Completely Knocked Down) and SKD (Semi Knocked Down) kit inventory record for vehicles and assemblies exported to overseas assembly plants. Captures kit number, target assembly plant, kit BOM reference, packing list, container assignment, export documentation reference, kit completeness status, missing parts list, and customs valuation. Supports international manufacturing operations, transfer pricing, and customs compliance for cross-border kit shipments.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`adjustment` (
     `adjustment_id` BIGINT COMMENT 'System-generated unique identifier for the inventory adjustment transaction.',
     `employee_id` BIGINT COMMENT 'System user identifier who created the adjustment record.',
+    `adjustment_employee_id` BIGINT COMMENT 'Identifier of the employee who approved the inventory adjustment.',
     `adjustment_updated_by_user_employee_id` BIGINT COMMENT 'System user identifier who last modified the adjustment record.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the employee who approved the inventory adjustment.',
-    `quaternary_adjustment_updated_by_user_employee_id` BIGINT COMMENT 'System user identifier who last modified the adjustment record.',
+    `primary_adjustment_created_by_user_employee_id` BIGINT COMMENT 'System user identifier who created the adjustment record.',
     `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: inventory_adjustment adjusts quantities for a SKU; linking to sku_master consolidates SKU reference.',
     `storage_location_id` BIGINT COMMENT 'Foreign key linking to inventory.storage_location. Business justification: Adjustment records reference a storage location; replace string with FK',
-    `tertiary_adjustment_employee_id` BIGINT COMMENT 'Identifier of the employee who approved the inventory adjustment.',
+    `tertiary_adjustment_updated_by_user_employee_id` BIGINT COMMENT 'System user identifier who last modified the adjustment record.',
     `accounting_document_number` STRING COMMENT 'Financial document number generated for the adjustment in the general ledger.',
     `adjustment_number` STRING COMMENT 'Business identifier assigned to the adjustment for tracking and reference.',
     `adjustment_status` STRING COMMENT 'Current lifecycle status of the adjustment transaction.. Valid values are `draft|submitted|approved|rejected|posted|cancelled`',
@@ -816,14 +811,14 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`adjustment` (
     `unit_of_measure` STRING COMMENT 'Measurement unit for the quantity adjusted.. Valid values are `EA|KG|L|M|BOX`',
     `valuation_area_code` STRING COMMENT 'Code representing the valuation area used for inventory accounting.',
     CONSTRAINT pk_adjustment PRIMARY KEY(`adjustment_id`)
-) COMMENT 'Inventory adjustment transaction record capturing manual corrections to stock quantities resulting from cycle count variances, system reconciliation, damage write-offs, or process corrections. Captures adjustment type (count variance, damage, theft, system error, process correction), affected SKU/batch/serial, adjusted quantity (positive or negative), adjustment reason code, approver, financial impact, and posting date. Provides audit trail for inventory accuracy management and SOX compliance. [preservation_guardrail: verified]';
+) COMMENT 'Inventory adjustment transaction record capturing manual corrections to stock quantities resulting from cycle count variances, system reconciliation, damage write-offs, or process corrections. Captures adjustment type (count variance, damage, theft, system error, process correction), affected SKU/batch/serial, adjusted quantity (positive or negative), adjustment reason code, approver, financial impact, and posting date. Provides audit trail for inventory accuracy management and SOX compliance.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` (
     `warehouse_task_id` BIGINT COMMENT 'System-generated unique identifier for the warehouse execution task.',
     `order_line_id` BIGINT COMMENT 'Foreign key linking to sales.order_line. Business justification: Warehouse tasks are created to pick/pack specific order lines; the Order Line Fulfillment report requires this FK for performance tracking.',
     `employee_id` BIGINT COMMENT 'Identifier of the user who created the task record.',
-    `primary_warehouse_employee_id` BIGINT COMMENT 'Identifier of the user who created the task record.',
     `storage_bin_id` BIGINT COMMENT 'Foreign key linking to inventory.bin. Business justification: Warehouse task source bin should reference bin entity',
+    `warehouse_employee_id` BIGINT COMMENT 'Identifier of the user who created the task record.',
     `warehouse_id` BIGINT COMMENT 'Identifier of the warehouse or distribution center where the task occurs.',
     `warehouse_updated_by_user_employee_id` BIGINT COMMENT 'Identifier of the user who last modified the task record.',
     `batch_number` STRING COMMENT 'Batch identifier when the material is batch‑controlled.',
@@ -854,7 +849,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` (
     `unit_of_measure` STRING COMMENT 'Measurement unit for the quantity (e.g., pcs, kg).',
     `warehouse_task_status` STRING COMMENT 'Current lifecycle state of the task.. Valid values are `pending|in_progress|completed|exception|cancelled`',
     CONSTRAINT pk_warehouse_task PRIMARY KEY(`warehouse_task_id`)
-) COMMENT 'Warehouse execution task record representing a discrete physical activity assigned to a warehouse operator or AGV (Automated Guided Vehicle), such as putaway, picking, replenishment, or relocation. Aligned with SAP EWM warehouse task. Captures task type, assigned resource (operator ID or AGV unit), source and destination bin, SKU and quantity, priority, creation time, start time, completion time, and exception reason if incomplete. Supports warehouse labor management and AGV fleet coordination. [preservation_guardrail: verified]';
+) COMMENT 'Warehouse execution task record representing a discrete physical activity assigned to a warehouse operator or AGV (Automated Guided Vehicle), such as putaway, picking, replenishment, or relocation. Aligned with SAP EWM warehouse task. Captures task type, assigned resource (operator ID or AGV unit), source and destination bin, SKU and quantity, priority, creation time, start time, completion time, and exception reason if incomplete. Supports warehouse labor management and AGV fleet coordination.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`movement_type` (
     `movement_type_id` BIGINT COMMENT 'Surrogate primary key for each inventory movement type record. [canonical_skip_reason: REFERENCE_LOOKUP - classification table for movement types]',
@@ -898,7 +893,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`movement_type` (
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the movement type record.',
     `valuation_class` STRING COMMENT 'Key used in valuation to determine price control and account assignment.',
     CONSTRAINT pk_movement_type PRIMARY KEY(`movement_type_id`)
-) COMMENT 'Reference classification table defining all valid inventory movement types used in goods movement transactions. Captures movement type code, description, movement direction (inbound/outbound/transfer), account determination relevance, reversal movement type, and applicable business scenarios (e.g., 101=GR for PO, 261=GI for production order, 311=transfer posting). Aligned with SAP MM movement type configuration. Provides standardized classification for all goods movement transactions. [preservation_guardrail: verified]';
+) COMMENT 'Reference classification table defining all valid inventory movement types used in goods movement transactions. Captures movement type code, description, movement direction (inbound/outbound/transfer), account determination relevance, reversal movement type, and applicable business scenarios (e.g., 101=GR for PO, 261=GI for production order, 311=transfer posting). Aligned with SAP MM movement type configuration. Provides standardized classification for all goods movement transactions.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` (
     `dealer_sku_stock_id` BIGINT COMMENT 'Primary key for the DealerSkuStock association',
@@ -911,7 +906,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` (
     `reorder_point` BIGINT COMMENT 'Inventory level that triggers a reorder for the SKU at the dealership',
     `safety_stock` BIGINT COMMENT 'Safety stock quantity maintained for the SKU at the dealership',
     CONSTRAINT pk_dealer_sku_stock PRIMARY KEY(`dealer_sku_stock_id`)
-) COMMENT 'Represents the inventory allocation of a specific SKU at a specific dealership. Each record captures operational stock attributes that are unique to the SKU‑dealership pairing.. Existence Justification: A SKU can be stocked at many dealership locations and a dealership stocks many SKUs. The business actively manages the stock level, reorder point, safety stock, lead time, cost and currency for each SKU at each dealership, creating a distinct inventory record per SKU‑dealership pair. [preservation_guardrail: verified]';
+) COMMENT 'Represents the inventory allocation of a specific SKU at a specific dealership. Each record captures operational stock attributes that are unique to the SKU‑dealership pairing.. Existence Justification: A SKU can be stocked at many dealership locations and a dealership stocks many SKUs. The business actively manages the stock level, reorder point, safety stock, lead time, cost and currency for each SKU at each dealership, creating a distinct inventory record per SKU‑dealership pair.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`warehouse` (
     `warehouse_id` BIGINT COMMENT 'Primary key for warehouse',
@@ -946,7 +941,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`warehouse` (
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the warehouse record.',
     `zone` STRING COMMENT 'Internal zone or area identifier within the warehouse complex.',
     CONSTRAINT pk_warehouse PRIMARY KEY(`warehouse_id`)
-) COMMENT 'Master reference table for warehouse. Referenced by warehouse_id. [preservation_guardrail: verified]';
+) COMMENT 'Master reference table for warehouse. Referenced by warehouse_id.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` (
     `inventory_hold_id` BIGINT COMMENT 'Unique identifier for the inventory hold record.',
@@ -981,7 +976,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` (
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the hold record.',
     `created_by` STRING COMMENT 'User identifier who created the hold record.',
     CONSTRAINT pk_inventory_hold PRIMARY KEY(`inventory_hold_id`)
-) COMMENT 'Inventory hold and block record restricting the use or movement of specific stock due to quality holds, engineering change notices (ECN), regulatory non-conformance, supplier PPAP failures, or recall investigations. Captures hold type, affected SKU/batch/serial range, quantity blocked, hold reason code, initiating department, hold start date, expected release date, and disposition decision (use-as-is, rework, scrap, return-to-supplier). Supports APQP/PPAP compliance and quality containment actions. [preservation_guardrail: verified]';
+) COMMENT 'Inventory hold and block record restricting the use or movement of specific stock due to quality holds, engineering change notices (ECN), regulatory non-conformance, supplier PPAP failures, or recall investigations. Captures hold type, affected SKU/batch/serial range, quantity blocked, hold reason code, initiating department, hold start date, expected release date, and disposition decision (use-as-is, rework, scrap, return-to-supplier). Supports APQP/PPAP compliance and quality containment actions.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` (
     `storage_bin_id` BIGINT COMMENT 'Primary key for bin',
@@ -1019,7 +1014,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` (
     `storage_bin_type` STRING COMMENT 'Category of bin indicating its physical configuration or purpose.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the bin record.',
     CONSTRAINT pk_storage_bin PRIMARY KEY(`storage_bin_id`)
-) COMMENT 'Master reference table for bin. Referenced by source_bin_id. [preservation_guardrail: verified]';
+) COMMENT 'Master reference table for bin. Referenced by source_bin_id.';
 
 -- ========= FOREIGN KEYS =========
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ADD CONSTRAINT `fk_inventory_storage_location_warehouse_id` FOREIGN KEY (`warehouse_id`) REFERENCES `vibe_automotive_v1`.`inventory`.`warehouse`(`warehouse_id`);
@@ -1065,1306 +1060,1242 @@ ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ADD CONSTRAINT `fk_in
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ADD CONSTRAINT `fk_inventory_storage_bin_warehouse_id` FOREIGN KEY (`warehouse_id`) REFERENCES `vibe_automotive_v1`.`inventory`.`warehouse`(`warehouse_id`);
 
 -- ========= TAGS =========
-ALTER SCHEMA `vibe_automotive_v1`.`inventory` SET TAGS ('dbx_pii_division' = 'operations');
-ALTER SCHEMA `vibe_automotive_v1`.`inventory` SET TAGS ('dbx_pii_domain' = 'inventory');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'SKU Master Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `compliance_document_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Document Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Product Owner Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `regulatory_requirement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Requirement Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `country_of_origin` SET TAGS ('dbx_pii_business_glossary_term' = 'Country of Origin');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `country_of_origin` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `customs_tariff_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Customs Tariff Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_master_description` SET TAGS ('dbx_pii_business_glossary_term' = 'SKU Description');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `ean13` SET TAGS ('dbx_pii_business_glossary_term' = 'EAN‑13 Barcode');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `ean13` SET TAGS ('dbx_pii_value_regex' = '^d{13}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `hazardous_class` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Class');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `hazardous_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `height_cm` SET TAGS ('dbx_pii_business_glossary_term' = 'Height (Centimeters)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `last_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Purchase Price');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time (Days)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `length_cm` SET TAGS ('dbx_pii_business_glossary_term' = 'Length (Centimeters)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `lot_controlled_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Controlled Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `material_group` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Group');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `material_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `max_order_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Order Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `min_order_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Order Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `mrp_controller` SET TAGS ('dbx_pii_business_glossary_term' = 'MRP Controller');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `mrp_type` SET TAGS ('dbx_pii_business_glossary_term' = 'MRP Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `mrp_type` SET TAGS ('dbx_pii_value_regex' = 'PD|VB|FO|...');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `procurement_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Procurement Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `procurement_type` SET TAGS ('dbx_pii_value_regex' = 'E|I|M');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `product_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Product Category');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `product_subcategory` SET TAGS ('dbx_pii_business_glossary_term' = 'Product Subcategory');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `reorder_point_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Reorder Point Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `safety_stock_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `serial_controlled_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Controlled Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `shelf_life_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Shelf Life (Days)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_code` SET TAGS ('dbx_pii_business_glossary_term' = 'SKU Code (Stock Keeping Unit)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_master_status` SET TAGS ('dbx_pii_business_glossary_term' = 'SKU Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_master_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|discontinued|pending');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_name` SET TAGS ('dbx_pii_business_glossary_term' = 'SKU Name');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `standard_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Price');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `tax_indicator` SET TAGS ('dbx_pii_business_glossary_term' = 'Tax Indicator');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'EA|KG|L|M|CM|MM');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `upc` SET TAGS ('dbx_pii_business_glossary_term' = 'UPC Barcode');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `upc` SET TAGS ('dbx_pii_value_regex' = '^d{12}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `valuation_class` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Class');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `volume_m3` SET TAGS ('dbx_pii_business_glossary_term' = 'Volume (Cubic Meters)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight (Kilograms)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `width_cm` SET TAGS ('dbx_pii_business_glossary_term' = 'Width (Centimeters)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location ID (SLID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `environmental_permit_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Environmental Permit Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Functional Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Identifier (PID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Identifier (WID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_business_glossary_term' = 'Address Line 1 (ADDR1)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_pii_address' = 'true');
+ALTER SCHEMA `vibe_automotive_v1`.`inventory` SET TAGS ('dbx_division' = 'operations');
+ALTER SCHEMA `vibe_automotive_v1`.`inventory` SET TAGS ('dbx_domain' = 'inventory');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'SKU Master Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `compliance_document_id` SET TAGS ('dbx_business_glossary_term' = 'Compliance Document Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Product Owner Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `regulatory_requirement_id` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Requirement Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `country_of_origin` SET TAGS ('dbx_business_glossary_term' = 'Country of Origin');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `country_of_origin` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `customs_tariff_code` SET TAGS ('dbx_business_glossary_term' = 'Customs Tariff Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_master_description` SET TAGS ('dbx_business_glossary_term' = 'SKU Description');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `ean13` SET TAGS ('dbx_business_glossary_term' = 'EAN‑13 Barcode');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `ean13` SET TAGS ('dbx_value_regex' = '^d{13}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `hazardous_class` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Class');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `hazardous_flag` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `height_cm` SET TAGS ('dbx_business_glossary_term' = 'Height (Centimeters)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `last_price` SET TAGS ('dbx_business_glossary_term' = 'Last Purchase Price');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time (Days)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `length_cm` SET TAGS ('dbx_business_glossary_term' = 'Length (Centimeters)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `lot_controlled_flag` SET TAGS ('dbx_business_glossary_term' = 'Lot Controlled Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `material_group` SET TAGS ('dbx_business_glossary_term' = 'Material Group');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `material_type` SET TAGS ('dbx_business_glossary_term' = 'Material Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `max_order_qty` SET TAGS ('dbx_business_glossary_term' = 'Maximum Order Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `min_order_qty` SET TAGS ('dbx_business_glossary_term' = 'Minimum Order Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `mrp_controller` SET TAGS ('dbx_business_glossary_term' = 'MRP Controller');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `mrp_type` SET TAGS ('dbx_business_glossary_term' = 'MRP Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `mrp_type` SET TAGS ('dbx_value_regex' = 'PD|VB|FO|...');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `procurement_type` SET TAGS ('dbx_business_glossary_term' = 'Procurement Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `procurement_type` SET TAGS ('dbx_value_regex' = 'E|I|M');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `product_category` SET TAGS ('dbx_business_glossary_term' = 'Product Category');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `product_subcategory` SET TAGS ('dbx_business_glossary_term' = 'Product Subcategory');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `reorder_point_qty` SET TAGS ('dbx_business_glossary_term' = 'Reorder Point Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `safety_stock_qty` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `serial_controlled_flag` SET TAGS ('dbx_business_glossary_term' = 'Serial Controlled Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `shelf_life_days` SET TAGS ('dbx_business_glossary_term' = 'Shelf Life (Days)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_code` SET TAGS ('dbx_business_glossary_term' = 'SKU Code (Stock Keeping Unit)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_master_status` SET TAGS ('dbx_business_glossary_term' = 'SKU Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_master_status` SET TAGS ('dbx_value_regex' = 'active|inactive|discontinued|pending');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `sku_name` SET TAGS ('dbx_business_glossary_term' = 'SKU Name');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `standard_price` SET TAGS ('dbx_business_glossary_term' = 'Standard Price');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `tax_indicator` SET TAGS ('dbx_business_glossary_term' = 'Tax Indicator');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M|CM|MM');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `upc` SET TAGS ('dbx_business_glossary_term' = 'UPC Barcode');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `upc` SET TAGS ('dbx_value_regex' = '^d{12}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `valuation_class` SET TAGS ('dbx_business_glossary_term' = 'Valuation Class');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `volume_m3` SET TAGS ('dbx_business_glossary_term' = 'Volume (Cubic Meters)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Weight (Kilograms)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`sku_master` ALTER COLUMN `width_cm` SET TAGS ('dbx_business_glossary_term' = 'Width (Centimeters)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location ID (SLID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `environmental_permit_id` SET TAGS ('dbx_business_glossary_term' = 'Environmental Permit Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_business_glossary_term' = 'Functional Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant Identifier (PID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Identifier (WID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line1` SET TAGS ('dbx_business_glossary_term' = 'Address Line 1 (ADDR1)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line1` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_business_glossary_term' = 'Address Line 2 (ADDR2)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line2` SET TAGS ('dbx_business_glossary_term' = 'Address Line 2 (ADDR2)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line2` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `agv_routing_priority` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Routing Priority (AGV_PRIO)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `aisle` SET TAGS ('dbx_pii_business_glossary_term' = 'Aisle Identifier (AISLE)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `bin` SET TAGS ('dbx_pii_business_glossary_term' = 'Bin Identifier (BIN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `capacity_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Capacity Quantity (SCQ)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `capacity_uom` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `city` SET TAGS ('dbx_pii_business_glossary_term' = 'City (CITY)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `city` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `city` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `country_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Country Code (ISO3)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `country_code` SET TAGS ('dbx_pii_value_regex' = 'USA|CAN|MEX|DEU|FRA|GBR');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp (RCT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `storage_location_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Description (SLD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From Date (EFD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until Date (EUD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `external_system_source` SET TAGS ('dbx_pii_business_glossary_term' = 'External System Source (ESS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `external_system_source` SET TAGS ('dbx_pii_value_regex' = 'SAP_WM|Oracle_WMS|Custom');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `fire_safety_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Fire Safety Rating (FSR)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `fire_safety_rating` SET TAGS ('dbx_pii_value_regex' = 'A|B|C|D');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `hazardous_material_allowed` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Allowed Flag (HMAF)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `inventory_accuracy_percent` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Accuracy Percentage (IAP)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `is_default_location` SET TAGS ('dbx_pii_business_glossary_term' = 'Default Location Flag (DLF)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `last_inventory_count_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Inventory Count Date (LICD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_business_glossary_term' = 'Latitude (LAT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `agv_routing_priority` SET TAGS ('dbx_business_glossary_term' = 'AGV Routing Priority (AGV_PRIO)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `aisle` SET TAGS ('dbx_business_glossary_term' = 'Aisle Identifier (AISLE)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `bin` SET TAGS ('dbx_business_glossary_term' = 'Bin Identifier (BIN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `capacity_quantity` SET TAGS ('dbx_business_glossary_term' = 'Storage Capacity Quantity (SCQ)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `capacity_quantity` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `capacity_uom` SET TAGS ('dbx_business_glossary_term' = 'Capacity Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `capacity_uom` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `city` SET TAGS ('dbx_business_glossary_term' = 'City (CITY)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `city` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `country_code` SET TAGS ('dbx_business_glossary_term' = 'Country Code (ISO3)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `country_code` SET TAGS ('dbx_value_regex' = 'USA|CAN|MEX|DEU|FRA|GBR');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp (RCT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `storage_location_description` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Description (SLD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From Date (EFD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until Date (EUD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `external_system_source` SET TAGS ('dbx_business_glossary_term' = 'External System Source (ESS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `external_system_source` SET TAGS ('dbx_value_regex' = 'SAP_WM|Oracle_WMS|Custom');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `fire_safety_rating` SET TAGS ('dbx_business_glossary_term' = 'Fire Safety Rating (FSR)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `fire_safety_rating` SET TAGS ('dbx_value_regex' = 'A|B|C|D');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `hazardous_material_allowed` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Allowed Flag (HMAF)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `inventory_accuracy_percent` SET TAGS ('dbx_business_glossary_term' = 'Inventory Accuracy Percentage (IAP)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `is_default_location` SET TAGS ('dbx_business_glossary_term' = 'Default Location Flag (DLF)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `last_inventory_count_date` SET TAGS ('dbx_business_glossary_term' = 'Last Inventory Count Date (LICD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `latitude` SET TAGS ('dbx_business_glossary_term' = 'Latitude (LAT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `latitude` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `location_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Code (SLC)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `location_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Name (SLN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `location_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Type (SLT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `location_type` SET TAGS ('dbx_pii_value_regex' = 'bulk|rack|floor|cold_chain|automated|quarantine');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_business_glossary_term' = 'Longitude (LON)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `location_code` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Code (SLC)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `location_name` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Name (SLN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `location_type` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Type (SLT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `location_type` SET TAGS ('dbx_value_regex' = 'bulk|rack|floor|cold_chain|automated|quarantine');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `longitude` SET TAGS ('dbx_business_glossary_term' = 'Longitude (LON)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `longitude` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Postal Code (POSTAL)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `postal_code` SET TAGS ('dbx_business_glossary_term' = 'Postal Code (POSTAL)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `postal_code` SET TAGS ('dbx_restricted' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `rack` SET TAGS ('dbx_pii_business_glossary_term' = 'Rack Identifier (RACK)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `state` SET TAGS ('dbx_pii_business_glossary_term' = 'State/Province (STATE)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `state` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `storage_location_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Status (SLS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `storage_location_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|maintenance|closed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `temperature_controlled` SET TAGS ('dbx_pii_business_glossary_term' = 'Temperature Controlled Flag (TCF)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `temperature_range_celsius` SET TAGS ('dbx_pii_business_glossary_term' = 'Temperature Range Celsius (TRC)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp (RUT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `used_capacity_percentage` SET TAGS ('dbx_pii_business_glossary_term' = 'Used Capacity Percentage (UCP)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `zone` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Zone (WZ)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `stock_balance_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Balance ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Gl Account Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `blocked_stock_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Blocked Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `consignment_stock_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Consignment Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = 'USD|EUR|JPY|CNY|GBP|CHF');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `goods_movement_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Goods Movement Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `goods_movement_type` SET TAGS ('dbx_pii_value_regex' = '101|102|201|202|301|311');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `in_transit_stock_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'In‑Transit Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `is_serialized` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Serialized');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `last_movement_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Goods Movement Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Lifecycle Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_value_regex' = 'unrestricted|quality_inspection|blocked|consignment|in_transit|safety');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `manufacturing_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `physical_location_hierarchy` SET TAGS ('dbx_pii_business_glossary_term' = 'Physical Location Hierarchy');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `purchase_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Purchase Order Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `quality_inspection_stock_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `quality_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `quality_status` SET TAGS ('dbx_pii_value_regex' = 'passed|failed|pending');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity On Hand');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `safety_stock_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `stock_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Category');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `stock_category` SET TAGS ('dbx_pii_value_regex' = 'raw_material|component|finished_good|service_part|spare_part');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `supplier_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `unrestricted_stock_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Unrestricted Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `valuation_area_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Area Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `valuation_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Price');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `valuation_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `valuation_type` SET TAGS ('dbx_pii_value_regex' = 'standard|moving_average|fifo|lifo');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `goods_movement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Goods Movement ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `agv_movement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'AGV Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `batch_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Record Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Posted By User ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `movement_type_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Movement Type Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Identifier (MAT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Posted By User ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `primary_party_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Customer ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `procurement_purchase_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Purchase Order ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `reversal_of_movement_goods_movement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Reversal Of Movement ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `serialized_unit_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Serialized Unit Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Source Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `amount_local` SET TAGS ('dbx_pii_business_glossary_term' = 'Local Currency Amount');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `amount_usd` SET TAGS ('dbx_pii_business_glossary_term' = 'USD Amount');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `base_uom` SET TAGS ('dbx_pii_business_glossary_term' = 'Base Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `currency` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code (ISO)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `delivery_note_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Delivery Note Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `destination_plant` SET TAGS ('dbx_pii_business_glossary_term' = 'Destination Plant (PLT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `destination_storage_location` SET TAGS ('dbx_pii_business_glossary_term' = 'Destination Storage Location (SL)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `goods_movement_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Movement Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `goods_movement_status` SET TAGS ('dbx_pii_value_regex' = 'posted|reversed|pending');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `inspection_document_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Inspection Document Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `is_automated` SET TAGS ('dbx_pii_business_glossary_term' = 'Automated Movement Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `is_lot_tracked` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Tracked Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `is_serial_tracked` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Tracked Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `line_sequence` SET TAGS ('dbx_pii_business_glossary_term' = 'Line Sequence Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `location_zone` SET TAGS ('dbx_pii_business_glossary_term' = 'Location Zone');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `movement_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Movement Reason (Reason)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `movement_reason` SET TAGS ('dbx_pii_value_regex' = 'Production|Sales|Repair|Scrap|Transfer');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `posting_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Posting Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `posting_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Posting Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `quality_inspection_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `quality_inspection_status` SET TAGS ('dbx_pii_value_regex' = 'passed|failed|not_required');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity (Qty)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `reference_document_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Reference Document Number (RefDocNo)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `reference_document_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Reference Document Type (RefDocType)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `reference_document_type` SET TAGS ('dbx_pii_value_regex' = 'PO|PR|WO|DO|SA');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `reversal_indicator` SET TAGS ('dbx_pii_business_glossary_term' = 'Reversal Indicator');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `source_plant` SET TAGS ('dbx_pii_business_glossary_term' = 'Source Plant (PLT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `valuation_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `valuation_type` SET TAGS ('dbx_pii_value_regex' = 'Standard|MovingAverage|FIFO|LIFO');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `warehouse_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_transfer_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Transfer Order ID (STO_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `storage_bin_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Destination Bin Identifier (DST_BIN_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Destination Plant Identifier (DST_PLANT_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Picker Employee Identifier (PICKER_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `primary_stock_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Picker Employee Identifier (PICKER_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `primary_stock_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `primary_stock_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `source_bin_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Source Bin Identifier (SRC_BIN_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `source_plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Source Plant Identifier (SRC_PLANT_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_created_by_user_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By User Identifier (CREATED_BY_UID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_created_by_user_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_created_by_user_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_created_by_user_employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_updated_by_user_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By User Identifier (UPDATED_BY_UID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_updated_by_user_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_updated_by_user_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `tertiary_stock_updated_by_user_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By User Identifier (UPDATED_BY_UID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `tertiary_stock_updated_by_user_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `tertiary_stock_updated_by_user_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `agv_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Automated Guided Vehicle Identifier (AGV_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number (BATCH_NO)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `confirmation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Transfer Confirmation Status (CONFIRM_STATUS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `confirmation_status` SET TAGS ('dbx_pii_value_regex' = 'pending|confirmed|rejected');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `cost_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Transfer Cost Amount (COST_AMT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Code (COST_CENTER_CD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `cost_currency` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Currency Code (COST_CURR)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `execution_end_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Execution End Timestamp (EXEC_END_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `execution_start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Execution Start Timestamp (EXEC_START_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `handling_instructions` SET TAGS ('dbx_pii_business_glossary_term' = 'Handling Instructions (HANDLING_INSTR)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Flag (IS_HAZARDOUS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `is_jis` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-In-Sequence Flag (IS_JIS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `is_jit` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-In-Time Flag (IS_JIT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number (LOT_NO)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `material_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Description (MAT_DESC)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `material_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Number (MATNR)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `movement_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Movement Reason Code (MOVE_REASON_CD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `movement_reason_code` SET TAGS ('dbx_pii_value_regex' = 'stock_replenishment|production|maintenance|scrap|return|adjustment');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `priority` SET TAGS ('dbx_pii_business_glossary_term' = 'Transfer Priority (PRIORITY)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `priority` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `project_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Project Number (PROJ_NO)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Transfer Quantity (TRANSFER_QTY)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Audit Created Timestamp (AUDIT_CREATED_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Audit Updated Timestamp (AUDIT_UPDATED_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Serialized Material Flag (IS_SERIALIZED)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `special_handling_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Special Handling Flag (IS_SPECIAL_HANDLING)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_transfer_order_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Transfer Order Status (TO_STATUS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_transfer_order_status` SET TAGS ('dbx_pii_value_regex' = 'draft|planned|released|in_progress|completed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `temperature_control_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Temperature Control Required Flag (TEMP_CTRL_REQ)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `transfer_created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Transfer Order Creation Timestamp (TO_CREATED_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `transfer_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Transfer Order Number (TO_NUM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `transfer_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Transfer Type (TO_TYPE)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `transfer_type` SET TAGS ('dbx_pii_value_regex' = 'plant_to_plant|plant_to_warehouse|warehouse_to_warehouse|replenishment|return|adjustment');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'EA|KG|L|M|BOX|PACK');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `mrp_requirement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Requirements Planning (MRP) Requirement ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Planner ID (PLNR_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Planner ID (PLNR_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier ID (SUPP_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `regulatory_requirement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Requirement Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `batch_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Management Flag (BATCH_FLAG)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `demand_source` SET TAGS ('dbx_pii_business_glossary_term' = 'Demand Source (DEMAND_SRC)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `demand_source` SET TAGS ('dbx_pii_value_regex' = 'forecast|sales_order|production|stock_transfer');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `exception_message` SET TAGS ('dbx_pii_business_glossary_term' = 'Exception Message (EXC_MSG)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time in Days (LT_DAYS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `lot_size` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Size Quantity (LOT_SZ)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `material_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Number (MATNR)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `material_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{18}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `mrp_requirement_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Requirement Lifecycle Status (REQ_STATUS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `mrp_requirement_status` SET TAGS ('dbx_pii_value_regex' = 'planned|released|cancelled|exception');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `planning_horizon_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Planning Horizon (PLAN_HORIZON)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `planning_scenario` SET TAGS ('dbx_pii_business_glossary_term' = 'Planning Scenario (PLAN_SCEN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `planning_scenario` SET TAGS ('dbx_pii_value_regex' = 'MPS|MRP|DRP');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Code (PLANT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{4}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `priority_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Priority Code (PRIO)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `priority_code` SET TAGS ('dbx_pii_value_regex' = 'high|medium|low');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `quantity_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Required Quantity (QTY_REQ)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp (CREATED_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp (UPDATED_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `reorder_point` SET TAGS ('dbx_pii_business_glossary_term' = 'Reorder Point Quantity (ROP_QTY)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `requirement_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Requirement Date (REQ_DATE)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `requirement_number` SET TAGS ('dbx_pii_business_glossary_term' = 'MRP Requirement Number (REQ_NO)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `requirement_number` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{1,20}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `requirement_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Requirement Type (REQ_TYPE)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `requirement_type` SET TAGS ('dbx_pii_value_regex' = 'independent|dependent');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `safety_stock` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Quantity (SS_QTY)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `source_of_supply` SET TAGS ('dbx_pii_business_glossary_term' = 'Source of Supply (SUPPLY_SRC)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `source_of_supply` SET TAGS ('dbx_pii_value_regex' = 'internal|external');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'EA|KG|L|M');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `cycle_count_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cycle Count Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Counter Employee Identifier (COUNTER_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `plant_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Identifier (PLANT_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Counter Employee Identifier (COUNTER_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `sku_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Keeping Unit Identifier (SKU_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Location Identifier (LOC_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `abc_classification` SET TAGS ('dbx_pii_business_glossary_term' = 'ABC Classification (ABC)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `abc_classification` SET TAGS ('dbx_pii_value_regex' = 'A|B|C');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Timestamp (APP_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By Employee Identifier (APPROVER_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_person_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `book_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Book Quantity (BQ)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `compliance_iatf16949_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'IATF 16949 Compliance Flag (IATF_FLAG)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `compliance_nhtsa_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'NHTSA Compliance Flag (NHTSA_FLAG)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Code (CC_CODE)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Count Date (CD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_document_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Count Document Number (CDN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_frequency_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Count Frequency (DAYS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Count Status (CS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_status` SET TAGS ('dbx_pii_value_regex' = 'planned|counted|posted|approved|rejected');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Count Type (CT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_type` SET TAGS ('dbx_pii_value_regex' = 'full|partial|cycle');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `counted_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Counted Quantity (CQ)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp (CREATED_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Fiscal Year (FY)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `inventory_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Category (INV_CAT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `inventory_category` SET TAGS ('dbx_pii_value_regex' = 'raw_material|component|wip|finished_goods|service_part');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `is_locked` SET TAGS ('dbx_pii_business_glossary_term' = 'Lock Flag (LOCK_FLAG)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `is_obsolete` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolete Flag (OBSOLETE_FLAG)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `last_count_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Count Date (LAST_CD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number (LOT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `method` SET TAGS ('dbx_pii_business_glossary_term' = 'Cycle Count Method (CC_METHOD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `method` SET TAGS ('dbx_pii_value_regex' = 'manual|automated|RFID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `next_scheduled_count_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Scheduled Count Date (NEXT_CD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `physical_inventory_doc_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Physical Inventory Document Type (PID_TYPE)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `physical_inventory_doc_type` SET TAGS ('dbx_pii_value_regex' = 'MI01|MI07');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `posted_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Posted By Employee Identifier (POSTED_BY)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `posted_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Posted Timestamp (POSTED_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `recount_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Recount Flag (RC_FLAG)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `recount_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Recount Sequence Number (RC_NUM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `remarks` SET TAGS ('dbx_pii_business_glossary_term' = 'Remarks (RMKS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `reorder_point_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Reorder Point Quantity (ROP_QTY)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `safety_stock_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Quantity (SS_QTY)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number Flag (SN_FLAG)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `storage_bin` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Bin Code (BIN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'EA|KG|L|M');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp (UPDATED_TS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_percentage` SET TAGS ('dbx_pii_business_glossary_term' = 'Variance Percentage (VPCT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity Variance (QV)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Variance Reason (VR)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Record Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `compliance_document_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Document Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_classification` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Classification');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_classification` SET TAGS ('dbx_pii_value_regex' = 'raw|component|finished|service');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Name');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_owner_department` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Owner Department');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_status` SET TAGS ('dbx_pii_value_regex' = 'created|released|quarantined|consumed|archived');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `compliance_carb_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'CARB Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `compliance_iatf16949_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'IATF 16949 Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `expiration_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `expiration_status` SET TAGS ('dbx_pii_value_regex' = 'valid|near_expiry|expired');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `expiry_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiry Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `last_inspection_user` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Inspection User');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `lot_traceability_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Traceability Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `manufacturing_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `material_grade` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Grade');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `material_grade` SET TAGS ('dbx_pii_value_regex' = 'A|B|C|D');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `production_site_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Site Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `quality_inspection_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `quality_inspection_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `quality_inspection_status` SET TAGS ('dbx_pii_value_regex' = 'pending|passed|failed|rework');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `quality_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Score');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `quantity_in_base_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity (Base Units)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `restricted_use_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Restricted Use Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `supplier_lot_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Lot Reference');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `tensile_strength_mpa` SET TAGS ('dbx_pii_business_glossary_term' = 'Tensile Strength (MPa)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'kg|l|pcs|m|cm|g');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serialized_unit_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Serialized Unit ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `defect_code_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Defect Code Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Installed By Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `associated_vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `associated_vin` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number (BN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `calibration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Calibration Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `calibration_due_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Calibration Due Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `capacity_ah` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity (Ah)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_value_regex' = 'compliant|non_compliant|pending|exempt');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `component_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Component Type (CT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `component_type` SET TAGS ('dbx_pii_value_regex' = 'ECU|Battery|ADAS_Sensor|Transmission|Gearbox|Infotainment');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code (CC)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = 'USD|EUR|JPY|CNY|GBP|CAD');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `dimensions_mm` SET TAGS ('dbx_pii_business_glossary_term' = 'Dimensions (mm)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `firmware_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Firmware Version (FW)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `health_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Health Status (HS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `health_status` SET TAGS ('dbx_pii_value_regex' = 'good|fair|poor|critical');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `health_status` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `health_status` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `installation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Installation Status (IS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `installation_status` SET TAGS ('dbx_pii_value_regex' = 'not_installed|installed_in_vehicle|installed_in_test|installed_in_service');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `is_defective` SET TAGS ('dbx_pii_business_glossary_term' = 'Defective Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `last_service_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Service Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number (LN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `manufacture_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacture Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `purchase_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Purchase Price (PP)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `purchase_price` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `purchase_price` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `receipt_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Receipt Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `safety_certification_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Certification Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number (SN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_pii_device' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serialized_unit_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Lifecycle Status (LS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serialized_unit_status` SET TAGS ('dbx_pii_value_regex' = 'in_stock|installed|returned|scrapped|reserved|under_repair');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `supplier_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Code (SC)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `voltage_nominal` SET TAGS ('dbx_pii_business_glossary_term' = 'Nominal Voltage (V)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `warranty_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty End Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `warranty_period_months` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Period (Months)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `warranty_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Start Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight (kg)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `wip_order_stock_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Work-in-Progress Order Stock ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `production_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Order ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `backflush_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Backflush Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `component_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Component Name');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `cost_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Component Cost Amount');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = 'USD|EUR|JPY|CNY|GBP|CAD');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `effective_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `inventory_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `inventory_status` SET TAGS ('dbx_pii_value_regex' = 'available|allocated|in_process|scrapped|reserved|on_hold');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `issued_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Issued Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `line_sequence` SET TAGS ('dbx_pii_business_glossary_term' = 'Line Sequence Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `operation_sequence` SET TAGS ('dbx_pii_business_glossary_term' = 'Operation Sequence');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `remarks` SET TAGS ('dbx_pii_business_glossary_term' = 'Remarks');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `required_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Required Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `scrap_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Scrap Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `uom` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `uom` SET TAGS ('dbx_pii_value_regex' = 'EA|KG|L|M|PCS|SET');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `wip_order_stock_status` SET TAGS ('dbx_pii_business_glossary_term' = 'WIP Line Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `wip_order_stock_status` SET TAGS ('dbx_pii_value_regex' = 'open|closed|released|cancelled|pending|completed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `finished_vehicle_stock_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Finished Vehicle Stock ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Assigned Sales Rep Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `invoice_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Invoice Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `primary_dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Dealer ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Profit Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vehicle_ownership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Ownership Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `aging_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Aging Days');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `allocation_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Allocation Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `body_style` SET TAGS ('dbx_pii_business_glossary_term' = 'Body Style');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `color` SET TAGS ('dbx_pii_business_glossary_term' = 'Exterior Color');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `current_location_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Location Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `delivery_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Delivery Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `emission_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Emission Standard');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `expected_delivery_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expected Delivery Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `hold_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `hold_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Reason');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `location_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Location Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `location_type` SET TAGS ('dbx_pii_value_regex' = 'compound|yard|warehouse|dealer|in_transit');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `model_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `msrp` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'EV|ICE|HEV|PHEV');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `production_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `production_line` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `recall_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Recall Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `stock_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `stock_status` SET TAGS ('dbx_pii_value_regex' = 'in_production|pdi_pending|pdi_complete|allocated|in_transit|delivered');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `trim_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Trim Level');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vin` SET TAGS ('dbx_pii_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vin` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vin` SET TAGS ('dbx_pii_pii_identifier' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `warranty_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty End Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `warranty_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Start Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `service_parts_stock_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Parts Stock ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Issued To Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `spare_parts_catalog_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Spare Parts Catalog Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Location ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Id');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_pii_internal' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `aisle` SET TAGS ('dbx_pii_business_glossary_term' = 'Aisle');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `bin_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Bin Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `cost_per_unit` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Per Unit');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = 'USD|EUR|JPY|CAD|GBP');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `cycle_count_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Cycle Count Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `cycle_count_status` SET TAGS ('dbx_pii_value_regex' = 'due|overdue|completed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `inventory_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `inventory_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|blocked');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `last_cost_update_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Cost Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `last_count_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Count Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `last_issue_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Issue Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `last_receipt_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Receipt Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time (Days)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `max_stock_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Stock Level');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `min_stock_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Stock Level');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `obsolescence_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolescence Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `obsolescence_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolescence Reason');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `obsolescence_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolescence Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `obsolescence_status` SET TAGS ('dbx_pii_value_regex' = 'active|obsolete|pending');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `part_revision` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Revision');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `quantity_available` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity Available');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `quantity_committed` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity Committed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity On Hand');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Audit Created');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Audit Updated');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `reorder_point` SET TAGS ('dbx_pii_business_glossary_term' = 'Reorder Point');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `safety_stock` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `shelf` SET TAGS ('dbx_pii_business_glossary_term' = 'Shelf');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `supersession_part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Supersession Part Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `valuation_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Method');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `valuation_method` SET TAGS ('dbx_pii_value_regex' = 'standard|fifo|lifo|average');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `warranty_expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `warranty_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `warranty_status` SET TAGS ('dbx_pii_value_regex' = 'in_warranty|out_of_warranty');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `replenishment_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Replenishment Order ID (ROID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Destination Storage Location Identifier (DSLI)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `primary_replenishment_storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Source Storage Location Identifier (SSLI)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Identifier (SUP_ID)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Requested By Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `trade_compliance_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Trade Compliance Record Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `actual_delivery_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Delivery Timestamp (ADT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number (BN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `cost_per_unit` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Per Unit (CPU)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp (RCT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `event_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Replenishment Request Timestamp (RRT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `fulfillment_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Fulfillment Status (FS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `fulfillment_status` SET TAGS ('dbx_pii_value_regex' = 'pending|in_progress|completed|failed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `is_critical` SET TAGS ('dbx_pii_business_glossary_term' = 'Critical Part Indicator (CPI)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `last_modified_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Modified By User (RLMU)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time in Days (LTD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number (LOT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `max_stock_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Stock Level (XSL)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `min_stock_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Stock Level (MSL)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Additional Notes (NOTE)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Replenishment Order Number (RON)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `order_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Replenishment Order Status (ROS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `order_status` SET TAGS ('dbx_pii_value_regex' = 'draft|open|released|fulfilled|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `order_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Replenishment Order Type (ROT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `order_type` SET TAGS ('dbx_pii_value_regex' = 'kanban|min_max|jit_pull|jis_sequence');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Replenishment Priority Level (RPL)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `promised_delivery_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Promised Delivery Date (PDD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `replenishment_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Replenishment Method (RM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `replenishment_method` SET TAGS ('dbx_pii_value_regex' = 'automatic|manual');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `requested_delivery_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Requested Delivery Date (RDD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `requested_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Requested Quantity (RQ)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `safety_stock_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Quantity (SSQ)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number (SN)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `trigger_source` SET TAGS ('dbx_pii_business_glossary_term' = 'Replenishment Trigger Source (RTS)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `trigger_source` SET TAGS ('dbx_pii_value_regex' = 'production_schedule|reorder_point|manual|system');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `uom` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `uom` SET TAGS ('dbx_pii_value_regex' = 'EA|KG|L|M|BOX');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Update Timestamp (RUT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created By User (RCBU)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_person_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_stock_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Consignment Stock ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `aging_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Aging (Days)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Consignment Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Consignment Reference');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_stock_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Consignment Stock Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_stock_status` SET TAGS ('dbx_pii_value_regex' = 'available|reserved|consumed|settled|blocked');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Consignment Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_type` SET TAGS ('dbx_pii_value_regex' = 'JIT|JIS|standard');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consumption_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Consumption Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `contract_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Contract Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `is_batch_managed` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Batch Managed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `is_serialized` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Serialized');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `last_movement_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Movement Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `last_settlement_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Settlement Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `material_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Description');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `material_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Number (SAP)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity On Hand');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `receipt_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Receipt Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `reorder_point` SET TAGS ('dbx_pii_business_glossary_term' = 'Reorder Point');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `safety_stock` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `settlement_due_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Settlement‑Due Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `settlement_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Settlement Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `settlement_status` SET TAGS ('dbx_pii_value_regex' = 'pending|settled|disputed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `stock_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Category');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `stock_category` SET TAGS ('dbx_pii_value_regex' = 'raw_material|component|finished_goods|service_part|spare_part');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `storage_location` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'EA|KG|L|M|PCS|SET');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `valuation_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Amount');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `valuation_currency` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Currency');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `valuation_currency` SET TAGS ('dbx_pii_value_regex' = 'USD|EUR|JPY|GBP|CNY|CHF');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `valuation_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Method');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `valuation_method` SET TAGS ('dbx_pii_value_regex' = 'standard_cost|moving_average|fifo|lifo');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `inventory_valuation_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Valuation ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Gl Account Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Profit Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `area` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Area');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code (ISO 4217)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = 'USD|EUR|JPY|CNY|GBP|CHF');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Fiscal Year');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `last_valuation_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Valuation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `moving_average_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Moving Average Price (Currency per Base Unit)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `obsolescence_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolescence Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `period` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Period');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `price_control` SET TAGS ('dbx_pii_business_glossary_term' = 'Price Control Indicator');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `price_control` SET TAGS ('dbx_pii_value_regex' = 'standard|moving_average');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `price_variance` SET TAGS ('dbx_pii_business_glossary_term' = 'Price Variance (Currency per Base Unit)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Audit Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Audit Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `standard_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Price (Currency per Base Unit)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `total_stock_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Stock Quantity (Base Units)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `total_stock_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Stock Value (Currency)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `valuation_class` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Class');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `valuation_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `valuation_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `valuation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `valuation_status` SET TAGS ('dbx_pii_value_regex' = 'draft|in_progress|finalized|reversed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `write_down_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Write‑Down Amount (Currency)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_policy_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Policy Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `demand_variability_factor` SET TAGS ('dbx_pii_business_glossary_term' = 'Demand Variability Factor');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `last_recalculation_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Recalculation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time (Days)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Policy Lifecycle Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_value_regex' = 'draft|approved|implemented|retired');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `location_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `maximum_stock_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Stock Level');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Policy Notes');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `policy_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Policy Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `policy_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Policy Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `policy_type` SET TAGS ('dbx_pii_value_regex' = 'safety_stock|reorder_point|max_stock');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `reorder_point` SET TAGS ('dbx_pii_business_glossary_term' = 'Reorder Point');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `review_cycle_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Cycle (Days)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Calculation Method');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_method` SET TAGS ('dbx_pii_value_regex' = 'statistical|fixed|dynamic');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_policy_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Policy Operational Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_policy_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|pending');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_source` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Source');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_source` SET TAGS ('dbx_pii_value_regex' = 'system|manual|external');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `service_level_target` SET TAGS ('dbx_pii_business_glossary_term' = 'Service Level Target (Percent)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `abc_xyz_classification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'ABC/XYZ Classification Record ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `abc_class` SET TAGS ('dbx_pii_business_glossary_term' = 'ABC Classification (A=High Value, B=Medium, C=Low)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `abc_class` SET TAGS ('dbx_pii_value_regex' = 'A|B|C');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `abc_xyz_classification_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Classification Record Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `abc_xyz_classification_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|pending_review|retired');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `annual_consumption_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Annual Consumption Value (USD)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `annual_consumption_value` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `classification_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Classification Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `classification_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Classification Method');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `classification_method` SET TAGS ('dbx_pii_value_regex' = 'pareto|custom|automated');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `consumption_frequency_per_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Consumption Frequency Per Year');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `cycle_count_frequency_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Cycle Count Frequency (Days)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `is_obsolete` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolete Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `next_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Next Review Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Classification Notes');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `safety_stock_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Quantity (Units)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `xyz_class` SET TAGS ('dbx_pii_business_glossary_term' = 'XYZ Classification (X=Stable, Y=Variable, Z=Irregular)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `xyz_class` SET TAGS ('dbx_pii_value_regex' = 'X|Y|Z');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `obsolescence_review_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolescence Review ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Reviewer ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `reviewer_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Reviewer ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `reviewer_employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `compliance_carb_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'CARB Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `compliance_iatf16949_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'IATF 16949 Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code (ISO 4217)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `days_since_last_movement` SET TAGS ('dbx_pii_business_glossary_term' = 'Days Since Last Movement');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `disposition_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Disposition Reason');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `eop_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'End‑of‑Production Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `estimated_write_down_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Estimated Write‑Down Value');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `is_critical` SET TAGS ('dbx_pii_business_glossary_term' = 'Critical Obsolescence Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `last_movement_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Movement Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `manufacturing_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Manufacturing Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Notes');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{2,5}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `recommended_disposition` SET TAGS ('dbx_pii_business_glossary_term' = 'Recommended Disposition');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `recommended_disposition` SET TAGS ('dbx_pii_value_regex' = 'continue|markdown|scrap|return_to_supplier|donate');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `review_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolescence Review Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `review_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `review_status` SET TAGS ('dbx_pii_value_regex' = 'draft|pending|approved|rejected');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `risk_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolescence Risk Score');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `safety_stock_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `sku` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Keeping Unit (SKU)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `sku` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9_-]{1,20}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `stock_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `supplier_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `supplier_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z0-9]{3,10}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'EA|KG|L|M');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `valuation_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Price per Unit');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `kanban_card_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Kanban Card ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `card_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Kanban Card Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `card_number` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `card_number` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `cards_in_circulation` SET TAGS ('dbx_pii_business_glossary_term' = 'Cards In Circulation');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `consuming_work_center` SET TAGS ('dbx_pii_business_glossary_term' = 'Consuming Work Center');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `container_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Container Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `container_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Container Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `container_type` SET TAGS ('dbx_pii_value_regex' = 'bin|pallet|box|tote|crate');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `kanban_card_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Kanban Description');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `is_jis_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Just‑In‑Sequence Enabled Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `is_jit_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Just‑In‑Time Enabled Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `kanban_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Kanban Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `kanban_status` SET TAGS ('dbx_pii_value_regex' = 'empty|in_transit|full|blocked');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `last_consumption_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Consumption Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `last_signal_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Signal Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time (Days)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `lot_control_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Control Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Kanban Notes');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Priority Level');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `production_line` SET TAGS ('dbx_pii_business_glossary_term' = 'Production Line Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `reorder_point_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Reorder Point Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `replenishment_strategy` SET TAGS ('dbx_pii_business_glossary_term' = 'Replenishment Strategy');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `replenishment_strategy` SET TAGS ('dbx_pii_value_regex' = 'internal|external|in_house_production');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `safety_stock_qty` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `serial_control_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Control Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `signal_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Signal Method');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `signal_method` SET TAGS ('dbx_pii_value_regex' = 'physical|electronic|barcode');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `supply_area` SET TAGS ('dbx_pii_business_glossary_term' = 'Supply Area Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'pcs|kg|liter|meter');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `ckd_skd_kit_id` SET TAGS ('dbx_pii_business_glossary_term' = 'CKD/SKD Kit Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By User ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `primary_ckd_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By User ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `primary_ckd_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `primary_ckd_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By User ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Procurement Supplier Id');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_internal' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `model_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `actual_arrival_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Arrival Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `bom_reference_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Bill of Materials Reference Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `completeness_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Kit Completeness Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `completeness_status` SET TAGS ('dbx_pii_value_regex' = 'complete|partial|missing_parts');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `container_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Container Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `customs_tariff_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Customs Tariff Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `customs_valuation_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Customs Valuation Amount');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `customs_valuation_currency` SET TAGS ('dbx_pii_business_glossary_term' = 'Customs Valuation Currency');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `documentation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Documentation Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `documentation_status` SET TAGS ('dbx_pii_value_regex' = 'pending|submitted|approved|rejected');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `expected_arrival_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expected Arrival Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `export_country_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Export Country Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `export_country_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `export_document_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Export Document Reference');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `inventory_accuracy_percent` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Accuracy Percent');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `is_jis_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Just‑In‑Sequence Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `is_jit_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Just‑In‑Time Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `is_obsolete_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolete Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Kit Category (KIT_CAT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_category` SET TAGS ('dbx_pii_value_regex' = 'CKD|SKD|Mixed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Kit Name (KIT_NAME)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Kit Number (KIT_NO)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Kit Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_status` SET TAGS ('dbx_pii_value_regex' = 'created|packed|shipped|in_transit|arrived|closed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `last_inventory_count_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Inventory Count Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `missing_parts_list` SET TAGS ('dbx_pii_business_glossary_term' = 'Missing Parts List');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `packing_list_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Packing List Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `serial_numbers` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Numbers List');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `shipping_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Shipping Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `special_handling_instructions` SET TAGS ('dbx_pii_business_glossary_term' = 'Special Handling Instructions');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `supplier_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `target_assembly_plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Assembly Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `target_assembly_plant_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Assembly Plant Name');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `temperature_control_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Temperature Control Required');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `total_volume_m3` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Kit Volume (M3)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `total_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Kit Weight (KG)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `transfer_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Transfer Price');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `transfer_price_currency` SET TAGS ('dbx_pii_business_glossary_term' = 'Transfer Price Currency');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `transfer_price_incoterms` SET TAGS ('dbx_pii_business_glossary_term' = 'Incoterms for Transfer Price');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `transfer_price_incoterms` SET TAGS ('dbx_pii_value_regex' = 'EXW|FCA|FOB|CFR|CIF|DDP');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `valuation_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Kit Valuation Amount');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `valuation_currency` SET TAGS ('dbx_pii_business_glossary_term' = 'Kit Valuation Currency');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Adjustment ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By User ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_updated_by_user_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By User ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_updated_by_user_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_updated_by_user_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Approver ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `quaternary_adjustment_updated_by_user_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By User ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `quaternary_adjustment_updated_by_user_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `quaternary_adjustment_updated_by_user_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tertiary_adjustment_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Approver ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tertiary_adjustment_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tertiary_adjustment_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `accounting_document_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Accounting Document Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Adjustment Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Adjustment Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_status` SET TAGS ('dbx_pii_value_regex' = 'draft|submitted|approved|rejected|posted|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Adjustment Event Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Adjustment Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_type` SET TAGS ('dbx_pii_value_regex' = 'count_variance|damage|theft|system_error|process_correction');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `approver_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Approver Name');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `comments` SET TAGS ('dbx_pii_business_glossary_term' = 'Adjustment Comments');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `cost_currency` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Currency');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `cost_currency` SET TAGS ('dbx_pii_value_regex' = 'USD|EUR|JPY|CNY|GBP|CAD');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `cost_impact_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Impact Amount');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `is_approved` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Approved');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `is_manual` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Manual Adjustment');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `posting_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Posting Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `project_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Project Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `quantity_adjusted` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity Adjusted');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Adjustment Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `reason_code` SET TAGS ('dbx_pii_value_regex' = 'RC01|RC02|RC03|RC04|RC05|RC06');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `reason_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Adjustment Reason Description');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `related_document_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Related Document Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tax_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Tax Amount');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tax_indicator` SET TAGS ('dbx_pii_business_glossary_term' = 'Tax Indicator');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tax_indicator` SET TAGS ('dbx_pii_value_regex' = 'taxable|non_taxable');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'EA|KG|L|M|BOX');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `valuation_area_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Area Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_task_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Task Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `order_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Order Line Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By User Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_employee_ref' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `primary_warehouse_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By User Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `primary_warehouse_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `primary_warehouse_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `storage_bin_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Source Bin Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_updated_by_user_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By User Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_updated_by_user_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_updated_by_user_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `completion_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Task Completion Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `cost_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Task Cost Amount');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `cost_currency` SET TAGS ('dbx_pii_business_glossary_term' = 'Task Cost Currency');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `cost_currency` SET TAGS ('dbx_pii_value_regex' = '[A-Z]{3}');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `destination_bin_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Destination Bin Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `exception_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Task Exception Reason');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `handling_instructions` SET TAGS ('dbx_pii_business_glossary_term' = 'Handling Instructions');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `is_jis` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-In-Sequence Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `is_jit` SET TAGS ('dbx_pii_business_glossary_term' = 'Just-In-Time Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `plant_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `priority` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Task Priority');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `priority` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Task Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Audit Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Audit Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `resource_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Resource Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `resource_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Resource Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `resource_type` SET TAGS ('dbx_pii_value_regex' = 'operator|agv');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `sku_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Stock Keeping Unit Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `special_handling_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Special Handling Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Task Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `task_created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Task Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `task_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Task Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `task_type` SET TAGS ('dbx_pii_value_regex' = 'putaway|picking|replenishment|relocation|inventory_count');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `temperature_control_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Temperature Control Required Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_task_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Task Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_task_status` SET TAGS ('dbx_pii_value_regex' = 'pending|in_progress|completed|exception|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_type_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Movement Type ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `account_determination_relevant` SET TAGS ('dbx_pii_business_glossary_term' = 'Account Determination Relevant');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `allowed_destination_location_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Allowed Destination Location Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `allowed_source_location_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Allowed Source Location Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `batch_management_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Management Required');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_type_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Movement Type Code (MT)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `cost_center_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Required');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `default_quantity_sign` SET TAGS ('dbx_pii_business_glossary_term' = 'Default Quantity Sign');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_type_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Movement Type Description');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `direction` SET TAGS ('dbx_pii_business_glossary_term' = 'Movement Direction');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `direction` SET TAGS ('dbx_pii_value_regex' = 'inbound|outbound|transfer');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `hazardous_material_allowed` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Allowed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `inventory_accounting_relevant` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Accounting Relevant');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `inventory_impact` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Impact');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `inventory_impact` SET TAGS ('dbx_pii_value_regex' = 'increase|decrease|neutral');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_active` SET TAGS ('dbx_pii_business_glossary_term' = 'Active Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_automated` SET TAGS ('dbx_pii_business_glossary_term' = 'Automated Posting Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_deprecated` SET TAGS ('dbx_pii_business_glossary_term' = 'Deprecated Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_jis` SET TAGS ('dbx_pii_business_glossary_term' = 'Just‑In‑Sequence Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_jit` SET TAGS ('dbx_pii_business_glossary_term' = 'Just‑In‑Time Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_lot_tracked` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Tracking Required');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_serial_tracked` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Tracking Required');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Movement Category');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_category` SET TAGS ('dbx_pii_value_regex' = 'goods_receipt|goods_issue|transfer|physical_inventory|adjustment');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Movement Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Movement Type Notes');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `price_control` SET TAGS ('dbx_pii_business_glossary_term' = 'Price Control');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `price_control` SET TAGS ('dbx_pii_value_regex' = 'standard|moving_average|none');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `profit_center_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Profit Center Required');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `quality_inspection_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Inspection Required');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `requires_approval` SET TAGS ('dbx_pii_business_glossary_term' = 'Requires Approval');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `reversal_allowed` SET TAGS ('dbx_pii_business_glossary_term' = 'Reversal Allowed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `reversal_movement_type_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Reversal Movement Type Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `serial_number_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number Required');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `special_stock_indicator` SET TAGS ('dbx_pii_business_glossary_term' = 'Special Stock Indicator');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `special_stock_indicator` SET TAGS ('dbx_pii_value_regex' = 'none|blocked|quality|consignment|project');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `system_defined` SET TAGS ('dbx_pii_business_glossary_term' = 'System Defined Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `tax_relevant` SET TAGS ('dbx_pii_business_glossary_term' = 'Tax Relevant');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `transaction_event` SET TAGS ('dbx_pii_business_glossary_term' = 'Transaction Event');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `transaction_event` SET TAGS ('dbx_pii_value_regex' = 'purchase|production|sales|transfer|physical_inventory|adjustment');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `valuation_class` SET TAGS ('dbx_pii_business_glossary_term' = 'Valuation Class');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` SET TAGS ('dbx_pii_data_type' = 'association_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` SET TAGS ('dbx_pii_association_edges' = 'inventory.sku_master,dealer.dealership');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `dealer_sku_stock_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealerskustock - Dealer Sku Stock Id');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealerskustock - Dealership Id');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealerskustock - Sku Master Id');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `cost_per_unit` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit Cost');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_pii_business_glossary_term' = 'On Hand Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `reorder_point` SET TAGS ('dbx_pii_business_glossary_term' = 'Reorder Point');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `safety_stock` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Stock');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `parent_warehouse_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Parent Warehouse Id');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `parent_warehouse_id` SET TAGS ('dbx_pii_self_ref_fk' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_business_glossary_term' = 'Address Line1');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_classification' = 'restricted');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `rack` SET TAGS ('dbx_business_glossary_term' = 'Rack Identifier (RACK)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `state` SET TAGS ('dbx_business_glossary_term' = 'State/Province (STATE)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `storage_location_status` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Status (SLS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `storage_location_status` SET TAGS ('dbx_value_regex' = 'active|inactive|maintenance|closed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `temperature_controlled` SET TAGS ('dbx_business_glossary_term' = 'Temperature Controlled Flag (TCF)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `temperature_range_celsius` SET TAGS ('dbx_business_glossary_term' = 'Temperature Range Celsius (TRC)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp (RUT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `used_capacity_percentage` SET TAGS ('dbx_business_glossary_term' = 'Used Capacity Percentage (UCP)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `used_capacity_percentage` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_location` ALTER COLUMN `zone` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Zone (WZ)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `stock_balance_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Balance ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `blocked_stock_qty` SET TAGS ('dbx_business_glossary_term' = 'Blocked Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `consignment_stock_qty` SET TAGS ('dbx_business_glossary_term' = 'Consignment Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CNY|GBP|CHF');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `goods_movement_type` SET TAGS ('dbx_business_glossary_term' = 'Goods Movement Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `goods_movement_type` SET TAGS ('dbx_value_regex' = '101|102|201|202|301|311');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `in_transit_stock_qty` SET TAGS ('dbx_business_glossary_term' = 'In‑Transit Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `is_serialized` SET TAGS ('dbx_business_glossary_term' = 'Is Serialized');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `last_movement_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Goods Movement Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_business_glossary_term' = 'Stock Lifecycle Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_value_regex' = 'unrestricted|quality_inspection|blocked|consignment|in_transit|safety');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `manufacturing_date` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `physical_location_hierarchy` SET TAGS ('dbx_business_glossary_term' = 'Physical Location Hierarchy');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `purchase_order_number` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `quality_inspection_stock_qty` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `quality_status` SET TAGS ('dbx_business_glossary_term' = 'Quality Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `quality_status` SET TAGS ('dbx_value_regex' = 'passed|failed|pending');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_business_glossary_term' = 'Quantity On Hand');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `safety_stock_qty` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `serial_number` SET TAGS ('dbx_business_glossary_term' = 'Serial Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `stock_category` SET TAGS ('dbx_business_glossary_term' = 'Stock Category');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `stock_category` SET TAGS ('dbx_value_regex' = 'raw_material|component|finished_good|service_part|spare_part');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `supplier_code` SET TAGS ('dbx_business_glossary_term' = 'Supplier Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `unrestricted_stock_qty` SET TAGS ('dbx_business_glossary_term' = 'Unrestricted Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `valuation_area_code` SET TAGS ('dbx_business_glossary_term' = 'Valuation Area Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `valuation_price` SET TAGS ('dbx_business_glossary_term' = 'Valuation Price');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `valuation_type` SET TAGS ('dbx_business_glossary_term' = 'Valuation Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_balance` ALTER COLUMN `valuation_type` SET TAGS ('dbx_value_regex' = 'standard|moving_average|fifo|lifo');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `goods_movement_id` SET TAGS ('dbx_business_glossary_term' = 'Goods Movement ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `agv_movement_id` SET TAGS ('dbx_business_glossary_term' = 'AGV Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `batch_record_id` SET TAGS ('dbx_business_glossary_term' = 'Batch Record Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Posted By User ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `goods_party_id` SET TAGS ('dbx_business_glossary_term' = 'Customer ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `goods_posted_by_user_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Posted By User ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `goods_posted_by_user_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `goods_posted_by_user_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `movement_type_id` SET TAGS ('dbx_business_glossary_term' = 'Movement Type Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Material Identifier (MAT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `procurement_purchase_order_id` SET TAGS ('dbx_business_glossary_term' = 'Purchase Order ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `reversal_of_movement_goods_movement_id` SET TAGS ('dbx_business_glossary_term' = 'Reversal Of Movement ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `serialized_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Serialized Unit Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Source Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `amount_local` SET TAGS ('dbx_business_glossary_term' = 'Local Currency Amount');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `amount_usd` SET TAGS ('dbx_business_glossary_term' = 'USD Amount');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `base_uom` SET TAGS ('dbx_business_glossary_term' = 'Base Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `currency` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `delivery_note_number` SET TAGS ('dbx_business_glossary_term' = 'Delivery Note Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `destination_plant` SET TAGS ('dbx_business_glossary_term' = 'Destination Plant (PLT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `destination_storage_location` SET TAGS ('dbx_business_glossary_term' = 'Destination Storage Location (SL)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `goods_movement_status` SET TAGS ('dbx_business_glossary_term' = 'Movement Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `goods_movement_status` SET TAGS ('dbx_value_regex' = 'posted|reversed|pending');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `inspection_document_number` SET TAGS ('dbx_business_glossary_term' = 'Inspection Document Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `is_automated` SET TAGS ('dbx_business_glossary_term' = 'Automated Movement Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `is_lot_tracked` SET TAGS ('dbx_business_glossary_term' = 'Lot Tracked Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `is_serial_tracked` SET TAGS ('dbx_business_glossary_term' = 'Serial Tracked Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `line_sequence` SET TAGS ('dbx_business_glossary_term' = 'Line Sequence Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `location_zone` SET TAGS ('dbx_business_glossary_term' = 'Location Zone');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `movement_reason` SET TAGS ('dbx_business_glossary_term' = 'Movement Reason (Reason)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `movement_reason` SET TAGS ('dbx_value_regex' = 'Production|Sales|Repair|Scrap|Transfer');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `posting_date` SET TAGS ('dbx_business_glossary_term' = 'Posting Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `posting_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Posting Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `quality_inspection_status` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `quality_inspection_status` SET TAGS ('dbx_value_regex' = 'passed|failed|not_required');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `quantity` SET TAGS ('dbx_business_glossary_term' = 'Quantity (Qty)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `reference_document_number` SET TAGS ('dbx_business_glossary_term' = 'Reference Document Number (RefDocNo)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `reference_document_type` SET TAGS ('dbx_business_glossary_term' = 'Reference Document Type (RefDocType)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `reference_document_type` SET TAGS ('dbx_value_regex' = 'PO|PR|WO|DO|SA');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `reversal_indicator` SET TAGS ('dbx_business_glossary_term' = 'Reversal Indicator');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `source_plant` SET TAGS ('dbx_business_glossary_term' = 'Source Plant (PLT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `valuation_type` SET TAGS ('dbx_business_glossary_term' = 'Valuation Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `valuation_type` SET TAGS ('dbx_value_regex' = 'Standard|MovingAverage|FIFO|LIFO');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`goods_movement` ALTER COLUMN `warehouse_number` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_transfer_order_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Transfer Order ID (STO_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `storage_bin_id` SET TAGS ('dbx_business_glossary_term' = 'Destination Bin Identifier (DST_BIN_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Destination Plant Identifier (DST_PLANT_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Picker Employee Identifier (PICKER_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `source_bin_id` SET TAGS ('dbx_business_glossary_term' = 'Source Bin Identifier (SRC_BIN_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `source_plant_id` SET TAGS ('dbx_business_glossary_term' = 'Source Plant Identifier (SRC_PLANT_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_created_by_user_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Created By User Identifier (CREATED_BY_UID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_created_by_user_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_created_by_user_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Picker Employee Identifier (PICKER_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_updated_by_user_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Updated By User Identifier (UPDATED_BY_UID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_updated_by_user_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_updated_by_user_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `tertiary_stock_updated_by_user_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Updated By User Identifier (UPDATED_BY_UID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `tertiary_stock_updated_by_user_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `tertiary_stock_updated_by_user_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `agv_code` SET TAGS ('dbx_business_glossary_term' = 'Automated Guided Vehicle Identifier (AGV_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number (BATCH_NO)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `confirmation_status` SET TAGS ('dbx_business_glossary_term' = 'Transfer Confirmation Status (CONFIRM_STATUS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `confirmation_status` SET TAGS ('dbx_value_regex' = 'pending|confirmed|rejected');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `cost_amount` SET TAGS ('dbx_business_glossary_term' = 'Transfer Cost Amount (COST_AMT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Code (COST_CENTER_CD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `cost_currency` SET TAGS ('dbx_business_glossary_term' = 'Cost Currency Code (COST_CURR)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `execution_end_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Execution End Timestamp (EXEC_END_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `execution_start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Execution Start Timestamp (EXEC_START_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `handling_instructions` SET TAGS ('dbx_business_glossary_term' = 'Handling Instructions (HANDLING_INSTR)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Flag (IS_HAZARDOUS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `is_jis` SET TAGS ('dbx_business_glossary_term' = 'Just-In-Sequence Flag (IS_JIS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `is_jit` SET TAGS ('dbx_business_glossary_term' = 'Just-In-Time Flag (IS_JIT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number (LOT_NO)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `material_description` SET TAGS ('dbx_business_glossary_term' = 'Material Description (MAT_DESC)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `material_number` SET TAGS ('dbx_business_glossary_term' = 'Material Number (MATNR)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `movement_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Movement Reason Code (MOVE_REASON_CD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `movement_reason_code` SET TAGS ('dbx_value_regex' = 'stock_replenishment|production|maintenance|scrap|return|adjustment');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `priority` SET TAGS ('dbx_business_glossary_term' = 'Transfer Priority (PRIORITY)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `priority` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `project_number` SET TAGS ('dbx_business_glossary_term' = 'Project Number (PROJ_NO)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `quantity` SET TAGS ('dbx_business_glossary_term' = 'Transfer Quantity (TRANSFER_QTY)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Created Timestamp (AUDIT_CREATED_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Updated Timestamp (AUDIT_UPDATED_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_business_glossary_term' = 'Serialized Material Flag (IS_SERIALIZED)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `special_handling_flag` SET TAGS ('dbx_business_glossary_term' = 'Special Handling Flag (IS_SPECIAL_HANDLING)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_transfer_order_status` SET TAGS ('dbx_business_glossary_term' = 'Transfer Order Status (TO_STATUS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `stock_transfer_order_status` SET TAGS ('dbx_value_regex' = 'draft|planned|released|in_progress|completed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `temperature_control_required` SET TAGS ('dbx_business_glossary_term' = 'Temperature Control Required Flag (TEMP_CTRL_REQ)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `transfer_created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Transfer Order Creation Timestamp (TO_CREATED_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `transfer_order_number` SET TAGS ('dbx_business_glossary_term' = 'Transfer Order Number (TO_NUM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `transfer_type` SET TAGS ('dbx_business_glossary_term' = 'Transfer Type (TO_TYPE)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `transfer_type` SET TAGS ('dbx_value_regex' = 'plant_to_plant|plant_to_warehouse|warehouse_to_warehouse|replenishment|return|adjustment');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`stock_transfer_order` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M|BOX|PACK');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `mrp_requirement_id` SET TAGS ('dbx_business_glossary_term' = 'Material Requirements Planning (MRP) Requirement ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Planner ID (PLNR_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `mrp_planner_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Planner ID (PLNR_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `mrp_planner_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `mrp_planner_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID (SUPP_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `regulatory_requirement_id` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Requirement Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `batch_flag` SET TAGS ('dbx_business_glossary_term' = 'Batch Management Flag (BATCH_FLAG)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `demand_source` SET TAGS ('dbx_business_glossary_term' = 'Demand Source (DEMAND_SRC)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `demand_source` SET TAGS ('dbx_value_regex' = 'forecast|sales_order|production|stock_transfer');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `exception_message` SET TAGS ('dbx_business_glossary_term' = 'Exception Message (EXC_MSG)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time in Days (LT_DAYS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `lot_size` SET TAGS ('dbx_business_glossary_term' = 'Lot Size Quantity (LOT_SZ)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `material_number` SET TAGS ('dbx_business_glossary_term' = 'Material Number (MATNR)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `material_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{18}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `mrp_requirement_status` SET TAGS ('dbx_business_glossary_term' = 'Requirement Lifecycle Status (REQ_STATUS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `mrp_requirement_status` SET TAGS ('dbx_value_regex' = 'planned|released|cancelled|exception');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `planning_horizon_days` SET TAGS ('dbx_business_glossary_term' = 'Planning Horizon (PLAN_HORIZON)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `planning_scenario` SET TAGS ('dbx_business_glossary_term' = 'Planning Scenario (PLAN_SCEN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `planning_scenario` SET TAGS ('dbx_value_regex' = 'MPS|MRP|DRP');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Code (PLANT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `plant_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{4}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `priority_code` SET TAGS ('dbx_business_glossary_term' = 'Priority Code (PRIO)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `priority_code` SET TAGS ('dbx_value_regex' = 'high|medium|low');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `quantity_required` SET TAGS ('dbx_business_glossary_term' = 'Required Quantity (QTY_REQ)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp (CREATED_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp (UPDATED_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `reorder_point` SET TAGS ('dbx_business_glossary_term' = 'Reorder Point Quantity (ROP_QTY)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `requirement_date` SET TAGS ('dbx_business_glossary_term' = 'Planned Requirement Date (REQ_DATE)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `requirement_number` SET TAGS ('dbx_business_glossary_term' = 'MRP Requirement Number (REQ_NO)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `requirement_number` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{1,20}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `requirement_type` SET TAGS ('dbx_business_glossary_term' = 'Requirement Type (REQ_TYPE)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `requirement_type` SET TAGS ('dbx_value_regex' = 'independent|dependent');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `safety_stock` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Quantity (SS_QTY)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `source_of_supply` SET TAGS ('dbx_business_glossary_term' = 'Source of Supply (SUPPLY_SRC)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `source_of_supply` SET TAGS ('dbx_value_regex' = 'internal|external');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`mrp_requirement` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `cycle_count_id` SET TAGS ('dbx_business_glossary_term' = 'Cycle Count Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Counter Employee Identifier (COUNTER_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `cycle_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Counter Employee Identifier (COUNTER_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `cycle_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `cycle_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `plant_id` SET TAGS ('dbx_business_glossary_term' = 'Plant Identifier (PLANT_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `sku_id` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit Identifier (SKU_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Location Identifier (LOC_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `abc_classification` SET TAGS ('dbx_business_glossary_term' = 'ABC Classification (ABC)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `abc_classification` SET TAGS ('dbx_value_regex' = 'A|B|C');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp (APP_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By Employee Identifier (APPROVER_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `book_quantity` SET TAGS ('dbx_business_glossary_term' = 'Book Quantity (BQ)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `compliance_iatf16949_flag` SET TAGS ('dbx_business_glossary_term' = 'IATF 16949 Compliance Flag (IATF_FLAG)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `compliance_nhtsa_flag` SET TAGS ('dbx_business_glossary_term' = 'NHTSA Compliance Flag (NHTSA_FLAG)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Code (CC_CODE)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_date` SET TAGS ('dbx_business_glossary_term' = 'Count Date (CD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_document_number` SET TAGS ('dbx_business_glossary_term' = 'Count Document Number (CDN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_frequency_days` SET TAGS ('dbx_business_glossary_term' = 'Count Frequency (DAYS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_status` SET TAGS ('dbx_business_glossary_term' = 'Count Status (CS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_status` SET TAGS ('dbx_value_regex' = 'planned|counted|posted|approved|rejected');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_type` SET TAGS ('dbx_business_glossary_term' = 'Count Type (CT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `count_type` SET TAGS ('dbx_value_regex' = 'full|partial|cycle');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `counted_quantity` SET TAGS ('dbx_business_glossary_term' = 'Counted Quantity (CQ)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp (CREATED_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_business_glossary_term' = 'Fiscal Year (FY)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `inventory_category` SET TAGS ('dbx_business_glossary_term' = 'Inventory Category (INV_CAT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `inventory_category` SET TAGS ('dbx_value_regex' = 'raw_material|component|wip|finished_goods|service_part');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `is_locked` SET TAGS ('dbx_business_glossary_term' = 'Lock Flag (LOCK_FLAG)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `is_obsolete` SET TAGS ('dbx_business_glossary_term' = 'Obsolete Flag (OBSOLETE_FLAG)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `last_count_date` SET TAGS ('dbx_business_glossary_term' = 'Last Count Date (LAST_CD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number (LOT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `method` SET TAGS ('dbx_business_glossary_term' = 'Cycle Count Method (CC_METHOD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `method` SET TAGS ('dbx_value_regex' = 'manual|automated|RFID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `next_scheduled_count_date` SET TAGS ('dbx_business_glossary_term' = 'Next Scheduled Count Date (NEXT_CD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `physical_inventory_doc_type` SET TAGS ('dbx_business_glossary_term' = 'Physical Inventory Document Type (PID_TYPE)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `physical_inventory_doc_type` SET TAGS ('dbx_value_regex' = 'MI01|MI07');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `posted_by` SET TAGS ('dbx_business_glossary_term' = 'Posted By Employee Identifier (POSTED_BY)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `posted_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Posted Timestamp (POSTED_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `recount_flag` SET TAGS ('dbx_business_glossary_term' = 'Recount Flag (RC_FLAG)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `recount_number` SET TAGS ('dbx_business_glossary_term' = 'Recount Sequence Number (RC_NUM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `remarks` SET TAGS ('dbx_business_glossary_term' = 'Remarks (RMKS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `reorder_point_quantity` SET TAGS ('dbx_business_glossary_term' = 'Reorder Point Quantity (ROP_QTY)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `safety_stock_quantity` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Quantity (SS_QTY)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_business_glossary_term' = 'Serial Number Flag (SN_FLAG)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `storage_bin` SET TAGS ('dbx_business_glossary_term' = 'Storage Bin Code (BIN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp (UPDATED_TS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_percentage` SET TAGS ('dbx_business_glossary_term' = 'Variance Percentage (VPCT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_quantity` SET TAGS ('dbx_business_glossary_term' = 'Quantity Variance (QV)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`cycle_count` ALTER COLUMN `variance_reason` SET TAGS ('dbx_business_glossary_term' = 'Variance Reason (VR)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_record_id` SET TAGS ('dbx_business_glossary_term' = 'Batch Record Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_classification` SET TAGS ('dbx_business_glossary_term' = 'Batch Classification');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_classification` SET TAGS ('dbx_value_regex' = 'raw|component|finished|service');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_name` SET TAGS ('dbx_business_glossary_term' = 'Batch Name');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_owner_department` SET TAGS ('dbx_business_glossary_term' = 'Batch Owner Department');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_status` SET TAGS ('dbx_business_glossary_term' = 'Batch Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `batch_status` SET TAGS ('dbx_value_regex' = 'created|released|quarantined|consumed|archived');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `compliance_carb_flag` SET TAGS ('dbx_business_glossary_term' = 'CARB Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `compliance_iatf16949_flag` SET TAGS ('dbx_business_glossary_term' = 'IATF 16949 Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `expiration_status` SET TAGS ('dbx_business_glossary_term' = 'Expiration Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `expiration_status` SET TAGS ('dbx_value_regex' = 'valid|near_expiry|expired');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `last_inspection_user` SET TAGS ('dbx_business_glossary_term' = 'Last Inspection User');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `lot_traceability_flag` SET TAGS ('dbx_business_glossary_term' = 'Lot Traceability Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `manufacturing_date` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `material_grade` SET TAGS ('dbx_business_glossary_term' = 'Material Grade');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `material_grade` SET TAGS ('dbx_value_regex' = 'A|B|C|D');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `production_site_code` SET TAGS ('dbx_business_glossary_term' = 'Production Site Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `quality_inspection_date` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `quality_inspection_status` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `quality_inspection_status` SET TAGS ('dbx_value_regex' = 'pending|passed|failed|rework');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `quality_score` SET TAGS ('dbx_business_glossary_term' = 'Quality Score');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `quantity_in_base_units` SET TAGS ('dbx_business_glossary_term' = 'Quantity (Base Units)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `restricted_use_flag` SET TAGS ('dbx_business_glossary_term' = 'Restricted Use Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `serial_number` SET TAGS ('dbx_business_glossary_term' = 'Serial Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `supplier_lot_reference` SET TAGS ('dbx_business_glossary_term' = 'Supplier Lot Reference');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `tensile_strength_mpa` SET TAGS ('dbx_business_glossary_term' = 'Tensile Strength (MPa)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'kg|l|pcs|m|cm|g');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`batch_record` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serialized_unit_id` SET TAGS ('dbx_business_glossary_term' = 'Serialized Unit ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `defect_code_id` SET TAGS ('dbx_business_glossary_term' = 'Defect Code Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Installed By Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `associated_vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `associated_vin` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number (BN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `calibration_date` SET TAGS ('dbx_business_glossary_term' = 'Calibration Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `calibration_due_date` SET TAGS ('dbx_business_glossary_term' = 'Calibration Due Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `capacity_ah` SET TAGS ('dbx_business_glossary_term' = 'Capacity (Ah)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `capacity_ah` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending|exempt');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `component_type` SET TAGS ('dbx_business_glossary_term' = 'Component Type (CT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `component_type` SET TAGS ('dbx_value_regex' = 'ECU|Battery|ADAS_Sensor|Transmission|Gearbox|Infotainment');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (CC)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CNY|GBP|CAD');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `dimensions_mm` SET TAGS ('dbx_business_glossary_term' = 'Dimensions (mm)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `firmware_version` SET TAGS ('dbx_business_glossary_term' = 'Firmware Version (FW)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `health_status` SET TAGS ('dbx_business_glossary_term' = 'Health Status (HS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `health_status` SET TAGS ('dbx_value_regex' = 'good|fair|poor|critical');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `health_status` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `health_status` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `installation_status` SET TAGS ('dbx_business_glossary_term' = 'Installation Status (IS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `installation_status` SET TAGS ('dbx_value_regex' = 'not_installed|installed_in_vehicle|installed_in_test|installed_in_service');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `is_defective` SET TAGS ('dbx_business_glossary_term' = 'Defective Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `last_service_date` SET TAGS ('dbx_business_glossary_term' = 'Last Service Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number (LN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `manufacture_date` SET TAGS ('dbx_business_glossary_term' = 'Manufacture Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `purchase_price` SET TAGS ('dbx_business_glossary_term' = 'Purchase Price (PP)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `purchase_price` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `purchase_price` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Receipt Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `safety_certification_code` SET TAGS ('dbx_business_glossary_term' = 'Safety Certification Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serial_number` SET TAGS ('dbx_business_glossary_term' = 'Serial Number (SN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serial_number` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serial_number` SET TAGS ('dbx_pii_device' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serialized_unit_status` SET TAGS ('dbx_business_glossary_term' = 'Lifecycle Status (LS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `serialized_unit_status` SET TAGS ('dbx_value_regex' = 'in_stock|installed|returned|scrapped|reserved|under_repair');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `supplier_code` SET TAGS ('dbx_business_glossary_term' = 'Supplier Code (SC)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `voltage_nominal` SET TAGS ('dbx_business_glossary_term' = 'Nominal Voltage (V)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `warranty_end_date` SET TAGS ('dbx_business_glossary_term' = 'Warranty End Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `warranty_period_months` SET TAGS ('dbx_business_glossary_term' = 'Warranty Period (Months)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `warranty_start_date` SET TAGS ('dbx_business_glossary_term' = 'Warranty Start Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`serialized_unit` ALTER COLUMN `weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `wip_order_stock_id` SET TAGS ('dbx_business_glossary_term' = 'Work-in-Progress Order Stock ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `production_order_id` SET TAGS ('dbx_business_glossary_term' = 'Production Order ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `backflush_flag` SET TAGS ('dbx_business_glossary_term' = 'Backflush Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `component_name` SET TAGS ('dbx_business_glossary_term' = 'Component Name');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `cost_amount` SET TAGS ('dbx_business_glossary_term' = 'Component Cost Amount');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CNY|GBP|CAD');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `inventory_status` SET TAGS ('dbx_business_glossary_term' = 'Inventory Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `inventory_status` SET TAGS ('dbx_value_regex' = 'available|allocated|in_process|scrapped|reserved|on_hold');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `issued_quantity` SET TAGS ('dbx_business_glossary_term' = 'Issued Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `line_sequence` SET TAGS ('dbx_business_glossary_term' = 'Line Sequence Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `operation_sequence` SET TAGS ('dbx_business_glossary_term' = 'Operation Sequence');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `remarks` SET TAGS ('dbx_business_glossary_term' = 'Remarks');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `required_quantity` SET TAGS ('dbx_business_glossary_term' = 'Required Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `scrap_quantity` SET TAGS ('dbx_business_glossary_term' = 'Scrap Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_business_glossary_term' = 'Serial Number Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `uom` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `uom` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M|PCS|SET');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `wip_order_stock_status` SET TAGS ('dbx_business_glossary_term' = 'WIP Line Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`wip_order_stock` ALTER COLUMN `wip_order_stock_status` SET TAGS ('dbx_value_regex' = 'open|closed|released|cancelled|pending|completed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `finished_vehicle_stock_id` SET TAGS ('dbx_business_glossary_term' = 'Finished Vehicle Stock ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned Sales Rep Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Connected Vehicle Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Allocation Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `finished_dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Allocation Dealer ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `invoice_id` SET TAGS ('dbx_business_glossary_term' = 'Invoice Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vin_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Vin Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `aging_days` SET TAGS ('dbx_business_glossary_term' = 'Aging Days');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `allocation_date` SET TAGS ('dbx_business_glossary_term' = 'Allocation Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `body_style` SET TAGS ('dbx_business_glossary_term' = 'Body Style');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `color` SET TAGS ('dbx_business_glossary_term' = 'Exterior Color');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `current_location_code` SET TAGS ('dbx_business_glossary_term' = 'Current Location Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Delivery Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `emission_standard` SET TAGS ('dbx_business_glossary_term' = 'Emission Standard');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `expected_delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Expected Delivery Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `hold_code` SET TAGS ('dbx_business_glossary_term' = 'Hold Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `hold_reason` SET TAGS ('dbx_business_glossary_term' = 'Hold Reason');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `location_type` SET TAGS ('dbx_business_glossary_term' = 'Location Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `location_type` SET TAGS ('dbx_value_regex' = 'compound|yard|warehouse|dealer|in_transit');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `model_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `msrp` SET TAGS ('dbx_business_glossary_term' = 'Manufacturer Suggested Retail Price (MSRP)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'EV|ICE|HEV|PHEV');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `production_date` SET TAGS ('dbx_business_glossary_term' = 'Production Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `production_line` SET TAGS ('dbx_business_glossary_term' = 'Production Line');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `recall_flag` SET TAGS ('dbx_business_glossary_term' = 'Recall Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `stock_status` SET TAGS ('dbx_business_glossary_term' = 'Stock Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `stock_status` SET TAGS ('dbx_value_regex' = 'in_production|pdi_pending|pdi_complete|allocated|in_transit|delivered');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `trim_level` SET TAGS ('dbx_business_glossary_term' = 'Trim Level');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vin` SET TAGS ('dbx_value_regex' = '^[A-HJ-NPR-Z0-9]{17}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vin` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `vin` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `warranty_end_date` SET TAGS ('dbx_business_glossary_term' = 'Warranty End Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`finished_vehicle_stock` ALTER COLUMN `warranty_start_date` SET TAGS ('dbx_business_glossary_term' = 'Warranty Start Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `service_parts_stock_id` SET TAGS ('dbx_business_glossary_term' = 'Service Parts Stock ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Issued To Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `spare_parts_catalog_id` SET TAGS ('dbx_business_glossary_term' = 'Spare Parts Catalog Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Location ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Id');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_internal' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `aisle` SET TAGS ('dbx_business_glossary_term' = 'Aisle');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `bin_number` SET TAGS ('dbx_business_glossary_term' = 'Bin Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `cost_per_unit` SET TAGS ('dbx_business_glossary_term' = 'Cost Per Unit');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CAD|GBP');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `cycle_count_status` SET TAGS ('dbx_business_glossary_term' = 'Cycle Count Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `cycle_count_status` SET TAGS ('dbx_value_regex' = 'due|overdue|completed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `inventory_status` SET TAGS ('dbx_business_glossary_term' = 'Inventory Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `inventory_status` SET TAGS ('dbx_value_regex' = 'active|inactive|blocked');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `last_cost_update_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Cost Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `last_count_date` SET TAGS ('dbx_business_glossary_term' = 'Last Count Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `last_issue_date` SET TAGS ('dbx_business_glossary_term' = 'Last Issue Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `last_receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Last Receipt Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time (Days)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `max_stock_level` SET TAGS ('dbx_business_glossary_term' = 'Maximum Stock Level');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `min_stock_level` SET TAGS ('dbx_business_glossary_term' = 'Minimum Stock Level');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `obsolescence_date` SET TAGS ('dbx_business_glossary_term' = 'Obsolescence Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `obsolescence_reason` SET TAGS ('dbx_business_glossary_term' = 'Obsolescence Reason');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `obsolescence_status` SET TAGS ('dbx_business_glossary_term' = 'Obsolescence Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `obsolescence_status` SET TAGS ('dbx_value_regex' = 'active|obsolete|pending');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `part_revision` SET TAGS ('dbx_business_glossary_term' = 'Part Revision');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `quantity_available` SET TAGS ('dbx_business_glossary_term' = 'Quantity Available');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `quantity_committed` SET TAGS ('dbx_business_glossary_term' = 'Quantity Committed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_business_glossary_term' = 'Quantity On Hand');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Created');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Updated');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `reorder_point` SET TAGS ('dbx_business_glossary_term' = 'Reorder Point');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `safety_stock` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_business_glossary_term' = 'Serial Number Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `shelf` SET TAGS ('dbx_business_glossary_term' = 'Shelf');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `supersession_part_number` SET TAGS ('dbx_business_glossary_term' = 'Supersession Part Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `valuation_method` SET TAGS ('dbx_business_glossary_term' = 'Valuation Method');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `valuation_method` SET TAGS ('dbx_value_regex' = 'standard|fifo|lifo|average');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `warranty_expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Warranty Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `warranty_status` SET TAGS ('dbx_business_glossary_term' = 'Warranty Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`service_parts_stock` ALTER COLUMN `warranty_status` SET TAGS ('dbx_value_regex' = 'in_warranty|out_of_warranty');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `replenishment_order_id` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Order ID (ROID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Destination Storage Location Identifier (DSLI)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `primary_replenishment_storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Source Storage Location Identifier (SSLI)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Identifier (SUP_ID)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Requested By Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `trade_compliance_record_id` SET TAGS ('dbx_business_glossary_term' = 'Trade Compliance Record Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `actual_delivery_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Delivery Timestamp (ADT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number (BN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `cost_per_unit` SET TAGS ('dbx_business_glossary_term' = 'Cost Per Unit (CPU)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp (RCT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `event_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Request Timestamp (RRT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `fulfillment_status` SET TAGS ('dbx_business_glossary_term' = 'Fulfillment Status (FS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `fulfillment_status` SET TAGS ('dbx_value_regex' = 'pending|in_progress|completed|failed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `is_critical` SET TAGS ('dbx_business_glossary_term' = 'Critical Part Indicator (CPI)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `last_modified_by` SET TAGS ('dbx_business_glossary_term' = 'Record Last Modified By User (RLMU)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time in Days (LTD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number (LOT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `max_stock_level` SET TAGS ('dbx_business_glossary_term' = 'Maximum Stock Level (XSL)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `min_stock_level` SET TAGS ('dbx_business_glossary_term' = 'Minimum Stock Level (MSL)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Additional Notes (NOTE)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `order_number` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Order Number (RON)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `order_status` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Order Status (ROS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `order_status` SET TAGS ('dbx_value_regex' = 'draft|open|released|fulfilled|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `order_type` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Order Type (ROT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `order_type` SET TAGS ('dbx_value_regex' = 'kanban|min_max|jit_pull|jis_sequence');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `priority_level` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Priority Level (RPL)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `priority_level` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `promised_delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Promised Delivery Date (PDD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `replenishment_method` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Method (RM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `replenishment_method` SET TAGS ('dbx_value_regex' = 'automatic|manual');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `requested_delivery_date` SET TAGS ('dbx_business_glossary_term' = 'Requested Delivery Date (RDD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `requested_quantity` SET TAGS ('dbx_business_glossary_term' = 'Requested Quantity (RQ)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `safety_stock_quantity` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Quantity (SSQ)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `serial_number` SET TAGS ('dbx_business_glossary_term' = 'Serial Number (SN)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `trigger_source` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Trigger Source (RTS)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `trigger_source` SET TAGS ('dbx_value_regex' = 'production_schedule|reorder_point|manual|system');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `uom` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `uom` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M|BOX');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Update Timestamp (RUT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`replenishment_order` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Record Created By User (RCBU)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_stock_id` SET TAGS ('dbx_business_glossary_term' = 'Consignment Stock ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `aging_days` SET TAGS ('dbx_business_glossary_term' = 'Aging (Days)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_number` SET TAGS ('dbx_business_glossary_term' = 'Consignment Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_reference` SET TAGS ('dbx_business_glossary_term' = 'Consignment Reference');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_stock_status` SET TAGS ('dbx_business_glossary_term' = 'Consignment Stock Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_stock_status` SET TAGS ('dbx_value_regex' = 'available|reserved|consumed|settled|blocked');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_type` SET TAGS ('dbx_business_glossary_term' = 'Consignment Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consignment_type` SET TAGS ('dbx_value_regex' = 'JIT|JIS|standard');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `consumption_quantity` SET TAGS ('dbx_business_glossary_term' = 'Consumption Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `contract_number` SET TAGS ('dbx_business_glossary_term' = 'Contract Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `is_batch_managed` SET TAGS ('dbx_business_glossary_term' = 'Is Batch Managed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `is_serialized` SET TAGS ('dbx_business_glossary_term' = 'Is Serialized');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `last_movement_date` SET TAGS ('dbx_business_glossary_term' = 'Last Movement Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `last_settlement_date` SET TAGS ('dbx_business_glossary_term' = 'Last Settlement Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `material_description` SET TAGS ('dbx_business_glossary_term' = 'Material Description');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `material_number` SET TAGS ('dbx_business_glossary_term' = 'Material Number (SAP)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_business_glossary_term' = 'Quantity On Hand');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `receipt_date` SET TAGS ('dbx_business_glossary_term' = 'Receipt Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `reorder_point` SET TAGS ('dbx_business_glossary_term' = 'Reorder Point');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `safety_stock` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `serial_number` SET TAGS ('dbx_business_glossary_term' = 'Serial Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `settlement_due_quantity` SET TAGS ('dbx_business_glossary_term' = 'Settlement‑Due Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `settlement_status` SET TAGS ('dbx_business_glossary_term' = 'Settlement Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `settlement_status` SET TAGS ('dbx_value_regex' = 'pending|settled|disputed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `stock_category` SET TAGS ('dbx_business_glossary_term' = 'Stock Category');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `stock_category` SET TAGS ('dbx_value_regex' = 'raw_material|component|finished_goods|service_part|spare_part');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `storage_location` SET TAGS ('dbx_business_glossary_term' = 'Storage Location');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M|PCS|SET');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `valuation_amount` SET TAGS ('dbx_business_glossary_term' = 'Valuation Amount');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `valuation_currency` SET TAGS ('dbx_business_glossary_term' = 'Valuation Currency');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `valuation_currency` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|GBP|CNY|CHF');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `valuation_method` SET TAGS ('dbx_business_glossary_term' = 'Valuation Method');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`consignment_stock` ALTER COLUMN `valuation_method` SET TAGS ('dbx_value_regex' = 'standard_cost|moving_average|fifo|lifo');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `inventory_valuation_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Valuation ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `gl_account_id` SET TAGS ('dbx_business_glossary_term' = 'Gl Account Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `area` SET TAGS ('dbx_business_glossary_term' = 'Valuation Area');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CNY|GBP|CHF');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `fiscal_year` SET TAGS ('dbx_business_glossary_term' = 'Fiscal Year');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `last_valuation_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Valuation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `moving_average_price` SET TAGS ('dbx_business_glossary_term' = 'Moving Average Price (Currency per Base Unit)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `obsolescence_flag` SET TAGS ('dbx_business_glossary_term' = 'Obsolescence Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `period` SET TAGS ('dbx_business_glossary_term' = 'Valuation Period');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `price_control` SET TAGS ('dbx_business_glossary_term' = 'Price Control Indicator');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `price_control` SET TAGS ('dbx_value_regex' = 'standard|moving_average');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `price_variance` SET TAGS ('dbx_business_glossary_term' = 'Price Variance (Currency per Base Unit)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `standard_price` SET TAGS ('dbx_business_glossary_term' = 'Standard Price (Currency per Base Unit)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `total_stock_quantity` SET TAGS ('dbx_business_glossary_term' = 'Total Stock Quantity (Base Units)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `total_stock_value` SET TAGS ('dbx_business_glossary_term' = 'Total Stock Value (Currency)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `valuation_class` SET TAGS ('dbx_business_glossary_term' = 'Valuation Class');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `valuation_date` SET TAGS ('dbx_business_glossary_term' = 'Valuation Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `valuation_number` SET TAGS ('dbx_business_glossary_term' = 'Valuation Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `valuation_status` SET TAGS ('dbx_business_glossary_term' = 'Valuation Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `valuation_status` SET TAGS ('dbx_value_regex' = 'draft|in_progress|finalized|reversed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_valuation` ALTER COLUMN `write_down_amount` SET TAGS ('dbx_business_glossary_term' = 'Write‑Down Amount (Currency)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_policy_id` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Policy Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `demand_variability_factor` SET TAGS ('dbx_business_glossary_term' = 'Demand Variability Factor');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `last_recalculation_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Recalculation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time (Days)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_business_glossary_term' = 'Policy Lifecycle Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_value_regex' = 'draft|approved|implemented|retired');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `location_code` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `maximum_stock_level` SET TAGS ('dbx_business_glossary_term' = 'Maximum Stock Level');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Policy Notes');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `policy_number` SET TAGS ('dbx_business_glossary_term' = 'Policy Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `policy_type` SET TAGS ('dbx_business_glossary_term' = 'Policy Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `policy_type` SET TAGS ('dbx_value_regex' = 'safety_stock|reorder_point|max_stock');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `reorder_point` SET TAGS ('dbx_business_glossary_term' = 'Reorder Point');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `review_cycle_days` SET TAGS ('dbx_business_glossary_term' = 'Review Cycle (Days)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_method` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Calculation Method');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_method` SET TAGS ('dbx_value_regex' = 'statistical|fixed|dynamic');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_policy_status` SET TAGS ('dbx_business_glossary_term' = 'Policy Operational Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_policy_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_quantity` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_source` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Source');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `safety_stock_source` SET TAGS ('dbx_value_regex' = 'system|manual|external');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `service_level_target` SET TAGS ('dbx_business_glossary_term' = 'Service Level Target (Percent)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`safety_stock_policy` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `abc_xyz_classification_id` SET TAGS ('dbx_business_glossary_term' = 'ABC/XYZ Classification Record ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `abc_class` SET TAGS ('dbx_business_glossary_term' = 'ABC Classification (A=High Value, B=Medium, C=Low)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `abc_class` SET TAGS ('dbx_value_regex' = 'A|B|C');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `abc_xyz_classification_status` SET TAGS ('dbx_business_glossary_term' = 'Classification Record Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `abc_xyz_classification_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending_review|retired');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `annual_consumption_value` SET TAGS ('dbx_business_glossary_term' = 'Annual Consumption Value (USD)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `annual_consumption_value` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `classification_date` SET TAGS ('dbx_business_glossary_term' = 'Classification Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `classification_method` SET TAGS ('dbx_business_glossary_term' = 'Classification Method');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `classification_method` SET TAGS ('dbx_value_regex' = 'pareto|custom|automated');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `consumption_frequency_per_year` SET TAGS ('dbx_business_glossary_term' = 'Consumption Frequency Per Year');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `cycle_count_frequency_days` SET TAGS ('dbx_business_glossary_term' = 'Cycle Count Frequency (Days)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `is_obsolete` SET TAGS ('dbx_business_glossary_term' = 'Obsolete Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `next_review_date` SET TAGS ('dbx_business_glossary_term' = 'Next Review Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Classification Notes');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `safety_stock_quantity` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Quantity (Units)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `xyz_class` SET TAGS ('dbx_business_glossary_term' = 'XYZ Classification (X=Stable, Y=Variable, Z=Irregular)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`abc_xyz_classification` ALTER COLUMN `xyz_class` SET TAGS ('dbx_value_regex' = 'X|Y|Z');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `obsolescence_review_id` SET TAGS ('dbx_business_glossary_term' = 'Obsolescence Review ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Reviewer ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `reviewer_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Reviewer ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `reviewer_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `reviewer_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `compliance_carb_flag` SET TAGS ('dbx_business_glossary_term' = 'CARB Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `compliance_iatf16949_flag` SET TAGS ('dbx_business_glossary_term' = 'IATF 16949 Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `days_since_last_movement` SET TAGS ('dbx_business_glossary_term' = 'Days Since Last Movement');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `disposition_reason` SET TAGS ('dbx_business_glossary_term' = 'Disposition Reason');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `eop_flag` SET TAGS ('dbx_business_glossary_term' = 'End‑of‑Production Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `estimated_write_down_value` SET TAGS ('dbx_business_glossary_term' = 'Estimated Write‑Down Value');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `is_critical` SET TAGS ('dbx_business_glossary_term' = 'Critical Obsolescence Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `last_movement_date` SET TAGS ('dbx_business_glossary_term' = 'Last Movement Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `manufacturing_date` SET TAGS ('dbx_business_glossary_term' = 'Manufacturing Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Review Notes');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `plant_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{2,5}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `recommended_disposition` SET TAGS ('dbx_business_glossary_term' = 'Recommended Disposition');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `recommended_disposition` SET TAGS ('dbx_value_regex' = 'continue|markdown|scrap|return_to_supplier|donate');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `review_date` SET TAGS ('dbx_business_glossary_term' = 'Review Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `review_number` SET TAGS ('dbx_business_glossary_term' = 'Obsolescence Review Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `review_status` SET TAGS ('dbx_business_glossary_term' = 'Review Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `review_status` SET TAGS ('dbx_value_regex' = 'draft|pending|approved|rejected');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `risk_score` SET TAGS ('dbx_business_glossary_term' = 'Obsolescence Risk Score');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `safety_stock_qty` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `sku` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit (SKU)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `sku` SET TAGS ('dbx_value_regex' = '^[A-Z0-9_-]{1,20}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `stock_quantity` SET TAGS ('dbx_business_glossary_term' = 'Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `supplier_code` SET TAGS ('dbx_business_glossary_term' = 'Supplier Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `supplier_code` SET TAGS ('dbx_value_regex' = '^[A-Z0-9]{3,10}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`obsolescence_review` ALTER COLUMN `valuation_price` SET TAGS ('dbx_business_glossary_term' = 'Valuation Price per Unit');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `kanban_card_id` SET TAGS ('dbx_business_glossary_term' = 'Kanban Card ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `card_number` SET TAGS ('dbx_business_glossary_term' = 'Kanban Card Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `card_number` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `card_number` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `cards_in_circulation` SET TAGS ('dbx_business_glossary_term' = 'Cards In Circulation');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `consuming_work_center` SET TAGS ('dbx_business_glossary_term' = 'Consuming Work Center');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `container_quantity` SET TAGS ('dbx_business_glossary_term' = 'Container Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `container_type` SET TAGS ('dbx_business_glossary_term' = 'Container Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `container_type` SET TAGS ('dbx_value_regex' = 'bin|pallet|box|tote|crate');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `kanban_card_description` SET TAGS ('dbx_business_glossary_term' = 'Kanban Description');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `is_jis_enabled` SET TAGS ('dbx_business_glossary_term' = 'Just‑In‑Sequence Enabled Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `is_jit_enabled` SET TAGS ('dbx_business_glossary_term' = 'Just‑In‑Time Enabled Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `kanban_status` SET TAGS ('dbx_business_glossary_term' = 'Kanban Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `kanban_status` SET TAGS ('dbx_value_regex' = 'empty|in_transit|full|blocked');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `last_consumption_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Consumption Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `last_signal_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Signal Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time (Days)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `lot_control_flag` SET TAGS ('dbx_business_glossary_term' = 'Lot Control Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Kanban Notes');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `priority_level` SET TAGS ('dbx_business_glossary_term' = 'Priority Level');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `priority_level` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `production_line` SET TAGS ('dbx_business_glossary_term' = 'Production Line Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `reorder_point_qty` SET TAGS ('dbx_business_glossary_term' = 'Reorder Point Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `replenishment_strategy` SET TAGS ('dbx_business_glossary_term' = 'Replenishment Strategy');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `replenishment_strategy` SET TAGS ('dbx_value_regex' = 'internal|external|in_house_production');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `safety_stock_qty` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `serial_control_flag` SET TAGS ('dbx_business_glossary_term' = 'Serial Control Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `signal_method` SET TAGS ('dbx_business_glossary_term' = 'Signal Method');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `signal_method` SET TAGS ('dbx_value_regex' = 'physical|electronic|barcode');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `supply_area` SET TAGS ('dbx_business_glossary_term' = 'Supply Area Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'pcs|kg|liter|meter');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`kanban_card` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `ckd_skd_kit_id` SET TAGS ('dbx_business_glossary_term' = 'CKD/SKD Kit Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Created By User ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `ckd_updated_by_user_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Updated By User ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `ckd_updated_by_user_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `ckd_updated_by_user_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `primary_ckd_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Created By User ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `primary_ckd_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `primary_ckd_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Procurement Supplier Id');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_internal' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `model_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `vehicle_order_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Order Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `actual_arrival_date` SET TAGS ('dbx_business_glossary_term' = 'Actual Arrival Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `bom_reference_number` SET TAGS ('dbx_business_glossary_term' = 'Bill of Materials Reference Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `completeness_status` SET TAGS ('dbx_business_glossary_term' = 'Kit Completeness Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `completeness_status` SET TAGS ('dbx_value_regex' = 'complete|partial|missing_parts');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `container_number` SET TAGS ('dbx_business_glossary_term' = 'Container Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `customs_tariff_code` SET TAGS ('dbx_business_glossary_term' = 'Customs Tariff Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `customs_valuation_amount` SET TAGS ('dbx_business_glossary_term' = 'Customs Valuation Amount');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `customs_valuation_currency` SET TAGS ('dbx_business_glossary_term' = 'Customs Valuation Currency');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `documentation_status` SET TAGS ('dbx_business_glossary_term' = 'Documentation Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `documentation_status` SET TAGS ('dbx_value_regex' = 'pending|submitted|approved|rejected');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `expected_arrival_date` SET TAGS ('dbx_business_glossary_term' = 'Expected Arrival Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `export_country_code` SET TAGS ('dbx_business_glossary_term' = 'Export Country Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `export_country_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `export_document_reference` SET TAGS ('dbx_business_glossary_term' = 'Export Document Reference');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `inventory_accuracy_percent` SET TAGS ('dbx_business_glossary_term' = 'Inventory Accuracy Percent');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `is_jis_flag` SET TAGS ('dbx_business_glossary_term' = 'Just‑In‑Sequence Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `is_jit_flag` SET TAGS ('dbx_business_glossary_term' = 'Just‑In‑Time Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `is_obsolete_flag` SET TAGS ('dbx_business_glossary_term' = 'Obsolete Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_category` SET TAGS ('dbx_business_glossary_term' = 'Kit Category (KIT_CAT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_category` SET TAGS ('dbx_value_regex' = 'CKD|SKD|Mixed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_name` SET TAGS ('dbx_business_glossary_term' = 'Kit Name (KIT_NAME)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_number` SET TAGS ('dbx_business_glossary_term' = 'Kit Number (KIT_NO)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_status` SET TAGS ('dbx_business_glossary_term' = 'Kit Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `kit_status` SET TAGS ('dbx_value_regex' = 'created|packed|shipped|in_transit|arrived|closed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `last_inventory_count_date` SET TAGS ('dbx_business_glossary_term' = 'Last Inventory Count Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `missing_parts_list` SET TAGS ('dbx_business_glossary_term' = 'Missing Parts List');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `packing_list_number` SET TAGS ('dbx_business_glossary_term' = 'Packing List Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_business_glossary_term' = 'Serial Number Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `serial_numbers` SET TAGS ('dbx_business_glossary_term' = 'Serial Numbers List');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `shipping_date` SET TAGS ('dbx_business_glossary_term' = 'Shipping Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `special_handling_instructions` SET TAGS ('dbx_business_glossary_term' = 'Special Handling Instructions');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `supplier_code` SET TAGS ('dbx_business_glossary_term' = 'Supplier Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `target_assembly_plant_code` SET TAGS ('dbx_business_glossary_term' = 'Target Assembly Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `target_assembly_plant_name` SET TAGS ('dbx_business_glossary_term' = 'Target Assembly Plant Name');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `temperature_control_required` SET TAGS ('dbx_business_glossary_term' = 'Temperature Control Required');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `total_volume_m3` SET TAGS ('dbx_business_glossary_term' = 'Total Kit Volume (M3)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `total_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Total Kit Weight (KG)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `transfer_price` SET TAGS ('dbx_business_glossary_term' = 'Transfer Price');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `transfer_price_currency` SET TAGS ('dbx_business_glossary_term' = 'Transfer Price Currency');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `transfer_price_incoterms` SET TAGS ('dbx_business_glossary_term' = 'Incoterms for Transfer Price');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `transfer_price_incoterms` SET TAGS ('dbx_value_regex' = 'EXW|FCA|FOB|CFR|CIF|DDP');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `valuation_amount` SET TAGS ('dbx_business_glossary_term' = 'Kit Valuation Amount');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`ckd_skd_kit` ALTER COLUMN `valuation_currency` SET TAGS ('dbx_business_glossary_term' = 'Kit Valuation Currency');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Adjustment ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Created By User ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Approver ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_updated_by_user_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Updated By User ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_updated_by_user_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_updated_by_user_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `primary_adjustment_created_by_user_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Created By User ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `primary_adjustment_created_by_user_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `primary_adjustment_created_by_user_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tertiary_adjustment_updated_by_user_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Updated By User ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tertiary_adjustment_updated_by_user_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tertiary_adjustment_updated_by_user_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `accounting_document_number` SET TAGS ('dbx_business_glossary_term' = 'Accounting Document Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_number` SET TAGS ('dbx_business_glossary_term' = 'Inventory Adjustment Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_status` SET TAGS ('dbx_business_glossary_term' = 'Adjustment Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_status` SET TAGS ('dbx_value_regex' = 'draft|submitted|approved|rejected|posted|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Adjustment Event Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_type` SET TAGS ('dbx_business_glossary_term' = 'Adjustment Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `adjustment_type` SET TAGS ('dbx_value_regex' = 'count_variance|damage|theft|system_error|process_correction');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `approver_name` SET TAGS ('dbx_business_glossary_term' = 'Approver Name');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `comments` SET TAGS ('dbx_business_glossary_term' = 'Adjustment Comments');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `cost_currency` SET TAGS ('dbx_business_glossary_term' = 'Cost Currency');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `cost_currency` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CNY|GBP|CAD');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `cost_impact_amount` SET TAGS ('dbx_business_glossary_term' = 'Cost Impact Amount');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `is_approved` SET TAGS ('dbx_business_glossary_term' = 'Is Approved');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `is_manual` SET TAGS ('dbx_business_glossary_term' = 'Is Manual Adjustment');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `posting_date` SET TAGS ('dbx_business_glossary_term' = 'Posting Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `project_number` SET TAGS ('dbx_business_glossary_term' = 'Project Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `quantity_adjusted` SET TAGS ('dbx_business_glossary_term' = 'Quantity Adjusted');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `reason_code` SET TAGS ('dbx_business_glossary_term' = 'Adjustment Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `reason_code` SET TAGS ('dbx_value_regex' = 'RC01|RC02|RC03|RC04|RC05|RC06');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `reason_description` SET TAGS ('dbx_business_glossary_term' = 'Adjustment Reason Description');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `related_document_number` SET TAGS ('dbx_business_glossary_term' = 'Related Document Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `serial_number` SET TAGS ('dbx_business_glossary_term' = 'Serial Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tax_amount` SET TAGS ('dbx_business_glossary_term' = 'Tax Amount');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tax_indicator` SET TAGS ('dbx_business_glossary_term' = 'Tax Indicator');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `tax_indicator` SET TAGS ('dbx_value_regex' = 'taxable|non_taxable');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|M|BOX');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`adjustment` ALTER COLUMN `valuation_area_code` SET TAGS ('dbx_business_glossary_term' = 'Valuation Area Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_task_id` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Task Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `order_line_id` SET TAGS ('dbx_business_glossary_term' = 'Order Line Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Created By User Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `storage_bin_id` SET TAGS ('dbx_business_glossary_term' = 'Source Bin Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Created By User Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_updated_by_user_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Updated By User Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_updated_by_user_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_updated_by_user_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `completion_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Task Completion Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `cost_amount` SET TAGS ('dbx_business_glossary_term' = 'Task Cost Amount');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `cost_currency` SET TAGS ('dbx_business_glossary_term' = 'Task Cost Currency');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `cost_currency` SET TAGS ('dbx_value_regex' = '[A-Z]{3}');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `destination_bin_code` SET TAGS ('dbx_business_glossary_term' = 'Destination Bin Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `exception_reason` SET TAGS ('dbx_business_glossary_term' = 'Task Exception Reason');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `handling_instructions` SET TAGS ('dbx_business_glossary_term' = 'Handling Instructions');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `hazardous_material_flag` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `is_jis` SET TAGS ('dbx_business_glossary_term' = 'Just-In-Sequence Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `is_jit` SET TAGS ('dbx_business_glossary_term' = 'Just-In-Time Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `plant_code` SET TAGS ('dbx_business_glossary_term' = 'Plant Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `priority` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Task Priority');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `priority` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `quantity` SET TAGS ('dbx_business_glossary_term' = 'Task Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `resource_code` SET TAGS ('dbx_business_glossary_term' = 'Resource Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `resource_type` SET TAGS ('dbx_business_glossary_term' = 'Resource Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `resource_type` SET TAGS ('dbx_value_regex' = 'operator|agv');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `serial_number_flag` SET TAGS ('dbx_business_glossary_term' = 'Serial Number Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `sku_code` SET TAGS ('dbx_business_glossary_term' = 'Stock Keeping Unit Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `special_handling_flag` SET TAGS ('dbx_business_glossary_term' = 'Special Handling Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Task Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `task_created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Task Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `task_type` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Task Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `task_type` SET TAGS ('dbx_value_regex' = 'putaway|picking|replenishment|relocation|inventory_count');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `temperature_control_required` SET TAGS ('dbx_business_glossary_term' = 'Temperature Control Required Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_task_status` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Task Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse_task` ALTER COLUMN `warehouse_task_status` SET TAGS ('dbx_value_regex' = 'pending|in_progress|completed|exception|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_type_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Movement Type ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `account_determination_relevant` SET TAGS ('dbx_business_glossary_term' = 'Account Determination Relevant');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `allowed_destination_location_type` SET TAGS ('dbx_business_glossary_term' = 'Allowed Destination Location Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `allowed_source_location_type` SET TAGS ('dbx_business_glossary_term' = 'Allowed Source Location Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `batch_management_required` SET TAGS ('dbx_business_glossary_term' = 'Batch Management Required');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_type_code` SET TAGS ('dbx_business_glossary_term' = 'Movement Type Code (MT)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `cost_center_required` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Required');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `default_quantity_sign` SET TAGS ('dbx_business_glossary_term' = 'Default Quantity Sign');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_type_description` SET TAGS ('dbx_business_glossary_term' = 'Movement Type Description');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `direction` SET TAGS ('dbx_business_glossary_term' = 'Movement Direction');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `direction` SET TAGS ('dbx_value_regex' = 'inbound|outbound|transfer');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `hazardous_material_allowed` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Allowed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `inventory_accounting_relevant` SET TAGS ('dbx_business_glossary_term' = 'Inventory Accounting Relevant');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `inventory_impact` SET TAGS ('dbx_business_glossary_term' = 'Inventory Impact');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `inventory_impact` SET TAGS ('dbx_value_regex' = 'increase|decrease|neutral');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_active` SET TAGS ('dbx_business_glossary_term' = 'Active Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_automated` SET TAGS ('dbx_business_glossary_term' = 'Automated Posting Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_deprecated` SET TAGS ('dbx_business_glossary_term' = 'Deprecated Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_jis` SET TAGS ('dbx_business_glossary_term' = 'Just‑In‑Sequence Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_jit` SET TAGS ('dbx_business_glossary_term' = 'Just‑In‑Time Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_lot_tracked` SET TAGS ('dbx_business_glossary_term' = 'Lot Tracking Required');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `is_serial_tracked` SET TAGS ('dbx_business_glossary_term' = 'Serial Tracking Required');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_category` SET TAGS ('dbx_business_glossary_term' = 'Movement Category');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_category` SET TAGS ('dbx_value_regex' = 'goods_receipt|goods_issue|transfer|physical_inventory|adjustment');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `movement_reason_code` SET TAGS ('dbx_business_glossary_term' = 'Movement Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Movement Type Notes');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `price_control` SET TAGS ('dbx_business_glossary_term' = 'Price Control');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `price_control` SET TAGS ('dbx_value_regex' = 'standard|moving_average|none');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `profit_center_required` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Required');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `quality_inspection_required` SET TAGS ('dbx_business_glossary_term' = 'Quality Inspection Required');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `requires_approval` SET TAGS ('dbx_business_glossary_term' = 'Requires Approval');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `reversal_allowed` SET TAGS ('dbx_business_glossary_term' = 'Reversal Allowed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `reversal_movement_type_code` SET TAGS ('dbx_business_glossary_term' = 'Reversal Movement Type Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `serial_number_required` SET TAGS ('dbx_business_glossary_term' = 'Serial Number Required');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `special_stock_indicator` SET TAGS ('dbx_business_glossary_term' = 'Special Stock Indicator');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `special_stock_indicator` SET TAGS ('dbx_value_regex' = 'none|blocked|quality|consignment|project');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `system_defined` SET TAGS ('dbx_business_glossary_term' = 'System Defined Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `tax_relevant` SET TAGS ('dbx_business_glossary_term' = 'Tax Relevant');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `transaction_event` SET TAGS ('dbx_business_glossary_term' = 'Transaction Event');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `transaction_event` SET TAGS ('dbx_value_regex' = 'purchase|production|sales|transfer|physical_inventory|adjustment');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`movement_type` ALTER COLUMN `valuation_class` SET TAGS ('dbx_business_glossary_term' = 'Valuation Class');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` SET TAGS ('dbx_data_type' = 'association_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` SET TAGS ('dbx_association_edges' = 'inventory.sku_master,dealer.dealership');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `dealer_sku_stock_id` SET TAGS ('dbx_business_glossary_term' = 'Dealerskustock - Dealer Sku Stock Id');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealerskustock - Dealership Id');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Dealerskustock - Sku Master Id');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `cost_per_unit` SET TAGS ('dbx_business_glossary_term' = 'Unit Cost');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_business_glossary_term' = 'On Hand Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `reorder_point` SET TAGS ('dbx_business_glossary_term' = 'Reorder Point');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`dealer_sku_stock` ALTER COLUMN `safety_stock` SET TAGS ('dbx_business_glossary_term' = 'Safety Stock');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `parent_warehouse_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Warehouse Id');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `parent_warehouse_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_business_glossary_term' = 'Address Line1');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii_geo_location' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_business_glossary_term' = 'Address Line2');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_classification' = 'restricted');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_classification' = 'restricted');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line1` SET TAGS ('dbx_classification' = 'confidential');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_business_glossary_term' = 'Address Line2');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `capacity_cubic_m` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Cubic M');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `capacity_sqft` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Sqft');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `city` SET TAGS ('dbx_pii_business_glossary_term' = 'City');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `city` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `city` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `close_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Close Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `country` SET TAGS ('dbx_pii_business_glossary_term' = 'Country');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `country` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Description');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_business_glossary_term' = 'Latitude');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_classification' = 'restricted');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_location' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_classification' = 'restricted');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `address_line2` SET TAGS ('dbx_classification' = 'confidential');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `capacity_cubic_m` SET TAGS ('dbx_business_glossary_term' = 'Capacity Cubic M');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `capacity_cubic_m` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `capacity_sqft` SET TAGS ('dbx_business_glossary_term' = 'Capacity Sqft');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `capacity_sqft` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `city` SET TAGS ('dbx_business_glossary_term' = 'City');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `city` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `close_date` SET TAGS ('dbx_business_glossary_term' = 'Close Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_code` SET TAGS ('dbx_business_glossary_term' = 'Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `country` SET TAGS ('dbx_business_glossary_term' = 'Country');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_description` SET TAGS ('dbx_business_glossary_term' = 'Description');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_business_glossary_term' = 'Latitude');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_pii_geo_location' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_business_glossary_term' = 'Longitude');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_classification' = 'restricted');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_location' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_classification' = 'restricted');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `latitude` SET TAGS ('dbx_classification' = 'confidential');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_business_glossary_term' = 'Longitude');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_pii_geo_location' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_email` SET TAGS ('dbx_pii_business_glossary_term' = 'Manager Email');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_email` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_email` SET TAGS ('dbx_pii_pii_email' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_classification' = 'restricted');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `longitude` SET TAGS ('dbx_classification' = 'confidential');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_email` SET TAGS ('dbx_business_glossary_term' = 'Manager Email');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_email` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_email` SET TAGS ('dbx_pii_email' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Manager Name');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_name` SET TAGS ('dbx_pii_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_name` SET TAGS ('dbx_pii_person_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_phone` SET TAGS ('dbx_pii_business_glossary_term' = 'Manager Phone');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_phone` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_phone` SET TAGS ('dbx_pii_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_name` SET TAGS ('dbx_business_glossary_term' = 'Manager Name');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_name` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_phone` SET TAGS ('dbx_business_glossary_term' = 'Manager Phone');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_phone` SET TAGS ('dbx_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `manager_phone` SET TAGS ('dbx_pii_phone' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Name');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `open_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Open Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `operating_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Operating Hours');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Postal Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_classification' = 'restricted');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_address' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_name` SET TAGS ('dbx_business_glossary_term' = 'Name');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `open_date` SET TAGS ('dbx_business_glossary_term' = 'Open Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `operating_hours` SET TAGS ('dbx_business_glossary_term' = 'Operating Hours');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_business_glossary_term' = 'Postal Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_confidential' = 'true');
 ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii_pii_true' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `region` SET TAGS ('dbx_pii_business_glossary_term' = 'Region');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `security_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Security Level');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `state` SET TAGS ('dbx_pii_business_glossary_term' = 'State');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `state` SET TAGS ('dbx_pii_address' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `temperature_controlled` SET TAGS ('dbx_pii_business_glossary_term' = 'Temperature Controlled');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `zone` SET TAGS ('dbx_pii_business_glossary_term' = 'Zone');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` SET TAGS ('dbx_pii_subdomain' = 'transaction_processing');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `inventory_hold_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Inventory Hold ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Initiated By Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `recall_campaign_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Recall Campaign Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `spare_parts_catalog_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Spare Parts Catalog Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Location ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `supplier_nonconformance_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Non-Conformance ID');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `actual_release_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Release Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Batch Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `comments` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Comments');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `disposition_decision` SET TAGS ('dbx_pii_business_glossary_term' = 'Disposition Decision');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `disposition_decision` SET TAGS ('dbx_pii_value_regex' = 'use_as_is|rework|scrap|return_to_supplier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `expected_release_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Expected Release Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Number (HOLD_NO)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_source` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Source');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_source` SET TAGS ('dbx_pii_value_regex' = 'system|manual');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_status` SET TAGS ('dbx_pii_value_regex' = 'active|released|cancelled|expired');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_type` SET TAGS ('dbx_pii_value_regex' = 'quality|engineering|regulatory|supplier|recall');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `initiating_department` SET TAGS ('dbx_pii_business_glossary_term' = 'Initiating Department');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `initiating_department` SET TAGS ('dbx_pii_value_regex' = 'quality|engineering|procurement|production|logistics');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `is_critical_hold` SET TAGS ('dbx_pii_business_glossary_term' = 'Critical Hold Flag');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `lot_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Lot Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `quantity_held` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity Held');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `reason_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Reason Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `related_ecn_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change Notice (ECN) Number');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `related_ppap_status` SET TAGS ('dbx_pii_business_glossary_term' = 'PPAP Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `related_ppap_status` SET TAGS ('dbx_pii_value_regex' = 'failed|pending|approved');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `serial_number_end` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number End');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `serial_number_start` SET TAGS ('dbx_pii_business_glossary_term' = 'Serial Number Start');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `start_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Hold Start Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure (UOM)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_value_regex' = 'EA|KG|L|SET');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_person_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_person_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` SET TAGS ('dbx_pii_subdomain' = 'material_master');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Bin Identifier');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `parent_bin_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Parent Bin Id');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `parent_bin_id` SET TAGS ('dbx_pii_self_ref_fk' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `primary_storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Storage Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Location Id');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Warehouse Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `aisle` SET TAGS ('dbx_pii_business_glossary_term' = 'Aisle');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `barcode` SET TAGS ('dbx_pii_business_glossary_term' = 'Barcode');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `bin_group` SET TAGS ('dbx_pii_business_glossary_term' = 'Bin Group');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `capacity_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `capacity_unit` SET TAGS ('dbx_pii_business_glossary_term' = 'Capacity Unit');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Code');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `current_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Weight Kg');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Description');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `hazardous_material_allowed` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Material Allowed');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `is_default` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Default');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `is_reserved` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Reserved');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `last_inventory_count_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Inventory Count Date');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `last_inventory_count_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Inventory Count Quantity');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Level');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `max_temperature_c` SET TAGS ('dbx_pii_business_glossary_term' = 'Max Temperature C');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `max_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Max Weight Kg');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `min_temperature_c` SET TAGS ('dbx_pii_business_glossary_term' = 'Min Temperature C');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Name');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `occupancy_percentage` SET TAGS ('dbx_pii_business_glossary_term' = 'Occupancy Percentage');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `owner_department` SET TAGS ('dbx_pii_business_glossary_term' = 'Owner Department');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `rack` SET TAGS ('dbx_pii_business_glossary_term' = 'Rack');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `reserved_for_sku` SET TAGS ('dbx_pii_business_glossary_term' = 'Reserved For Sku');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Status');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `temperature_controlled` SET TAGS ('dbx_pii_business_glossary_term' = 'Temperature Controlled');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Type');
-ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_classification' = 'restricted');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `postal_code` SET TAGS ('dbx_classification' = 'confidential');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `region` SET TAGS ('dbx_business_glossary_term' = 'Region');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `security_level` SET TAGS ('dbx_business_glossary_term' = 'Security Level');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `state` SET TAGS ('dbx_business_glossary_term' = 'State');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `temperature_controlled` SET TAGS ('dbx_business_glossary_term' = 'Temperature Controlled');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `warehouse_type` SET TAGS ('dbx_business_glossary_term' = 'Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`warehouse` ALTER COLUMN `zone` SET TAGS ('dbx_business_glossary_term' = 'Zone');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` SET TAGS ('dbx_subdomain' = 'warehouse_operations');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `inventory_hold_id` SET TAGS ('dbx_business_glossary_term' = 'Inventory Hold ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Initiated By Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `recall_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Recall Campaign Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `spare_parts_catalog_id` SET TAGS ('dbx_business_glossary_term' = 'Spare Parts Catalog Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Location ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `supplier_nonconformance_id` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Non-Conformance ID');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `actual_release_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Actual Release Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `batch_number` SET TAGS ('dbx_business_glossary_term' = 'Batch Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `comments` SET TAGS ('dbx_business_glossary_term' = 'Hold Comments');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `disposition_decision` SET TAGS ('dbx_business_glossary_term' = 'Disposition Decision');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `disposition_decision` SET TAGS ('dbx_value_regex' = 'use_as_is|rework|scrap|return_to_supplier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `expected_release_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Expected Release Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_number` SET TAGS ('dbx_business_glossary_term' = 'Hold Number (HOLD_NO)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_source` SET TAGS ('dbx_business_glossary_term' = 'Hold Source');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_source` SET TAGS ('dbx_value_regex' = 'system|manual');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_status` SET TAGS ('dbx_business_glossary_term' = 'Hold Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_status` SET TAGS ('dbx_value_regex' = 'active|released|cancelled|expired');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_type` SET TAGS ('dbx_business_glossary_term' = 'Hold Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `hold_type` SET TAGS ('dbx_value_regex' = 'quality|engineering|regulatory|supplier|recall');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `initiating_department` SET TAGS ('dbx_business_glossary_term' = 'Initiating Department');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `initiating_department` SET TAGS ('dbx_value_regex' = 'quality|engineering|procurement|production|logistics');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `is_critical_hold` SET TAGS ('dbx_business_glossary_term' = 'Critical Hold Flag');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `lot_number` SET TAGS ('dbx_business_glossary_term' = 'Lot Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `quantity_held` SET TAGS ('dbx_business_glossary_term' = 'Quantity Held');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `reason_code` SET TAGS ('dbx_business_glossary_term' = 'Hold Reason Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `related_ecn_number` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Notice (ECN) Number');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `related_ppap_status` SET TAGS ('dbx_business_glossary_term' = 'PPAP Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `related_ppap_status` SET TAGS ('dbx_value_regex' = 'failed|pending|approved');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `serial_number_end` SET TAGS ('dbx_business_glossary_term' = 'Serial Number End');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `serial_number_start` SET TAGS ('dbx_business_glossary_term' = 'Serial Number Start');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `start_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Hold Start Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure (UOM)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_value_regex' = 'EA|KG|L|SET');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `updated_by` SET TAGS ('dbx_business_glossary_term' = 'Updated By');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`inventory_hold` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Created By');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` SET TAGS ('dbx_subdomain' = 'material_master');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_id` SET TAGS ('dbx_business_glossary_term' = 'Bin Identifier');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `parent_bin_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Bin Id');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `parent_bin_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `primary_storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Storage Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_location_id` SET TAGS ('dbx_business_glossary_term' = 'Location Id');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `warehouse_id` SET TAGS ('dbx_business_glossary_term' = 'Warehouse Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `aisle` SET TAGS ('dbx_business_glossary_term' = 'Aisle');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `barcode` SET TAGS ('dbx_business_glossary_term' = 'Barcode');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `bin_group` SET TAGS ('dbx_business_glossary_term' = 'Bin Group');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `capacity_quantity` SET TAGS ('dbx_business_glossary_term' = 'Capacity Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `capacity_quantity` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `capacity_unit` SET TAGS ('dbx_business_glossary_term' = 'Capacity Unit');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `capacity_unit` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_code` SET TAGS ('dbx_business_glossary_term' = 'Code');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `current_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Current Weight Kg');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_description` SET TAGS ('dbx_business_glossary_term' = 'Description');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `hazardous_material_allowed` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Material Allowed');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `is_default` SET TAGS ('dbx_business_glossary_term' = 'Is Default');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `is_reserved` SET TAGS ('dbx_business_glossary_term' = 'Is Reserved');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `last_inventory_count_date` SET TAGS ('dbx_business_glossary_term' = 'Last Inventory Count Date');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `last_inventory_count_quantity` SET TAGS ('dbx_business_glossary_term' = 'Last Inventory Count Quantity');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_level` SET TAGS ('dbx_business_glossary_term' = 'Level');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `max_temperature_c` SET TAGS ('dbx_business_glossary_term' = 'Max Temperature C');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `max_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Max Weight Kg');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `min_temperature_c` SET TAGS ('dbx_business_glossary_term' = 'Min Temperature C');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_name` SET TAGS ('dbx_business_glossary_term' = 'Name');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `occupancy_percentage` SET TAGS ('dbx_business_glossary_term' = 'Occupancy Percentage');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `owner_department` SET TAGS ('dbx_business_glossary_term' = 'Owner Department');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `rack` SET TAGS ('dbx_business_glossary_term' = 'Rack');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `reserved_for_sku` SET TAGS ('dbx_business_glossary_term' = 'Reserved For Sku');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `temperature_controlled` SET TAGS ('dbx_business_glossary_term' = 'Temperature Controlled');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `storage_bin_type` SET TAGS ('dbx_business_glossary_term' = 'Type');
+ALTER TABLE `vibe_automotive_v1`.`inventory`.`storage_bin` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');

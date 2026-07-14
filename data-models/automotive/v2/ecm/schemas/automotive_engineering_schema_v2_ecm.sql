@@ -1,5 +1,5 @@
 -- Schema for Domain: engineering | Business:  | Version: v2_ecm
--- Generated on: 2026-07-13 15:03:51
+-- Generated on: 2026-07-14 02:32:21
 
 -- ========= DATABASE =========
 CREATE DATABASE IF NOT EXISTS `vibe_automotive_v1`.`engineering` COMMENT 'Manages the full product design and development lifecycle including CAD (Computer-Aided Design), CAE (Computer-Aided Engineering), PLM (Product Lifecycle Management), and digital twin modeling. Owns engineering BOM, design specifications, CFD (Computational Fluid Dynamics), FEA (Finite Element Analysis), NVH (Noise Vibration Harshness) testing, prototype validation, and engineering change orders (ECO/ECN). Integrates with Siemens Teamcenter, CATIA, and ENOVIA for collaborative engineering.';
@@ -9,13 +9,13 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` (
     `vehicle_program_id` BIGINT COMMENT 'Primary key for vehicle_program',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Program budgeting uses a Cost Center; finance cost center reports expenses per vehicle program.',
     `employee_id` BIGINT COMMENT 'Surrogate key of the manager overseeing day‑to‑day execution.',
-    `aftersales_nameplate_id` BIGINT COMMENT 'Foreign key linking to product.nameplate. Business justification: Vehicle Program Management Report requires linking each engineering program to its product nameplate for schedule, cost, and compliance tracking.',
+    `aftersales_nameplate_id` BIGINT COMMENT 'Foreign key linking to aftersales.aftersales_nameplate. Business justification: Vehicle Program Management Report requires linking each engineering program to its product nameplate for schedule, cost, and compliance tracking.',
+    `ota_campaign_id` BIGINT COMMENT 'Foreign key linking to mobility.ota_campaign. Business justification: Enables OTA Campaign Planning reports linking each program to its scheduled OTA campaign for targeted firmware deployment.',
     `profit_center_id` BIGINT COMMENT 'Foreign key linking to finance.profit_center. Business justification: Program profitability analysis assigns each vehicle program to a Profit Center for revenue and margin reporting.',
     `bom_version` STRING COMMENT 'Version identifier of the engineering Bill of Materials.',
     `budget_allocation` DECIMAL(18,2) COMMENT 'Total budget allocated to the program (currency defined by currency_code).',
     `cad_release_version` STRING COMMENT 'Version of the CAD data set released for the program.',
     `cae_release_version` STRING COMMENT 'Version of the CAE simulation package released for the program.',
-    `vehicle_program_code` STRING COMMENT 'Business identifier used across systems to reference the program (e.g., "P1234").',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the vehicle program record was first created in the system.',
     `currency_code` STRING COMMENT 'ISO 4217 three‑letter currency code for monetary values.. Valid values are `^[A-Z]{3}$`',
     `vehicle_program_description` STRING COMMENT 'Free‑form textual description of the program objectives and scope.',
@@ -24,19 +24,19 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` (
     `emission_standard` STRING COMMENT 'Regulatory emissions standard the vehicle must meet.. Valid values are `EPA|Euro6|Euro5|CARB|UN/ECE`',
     `end_date` DATE COMMENT 'Target date for End of Production (EOP) of the program.',
     `engineering_change_order_count` STRING COMMENT 'Total number of ECOs/ECNs issued for the program.',
-    `field_quality_investigation_count` STRING COMMENT 'Count of active field quality investigations for this vehicle program.',
     `launch_date` DATE COMMENT 'Planned calendar date for market launch of the vehicle.',
     `model_year_end` STRING COMMENT 'Last model year covered by the program.',
     `model_year_start` STRING COMMENT 'First model year covered by the program.',
-    `vehicle_program_name` STRING COMMENT 'Human‑readable name of the vehicle program (e.g., "All‑New X5").',
     `notes` STRING COMMENT 'Additional remarks, observations, or comments captured by engineering.',
     `ota_update_capability` BOOLEAN COMMENT 'Indicates whether the vehicle will support Over‑The‑Air software updates.',
     `platform_architecture` STRING COMMENT 'Technical platform on which the vehicle is built (e.g., "Modular Electric Architecture").',
     `powertrain_type` STRING COMMENT 'Primary propulsion technology of the vehicle.. Valid values are `ICE|EV|HEV|PHEV|FCEV`',
+    `program_code` STRING COMMENT 'Business identifier used across systems to reference the program (e.g., "P1234").',
+    `program_name` STRING COMMENT 'Human‑readable name of the vehicle program (e.g., "All‑New X5").',
+    `program_type` STRING COMMENT 'Classification of the program as a nameplate, platform, or concept.. Valid values are `nameplate|platform|concept`',
     `regulatory_approval_status` STRING COMMENT 'Current status of regulatory approvals for the program.. Valid values are `pending|approved|rejected|under_review`',
     `segment` STRING COMMENT 'Market segment the vehicle belongs to (e.g., SUV, sedan).. Valid values are `sedan|suv|truck|crossover|van|coupe`',
     `start_date` DATE COMMENT 'Target date for Start of Production (SOP) of the program.',
-    `vehicle_program_status` STRING COMMENT 'Current lifecycle status of the program.. Valid values are `concept|development|validation|launch|completed|cancelled`',
     `target_cost_per_vehicle` DECIMAL(18,2) COMMENT 'Target average manufacturing cost per vehicle (currency defined by currency_code).',
     `target_emissions_g_per_km` DECIMAL(18,2) COMMENT 'Target CO₂ emissions in grams per kilometer.',
     `target_fuel_efficiency_mpg` DECIMAL(18,2) COMMENT 'Target fuel economy in miles per gallon for ICE/HEV variants.',
@@ -44,11 +44,11 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` (
     `target_production_volume` STRING COMMENT 'Planned total number of vehicles to be produced for the program.',
     `target_range_km` STRING COMMENT 'Target all‑electric driving range in kilometers for EV variants.',
     `target_weight_kg` DECIMAL(18,2) COMMENT 'Target curb weight of the vehicle in kilograms.',
-    `vehicle_program_type` STRING COMMENT 'Classification of the program as a nameplate, platform, or concept.. Valid values are `nameplate|platform|concept`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the vehicle program record.',
     `vehicle_class` STRING COMMENT 'Regulatory vehicle class (e.g., "Passenger", "Light Commercial").',
+    `vehicle_program_status` STRING COMMENT 'Current lifecycle status of the program.. Valid values are `concept|development|validation|launch|completed|cancelled`',
     CONSTRAINT pk_vehicle_program PRIMARY KEY(`vehicle_program_id`)
-) COMMENT 'Master record for a vehicle development program (nameplate/platform program), capturing program code, program name, vehicle segment, platform architecture, SOP (Start of Production) target date, EOP (End of Production) date, MY (Model Year) scope, program phase (concept, development, validation, launch), program director, budget allocation, and program status. Serves as the top-level anchor for all engineering activities within a development cycle. Owned by Siemens Teamcenter PLM. [preservation_guardrail: verified]';
+) COMMENT 'Master record for a vehicle development program (nameplate/platform program), capturing program code, program name, vehicle segment, platform architecture, SOP (Start of Production) target date, EOP (End of Production) date, MY (Model Year) scope, program phase (concept, development, validation, launch), program director, budget allocation, and program status. Serves as the top-level anchor for all engineering activities within a development cycle. Owned by Siemens Teamcenter PLM.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`bom` (
     `bom_id` BIGINT COMMENT 'Unique surrogate key for the engineering bill of materials record.',
@@ -59,6 +59,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`bom` (
     `sku_master_id` BIGINT COMMENT 'Foreign key linking to inventory.sku_master. Business justification: Needed for BOM‑to‑inventory allocation process, enabling the production scheduling system to reserve SKUs for each BOM.',
     `approval_date` DATE COMMENT 'Date on which the BOM revision was approved.',
     `approved_by` STRING COMMENT 'Name of the person who approved the BOM revision.',
+    `bom_type` STRING COMMENT 'Classification of the BOM: engineering (eBOM), manufacturing (mBOM), or service (sBOM).. Valid values are `eBOM|mBOM|sBOM`',
     `change_reason` STRING COMMENT 'Reason documented for the latest BOM revision.',
     `bom_code` STRING COMMENT 'Business identifier that uniquely identifies the BOM within a program.',
     `compliance_standard` STRING COMMENT 'Regulatory or industry standard to which the BOM complies.. Valid values are `ISO26262|IATF16949|SAEJ3061`',
@@ -78,7 +79,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`bom` (
     `revision_number` STRING COMMENT 'Revision identifier of the BOM (e.g., A, B, C).',
     `total_parts_count` STRING COMMENT 'Number of distinct part numbers referenced in the BOM.',
     `total_quantity` STRING COMMENT 'Sum of all component quantities across the BOM.',
-    `bom_type` STRING COMMENT 'Classification of the BOM: engineering (eBOM), manufacturing (mBOM), or service (sBOM).. Valid values are `eBOM|mBOM|sBOM`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the BOM record.',
     `vehicle_variant` STRING COMMENT 'Identifier for the specific vehicle variant (e.g., Sport, Luxury).',
     `version_number` STRING COMMENT 'Internal version counter for the BOM record.',
@@ -91,7 +91,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line
     `equipment_registry_id` BIGINT COMMENT 'Foreign key linking to asset.equipment_registry. Business justification: BOM line execution tracks which equipment assembles the part; needed for production scheduling and OEE reporting.',
     `part_master_id` BIGINT COMMENT 'Foreign key linking to engineering.part_master. Business justification: Parent assembly reference is a part_master; replace with descriptive FK to part_master.',
     `procurement_supplier_id` BIGINT COMMENT 'Foreign key linking to procurement.supplier. Business justification: BOM line sourcing assignment; procurement uses this FK to generate purchase orders for each part line.',
-    `product_bom_line_id` BIGINT COMMENT 'SSOT reference to product.product_bom_line (resolves cross-domain duplicate of bom_line).',
     CONSTRAINT pk_engineering_bom_line PRIMARY KEY(`engineering_bom_line_id`)
 ) COMMENT 'Individual line item within an engineering BOM, representing a single part-to-parent relationship in the BOM hierarchy. Captures parent assembly reference, child part number, find number, quantity, unit of measure, effectivity start/end dates, variant applicability, substitution flags, BOM level, and engineering change reference. Supports multi-level BOM explosion and where-used analysis. Sourced from Siemens Teamcenter BOM Management.';
 
@@ -99,7 +98,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`part_master` (
     `part_master_id` BIGINT COMMENT 'Primary key for part_master',
     `cost_center_id` BIGINT COMMENT 'Foreign key linking to finance.cost_center. Business justification: Part cost accounting charges material cost to a Cost Center; finance tracks part expenses per cost center.',
     `employee_id` BIGINT COMMENT 'Identifier of the engineer responsible for the part definition.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the engineer responsible for the part definition.',
+    `part_owning_engineer_employee_id` BIGINT COMMENT 'Identifier of the engineer responsible for the part definition.',
     `regulatory_requirement_id` BIGINT COMMENT 'Foreign key linking to compliance.regulatory_requirement. Business justification: Parts must be linked to applicable regulatory requirements for compliance tracking during part engineering.',
     `supply_supplier_id` BIGINT COMMENT 'Foreign key linking to supply.supply_supplier. Business justification: Supplier Management Process: engineering part master must be linked to the external supplier record for PPAP, cost, and lead‑time tracking.',
     `cad_model_reference` STRING COMMENT 'Path or identifier of the CAD 3D model stored in the PLM system.',
@@ -135,7 +134,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`part_master` (
     `weight_kg` DECIMAL(18,2) COMMENT 'Net weight of the part in kilograms.',
     `width_mm` DECIMAL(18,2) COMMENT 'Physical width of the part in millimetres.',
     CONSTRAINT pk_part_master PRIMARY KEY(`part_master_id`)
-) COMMENT 'Engineering part master record representing a unique part or component managed within the PLM system. Captures part number, part name, part classification, material type, weight, dimensions, drawing number, CAD model reference, lifecycle state (in-work, released, obsolete), revision level, owning engineer, supplier part number, REACH/RoHS compliance flag, and part family. Authoritative source for engineering part identity in Siemens Teamcenter / PTC Windchill. [preservation_guardrail: verified]';
+) COMMENT 'Engineering part master record representing a unique part or component managed within the PLM system. Captures part number, part name, part classification, material type, weight, dimensions, drawing number, CAD model reference, lifecycle state (in-work, released, obsolete), revision level, owning engineer, supplier part number, REACH/RoHS compliance flag, and part family. Authoritative source for engineering part identity in Siemens Teamcenter / PTC Windchill.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`design_specification` (
     `design_specification_id` BIGINT COMMENT 'System-generated unique identifier for the design specification record.',
@@ -190,11 +189,12 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`design_specification
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`cad_model` (
     `cad_model_id` BIGINT COMMENT 'Unique surrogate key for each CAD model record.',
-    `part_master_id` BIGINT COMMENT 'add column part_master_id (BIGINT) with FK to engineering.part_master.part_master_id - CAD models represent the 3D geometry of specific parts',
     `employee_id` BIGINT COMMENT 'Surrogate key of the engineer responsible for the model.',
-    `primary_employee_id` BIGINT COMMENT 'Surrogate key of the engineer responsible for the model.',
+    `part_master_id` BIGINT COMMENT 'add column part_master_id (BIGINT) with FK to engineering.part_master.part_master_id - CAD models represent the 3D geometry of specific parts',
+    `primary_cad_employee_id` BIGINT COMMENT 'Surrogate key of the engineer responsible for the model.',
     `vehicle_program_id` BIGINT COMMENT 'add column vehicle_program_id (BIGINT) with FK to engineering.vehicle_program.vehicle_program_id - CAD models are developed within vehicle programs',
     `assembly_name` STRING COMMENT 'Name of the parent assembly if the model is a sub‑component.',
+    `cad_model_status` STRING COMMENT 'Current lifecycle status of the model within the PLM system.. Valid values are `draft|released|archived|obsolete`',
     `compliance_iso26262_level` STRING COMMENT 'Functional safety classification of the component according to ISO 26262.. Valid values are `ASIL_A|ASIL_B|ASIL_C|ASIL_D|none`',
     `configuration_context` STRING COMMENT 'Contextual configuration (e.g., default, sport, luxury) for which the model variant is defined.',
     `coordinate_system` STRING COMMENT 'Reference coordinate system (e.g., right‑hand, left‑hand) applied to the model.',
@@ -212,17 +212,16 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`cad_model` (
     `last_published_date` DATE COMMENT 'Date when the model was last released to downstream teams or systems.',
     `lifecycle_status` STRING COMMENT 'Detailed stage of the model from creation to retirement.. Valid values are `in_design|in_review|approved|released|retired`',
     `maturity_level` STRING COMMENT 'Indicates how mature the model is within the product development lifecycle.. Valid values are `concept|detailed_design|validation|production`',
+    `model_number` STRING COMMENT 'Business identifier assigned to the CAD model; often mirrors the part number used in downstream processes.',
+    `model_type` STRING COMMENT 'Classification of the CAD geometry type.. Valid values are `part|assembly|surface|solid|wireframe`',
     `cad_model_name` STRING COMMENT 'Human‑readable name of the CAD model as shown in the engineering portal.',
     `notes` STRING COMMENT 'Free‑form comments or remarks entered by the designer.',
-    `number` STRING COMMENT 'Business identifier assigned to the CAD model; often mirrors the part number used in downstream processes.',
     `part_number` STRING COMMENT 'OEM part number that the CAD model represents; links the digital geometry to the physical component.',
     `regulatory_approval_status` STRING COMMENT 'Status of regulatory sign‑off (e.g., NHTSA, EPA) for the model.. Valid values are `pending|approved|rejected`',
     `related_vehicle_variant` STRING COMMENT 'Specific vehicle variant (e.g., sport, hybrid) that the model supports.',
     `revision` STRING COMMENT 'Revision identifier (e.g., A, B, C) used for minor changes within a version.',
     `simulation_ready` BOOLEAN COMMENT 'True if the model is prepared for CAE simulations (e.g., meshed, cleaned).',
-    `cad_model_status` STRING COMMENT 'Current lifecycle status of the model within the PLM system.. Valid values are `draft|released|archived|obsolete`',
     `tool_version` STRING COMMENT 'Version of the CAD application (e.g., CATIA V5R30) used to author the model.',
-    `cad_model_type` STRING COMMENT 'Classification of the CAD geometry type.. Valid values are `part|assembly|surface|solid|wireframe`',
     `updated_by` STRING COMMENT 'Full name of the engineer who performed the latest edit.',
     `updated_timestamp` TIMESTAMP COMMENT 'Date‑time of the most recent modification to the CAD model record.',
     `vehicle_model_year` STRING COMMENT 'Model year of the vehicle platform that uses this CAD model.',
@@ -236,12 +235,16 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`change` (
     `change_id` BIGINT COMMENT 'System-generated unique identifier for the engineering change record.',
     `employee_id` BIGINT COMMENT 'Identifier of the person or group that approved the change.',
     `approver_id` BIGINT COMMENT 'Identifier of the person or group that approved the change.',
+    `change_employee_id` BIGINT COMMENT 'Identifier of the person or group that originated the change request.',
     `equipment_registry_id` BIGINT COMMENT 'Foreign key linking to asset.equipment_registry. Business justification: ECO process requires identifying which production equipment must be reconfigured; linking change to equipment enables change impact analysis report.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the person or group that originated the change request.',
+    `primary_change_employee_id` BIGINT COMMENT 'Identifier of the person or group that originated the change request.',
     `tooling_registry_id` BIGINT COMMENT 'Foreign key linking to asset.tooling_registry. Business justification: Tooling impact of an engineering change must be tracked for re‑tooling schedules and cost estimation.',
     `affected_parts` STRING COMMENT 'Comma‑separated list of part numbers (e.g., VIN, SKU) impacted by the change.',
     `affected_programs` STRING COMMENT 'Comma‑separated list of vehicle programs impacted by the change.',
     `approval_timestamp` TIMESTAMP COMMENT 'Date and time when the change was formally approved.',
+    `change_number` STRING COMMENT 'Business identifier assigned to the change request (e.g., EC2023001234).',
+    `change_status` STRING COMMENT 'Current lifecycle status of the engineering change.. Valid values are `draft|under_review|approved|implemented|rejected`',
+    `change_type` STRING COMMENT 'Classification of the change request: Engineering Change Request (ECR), Engineering Change Order (ECO), or Engineering Change Notice (ECN).. Valid values are `ECR|ECO|ECN`',
     `closure_date` DATE COMMENT 'Date when the change record was closed after implementation verification.',
     `compliance_flag` BOOLEAN COMMENT 'Indicates whether the change is driven by regulatory or standards compliance.',
     `cost_adjustments` DECIMAL(18,2) COMMENT 'Estimated cost adjustments (e.g., tooling, re‑work) associated with the change.',
@@ -253,7 +256,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`change` (
     `effective_date` DATE COMMENT 'Date on which the change becomes effective in production or documentation.',
     `impact_analysis` STRING COMMENT 'Summary of technical and cost impact analysis performed for the change.',
     `implementation_date` DATE COMMENT 'Target calendar date for implementing the approved change on the product.',
-    `number` STRING COMMENT 'Business identifier assigned to the change request (e.g., EC2023001234).',
     `origin` STRING COMMENT 'Source of the change request: internal, supplier, or customer.. Valid values are `internal|supplier|customer`',
     `priority` STRING COMMENT 'Business priority assigned to the change (high, medium, low).. Valid values are `high|medium|low`',
     `reason_category` STRING COMMENT 'High‑level category describing why the change is initiated.. Valid values are `cost_reduction|quality|regulatory|customer_request|other`',
@@ -263,9 +265,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`change` (
     `risk_assessment` STRING COMMENT 'Detailed risk assessment narrative for the change.',
     `risk_level` STRING COMMENT 'Assessed risk level of the change to product quality, schedule, or cost.. Valid values are `low|medium|high|critical`',
     `scope` STRING COMMENT 'Scope of the change affecting a part, assembly, specification, or process.. Valid values are `part|assembly|specification|process`',
-    `change_status` STRING COMMENT 'Current lifecycle status of the engineering change.. Valid values are `draft|under_review|approved|implemented|rejected`',
     `title` STRING COMMENT 'Short descriptive title of the engineering change.',
-    `change_type` STRING COMMENT 'Classification of the change request: Engineering Change Request (ECR), Engineering Change Order (ECO), or Engineering Change Notice (ECN).. Valid values are `ECR|ECO|ECN`',
     `updated_timestamp` TIMESTAMP COMMENT 'System timestamp of the most recent update to the engineering change record.',
     `version` STRING COMMENT 'Version number of the change record, incremented on each revision.',
     CONSTRAINT pk_change PRIMARY KEY(`change_id`)
@@ -274,9 +274,9 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`change` (
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` (
     `cae_simulation_id` BIGINT COMMENT 'Unique surrogate key for the CAE simulation record.',
     `employee_id` BIGINT COMMENT 'Identifier of the engineering analyst who initiated or owned the simulation.',
+    `cae_employee_id` BIGINT COMMENT 'Identifier of the engineering analyst who initiated or owned the simulation.',
     `part_master_id` BIGINT COMMENT 'Identifier of the part or assembly that the simulation analyzes.',
     `cae_part_part_master_id` BIGINT COMMENT 'Identifier of the part or assembly that the simulation analyzes.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the engineering analyst who initiated or owned the simulation.',
     `analyst_name` STRING COMMENT 'Full name of the analyst responsible for the simulation.',
     `boundary_conditions` STRING COMMENT 'Structured description of boundary conditions (e.g., constraints, supports) used in the simulation.',
     `convergence_criteria` STRING COMMENT 'Criteria used to determine simulation convergence (e.g., residual threshold).',
@@ -287,7 +287,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` (
     `mesh_element_count` BIGINT COMMENT 'Total number of finite elements in the simulation mesh.',
     `mesh_quality_score` DECIMAL(18,2) COMMENT 'Quality rating of the mesh (higher is better).',
     `notes` STRING COMMENT 'Free‑form comments or observations recorded by the analyst.',
-    `number` STRING COMMENT 'External identifier assigned to the simulation run, used for tracking across systems.',
     `part_name` STRING COMMENT 'Descriptive name of the part or assembly.',
     `part_number` STRING COMMENT 'Catalog or engineering part number of the simulated component.',
     `result_metric_name` STRING COMMENT 'Name of the primary result metric produced by the simulation (e.g., Max Stress).',
@@ -296,12 +295,13 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` (
     `result_outcome` STRING COMMENT 'Pass/fail determination of the simulation against target criteria.. Valid values are `pass|fail`',
     `run_duration_seconds` DECIMAL(18,2) COMMENT 'Total wall‑clock time of the simulation run in seconds.',
     `run_timestamp` TIMESTAMP COMMENT 'Date and time when the simulation execution started.',
+    `simulation_number` STRING COMMENT 'External identifier assigned to the simulation run, used for tracking across systems.',
+    `simulation_status` STRING COMMENT 'Current lifecycle status of the simulation.. Valid values are `draft|queued|running|completed|failed|cancelled`',
+    `simulation_type` STRING COMMENT 'Category of analysis performed (e.g., Finite Element Analysis, Computational Fluid Dynamics).. Valid values are `FEA|CFD|NVH|Crash|Thermal|Fatigue`',
     `solver_name` STRING COMMENT 'Name of the computational solver used for the simulation.',
-    `cae_simulation_status` STRING COMMENT 'Current lifecycle status of the simulation.. Valid values are `draft|queued|running|completed|failed|cancelled`',
     `target_metric_name` STRING COMMENT 'Name of the target metric the simulation is evaluated against.',
     `target_metric_unit` STRING COMMENT 'Unit of measure for the target metric.. Valid values are `MPa|Pa|N|kg|m/s^2|Hz`',
     `target_metric_value` DECIMAL(18,2) COMMENT 'Numeric target value for the primary metric.',
-    `cae_simulation_type` STRING COMMENT 'Category of analysis performed (e.g., Finite Element Analysis, Computational Fluid Dynamics).. Valid values are `FEA|CFD|NVH|Crash|Thermal|Fatigue`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to the simulation record.',
     `version` STRING COMMENT 'Version identifier of the simulation setup (e.g., v1.2).',
     CONSTRAINT pk_cae_simulation PRIMARY KEY(`cae_simulation_id`)
@@ -313,75 +313,76 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` (
     `employee_id` BIGINT COMMENT 'Identifier of the engineer accountable for the build.',
     `prototype_responsible_engineer_employee_id` BIGINT COMMENT 'Identifier of the engineer accountable for the build.',
     `vehicle_program_id` BIGINT COMMENT 'add column vehicle_program_id (BIGINT) with FK to engineering.vehicle_program.vehicle_program_id - prototype builds are conducted within vehicle programs',
+    `build_cost` DECIMAL(18,2) COMMENT 'Total cost incurred to produce the prototype build.',
+    `build_date` DATE COMMENT 'Calendar date when the prototype was physically built.',
+    `build_duration_hours` DECIMAL(18,2) COMMENT 'Total elapsed time of the build process expressed in hours.',
+    `build_location` STRING COMMENT 'Plant or facility where the prototype build took place.',
+    `build_number` STRING COMMENT 'Internal sequential number assigned to each prototype build.',
+    `build_phase` STRING COMMENT 'Stage of the prototype build lifecycle.. Valid values are `mule|alpha|beta|pre_production|production`',
+    `build_purpose` STRING COMMENT 'Primary testing or validation purpose of the prototype build.. Valid values are `durability|crash|nvh|emissions|homologation|validation`',
     `compliance_status` STRING COMMENT 'Regulatory and quality compliance status of the prototype build.. Valid values are `compliant|non_compliant|pending`',
     `configuration_description` STRING COMMENT 'Textual description of the prototypes configuration and options.',
-    `cost` DECIMAL(18,2) COMMENT 'Total cost incurred to produce the prototype build.',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the build record was first created in the system.',
     `currency_code` STRING COMMENT 'Three‑letter ISO currency code for the build cost.. Valid values are `USD|EUR|JPY|CAD|GBP|CNY`',
     `data_source_system` STRING COMMENT 'Originating system that supplied the build data.. Valid values are `Teamcenter|CATIA|ENOVIA|SAP|MES`',
-    `prototype_build_date` DATE COMMENT 'Calendar date when the prototype was physically built.',
-    `duration_hours` DECIMAL(18,2) COMMENT 'Total elapsed time of the build process expressed in hours.',
     `emission_rating` STRING COMMENT 'Emission classification assigned to the prototype based on testing.. Valid values are `tier1|tier2|tier3|tier4`',
-    `location` STRING COMMENT 'Plant or facility where the prototype build took place.',
     `notes` STRING COMMENT 'Free‑form notes or comments captured by engineering staff.',
-    `number` STRING COMMENT 'Internal sequential number assigned to each prototype build.',
-    `phase` STRING COMMENT 'Stage of the prototype build lifecycle.. Valid values are `mule|alpha|beta|pre_production|production`',
     `program_code` STRING COMMENT 'Code identifying the vehicle program or project associated with the prototype.',
-    `prototype_number` STRING COMMENT 'Internal identifier for the prototype unit or component.',
-    `purpose` STRING COMMENT 'Primary testing or validation purpose of the prototype build.. Valid values are `durability|crash|nvh|emissions|homologation|validation`',
-    `safety_rating` STRING COMMENT 'Safety assessment rating for the prototype.. Valid values are `ncap|euro_ncap|none`',
     `prototype_build_status` STRING COMMENT 'Current lifecycle status of the prototype build.. Valid values are `planned|in_progress|completed|failed|cancelled`',
+    `prototype_number` STRING COMMENT 'Internal identifier for the prototype unit or component.',
+    `safety_rating` STRING COMMENT 'Safety assessment rating for the prototype.. Valid values are `ncap|euro_ncap|none`',
     `test_results_summary` STRING COMMENT 'High‑level summary of test outcomes associated with the prototype build.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the build record.',
     `vin` STRING COMMENT 'Globally unique identifier assigned to the prototype vehicle.',
     CONSTRAINT pk_prototype_build PRIMARY KEY(`prototype_build_id`)
-) COMMENT 'Prototype vehicle or component build record capturing the physical build event for validation purposes. Includes build number, build phase (mule, alpha, beta, pre-production), program reference, build date, build location, VIN or prototype identifier, configuration description, build purpose (durability, crash, NVH, emissions, homologation), responsible engineer, and build status. Tracks the physical instantiation of engineering designs for testing and validation activities. [preservation_guardrail: verified]';
+) COMMENT 'Prototype vehicle or component build record capturing the physical build event for validation purposes. Includes build number, build phase (mule, alpha, beta, pre-production), program reference, build date, build location, VIN or prototype identifier, configuration description, build purpose (durability, crash, NVH, emissions, homologation), responsible engineer, and build status. Tracks the physical instantiation of engineering designs for testing and validation activities.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`validation_test` (
     `validation_test_id` BIGINT COMMENT 'Unique identifier for the validation test record.',
     `part_master_id` BIGINT COMMENT 'add column part_master_id (BIGINT) with FK to engineering.part_master.part_master_id - validation tests verify specific parts meet requirements',
+    `requirements_traceability_id` BIGINT COMMENT 'Identifier for the requirements traceability id on the validation test record.',
     `employee_id` BIGINT COMMENT 'Foreign key linking to workforce.employee. Business justification: Test engineer must be linked to validation test for traceability and regulatory reporting.',
     `vehicle_program_id` BIGINT COMMENT 'add column vehicle_program_id (BIGINT) with FK to engineering.vehicle_program.vehicle_program_id - validation tests are conducted for specific vehicle programs',
+    `engineering_test_result_id` BIGINT COMMENT 'Identifier linking to the detailed test report document.',
     `approval_date` DATE COMMENT 'Date when the test was formally approved.',
-    `approval_status` STRING COMMENT 'Approval state after review of test results.. Valid values are `approved|rejected|pending`',
     `approved_by` STRING COMMENT 'Name of the individual who approved the test.',
-    `batch_number` STRING COMMENT 'Batch identifier linking the test to a production or prototype batch.',
-    `validation_test_category` STRING COMMENT 'High‑level engineering domain of the test.. Valid values are `structural|powertrain|electronics|software`',
     `comments` STRING COMMENT 'Free‑form comments or observations recorded by the test engineer.',
     `compliance_standard` STRING COMMENT 'Specific regulatory standard evaluated by the test.. Valid values are `FMVSS|EPA|NCAP|WLTP`',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the test record was created in the system.',
     `data_source_system` STRING COMMENT 'Originating system that captured the test data (e.g., Teamcenter, MES).',
     `disposition` STRING COMMENT 'Disposition decision based on test result.. Valid values are `accept|rework|reject`',
-    `document_reference` STRING COMMENT 'Reference to supporting documentation (e.g., test plan PDF).',
-    `duration_minutes` STRING COMMENT 'Total elapsed time of the test execution in minutes.',
     `emission_co2_g_per_km` DECIMAL(18,2) COMMENT 'Measured carbon dioxide emission per kilometer.',
-    `engineer` STRING COMMENT 'Name of the engineer responsible for conducting the test.',
-    `engineering_test_result_id` BIGINT COMMENT 'Identifier linking to the detailed test report document.',
     `equipment_used` STRING COMMENT 'List of major equipment or rigs employed during the test.',
-    `facility` STRING COMMENT 'Name of the facility or lab where the test was performed.',
     `is_critical` BOOLEAN COMMENT 'Indicates whether the test is classified as critical for safety or compliance.',
-    `location` STRING COMMENT 'Code identifying the physical location or plant where the test took place.',
-    `validation_test_name` STRING COMMENT 'Descriptive name of the validation test.',
     `noise_db` DECIMAL(18,2) COMMENT 'Measured acoustic noise level in decibels.',
-    `phase` STRING COMMENT 'Development phase during which the test was performed.. Valid values are `prototype|pre_production|production`',
     `regulatory_compliance_flag` BOOLEAN COMMENT 'Overall compliance status of the test against applicable regulations.',
-    `report_url` STRING COMMENT 'Web address or path to the stored test report.',
-    `result` STRING COMMENT 'Outcome of the test execution.. Valid values are `pass|fail|conditional`',
-    `result_timestamp` TIMESTAMP COMMENT 'Timestamp when the test result was entered into the system.',
-    `revision_number` STRING COMMENT 'Revision number of the test procedure or setup.',
-    `standard_reference` STRING COMMENT 'Reference code or document identifier for the standard governing the test.',
-    `validation_test_status` STRING COMMENT 'Current lifecycle status of the test.. Valid values are `planned|in_progress|completed|cancelled`',
     `target_emission_co2` DECIMAL(18,2) COMMENT 'Regulatory or design target for CO2 emission.',
     `target_noise_db` DECIMAL(18,2) COMMENT 'Target acoustic noise level for compliance.',
     `target_torque_nm` DECIMAL(18,2) COMMENT 'Target torque specification for the test.',
-    `timestamp` TIMESTAMP COMMENT 'Date and time when the test was executed.',
+    `test_approval_status` STRING COMMENT 'Approval state after review of test results.. Valid values are `approved|rejected|pending`',
+    `test_batch_number` STRING COMMENT 'Batch identifier linking the test to a production or prototype batch.',
+    `test_category` STRING COMMENT 'High‑level engineering domain of the test.. Valid values are `structural|powertrain|electronics|software`',
+    `test_document_reference` STRING COMMENT 'Reference to supporting documentation (e.g., test plan PDF).',
+    `test_duration_minutes` STRING COMMENT 'Total elapsed time of the test execution in minutes.',
+    `test_engineer` STRING COMMENT 'Name of the engineer responsible for conducting the test.',
+    `test_facility` STRING COMMENT 'Name of the facility or lab where the test was performed.',
+    `test_location` STRING COMMENT 'Code identifying the physical location or plant where the test took place.',
+    `test_name` STRING COMMENT 'Descriptive name of the validation test.',
+    `test_phase` STRING COMMENT 'Development phase during which the test was performed.. Valid values are `prototype|pre_production|production`',
+    `test_report_url` STRING COMMENT 'Web address or path to the stored test report.',
+    `test_result` STRING COMMENT 'Outcome of the test execution.. Valid values are `pass|fail|conditional`',
+    `test_result_timestamp` TIMESTAMP COMMENT 'Timestamp when the test result was entered into the system.',
+    `test_revision_number` STRING COMMENT 'Revision number of the test procedure or setup.',
+    `test_standard_reference` STRING COMMENT 'Reference code or document identifier for the standard governing the test.',
+    `test_status` STRING COMMENT 'Current lifecycle status of the test.. Valid values are `planned|in_progress|completed|cancelled`',
+    `test_timestamp` TIMESTAMP COMMENT 'Date and time when the test was executed.',
+    `test_type` STRING COMMENT 'Category of the validation test according to engineering verification plans.. Valid values are `DVP|PVP|PPAP|Durability|Emissions|NCAP`',
+    `test_version` STRING COMMENT 'Version identifier for the test procedure.',
     `torque_nm` DECIMAL(18,2) COMMENT 'Measured torque value in newton‑meters.',
-    `validation_test_type` STRING COMMENT 'Category of the validation test according to engineering verification plans.. Valid values are `DVP|PVP|PPAP|Durability|Emissions|NCAP`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the test record.',
     `variance_percent` DECIMAL(18,2) COMMENT 'Percentage variance between measured and target values.',
-    `version` STRING COMMENT 'Version identifier for the test procedure.',
     CONSTRAINT pk_validation_test PRIMARY KEY(`validation_test_id`)
-) COMMENT 'Engineering validation test record capturing a physical or virtual test event performed on a prototype or production-intent part/vehicle. Includes test ID, test type (DVP — Design Verification Plan, PVP — Process Validation Plan, PPAP, durability, emissions, NCAP/WLTP, FMVSS), test name, test standard reference, test facility, test date, test engineer, test result (pass/fail/conditional), measured values vs. targets, and disposition. Supports DVP&R (Design Verification Plan and Report) tracking. [preservation_guardrail: verified]';
+) COMMENT 'Engineering validation test record capturing a physical or virtual test event performed on a prototype or production-intent part/vehicle. Includes test ID, test type (DVP — Design Verification Plan, PVP — Process Validation Plan, PPAP, durability, emissions, NCAP/WLTP, FMVSS), test name, test standard reference, test facility, test date, test engineer, test result (pass/fail/conditional), measured values vs. targets, and disposition. Supports DVP&R (Design Verification Plan and Report) tracking.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` (
     `engineering_test_result_id` BIGINT COMMENT 'Unique identifier for the engineering_test_result data product (auto-inserted pre-linking).',
@@ -398,11 +399,12 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` (
     `engineering_team_id` BIGINT COMMENT 'Unique identifier of the engineering team.',
     `functional_location_id` BIGINT COMMENT 'Foreign key linking to asset.functional_location. Business justification: Digital twin of a component is tied to the physical plant location for synchronization and maintenance planning.',
     `primary_digital_part_master_id` BIGINT COMMENT 'Unique identifier of the physical part associated with the twin.',
+    `vehicle_ownership_id` BIGINT COMMENT 'Foreign key linking to customer.vehicle_ownership. Business justification: OTA update process requires linking a digital twin to the specific owned vehicle record for update history and compliance tracking.',
     `vehicle_program_id` BIGINT COMMENT 'Identifier of the engineering program linked to the digital twin.',
     `asset_vin` STRING COMMENT 'VIN of the physical vehicle linked to the digital twin, if applicable.',
-    `digital_twin_code` STRING COMMENT 'Business identifier code assigned to the digital twin within engineering systems.',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the digital twin record was first created.',
     `data_quality_score` DECIMAL(18,2) COMMENT 'Overall quality rating of the twins data (0‑100).',
+    `digital_twin_status` STRING COMMENT 'Current lifecycle state of the digital twin.. Valid values are `active|inactive|retired|archived`',
     `fidelity_level` STRING COMMENT 'Granularity of the digital twin model (e.g., high‑fidelity CFD vs. low‑fidelity schematic).. Valid values are `high|medium|low`',
     `last_sync_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent successful sync operation.',
     `model_description` STRING COMMENT 'Free‑text description of the digital twins purpose and scope.',
@@ -413,9 +415,9 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` (
     `regulatory_compliance_status` STRING COMMENT 'Compliance state with relevant automotive regulations (e.g., NHTSA, EPA).. Valid values are `compliant|non_compliant|pending`',
     `simulation_model_version` STRING COMMENT 'Version string of the simulation model used for the digital twin.',
     `simulation_tool` STRING COMMENT 'Software tool used to generate the simulation model.. Valid values are `ANSYS|Siemens|Altair|Dassault`',
-    `digital_twin_status` STRING COMMENT 'Current lifecycle state of the digital twin.. Valid values are `active|inactive|retired|archived`',
     `sync_status` STRING COMMENT 'Current synchronization state between the virtual model and physical asset data.. Valid values are `in_sync|out_of_sync|pending`',
-    `digital_twin_type` STRING COMMENT 'Category of the digital twin indicating the physical scope it represents.. Valid values are `vehicle|powertrain|chassis|body|component`',
+    `twin_code` STRING COMMENT 'Business identifier code assigned to the digital twin within engineering systems.',
+    `twin_type` STRING COMMENT 'Category of the digital twin indicating the physical scope it represents.. Valid values are `vehicle|powertrain|chassis|body|component`',
     `updated_by` STRING COMMENT 'User name or identifier that performed the last update.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the digital twin record.',
     `validation_status` STRING COMMENT 'Result of the latest validation run against physical test data.. Valid values are `validated|pending|rejected`',
@@ -425,9 +427,9 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` (
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`milestone` (
     `milestone_id` BIGINT COMMENT 'Unique identifier for the engineering milestone record.',
+    `employee_id` BIGINT COMMENT 'Identifier of the person responsible for delivering the milestone.',
     `functional_location_id` BIGINT COMMENT 'Foreign key linking to asset.functional_location. Business justification: Milestones (e.g., design freeze) occur at a plant location; linking supports location‑based milestone dashboards.',
-    `employee_id` BIGINT COMMENT 'FK to workforce.employee',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the person responsible for delivering the milestone.',
+    `owner_employee_id` BIGINT COMMENT 'FK to workforce.employee',
     `primary_milestone_employee_id` BIGINT COMMENT 'Identifier of the person responsible for delivering the milestone.',
     `tertiary_milestone_sign_off_authority_employee_id` BIGINT COMMENT 'Identifier of the authority who signed off the milestone.',
     `vehicle_program_id` BIGINT COMMENT 'Identifier of the engineering program to which this milestone belongs.',
@@ -440,13 +442,13 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`milestone` (
     `milestone_description` STRING COMMENT 'Detailed description of the milestone purpose, scope, and deliverables.',
     `gate_review_outcome` STRING COMMENT 'Result of the gate review for the milestone.. Valid values are `approved|conditional|deferred|rejected`',
     `is_critical` BOOLEAN COMMENT 'Indicates whether the milestone is deemed critical for program success.',
+    `milestone_status` STRING COMMENT 'Current lifecycle status of the milestone.. Valid values are `planned|in_progress|completed|closed|cancelled`',
+    `milestone_type` STRING COMMENT 'Category of the milestone within the product development process.. Valid values are `gate|review|release|prototype|pilot`',
     `milestone_name` STRING COMMENT 'Descriptive name of the milestone (e.g., P0 Concept Freeze, P1 Design Freeze).',
     `open_action_items_count` STRING COMMENT 'Number of unresolved action items after the gate review.',
     `planned_date` DATE COMMENT 'Planned calendar date for milestone completion.',
     `plant_location` STRING COMMENT 'Manufacturing plant or site associated with the milestone.',
     `risk_level` STRING COMMENT 'Risk classification assigned to the milestone.. Valid values are `low|medium|high|critical`',
-    `milestone_status` STRING COMMENT 'Current lifecycle status of the milestone.. Valid values are `planned|in_progress|completed|closed|cancelled`',
-    `milestone_type` STRING COMMENT 'Category of the milestone within the product development process.. Valid values are `gate|review|release|prototype|pilot`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the milestone record.',
     `version_number` STRING COMMENT 'Version number of the milestone record for change tracking.',
     CONSTRAINT pk_milestone PRIMARY KEY(`milestone_id`)
@@ -456,9 +458,9 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` (
     `fmea_record_id` BIGINT COMMENT 'System-generated unique identifier for the FMEA record.',
     `equipment_registry_id` BIGINT COMMENT 'Foreign key linking to asset.equipment_registry. Business justification: FMEA analysis often references the equipment where failure mode is observed; linking enables root‑cause tracking and preventive maintenance.',
     `employee_id` BIGINT COMMENT 'Identifier of the engineer or manager who approved the FMEA analysis.',
+    `fmea_employee_id` BIGINT COMMENT 'Identifier of the engineer or responsible person assigned to implement the recommended action.',
     `part_master_id` BIGINT COMMENT 'Reference to the part (or component) that the FMEA analyzes.',
     `fmea_part_part_master_id` BIGINT COMMENT 'Reference to the part (or component) that the FMEA analyzes.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the engineer or responsible person assigned to implement the recommended action.',
     `primary_fmea_employee_id` BIGINT COMMENT 'Identifier of the engineer or responsible person assigned to implement the recommended action.',
     `actual_completion_date` DATE COMMENT 'Date when the recommended action was actually completed.',
     `analysis_team` STRING COMMENT 'Name or identifier of the cross‑functional team that performed the FMEA.',
@@ -472,6 +474,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` (
     `failure_effect` STRING COMMENT 'Potential effect on the vehicle or process if the failure mode occurs.',
     `failure_mode` STRING COMMENT 'Textual description of the way the part or process could fail.',
     `fmea_number` STRING COMMENT 'Business identifier assigned to the FMEA record, often used in reports and traceability.',
+    `fmea_record_status` STRING COMMENT 'Current lifecycle status of the FMEA record.. Valid values are `open|in_progress|closed|rejected`',
     `fmea_type` STRING COMMENT 'Indicates whether the analysis is a Design FMEA (DFMEA) or Process FMEA (PFMEA).. Valid values are `DFMEA|PFMEA`',
     `notes` STRING COMMENT 'Free‑form comments or observations related to the FMEA.',
     `occurrence_rating` STRING COMMENT 'Occurrence score (1‑10) indicating how likely the failure mode is to happen.',
@@ -481,7 +484,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` (
     `risk_category` STRING COMMENT 'High‑level risk classification derived from the RPN.. Valid values are `high|medium|low`',
     `rpn` STRING COMMENT 'Calculated risk priority number (S × O × D) used to prioritize mitigation actions.',
     `severity_rating` STRING COMMENT 'Severity score (1‑10) reflecting the seriousness of the failure effect.',
-    `fmea_record_status` STRING COMMENT 'Current lifecycle status of the FMEA record.. Valid values are `open|in_progress|closed|rejected`',
     `target_completion_date` DATE COMMENT 'Planned date by which the recommended action should be completed.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to the FMEA record.',
     `version` STRING COMMENT 'Alphanumeric version label (e.g., v1.0, v2.1) for the FMEA record.',
@@ -492,25 +494,24 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` (
     `dvp_plan_id` BIGINT COMMENT 'System-generated unique identifier for the Design Verification Plan.',
     `change_id` BIGINT COMMENT 'Identifier of the engineering change order that triggered the plan.',
     `employee_id` BIGINT COMMENT 'Identifier of the user who created the plan record.',
+    `dvp_employee_id` BIGINT COMMENT 'Identifier of the engineer accountable for the plan execution.',
     `part_master_id` BIGINT COMMENT 'Identifier of the part or component covered by the DVP.',
     `dvp_part_part_master_id` BIGINT COMMENT 'Identifier of the part or component covered by the DVP.',
     `design_specification_id` BIGINT COMMENT 'Identifier of the engineering specification linked to the plan.',
     `dvp_related_specification_design_specification_id` BIGINT COMMENT 'Identifier of the engineering specification linked to the plan.',
     `dvp_updated_by_employee_id` BIGINT COMMENT 'Identifier of the user who performed the latest update.',
     `primary_dvp_employee_id` BIGINT COMMENT 'Identifier of the engineer accountable for the plan execution.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the engineer accountable for the plan execution.',
     `tertiary_dvp_updated_by_employee_id` BIGINT COMMENT 'Identifier of the user who performed the latest update.',
     `vehicle_program_id` BIGINT COMMENT 'Identifier of the vehicle program to which the plan belongs.',
     `actual_completion_date` DATE COMMENT 'Date when the last test in the plan was completed.',
     `approval_date` DATE COMMENT 'Date on which the plan received final approval.',
     `approval_status` STRING COMMENT 'Current approval state of the verification plan.. Valid values are `draft|pending|approved|rejected|withdrawn`',
-    `dvp_plan_code` STRING COMMENT 'Business-visible alphanumeric code used to reference the DVP plan.',
     `completed_test_count` STRING COMMENT 'Number of test cases that have been completed.',
     `completion_percentage` DECIMAL(18,2) COMMENT 'Percentage of tests completed (0‑100).',
     `cost_estimate_usd` DECIMAL(18,2) COMMENT 'Estimated cost to execute the verification plan, expressed in US dollars.',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the plan record was created.',
-    `dvp_plan_description` STRING COMMENT 'Detailed narrative describing the scope and objectives of the plan.',
     `document_url` STRING COMMENT 'Web link or repository path to the full DVP document.',
+    `dvp_plan_status` STRING COMMENT 'Current operational status of the verification plan.. Valid values are `active|inactive|archived|cancelled`',
     `effective_end_date` DATE COMMENT 'Date when the plan is retired or superseded (nullable).',
     `effective_start_date` DATE COMMENT 'Date when the plan becomes active for execution.',
     `is_automated` BOOLEAN COMMENT 'Indicates whether the test procedures are automated.',
@@ -519,19 +520,20 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` (
     `last_status_change_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent change to the plan status.',
     `model_year` STRING COMMENT 'Model year of the vehicle variant the plan applies to.',
     `notes` STRING COMMENT 'Additional remarks or comments about the verification plan.',
+    `plan_code` STRING COMMENT 'Business-visible alphanumeric code used to reference the DVP plan.',
+    `plan_description` STRING COMMENT 'Detailed narrative describing the scope and objectives of the plan.',
+    `plan_title` STRING COMMENT 'Descriptive title of the verification plan.',
+    `plan_type` STRING COMMENT 'Category of the plan indicating the level of the product it validates.. Valid values are `system|component|subsystem|vehicle|process`',
     `planned_completion_date` DATE COMMENT 'Target date for completing all tests in the plan.',
     `priority` STRING COMMENT 'Business priority assigned to the plan.. Valid values are `low|medium|high|critical`',
     `regulatory_approval_required` BOOLEAN COMMENT 'Indicates whether regulatory sign‑off is required for the plan.',
     `regulatory_approval_status` STRING COMMENT 'Current status of regulatory approval for the plan.. Valid values are `not_required|pending|approved|rejected`',
     `risk_level` STRING COMMENT 'Overall risk rating assigned to the verification plan.. Valid values are `low|medium|high|critical`',
-    `dvp_plan_status` STRING COMMENT 'Current operational status of the verification plan.. Valid values are `active|inactive|archived|cancelled`',
     `system_code` BIGINT COMMENT 'Identifier of the vehicle system (e.g., powertrain, ADAS) the plan validates.',
     `test_environment` STRING COMMENT 'Physical or virtual environment where testing occurs.. Valid values are `lab|test_track|simulation|field`',
     `test_phase` STRING COMMENT 'Lifecycle phase during which the tests are performed.. Valid values are `development|prototype|pre-production|production|post-production`',
     `test_type` STRING COMMENT 'Primary classification of the tests in the plan.. Valid values are `functional|performance|durability|safety|regulatory|environmental`',
-    `title` STRING COMMENT 'Descriptive title of the verification plan.',
     `total_test_count` STRING COMMENT 'Total number of test cases defined in the plan.',
-    `dvp_plan_type` STRING COMMENT 'Category of the plan indicating the level of the product it validates.. Valid values are `system|component|subsystem|vehicle|process`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the plan record.',
     `vehicle_variant` STRING COMMENT 'Specific vehicle variant or trim level associated with the plan.',
     `version_number` STRING COMMENT 'Semantic version identifier for the plan (e.g., 1.0, 2.1).',
@@ -542,11 +544,9 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`homologation_require
     `homologation_requirement_id` BIGINT COMMENT 'Unique surrogate key for the homologation requirement record.',
     `homologation_record_id` BIGINT COMMENT 'Foreign key linking to compliance.homologation_record. Business justification: Homologation requirement must reference the homologation record that documents market approval for that requirement.',
     `vehicle_program_id` BIGINT COMMENT 'Identifier of the vehicle program to which this requirement belongs.',
-    `homologation_requirement_code` STRING COMMENT 'Business identifier assigned to the requirement by the engineering organization.',
     `compliance_method` STRING COMMENT 'How compliance is demonstrated: test, calculation, or declaration.. Valid values are `test|calculation|declaration`',
     `compliance_status` STRING COMMENT 'Current status of the requirements compliance lifecycle.. Valid values are `pending|in_progress|compliant|non_compliant|exempt`',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the homologation requirement record was first created in the system.',
-    `homologation_requirement_description` STRING COMMENT 'Full textual description of what the regulation mandates.',
     `effective_date` DATE COMMENT 'Date when the requirement becomes legally effective.',
     `expiration_date` DATE COMMENT 'Date when the requirement is no longer applicable, if applicable.',
     `is_mandatory` BOOLEAN COMMENT 'Indicates whether the requirement is mandatory (true) or optional (false).',
@@ -557,6 +557,8 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`homologation_require
     `priority_level` STRING COMMENT 'Business priority assigned to the requirement for planning purposes.. Valid values are `high|medium|low`',
     `regulation_name` STRING COMMENT 'Name of the regulatory standard governing the requirement, e.g., FMVSS, ECE_R, CARB.. Valid values are `FMVSS|ECE_R|CARB|Euro_NCAP|WLTP|EPA`',
     `regulation_number` STRING COMMENT 'Official number or identifier of the regulation (e.g., FMVSS 123).',
+    `requirement_code` STRING COMMENT 'Business identifier assigned to the requirement by the engineering organization.',
+    `requirement_description` STRING COMMENT 'Full textual description of what the regulation mandates.',
     `submission_deadline` DATE COMMENT 'Latest date by which evidence of compliance must be submitted.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the requirement record.',
     `vehicle_model_year` STRING COMMENT 'Model year of the vehicle to which the requirement is tied.',
@@ -579,6 +581,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` (
     `diagnostic_trouble_code_support` STRING COMMENT 'List or description of DTCs supported by the ECU.',
     `dimensions_mm` STRING COMMENT 'Physical dimensions (L×W×H) in millimetres.',
     `ecu_family` STRING COMMENT 'Higher‑level family grouping for related ECUs.',
+    `ecu_specification_status` STRING COMMENT 'Current lifecycle state of the ECU specification.. Valid values are `active|inactive|deprecated|retired|development|released`',
     `ecu_type` STRING COMMENT 'Classification of the ECU function (e.g., engine control, ADAS).. Valid values are `engine_control|transmission|adas|body_control|battery_management|infotainment`',
     `effective_end_date` DATE COMMENT 'Date when the ECU specification is retired or superseded.',
     `effective_start_date` DATE COMMENT 'Date when the ECU specification becomes effective.',
@@ -598,7 +601,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` (
     `release_status` STRING COMMENT 'Current release state of the ECU specification.. Valid values are `draft|released|archived|obsolete`',
     `software_release_notes` STRING COMMENT 'Free‑form notes describing changes in the software release.',
     `software_version` STRING COMMENT 'Version identifier of the ECU software (e.g., v1.2.3).',
-    `ecu_specification_status` STRING COMMENT 'Current lifecycle state of the ECU specification.. Valid values are `active|inactive|deprecated|retired|development|released`',
     `supported_features` STRING COMMENT 'Comma‑separated list of functional features provided by the ECU.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the ECU specification.',
     `vehicle_platform` STRING COMMENT 'Vehicle platform or architecture that the ECU supports (e.g., MQB, e‑CM).',
@@ -615,7 +617,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` (
     `architecture_type` STRING COMMENT 'Physical layout of the engine (inline, V, boxer, etc.).',
     `aspiration_type` STRING COMMENT 'Method of air induction for the engine.. Valid values are `naturally_aspirated|turbocharged|supercharged`',
     `battery_capacity_kwh` DECIMAL(18,2) COMMENT 'Energy storage capacity for electrified powertrains; null for ICE/HEV.',
-    `powertrain_spec_code` STRING COMMENT 'Business identifier code used to reference the specification across systems.',
     `compliance_status` STRING COMMENT 'Overall regulatory compliance state of the specification.. Valid values are `compliant|non_compliant|pending`',
     `cost_currency` STRING COMMENT 'Currency code for the cost estimate.',
     `cost_estimate_usd` DECIMAL(18,2) COMMENT 'Estimated manufacturing cost for the powertrain.',
@@ -633,12 +634,13 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` (
     `is_locked` BOOLEAN COMMENT 'Indicates whether the specification is locked from further edits.',
     `last_review_date` DATE COMMENT 'Date of the most recent engineering review.',
     `model_year` STRING COMMENT 'Model year the specification applies to.',
-    `powertrain_spec_name` STRING COMMENT 'Human‑readable name of the powertrain specification.',
     `notes` STRING COMMENT 'Free‑form comments or engineering notes.',
     `power_output_kw` DECIMAL(18,2) COMMENT 'Peak power rating of the powertrain.',
-    `powertrain_type` STRING COMMENT 'Classification of the powertrain technology.. Valid values are `ICE|HEV|PHEV|BEV|FCEV`',
-    `start_of_production_date` DATE COMMENT 'Date when the powertrain entered series production.',
     `powertrain_spec_status` STRING COMMENT 'Current lifecycle status of the specification.. Valid values are `draft|active|retired|obsolete`',
+    `powertrain_type` STRING COMMENT 'Classification of the powertrain technology.. Valid values are `ICE|HEV|PHEV|BEV|FCEV`',
+    `spec_code` STRING COMMENT 'Business identifier code used to reference the specification across systems.',
+    `spec_name` STRING COMMENT 'Human‑readable name of the powertrain specification.',
+    `start_of_production_date` DATE COMMENT 'Date when the powertrain entered series production.',
     `target_program_code` STRING COMMENT 'Program identifier for which this specification is intended.',
     `thermal_management` STRING COMMENT 'Cooling/heating strategy used for the powertrain.. Valid values are `air|liquid|phase_change|heat_pump`',
     `torque_nm` DECIMAL(18,2) COMMENT 'Peak torque rating of the powertrain.',
@@ -649,14 +651,14 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` (
     `weight_kg` DECIMAL(18,2) COMMENT 'Mass of the powertrain assembly.',
     `wltp_range_km` STRING COMMENT 'Estimated driving range under WLTP test cycle.',
     CONSTRAINT pk_powertrain_spec PRIMARY KEY(`powertrain_spec_id`)
-) COMMENT 'Powertrain engineering specification record capturing the technical definition of an ICE, HEV, PHEV, or EV powertrain system. Includes spec ID, powertrain type (ICE, HEV, PHEV, BEV, FCEV), engine or motor displacement/power rating, torque output, transmission type, battery capacity (kWh) for electrified variants, fuel type, emissions standard compliance (Euro 6, EPA Tier 3, CARB LEV III), WLTP/EPA range rating, thermal management approach, and target program applicability. Supports R&D and powertrain engineering teams. [preservation_guardrail: verified]';
+) COMMENT 'Powertrain engineering specification record capturing the technical definition of an ICE, HEV, PHEV, or EV powertrain system. Includes spec ID, powertrain type (ICE, HEV, PHEV, BEV, FCEV), engine or motor displacement/power rating, torque output, transmission type, battery capacity (kWh) for electrified variants, fuel type, emissions standard compliance (Euro 6, EPA Tier 3, CARB LEV III), WLTP/EPA range rating, thermal management approach, and target program applicability. Supports R&D and powertrain engineering teams.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`weight_report` (
     `weight_report_id` BIGINT COMMENT 'Unique identifier for the weight report record.',
     `equipment_registry_id` BIGINT COMMENT 'Foreign key linking to asset.equipment_registry. Business justification: Weight reports are generated by weighing equipment; linking allows equipment calibration tracking and compliance audit.',
     `employee_id` BIGINT COMMENT 'Identifier of the engineer accountable for the weight report.',
-    `primary_weight_employee_id` BIGINT COMMENT 'Identifier of the engineer accountable for the weight report.',
     `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: Weight reports are generated for a specific vehicle program; linking provides program aggregation.',
+    `weight_employee_id` BIGINT COMMENT 'Identifier of the engineer accountable for the weight report.',
     `actual_weight_kg` DECIMAL(18,2) COMMENT 'Physical measurement of the component weight obtained during testing, in kilograms.',
     `approved_timestamp` TIMESTAMP COMMENT 'Timestamp when the report was approved, if applicable.',
     `comments` STRING COMMENT 'Free‑form notes or observations related to the weight report.',
@@ -665,12 +667,12 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`weight_report` (
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the weight report record was first created.',
     `estimated_weight_kg` DECIMAL(18,2) COMMENT 'Current engineering estimate of the component weight, in kilograms.',
     `is_locked` BOOLEAN COMMENT 'Indicates whether the report is locked from further edits.',
-    `weight_report_name` STRING COMMENT 'Human‑readable name or title of the weight report.',
-    `number` STRING COMMENT 'Business identifier assigned to the weight report for external reference.',
     `reduction_action` STRING COMMENT 'Planned or executed engineering action intended to reduce the component weight.',
     `regulatory_approval_status` STRING COMMENT 'Status of regulatory approval for the weight report.. Valid values are `pending|approved|rejected|not_required`',
+    `report_name` STRING COMMENT 'Human‑readable name or title of the weight report.',
+    `report_number` STRING COMMENT 'Business identifier assigned to the weight report for external reference.',
+    `report_status` STRING COMMENT 'Current lifecycle status of the weight report.. Valid values are `draft|in_review|approved|rejected|archived`',
     `reporting_date` DATE COMMENT 'Date on which the weight data was reported.',
-    `weight_report_status` STRING COMMENT 'Current lifecycle status of the weight report.. Valid values are `draft|in_review|approved|rejected|archived`',
     `system_scope` STRING COMMENT 'Engineering system or vehicle subsystem the weight measurement applies to (e.g., chassis, powertrain).',
     `target_weight_kg` DECIMAL(18,2) COMMENT 'Target mass budget allocation for the component, expressed in kilograms.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the weight report.',
@@ -680,7 +682,7 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`weight_report` (
     `weight_source` STRING COMMENT 'Origin of the weight data, such as simulation, prototype measurement, or supplier data.',
     `weight_target_category` STRING COMMENT 'Category of the weight target (e.g., mass budget, component limit).',
     CONSTRAINT pk_weight_report PRIMARY KEY(`weight_report_id`)
-) COMMENT 'Vehicle or component weight tracking record capturing mass budget allocations and actual measured weights throughout the development program. Includes report ID, program reference, reporting date, system or component scope, target weight (kg), current estimated weight, actual measured weight, weight delta vs. target, weight reduction actions, responsible engineer, and report status. Supports mass management — a critical engineering discipline for fuel economy (CAFE), EV range, and performance targets. [preservation_guardrail: verified]';
+) COMMENT 'Vehicle or component weight tracking record capturing mass budget allocations and actual measured weights throughout the development program. Includes report ID, program reference, reporting date, system or component scope, target weight (kg), current estimated weight, actual measured weight, weight delta vs. target, weight reduction actions, responsible engineer, and report status. Supports mass management — a critical engineering discipline for fuel economy (CAFE), EV range, and performance targets.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`design_review` (
     `design_review_id` BIGINT COMMENT 'Unique identifier for the design review event.',
@@ -690,20 +692,20 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`design_review` (
     `chair_name` STRING COMMENT 'Full name of the chairperson leading the design review.',
     `compliance_flag` BOOLEAN COMMENT 'Indicates whether the reviewed design meets required compliance standards (true = compliant).',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the design review record was first created in the system.',
-    `design_review_date` TIMESTAMP COMMENT 'Date and time when the design review took place.',
-    `duration_minutes` STRING COMMENT 'Total duration of the design review in minutes.',
+    `design_review_status` STRING COMMENT 'Current lifecycle status of the design review record.. Valid values are `scheduled|in_progress|completed|cancelled`',
     `findings_count` STRING COMMENT 'Total number of findings identified during the review.',
-    `identifier` STRING COMMENT 'Business identifier or code assigned to the design review (e.g., DR-2024-001).',
-    `location` STRING COMMENT 'Physical or virtual location where the design review was conducted.',
     `minutes_document_ref` STRING COMMENT 'Reference (e.g., file path or URL) to the detailed minutes of the review.',
     `notes` STRING COMMENT 'Additional free‑form notes captured during the design review.',
     `open_actions_count` STRING COMMENT 'Number of action items that remain open after the review.',
     `outcome` STRING COMMENT 'Result of the design review: approved, conditional, or rejected.. Valid values are `approved|conditional|rejected`',
+    `review_date` TIMESTAMP COMMENT 'Date and time when the design review took place.',
+    `review_duration_minutes` STRING COMMENT 'Total duration of the design review in minutes.',
+    `review_identifier` STRING COMMENT 'Business identifier or code assigned to the design review (e.g., DR-2024-001).',
+    `review_location` STRING COMMENT 'Physical or virtual location where the design review was conducted.',
+    `review_type` STRING COMMENT 'Type of design review (Preliminary Design Review, Critical Design Review, System Design Review, Supplier Design Review).. Valid values are `PDR|CDR|System|Supplier`',
     `risk_level` STRING COMMENT 'Risk assessment level assigned to the review outcomes.. Valid values are `low|medium|high`',
-    `design_review_status` STRING COMMENT 'Current lifecycle status of the design review record.. Valid values are `scheduled|in_progress|completed|cancelled`',
     `system_or_component` STRING COMMENT 'Name or identifier of the system or component that was reviewed.',
     `total_action_items` STRING COMMENT 'Total number of action items generated by the review (including open and closed).',
-    `design_review_type` STRING COMMENT 'Type of design review (Preliminary Design Review, Critical Design Review, System Design Review, Supplier Design Review).. Valid values are `PDR|CDR|System|Supplier`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the design review record.',
     `version_number` STRING COMMENT 'Version number of the design review record for audit tracking.',
     CONSTRAINT pk_design_review PRIMARY KEY(`design_review_id`)
@@ -731,15 +733,15 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`material_specificati
     `lead_time_days` STRING COMMENT 'Typical supplier lead time for the material, in calendar days.',
     `lifecycle_status` STRING COMMENT 'Lifecycle phase of the material specification.. Valid values are `in_design|approved|in_use|retired|archived`',
     `material_class` STRING COMMENT 'High‑level classification of the material type.. Valid values are `steel|aluminum|polymer|composite|glass`',
+    `material_specification_status` STRING COMMENT 'Current operational status of the specification.. Valid values are `active|inactive|deprecated|pending`',
+    `material_specification_type` STRING COMMENT 'Primary functional category of the material.. Valid values are `structural|electrical|thermal|decorative`',
     `material_specification_name` STRING COMMENT 'Human‑readable name of the material specification.',
     `notes` STRING COMMENT 'Free‑form comments or observations about the material specification.',
     `safety_rating` STRING COMMENT 'Safety classification of the material according to internal or regulatory criteria.. Valid values are `A|B|C|D|E`',
     `specific_heat_j_per_kgk` DECIMAL(18,2) COMMENT 'Energy required to raise the temperature of 1 kg of material by 1 K.',
-    `material_specification_status` STRING COMMENT 'Current operational status of the specification.. Valid values are `active|inactive|deprecated|pending`',
     `surface_treatment` STRING COMMENT 'Required surface finishing process for the material.. Valid values are `none|coating|plating|anodizing|galvanizing`',
     `tensile_strength_mpa` DECIMAL(18,2) COMMENT 'Maximum stress the material can withstand while being stretched before breaking.',
     `thermal_conductivity_w_per_mk` DECIMAL(18,2) COMMENT 'Rate at which heat passes through the material.',
-    `material_specification_type` STRING COMMENT 'Primary functional category of the material.. Valid values are `structural|electrical|thermal|decorative`',
     `updated_by` STRING COMMENT 'User identifier of the person who last modified the record.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the specification.',
     `version_number` STRING COMMENT 'Incremental version of the specification for change tracking.',
@@ -756,8 +758,8 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` 
     `approval_status` STRING COMMENT 'Current approval state of the rule within engineering governance.. Valid values are `approved|pending|rejected`',
     `approved_by` STRING COMMENT 'Identifier of the authority who approved the rule.',
     `change_reason` STRING COMMENT 'Reason why the rule was created or modified (e.g., new regulation, market demand).',
-    `configuration_rule_code` STRING COMMENT 'Business code used to reference the rule in engineering and ordering systems.',
     `compliance_standard` STRING COMMENT 'Reference to the regulatory or internal standard the rule satisfies (e.g., ISO 26262, FMVSS).',
+    `configuration_rule_status` STRING COMMENT 'Current lifecycle status of the rule.. Valid values are `active|inactive|retired|draft`',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the rule record was first created in the system.',
     `configuration_rule_description` STRING COMMENT 'Detailed textual description of the rule logic and intent.',
     `effective_date` DATE COMMENT 'Date on which the rule becomes active.',
@@ -766,16 +768,16 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` 
     `last_review_date` DATE COMMENT 'Date when the rule was last reviewed for relevance or compliance.',
     `market` STRING COMMENT 'Geographic market(s) where the rule is applicable (e.g., US, EU, CN).',
     `model_year` STRING COMMENT 'Model year for which the rule is valid.',
-    `configuration_rule_name` STRING COMMENT 'Human‑readable name describing the purpose of the rule.',
     `notes` STRING COMMENT 'Free‑form comments or observations about the rule.',
     `option_category` STRING COMMENT 'High‑level category of the options involved (e.g., powertrain, interior, safety).',
     `option_code_a` STRING COMMENT 'Identifier of the first option involved in the rule (e.g., engine, trim).',
     `option_code_b` STRING COMMENT 'Identifier of the second option involved in the rule.',
-    `priority` STRING COMMENT 'Numeric priority used when multiple rules conflict; lower numbers indicate higher priority.',
     `program_name` STRING COMMENT 'Name of the vehicle program (e.g., SUV‑X, EV‑Y) to which the rule applies.',
-    `source` STRING COMMENT 'Origin of the rule: commercial policy, engineering requirement, or regulatory mandate.. Valid values are `commercial|engineering|regulatory`',
-    `configuration_rule_status` STRING COMMENT 'Current lifecycle status of the rule.. Valid values are `active|inactive|retired|draft`',
-    `configuration_rule_type` STRING COMMENT 'Classification of the rule logic: include, exclude, requires, or incompatible.. Valid values are `include|exclude|requires|incompatible`',
+    `rule_code` STRING COMMENT 'Business code used to reference the rule in engineering and ordering systems.',
+    `rule_name` STRING COMMENT 'Human‑readable name describing the purpose of the rule.',
+    `rule_priority` STRING COMMENT 'Numeric priority used when multiple rules conflict; lower numbers indicate higher priority.',
+    `rule_source` STRING COMMENT 'Origin of the rule: commercial policy, engineering requirement, or regulatory mandate.. Valid values are `commercial|engineering|regulatory`',
+    `rule_type` STRING COMMENT 'Classification of the rule logic: include, exclude, requires, or incompatible.. Valid values are `include|exclude|requires|incompatible`',
     `updated_by` STRING COMMENT 'User identifier of the person who last modified the rule.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the rule record.',
     `vehicle_platform` STRING COMMENT 'Platform architecture (e.g., MQB, CMF) to which the rule applies.',
@@ -793,10 +795,8 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`ota_release` (
     `target_ecu_ecu_specification_id` BIGINT COMMENT 'Identifier of the electronic control unit that the OTA package targets.',
     `validation_test_id` BIGINT COMMENT 'Reference to the validation test suite that approved the OTA release.',
     `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: OTA releases are scoped to a vehicle program; linking provides program ownership and traceability.',
-    `approval_date` TIMESTAMP COMMENT 'Date and time when the OTA release was formally approved.',
     `approval_timestamp` TIMESTAMP COMMENT 'Exact time when the approval action was recorded.',
     `approved_by` STRING COMMENT 'Name or identifier of the authority that approved the OTA release.',
-    `build_number` STRING COMMENT 'Technical build identifier generated by the build system.',
     `compatible_vin_range` STRING COMMENT 'VIN prefix range (e.g., 1HGCM*) that identifies vehicles eligible for the update.',
     `compliance_standard` STRING COMMENT 'Name of the regulatory or industry standard satisfied (e.g., ISO 26262).',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the OTA release record was first created in the system.',
@@ -807,35 +807,61 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`ota_release` (
     `estimated_download_size_mb` DECIMAL(18,2) COMMENT 'Projected size of the OTA package for vehicle download, in megabytes.',
     `estimated_install_time_minutes` STRING COMMENT 'Projected time required for the vehicle to install the OTA update.',
     `expiry_date` DATE COMMENT 'Date after which the OTA release should no longer be offered.',
-    `hash` STRING COMMENT 'Cryptographic hash of the OTA package for integrity verification.',
     `is_critical` BOOLEAN COMMENT 'Flag indicating the update addresses critical safety or security issues.',
     `is_mandatory` BOOLEAN COMMENT 'Indicates whether the OTA update is required for compliance or safety.',
+    `ota_release_status` STRING COMMENT 'Current lifecycle status of the OTA release.. Valid values are `draft|pending|approved|deployed|retracted`',
     `regulatory_compliance_flag` BOOLEAN COMMENT 'Indicates whether the OTA release meets applicable regulatory requirements.',
+    `release_approval_date` TIMESTAMP COMMENT 'Date and time when the OTA release was formally approved.',
+    `release_build_number` STRING COMMENT 'Technical build identifier generated by the build system.',
+    `release_hash` STRING COMMENT 'Cryptographic hash of the OTA package for integrity verification.',
+    `release_signature` STRING COMMENT 'Digital signature used to authenticate the OTA package.',
+    `release_source` STRING COMMENT 'Origin of the OTA package content.. Valid values are `internal|supplier|partner`',
+    `release_type` STRING COMMENT 'Category of the OTA update indicating its purpose.. Valid values are `feature|security|calibration|regulatory`',
+    `release_version` STRING COMMENT 'Human‑readable version string of the OTA package (e.g., 2024.03.01).',
     `rollback_supported` BOOLEAN COMMENT 'Indicates whether the vehicle can revert to a prior software version if needed.',
     `rollback_window_days` STRING COMMENT 'Number of days after deployment during which a rollback is permitted.',
     `rollout_strategy` STRING COMMENT 'Planned deployment approach (e.g., staged, immediate, region‑based).',
-    `signature` STRING COMMENT 'Digital signature used to authenticate the OTA package.',
     `software_delta_description` STRING COMMENT 'Narrative of code changes, new features, or bug fixes included in the OTA package.',
-    `source` STRING COMMENT 'Origin of the OTA package content.. Valid values are `internal|supplier|partner`',
-    `ota_release_status` STRING COMMENT 'Current lifecycle status of the OTA release.. Valid values are `draft|pending|approved|deployed|retracted`',
     `target_market` STRING COMMENT 'Market segment (e.g., North America, EU) for which the OTA release is applicable.',
     `target_model_year_end` STRING COMMENT 'Last model year (inclusive) for which the OTA release is valid.',
     `target_model_year_start` STRING COMMENT 'First model year (inclusive) for which the OTA release is valid.',
     `target_region` STRING COMMENT 'Geographic region(s) where the OTA release is intended to be deployed.',
     `target_vehicle_model` STRING COMMENT 'Vehicle model name or code that the OTA release applies to.',
     `test_result_summary` STRING COMMENT 'Concise summary of key test outcomes supporting the release.',
-    `ota_release_type` STRING COMMENT 'Category of the OTA update indicating its purpose.. Valid values are `feature|security|calibration|regulatory`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to the OTA release record.',
     `validation_status` STRING COMMENT 'Overall result of all validation activities for the OTA release.. Valid values are `passed|failed|not_tested`',
-    `version` STRING COMMENT 'Human‑readable version string of the OTA package (e.g., 2024.03.01).',
     CONSTRAINT pk_ota_release PRIMARY KEY(`ota_release_id`)
-) COMMENT 'OTA (Over-the-Air) software release engineering record capturing the definition and approval of a software update package for connected vehicle ECUs. Includes release ID, release version, target ECU or system, software delta description, release type (feature, security patch, calibration, regulatory), compatible vehicle configurations (VIN range or model/MY), validation test references, cybersecurity assessment status, rollout strategy, and release approval date. Bridges engineering and connected mobility domains for software-defined vehicle programs. [preservation_guardrail: verified]';
+) COMMENT 'OTA (Over-the-Air) software release engineering record capturing the definition and approval of a software update package for connected vehicle ECUs. Includes release ID, release version, target ECU or system, software delta description, release type (feature, security patch, calibration, regulatory), compatible vehicle configurations (VIN range or model/MY), validation test references, cybersecurity assessment status, rollout strategy, and release approval date. Bridges engineering and connected mobility domains for software-defined vehicle programs.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` (
-    `engineering_document_id` BIGINT COMMENT 'Primary key for local engineering_document reference',
-    `compliance_document_id` BIGINT COMMENT 'FK reference to SSOT compliance.compliance_document',
+    `engineering_document_id` BIGINT COMMENT 'Unique surrogate key for the engineering document record.',
+    `employee_id` BIGINT COMMENT 'Foreign key linking to workforce.employee. Business justification: Document author employee needed for traceability and intellectual property records.',
+    `compliance_document_id` BIGINT COMMENT 'SSOT reference to compliance.compliance_document (cross-domain duplicate reconciliation; compliance designated SSOT owner for document).',
+    `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: Engineering documents are associated with a vehicle program; linking provides program context.',
+    `approval_timestamp` TIMESTAMP COMMENT 'Date and time when the document was approved.',
+    `approved_by` STRING COMMENT 'Name of the person who approved the document for release.',
+    `associated_part` STRING COMMENT 'Reference to the part or assembly that the document describes.',
+    `associated_program` STRING COMMENT 'Program or model line to which the document belongs (e.g., SUV2025).',
+    `author` STRING COMMENT 'Name of the engineer or author who created the document.',
+    `compliance_standard` STRING COMMENT 'Applicable compliance standard(s) the document satisfies (e.g., ISO 26262, IATF 16949).',
+    `confidentiality_level` STRING COMMENT 'Classification of the documents sensitivity.. Valid values are `public|internal|confidential|restricted`',
+    `created_timestamp` TIMESTAMP COMMENT 'Date and time when the document record was first created in the system.',
+    `document_number` STRING COMMENT 'Business identifier assigned to the document (e.g., drawing number, specification code).',
+    `document_type` STRING COMMENT 'Category of the engineering document. [ENUM-REF-CANDIDATE: drawing|specification|test_report|analysis_report|fmea|dvp|meeting_minutes — promote to reference product]',
+    `effective_end_date` DATE COMMENT 'Date after which the document content is no longer valid (if applicable).',
+    `effective_start_date` DATE COMMENT 'Date from which the document content is considered valid.',
+    `engineering_document_status` STRING COMMENT 'Current lifecycle state of the document.. Valid values are `draft|released|archived|obsolete`',
+    `file_path` STRING COMMENT 'Logical path or URI to the document file in the repository.',
+    `file_size_bytes` BIGINT COMMENT 'Size of the document file in bytes.',
+    `format` STRING COMMENT 'File format of the stored document.. Valid values are `pdf|dwg|docx|xlsx|xml`',
+    `is_digital_twin_ready` BOOLEAN COMMENT 'Indicates whether the document is linked to a digital twin model.',
+    `release_date` DATE COMMENT 'Effective date when the document became officially released.',
+    `retention_policy` STRING COMMENT 'Policy governing how long the document must be retained.. Valid values are `keep_5_years|keep_10_years|permanent`',
+    `revision` STRING COMMENT 'Revision identifier indicating the version of the document (e.g., A, B, C, 1.0, 2.1).',
+    `title` STRING COMMENT 'Human‑readable title of the engineering document.',
+    `updated_timestamp` TIMESTAMP COMMENT 'Date and time of the most recent modification to the document record.',
     CONSTRAINT pk_engineering_document PRIMARY KEY(`engineering_document_id`)
-) COMMENT 'Reference to SSOT owner compliance.compliance_document. Engineering document record serving as the metadata catalog for all controlled engineering documents managed in the PLM system. Includes document ID, document number, title, document type (drawing, specification, test report, analysis report, FMEA, DVP, meeting minutes), revision level, author, approval status, release date, associated program and part references, document format, storage location reference, and retention policy. Supports document control per IATF 16949 and ISO 9001 requirements.';
+) COMMENT 'Engineering document record serving as the metadata catalog for all controlled engineering documents managed in the PLM system. Includes document ID, document number, title, document type (drawing, specification, test report, analysis report, FMEA, DVP, meeting minutes), revision level, author, approval status, release date, associated program and part references, document format, storage location reference, and retention policy. Supports document control per IATF 16949 and ISO 9001 requirements.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` (
     `engineering_adas_feature_id` BIGINT COMMENT 'Unique identifier for the engineering_adas_feature data product (auto-inserted pre-linking).',
@@ -846,34 +872,34 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_fea
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`cost_target` (
     `cost_target_id` BIGINT COMMENT 'Unique identifier for the cost target record.',
     `employee_id` BIGINT COMMENT 'Identifier of the engineer responsible for the cost target.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the engineer responsible for the cost target.',
+    `primary_cost_employee_id` BIGINT COMMENT 'Identifier of the engineer responsible for the cost target.',
     `vehicle_program_id` BIGINT COMMENT 'Identifier of the vehicle program to which the cost target belongs.',
     `approval_date` DATE COMMENT 'Date when the cost target was approved.',
     `approval_status` STRING COMMENT 'Current approval status of the cost target.. Valid values are `pending|approved|rejected|under_review`',
-    `cost_target_code` STRING COMMENT 'Business identifier code for the cost target.',
     `component_code` STRING COMMENT 'Standard code for the component (e.g., BOM part number).',
     `cost_basis` STRING COMMENT 'Basis for the cost target calculation.. Valid values are `baseline|benchmark|historical|target`',
     `cost_gap_percentage` DECIMAL(18,2) COMMENT 'Percentage gap between target and current total cost.',
     `cost_gap_total` DECIMAL(18,2) COMMENT 'Difference between target total cost and current estimated total cost.',
-    `cost_manufacturing` DECIMAL(18,2) COMMENT 'Target manufacturing cost amount.',
-    `cost_material` DECIMAL(18,2) COMMENT 'Target material cost amount.',
     `cost_methodology` STRING COMMENT 'Methodology used to define the cost target.. Valid values are `DTC|Value Engineering|Target Costing|Other`',
     `cost_reduction_ideas_count` STRING COMMENT 'Number of cost reduction ideas recorded for this target.',
-    `cost_total` DECIMAL(18,2) COMMENT 'Overall target cost amount.',
+    `cost_target_status` STRING COMMENT 'Lifecycle status of the cost target record.. Valid values are `active|inactive|archived|draft`',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the cost target record was created.',
-    `currency` STRING COMMENT 'Three-letter ISO currency code for cost values.',
     `current_estimated_cost_manufacturing` DECIMAL(18,2) COMMENT 'Current estimated manufacturing cost.',
     `current_estimated_cost_material` DECIMAL(18,2) COMMENT 'Current estimated material cost.',
     `current_estimated_cost_total` DECIMAL(18,2) COMMENT 'Current total estimated cost.',
     `effective_end_date` DATE COMMENT 'Date when the cost target expires or is superseded.',
     `effective_start_date` DATE COMMENT 'Date when the cost target becomes effective.',
-    `freeze_date` DATE COMMENT 'Date when the cost target is frozen and no longer editable.',
     `is_locked` BOOLEAN COMMENT 'Indicates whether the cost target is locked from further changes.',
-    `cost_target_name` STRING COMMENT 'Descriptive name of the cost target, e.g., Powertrain System Cost Target.',
     `notes` STRING COMMENT 'Free-text notes or comments regarding the cost target.',
-    `cost_target_status` STRING COMMENT 'Lifecycle status of the cost target record.. Valid values are `active|inactive|archived|draft`',
     `system_or_component` STRING COMMENT 'Name of the vehicle system or component the cost target applies to.',
-    `cost_target_type` STRING COMMENT 'Classification of the cost target (design, manufacturing, total, etc.).. Valid values are `design|manufacturing|total|material|labor`',
+    `target_code` STRING COMMENT 'Business identifier code for the cost target.',
+    `target_cost_manufacturing` DECIMAL(18,2) COMMENT 'Target manufacturing cost amount.',
+    `target_cost_material` DECIMAL(18,2) COMMENT 'Target material cost amount.',
+    `target_cost_total` DECIMAL(18,2) COMMENT 'Overall target cost amount.',
+    `target_currency` STRING COMMENT 'Three-letter ISO currency code for cost values.',
+    `target_freeze_date` DATE COMMENT 'Date when the cost target is frozen and no longer editable.',
+    `target_name` STRING COMMENT 'Descriptive name of the cost target, e.g., Powertrain System Cost Target.',
+    `target_type` STRING COMMENT 'Classification of the cost target (design, manufacturing, total, etc.).. Valid values are `design|manufacturing|total|material|labor`',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent update to the cost target record.',
     `version_number` STRING COMMENT 'Version of the cost target record.',
     CONSTRAINT pk_cost_target PRIMARY KEY(`cost_target_id`)
@@ -883,9 +909,9 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_comp
     `engineering_bom_component_id` BIGINT COMMENT 'Primary key for the bom_component association',
     `part_master_id` BIGINT COMMENT 'Foreign key linking to the part master record',
     `production_bom_id` BIGINT COMMENT 'Foreign key linking to the production BOM record',
+    `component_type` STRING COMMENT 'Classification of the part within the BOM (e.g., standard, optional, service)',
     `installation_sequence` STRING COMMENT 'Order in which the part is installed during assembly',
     `quantity_per_vehicle` DECIMAL(18,2) COMMENT 'Number of units of the part required for one vehicle',
-    `engineering_bom_component_type` STRING COMMENT 'Classification of the part within the BOM (e.g., standard, optional, service)',
     `unit_of_measure` STRING COMMENT 'Unit in which the quantity is expressed',
     CONSTRAINT pk_engineering_bom_component PRIMARY KEY(`engineering_bom_component_id`)
 ) COMMENT 'This association product represents the BOM Component relationship between part_master and production_bom. It captures the quantity of the part per vehicle, the unit of measure, the type of component, and the installation sequence within the manufacturing BOM.. Existence Justification: A part_master can be used in many production_bom records (different vehicle models, configurations) and each production_bom contains many part_master entries. The link is managed as BOM component lines that capture quantity, unit of measure, component type, and installation sequence. This relationship is actively created, updated, and deleted by engineering/manufacturing teams as part of the BOM management process.';
@@ -907,9 +933,9 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventor
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` (
     `engineering_team_id` BIGINT COMMENT 'Primary key for engineering_team',
-    `employee_id` BIGINT COMMENT 'FK to workforce.employee',
+    `employee_id` BIGINT COMMENT 'Unique identifier of the employee who manages the team.',
+    `engineering_manager_employee_id` BIGINT COMMENT 'FK to workforce.employee',
     `parent_engineering_team_id` BIGINT COMMENT 'Self-referencing FK on engineering_team (parent_engineering_team_id)',
-    `primary_employee_id` BIGINT COMMENT 'Unique identifier of the employee who manages the team.',
     `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: Engineering teams are organized around vehicle programs; linking enables program‑level resource planning.',
     `budget_amount` DECIMAL(18,2) COMMENT 'Annual budget allocated to the engineering team (currency assumed corporate default).',
     `engineering_team_code` STRING COMMENT 'Unique alphanumeric code used to reference the team across systems.',
@@ -928,7 +954,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` (
     `is_virtual` BOOLEAN COMMENT 'True if the team operates primarily in a virtual/remote mode.',
     `last_review_date` DATE COMMENT 'Date of the most recent governance or performance review of the team.',
     `last_reviewed_by` STRING COMMENT 'Name of the person who performed the last review.',
-    `engineering_team_level` STRING COMMENT 'Scope level of the team within the organization.',
     `location` STRING COMMENT 'Primary physical site or plant where the team is based (e.g., plant code).',
     `engineering_team_name` STRING COMMENT 'Human‑readable name of the engineering team.',
     `notes` STRING COMMENT 'Additional free‑form remarks or observations about the team.',
@@ -936,7 +961,8 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` (
     `primary_skill` STRING COMMENT 'Dominant engineering discipline of the team.',
     `safety_certification_level` STRING COMMENT 'Functional safety classification of the teams deliverables per ISO 26262.',
     `engineering_team_status` STRING COMMENT 'Current lifecycle status of the team.',
-    `engineering_team_type` STRING COMMENT 'Category of engineering work performed by the team.',
+    `team_level` STRING COMMENT 'Scope level of the team within the organization.',
+    `team_type` STRING COMMENT 'Category of engineering work performed by the team.',
     `updated_timestamp` TIMESTAMP COMMENT 'Date and time of the most recent modification to the team record.',
     CONSTRAINT pk_engineering_team PRIMARY KEY(`engineering_team_id`)
 ) COMMENT 'Master reference table for engineering_team. Referenced by team_id.';
@@ -962,10 +988,11 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`material` (
     `environmental_impact_score` DECIMAL(18,2) COMMENT 'Numerical score representing the materials overall environmental footprint.',
     `family` STRING COMMENT 'Secondary classification grouping materials by typical engineering use.',
     `grade` STRING COMMENT 'Specific grade or standard within the material type (e.g., 6061‑T6 for aluminum).',
-    `group` STRING COMMENT 'Higher‑level grouping used for cost and inventory planning.',
     `hardness_hb` DECIMAL(18,2) COMMENT 'Hardness measurement using the Brinell scale.',
     `hazardous` BOOLEAN COMMENT 'Indicates whether the material is classified as hazardous under safety regulations.',
     `hazardous_class` STRING COMMENT 'Regulatory classification of the hazardous material.',
+    `material_group` STRING COMMENT 'Higher‑level grouping used for cost and inventory planning.',
+    `material_type` STRING COMMENT 'Broad classification of the material based on its composition.',
     `melting_point_c` DECIMAL(18,2) COMMENT 'Temperature at which the material transitions from solid to liquid.',
     `msds_url` STRING COMMENT 'Link to the online Material Safety Data Sheet for the material.',
     `material_name` STRING COMMENT 'Human‑readable name of the material as used in engineering documentation.',
@@ -982,7 +1009,6 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`material` (
     `surface_finish` STRING COMMENT 'Description of the materials surface treatment (e.g., polished, anodized).',
     `tensile_strength_mpa` DECIMAL(18,2) COMMENT 'Maximum stress the material can withstand while being stretched before failure.',
     `thermal_conductivity_w_per_mk` DECIMAL(18,2) COMMENT 'Rate at which heat passes through the material.',
-    `material_type` STRING COMMENT 'Broad classification of the material based on its composition.',
     `unit_of_measure` STRING COMMENT 'Standard unit used for material quantity calculations.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to the material record.',
     `version_number` STRING COMMENT 'Major version of the material definition.',
@@ -990,21 +1016,56 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`material` (
     CONSTRAINT pk_material PRIMARY KEY(`material_id`)
 ) COMMENT 'Master reference table for material. Referenced by material_id.';
 
+CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` (
+    `packaging_specification_id` BIGINT COMMENT 'Primary key for packaging_specification',
+    `part_master_id` BIGINT COMMENT 'Foreign key linking to engineering.part_master. Business justification: Packaging specifications are defined for specific parts; linking enables part‑level packaging management.',
+    `compliance_standard` STRING COMMENT 'Regulatory or industry standard that the packaging must meet (e.g., ISO 14001). [ENUM-REF-CANDIDATE: ISO_9001|ISO_14001|ISO_45001|SAE_J1739|REACH|RoHS — promote to reference product]',
+    `effective_from` DATE COMMENT 'Date on which the specification becomes effective.',
+    `effective_until` DATE COMMENT 'Date on which the specification expires or is superseded; null if open‑ended.',
+    `environmental_impact_score` DECIMAL(18,2) COMMENT 'Numeric score representing the environmental footprint of the packaging (higher = greater impact).',
+    `hazardous` BOOLEAN COMMENT 'True if the packaging contains or is used for hazardous materials.',
+    `height_mm` DECIMAL(18,2) COMMENT 'Internal height dimension of the packaging in millimetres.',
+    `is_default` BOOLEAN COMMENT 'Indicates whether this specification is the default choice for its product line.',
+    `length_mm` DECIMAL(18,2) COMMENT 'Internal length dimension of the packaging in millimetres.',
+    `material_grade` STRING COMMENT 'Specific grade or alloy designation of the material.',
+    `material_type` STRING COMMENT 'Primary material from which the packaging is constructed.',
+    `notes` STRING COMMENT 'Free‑form text for additional remarks or special handling instructions.',
+    `packaging_category` STRING COMMENT 'High‑level grouping of packaging (e.g., container, pallet, crate).',
+    `packaging_cost_usd` DECIMAL(18,2) COMMENT 'Standard cost of the packaging unit in US dollars.',
+    `packaging_subcategory` STRING COMMENT 'More specific classification within the packaging category.',
+    `record_audit_created` TIMESTAMP COMMENT 'Timestamp when the specification record was first created in the system.',
+    `record_audit_updated` TIMESTAMP COMMENT 'Timestamp of the most recent update to the specification record.',
+    `recyclable` BOOLEAN COMMENT 'True if the packaging material is recyclable under standard industry programs.',
+    `spec_code` STRING COMMENT 'Business identifier code used to reference the specification across systems.',
+    `spec_name` STRING COMMENT 'Human‑readable name of the packaging specification.',
+    `spec_type` STRING COMMENT 'Category describing the purpose or nature of the packaging specification.',
+    `packaging_specification_status` STRING COMMENT 'Current lifecycle status of the specification.',
+    `supplier_code` STRING COMMENT 'Code identifying the supplier that provides the packaging material.',
+    `version_number` STRING COMMENT 'Version identifier for the specification, incremented on changes.',
+    `volume_l` DECIMAL(18,2) COMMENT 'Internal volume capacity of the packaging in litres.',
+    `weight_kg` DECIMAL(18,2) COMMENT 'Net weight of the packaging in kilograms.',
+    `width_mm` DECIMAL(18,2) COMMENT 'Internal width dimension of the packaging in millimetres.',
+    CONSTRAINT pk_packaging_specification PRIMARY KEY(`packaging_specification_id`)
+) COMMENT 'Master reference table for packaging_specification. Referenced by packaging_specification_id.';
+
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` (
     `engineering_change_action_id` BIGINT COMMENT 'System-generated unique identifier for the engineering action record.',
     `employee_id` BIGINT COMMENT 'Identifier of the engineer responsible for executing the action.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the engineer responsible for executing the action.',
+    `engineering_employee_id` BIGINT COMMENT 'Identifier of the engineer responsible for executing the action.',
+    `action_code` STRING COMMENT 'Business identifier code for the action, used for tracking and reference across systems.',
+    `action_description` STRING COMMENT 'Detailed description of the issue, corrective measure, or improvement required.',
+    `action_status` STRING COMMENT 'Current lifecycle status of the engineering action.. Valid values are `open|in_progress|completed|closed|cancelled`',
+    `action_timestamp` TIMESTAMP COMMENT 'Timestamp of the real-world event that initiated the action.',
+    `action_type` STRING COMMENT 'Category of the engineering action indicating the nature of work required.. Valid values are `design_change|test_rerun|analysis|supplier_engagement|process_improvement|documentation_update`',
     `actual_effort_hours` DECIMAL(18,2) COMMENT 'Recorded labor effort spent on the action.',
     `attachment_count` STRING COMMENT 'Number of supporting documents or files attached to the action.',
     `closure_timestamp` TIMESTAMP COMMENT 'Timestamp when the action was officially closed in the system.',
-    `engineering_change_action_code` STRING COMMENT 'Business identifier code for the action, used for tracking and reference across systems.',
     `comments` STRING COMMENT 'Free-text field for additional remarks or notes.',
     `completion_date` DATE COMMENT 'Actual date when the action was marked completed.',
     `compliance_flag` BOOLEAN COMMENT 'True if the action is required to meet regulatory or internal compliance standards.',
     `cost_estimate` DECIMAL(18,2) COMMENT 'Estimated monetary cost to implement the action.',
     `created_timestamp` TIMESTAMP COMMENT 'Timestamp when the engineering action record was first created in the system.',
     `currency_code` STRING COMMENT 'Three-letter ISO currency code for the cost estimate.. Valid values are `^[A-Z]{3}$`',
-    `engineering_change_action_description` STRING COMMENT 'Detailed description of the issue, corrective measure, or improvement required.',
     `due_date` DATE COMMENT 'Planned date by which the action should be completed.',
     `estimated_effort_hours` DECIMAL(18,2) COMMENT 'Projected labor effort required to complete the action.',
     `is_critical` BOOLEAN COMMENT 'Indicates whether the action is deemed critical to program success.',
@@ -1012,11 +1073,8 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_a
     `resolution_description` STRING COMMENT 'Narrative of how the action was resolved or closed.',
     `risk_level` STRING COMMENT 'Assessed risk associated with the actions impact on the program.. Valid values are `low|medium|high|critical`',
     `source_event` STRING COMMENT 'Originating event that triggered the creation of the engineering action.. Valid values are `test_failure|fmea_finding|gate_review|audit|customer_feedback|regulatory_issue`',
-    `engineering_change_action_status` STRING COMMENT 'Current lifecycle status of the engineering action.. Valid values are `open|in_progress|completed|closed|cancelled`',
     `target_milestone` STRING COMMENT 'Program milestone or gate that the action is associated with.',
-    `timestamp` TIMESTAMP COMMENT 'Timestamp of the real-world event that initiated the action.',
     `title` STRING COMMENT 'Short descriptive title summarizing the engineering action.',
-    `engineering_change_action_type` STRING COMMENT 'Category of the engineering action indicating the nature of work required.. Valid values are `design_change|test_rerun|analysis|supplier_engagement|process_improvement|documentation_update`',
     `updated_by` STRING COMMENT 'User identifier of the person who last modified the action record.',
     `updated_timestamp` TIMESTAMP COMMENT 'Timestamp of the most recent modification to the engineering action record.',
     `created_by` STRING COMMENT 'User identifier of the person who created the action record.',
@@ -1025,8 +1083,8 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_a
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` (
     `engineering_project_id` BIGINT COMMENT 'Primary key for project',
-    `employee_id` BIGINT COMMENT 'Identifier of the sponsoring organization or business unit.',
-    `primary_employee_id` BIGINT COMMENT 'Identifier of the person managing the project.',
+    `employee_id` BIGINT COMMENT 'Identifier of the person managing the project.',
+    `engineering_sponsor_employee_id` BIGINT COMMENT 'Identifier of the sponsoring organization or business unit.',
     `vehicle_program_id` BIGINT COMMENT 'Foreign key linking to engineering.vehicle_program. Business justification: Projects are typically executed within the context of a vehicle program; linking provides program‑level project tracking.',
     `actual_cost` DECIMAL(18,2) COMMENT 'Cumulative cost incurred to date.',
     `approved_by` BIGINT COMMENT 'Identifier of the person who approved the project.',
@@ -1069,53 +1127,157 @@ CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`engineering_project`
 ) COMMENT 'Master reference table for project. Referenced by project_id.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` (
-    `cfd_simulation_result_id` BIGINT COMMENT 'Primary key for cfd_simulation_result',
-    `vehicle_program_id` BIGINT COMMENT 'FK to vehicle program',
+    `cfd_simulation_result_id` BIGINT COMMENT 'Unique identifier for the cfd simulation result record (cfd simulation result id).',
+    `employee_id` BIGINT COMMENT 'The analyst employee id attribute of cfd_simulation_result.',
+    `cae_simulation_id` BIGINT COMMENT 'Identifier for cae simulation id on the cfd simulation result record.',
+    `part_master_id` BIGINT COMMENT '',
+    `vehicle_program_id` BIGINT COMMENT '',
+    `convergence_status` STRING COMMENT '',
+    `cpu_hours` DECIMAL(18,2) COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `drag_coefficient` DECIMAL(18,2) COMMENT '',
+    `inlet_velocity_m_per_s` DECIMAL(18,2) COMMENT '',
+    `lift_coefficient` DECIMAL(18,2) COMMENT '',
+    `mesh_element_count` BIGINT COMMENT '',
+    `result_dataset_path` STRING COMMENT '',
+    `reynolds_number` DECIMAL(18,2) COMMENT '',
+    `run_number` STRING COMMENT '',
+    `run_timestamp` TIMESTAMP COMMENT '',
+    `solver_name` STRING COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
     CONSTRAINT pk_cfd_simulation_result PRIMARY KEY(`cfd_simulation_result_id`)
-) COMMENT 'Engineering R&D product: cfd simulation result';
+) COMMENT '';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` (
-    `fea_simulation_result_id` BIGINT COMMENT 'Primary key for fea_simulation_result',
-    `vehicle_program_id` BIGINT COMMENT 'FK to vehicle program',
+    `fea_simulation_result_id` BIGINT COMMENT '',
+    `employee_id` BIGINT COMMENT '',
+    `cae_simulation_id` BIGINT COMMENT '',
+    `part_master_id` BIGINT COMMENT '',
+    `vehicle_program_id` BIGINT COMMENT '',
+    `convergence_status` STRING COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `fatigue_cycles` BIGINT COMMENT '',
+    `load_case` STRING COMMENT '',
+    `max_displacement_mm` DECIMAL(18,2) COMMENT '',
+    `max_von_mises_stress_mpa` DECIMAL(18,2) COMMENT '',
+    `mesh_element_count` BIGINT COMMENT '',
+    `result_dataset_path` STRING COMMENT '',
+    `run_number` STRING COMMENT '',
+    `run_timestamp` TIMESTAMP COMMENT '',
+    `safety_factor` DECIMAL(18,2) COMMENT '',
+    `solver_name` STRING COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
     CONSTRAINT pk_fea_simulation_result PRIMARY KEY(`fea_simulation_result_id`)
-) COMMENT 'Engineering R&D product: fea simulation result';
+) COMMENT 'Stores fea simulation result records for the engineering domain.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` (
-    `nvh_test_result_id` BIGINT COMMENT 'Primary key for nvh_test_result',
-    `vehicle_program_id` BIGINT COMMENT 'FK to vehicle program',
+    `nvh_test_result_id` BIGINT COMMENT '',
+    `part_master_id` BIGINT COMMENT '',
+    `employee_id` BIGINT COMMENT '',
+    `validation_test_id` BIGINT COMMENT '',
+    `vehicle_program_id` BIGINT COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `frequency_hz` DECIMAL(18,2) COMMENT '',
+    `measurement_location` STRING COMMENT '',
+    `pass_fail_status` STRING COMMENT '',
+    `result_dataset_path` STRING COMMENT '',
+    `sound_pressure_level_db` DECIMAL(18,2) COMMENT '',
+    `target_db` DECIMAL(18,2) COMMENT '',
+    `test_number` STRING COMMENT '',
+    `test_timestamp` TIMESTAMP COMMENT '',
+    `test_type` STRING COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
+    `vibration_amplitude_mm` DECIMAL(18,2) COMMENT '',
     CONSTRAINT pk_nvh_test_result PRIMARY KEY(`nvh_test_result_id`)
-) COMMENT 'Engineering R&D product: nvh test result';
+) COMMENT 'Table storing nvh test result records in the engineering domain.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`test_bench_run` (
-    `test_bench_run_id` BIGINT COMMENT 'Primary key for test_bench_run',
-    `vehicle_program_id` BIGINT COMMENT 'FK to vehicle program',
+    `test_bench_run_id` BIGINT COMMENT '',
+    `equipment_registry_id` BIGINT COMMENT '',
+    `functional_location_id` BIGINT COMMENT '',
+    `employee_id` BIGINT COMMENT '',
+    `part_master_id` BIGINT COMMENT '',
+    `vehicle_program_id` BIGINT COMMENT '',
+    `bench_type` STRING COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `data_channel_count` STRING COMMENT '',
+    `duration_hours` DECIMAL(18,2) COMMENT '',
+    `end_timestamp` TIMESTAMP COMMENT '',
+    `measured_output_unit` STRING COMMENT '',
+    `measured_output_value` DECIMAL(18,2) COMMENT '',
+    `raw_data_path` STRING COMMENT '',
+    `run_number` STRING COMMENT '',
+    `run_status` STRING COMMENT '',
+    `start_timestamp` TIMESTAMP COMMENT '',
+    `test_profile` STRING COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
     CONSTRAINT pk_test_bench_run PRIMARY KEY(`test_bench_run_id`)
-) COMMENT 'Engineering R&D product: test bench run';
+) COMMENT 'Table capturing test bench run records within the engineering domain.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` (
-    `sensor_dataset_id` BIGINT COMMENT 'Primary key for sensor_dataset',
-    `vehicle_program_id` BIGINT COMMENT 'FK to vehicle program',
+    `sensor_dataset_id` BIGINT COMMENT '',
+    `engineering_adas_feature_id` BIGINT COMMENT '',
+    `employee_id` BIGINT COMMENT '',
+    `prototype_build_id` BIGINT COMMENT '',
+    `vehicle_program_id` BIGINT COMMENT '',
+    `annotation_status` STRING COMMENT '',
+    `collection_date` DATE COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `data_size_gb` DECIMAL(18,2) COMMENT '',
+    `dataset_name` STRING COMMENT '',
+    `recording_duration_seconds` DECIMAL(18,2) COMMENT '',
+    `sample_rate_hz` DECIMAL(18,2) COMMENT '',
+    `sensor_modality` STRING COMMENT '',
+    `sensor_type` STRING COMMENT '',
+    `storage_location` STRING COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
+    `weather_condition` STRING COMMENT '',
     CONSTRAINT pk_sensor_dataset PRIMARY KEY(`sensor_dataset_id`)
-) COMMENT 'Engineering R&D product: sensor dataset';
+) COMMENT 'Data product representing sensor dataset within the engineering domain.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` (
-    `driving_scenario_library_id` BIGINT COMMENT 'Primary key for driving_scenario_library',
-    `vehicle_program_id` BIGINT COMMENT 'FK to vehicle program',
+    `driving_scenario_library_id` BIGINT COMMENT '',
+    `engineering_adas_feature_id` BIGINT COMMENT '',
+    `employee_id` BIGINT COMMENT '',
+    `sensor_dataset_id` BIGINT COMMENT '',
+    `vehicle_program_id` BIGINT COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `criticality_level` STRING COMMENT '',
+    `library_version` STRING COMMENT '',
+    `odd_description` STRING COMMENT '',
+    `scenario_category` STRING COMMENT '',
+    `scenario_code` STRING COMMENT '',
+    `scenario_count` STRING COMMENT '',
+    `scenario_format` STRING COMMENT '',
+    `scenario_name` STRING COMMENT '',
+    `scenario_source` STRING COMMENT '',
+    `storage_location` STRING COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
     CONSTRAINT pk_driving_scenario_library PRIMARY KEY(`driving_scenario_library_id`)
-) COMMENT 'Engineering R&D product: driving scenario library';
+) COMMENT 'Records for driving scenario library in the engineering domain.';
 
 CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` (
-    `requirements_traceability_id` BIGINT COMMENT 'Primary key for requirements_traceability',
-    `vehicle_program_id` BIGINT COMMENT 'FK to vehicle program',
+    `requirements_traceability_id` BIGINT COMMENT '',
+    `change_id` BIGINT COMMENT '',
+    `design_specification_id` BIGINT COMMENT '',
+    `employee_id` BIGINT COMMENT '',
+    `part_master_id` BIGINT COMMENT '',
+    `upstream_requirement_requirements_traceability_id` BIGINT COMMENT '',
+    `vehicle_program_id` BIGINT COMMENT '',
+    `validation_test_id` BIGINT COMMENT '',
+    `baseline_version` STRING COMMENT '',
+    `coverage_status` STRING COMMENT '',
+    `created_timestamp` TIMESTAMP COMMENT '',
+    `downstream_artifact_reference` STRING COMMENT '',
+    `requirement_external_code` STRING COMMENT '',
+    `requirement_text` STRING COMMENT '',
+    `requirement_type` STRING COMMENT '',
+    `source_tool` STRING COMMENT '',
+    `trace_status` STRING COMMENT '',
+    `updated_timestamp` TIMESTAMP COMMENT '',
+    `verification_method` STRING COMMENT '',
     CONSTRAINT pk_requirements_traceability PRIMARY KEY(`requirements_traceability_id`)
-) COMMENT 'Engineering R&D product: requirements traceability';
-
-CREATE OR REPLACE TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` (
-    `packaging_specification_id` BIGINT COMMENT 'Primary key',
-    `created_timestamp` TIMESTAMP COMMENT 'Record creation timestamp',
-    `packaging_specification_status` STRING COMMENT 'Current status',
-    CONSTRAINT pk_packaging_specification PRIMARY KEY(`packaging_specification_id`)
-) COMMENT 'Engineering product: packaging specification';
+) COMMENT 'Data product capturing requirements traceability records within the engineering domain.';
 
 -- ========= FOREIGN KEYS =========
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ADD CONSTRAINT `fk_engineering_bom_change_id` FOREIGN KEY (`change_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`change`(`change_id`);
@@ -1128,7 +1290,9 @@ ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ADD CONSTRAINT `
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ADD CONSTRAINT `fk_engineering_cae_simulation_cae_part_part_master_id` FOREIGN KEY (`cae_part_part_master_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`part_master`(`part_master_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ADD CONSTRAINT `fk_engineering_prototype_build_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ADD CONSTRAINT `fk_engineering_validation_test_part_master_id` FOREIGN KEY (`part_master_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`part_master`(`part_master_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ADD CONSTRAINT `fk_engineering_validation_test_requirements_traceability_id` FOREIGN KEY (`requirements_traceability_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`requirements_traceability`(`requirements_traceability_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ADD CONSTRAINT `fk_engineering_validation_test_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ADD CONSTRAINT `fk_engineering_validation_test_engineering_test_result_id` FOREIGN KEY (`engineering_test_result_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`engineering_test_result`(`engineering_test_result_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` ADD CONSTRAINT `fk_engineering_engineering_test_result_validation_test_id` FOREIGN KEY (`validation_test_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`validation_test`(`validation_test_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ADD CONSTRAINT `fk_engineering_digital_twin_part_master_id` FOREIGN KEY (`part_master_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`part_master`(`part_master_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ADD CONSTRAINT `fk_engineering_digital_twin_prototype_build_id` FOREIGN KEY (`prototype_build_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`prototype_build`(`prototype_build_id`);
@@ -1157,6 +1321,7 @@ ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ADD CONSTRAINT `fk_
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ADD CONSTRAINT `fk_engineering_ota_release_target_ecu_ecu_specification_id` FOREIGN KEY (`target_ecu_ecu_specification_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`ecu_specification`(`ecu_specification_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ADD CONSTRAINT `fk_engineering_ota_release_validation_test_id` FOREIGN KEY (`validation_test_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`validation_test`(`validation_test_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ADD CONSTRAINT `fk_engineering_ota_release_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ADD CONSTRAINT `fk_engineering_engineering_document_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` ADD CONSTRAINT `fk_engineering_engineering_adas_feature_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ADD CONSTRAINT `fk_engineering_cost_target_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ADD CONSTRAINT `fk_engineering_engineering_bom_component_part_master_id` FOREIGN KEY (`part_master_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`part_master`(`part_master_id`);
@@ -1164,1322 +1329,1365 @@ ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ADD CONST
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ADD CONSTRAINT `fk_engineering_engineering_team_parent_engineering_team_id` FOREIGN KEY (`parent_engineering_team_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`engineering_team`(`engineering_team_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ADD CONSTRAINT `fk_engineering_engineering_team_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ADD CONSTRAINT `fk_engineering_material_parent_material_id` FOREIGN KEY (`parent_material_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`material`(`material_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ADD CONSTRAINT `fk_engineering_packaging_specification_part_master_id` FOREIGN KEY (`part_master_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`part_master`(`part_master_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ADD CONSTRAINT `fk_engineering_engineering_project_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` ADD CONSTRAINT `fk_engineering_cfd_simulation_result_cae_simulation_id` FOREIGN KEY (`cae_simulation_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`cae_simulation`(`cae_simulation_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` ADD CONSTRAINT `fk_engineering_cfd_simulation_result_part_master_id` FOREIGN KEY (`part_master_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`part_master`(`part_master_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` ADD CONSTRAINT `fk_engineering_cfd_simulation_result_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` ADD CONSTRAINT `fk_engineering_fea_simulation_result_cae_simulation_id` FOREIGN KEY (`cae_simulation_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`cae_simulation`(`cae_simulation_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` ADD CONSTRAINT `fk_engineering_fea_simulation_result_part_master_id` FOREIGN KEY (`part_master_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`part_master`(`part_master_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` ADD CONSTRAINT `fk_engineering_fea_simulation_result_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` ADD CONSTRAINT `fk_engineering_nvh_test_result_part_master_id` FOREIGN KEY (`part_master_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`part_master`(`part_master_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` ADD CONSTRAINT `fk_engineering_nvh_test_result_validation_test_id` FOREIGN KEY (`validation_test_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`validation_test`(`validation_test_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` ADD CONSTRAINT `fk_engineering_nvh_test_result_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`test_bench_run` ADD CONSTRAINT `fk_engineering_test_bench_run_part_master_id` FOREIGN KEY (`part_master_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`part_master`(`part_master_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`test_bench_run` ADD CONSTRAINT `fk_engineering_test_bench_run_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` ADD CONSTRAINT `fk_engineering_sensor_dataset_engineering_adas_feature_id` FOREIGN KEY (`engineering_adas_feature_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`engineering_adas_feature`(`engineering_adas_feature_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` ADD CONSTRAINT `fk_engineering_sensor_dataset_prototype_build_id` FOREIGN KEY (`prototype_build_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`prototype_build`(`prototype_build_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` ADD CONSTRAINT `fk_engineering_sensor_dataset_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` ADD CONSTRAINT `fk_engineering_driving_scenario_library_engineering_adas_feature_id` FOREIGN KEY (`engineering_adas_feature_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`engineering_adas_feature`(`engineering_adas_feature_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` ADD CONSTRAINT `fk_engineering_driving_scenario_library_sensor_dataset_id` FOREIGN KEY (`sensor_dataset_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`sensor_dataset`(`sensor_dataset_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` ADD CONSTRAINT `fk_engineering_driving_scenario_library_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` ADD CONSTRAINT `fk_engineering_requirements_traceability_change_id` FOREIGN KEY (`change_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`change`(`change_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` ADD CONSTRAINT `fk_engineering_requirements_traceability_design_specification_id` FOREIGN KEY (`design_specification_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`design_specification`(`design_specification_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` ADD CONSTRAINT `fk_engineering_requirements_traceability_part_master_id` FOREIGN KEY (`part_master_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`part_master`(`part_master_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` ADD CONSTRAINT `fk_engineering_requirements_traceability_upstream_requirement_requirements_traceability_id` FOREIGN KEY (`upstream_requirement_requirements_traceability_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`requirements_traceability`(`requirements_traceability_id`);
 ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` ADD CONSTRAINT `fk_engineering_requirements_traceability_vehicle_program_id` FOREIGN KEY (`vehicle_program_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`vehicle_program`(`vehicle_program_id`);
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` ADD CONSTRAINT `fk_engineering_requirements_traceability_validation_test_id` FOREIGN KEY (`validation_test_id`) REFERENCES `vibe_automotive_v1`.`engineering`.`validation_test`(`validation_test_id`);
 
 -- ========= TAGS =========
-ALTER SCHEMA `vibe_automotive_v1`.`engineering` SET TAGS ('dbx_pii_division' = 'operations');
-ALTER SCHEMA `vibe_automotive_v1`.`engineering` SET TAGS ('dbx_pii_domain' = 'engineering');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` SET TAGS ('dbx_pii_subdomain' = 'program_management');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Program Manager Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `aftersales_nameplate_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Nameplate Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Profit Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `bom_version` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Version');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `budget_allocation` SET TAGS ('dbx_pii_business_glossary_term' = 'Program Budget Allocation');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `budget_allocation` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `cad_release_version` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Release Version');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `cae_release_version` SET TAGS ('dbx_pii_business_glossary_term' = 'CAE Release Version');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Program Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `digital_twin_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Twin Enabled Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `drivetrain` SET TAGS ('dbx_pii_business_glossary_term' = 'Drivetrain Configuration');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `drivetrain` SET TAGS ('dbx_pii_value_regex' = 'FWD|RWD|AWD|4WD');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `emission_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Emission Standard');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `emission_standard` SET TAGS ('dbx_pii_value_regex' = 'EPA|Euro6|Euro5|CARB|UN/ECE');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End of Production Target Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `engineering_change_order_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change Order Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `launch_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Program Launch Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `model_year_end` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year End');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `model_year_start` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year Start');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Program Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `ota_update_capability` SET TAGS ('dbx_pii_business_glossary_term' = 'OTA Update Capability Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `platform_architecture` SET TAGS ('dbx_pii_business_glossary_term' = 'Platform Architecture');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|EV|HEV|PHEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_pii_value_regex' = 'pending|approved|rejected|under_review');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `segment` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Segment');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `segment` SET TAGS ('dbx_pii_value_regex' = 'sedan|suv|truck|crossover|van|coupe');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production Target Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_status` SET TAGS ('dbx_pii_value_regex' = 'concept|development|validation|launch|completed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_cost_per_vehicle` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Cost Per Vehicle');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_cost_per_vehicle` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_emissions_g_per_km` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Emissions (g/km)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_fuel_efficiency_mpg` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Fuel Efficiency (MPG)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_market` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Market Region');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_production_volume` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Production Volume');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_range_km` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Electric Range (km)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Vehicle Weight (kg)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_type` SET TAGS ('dbx_pii_value_regex' = 'nameplate|platform|concept');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_class` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Class');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering BOM ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `change_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change Order ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_engineering_change_order_change_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change Order ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sku Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `change_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Reason');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering BOM Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Standard');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_value_regex' = 'ISO26262|IATF16949|SAEJ3061');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_description` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `is_locked` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Locked');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Lifecycle Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|pending|retired');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering BOM Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `owner_department` SET TAGS ('dbx_pii_business_glossary_term' = 'Owner Department');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `plant_location` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Location');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `program_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `release_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `release_status` SET TAGS ('dbx_pii_value_regex' = 'draft|released|archived|obsolete');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `revision_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Revision Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `total_parts_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Parts Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `total_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Quantity');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_type` SET TAGS ('dbx_pii_business_glossary_term' = 'BOM Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_type` SET TAGS ('dbx_pii_value_regex' = 'eBOM|mBOM|sBOM');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `vehicle_variant` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Variant Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` ALTER COLUMN `engineering_bom_line_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Primary Key for engineering_bom_line');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` ALTER COLUMN `bom_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Bom Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Parent Assembly Part Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Master Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Owning Engineer ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Owning Engineer ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `regulatory_requirement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Requirement Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `supply_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supply Supplier Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `cad_model_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Model Reference');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `cost_usd` SET TAGS ('dbx_pii_business_glossary_term' = 'Standard Cost (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `cost_usd` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `criticality` SET TAGS ('dbx_pii_business_glossary_term' = 'Criticality Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `criticality` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `drawing_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Drawing Number (DRW)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `effective_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `eol_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'End‑of‑Life Reason');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `height_mm` SET TAGS ('dbx_pii_business_glossary_term' = 'Height (mm)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `inspection_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Inspection Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `inspection_status` SET TAGS ('dbx_pii_value_regex' = 'passed|failed|rework|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `is_active` SET TAGS ('dbx_pii_business_glossary_term' = 'Active Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `last_inspection_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Inspection Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time (Days)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `length_mm` SET TAGS ('dbx_pii_business_glossary_term' = 'Length (mm)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Lifecycle Status (LCS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_value_regex' = 'in_work|released|obsoleted|pending_release|discontinued');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `material` SET TAGS ('dbx_pii_business_glossary_term' = 'Material (MAT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `obsolescence_notice` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolescence Notice Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_classification` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Classification');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_classification` SET TAGS ('dbx_pii_value_regex' = 'mechanical|electrical|hydraulic|software|electronic|structural');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_family` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Family');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Number (PN)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Type (PT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_type` SET TAGS ('dbx_pii_value_regex' = 'raw|processed|assembly|subassembly|component');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `quality_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Quality Rating');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `quality_rating` SET TAGS ('dbx_pii_value_regex' = 'A|B|C|D|E|F');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `reach_compliance` SET TAGS ('dbx_pii_business_glossary_term' = 'REACH Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `revision_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Revision Level (REV)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `rohs_compliance` SET TAGS ('dbx_pii_business_glossary_term' = 'RoHS Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `supplier_part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Supplier Part Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `volume_cm3` SET TAGS ('dbx_pii_business_glossary_term' = 'Volume (cm³)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight (kg)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `width_mm` SET TAGS ('dbx_pii_business_glossary_term' = 'Width (mm)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `design_specification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Specification Identifier (DSID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Author Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `regulatory_requirement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Requirement Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Date (Approval Date)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Status (Approval Status)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_value_regex' = 'approved|rejected|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `approver` SET TAGS ('dbx_pii_business_glossary_term' = 'Approver Name (Approver)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `author` SET TAGS ('dbx_pii_business_glossary_term' = 'Author Name (Author)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `change_order_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Order Date (CO Date)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `change_order_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Order Number (CO Number)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Status (Compliance)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_value_regex' = 'compliant|non_compliant|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `component_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Component Name (Component)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `confidentiality_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Confidentiality Level (Conf Level)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `confidentiality_level` SET TAGS ('dbx_pii_value_regex' = 'internal|confidential|restricted');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `cost_estimate_usd` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Estimate (USD) (Cost Est)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `design_specification_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification Description (Description)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `design_phase` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Phase (Phase)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `design_phase` SET TAGS ('dbx_pii_value_regex' = 'concept|development|validation|production');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `dimensions_mm` SET TAGS ('dbx_pii_business_glossary_term' = 'Dimensions (mm) (Dimensions)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `document_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Document Lifecycle Status (Doc Status)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `document_status` SET TAGS ('dbx_pii_value_regex' = 'draft|in_review|approved|released|archived');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `effective_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Date (Effective Date)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `engineering_department` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Department (Dept)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Date (Expiration Date)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `interface_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Interface Name (Interface)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `is_active` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Active Flag (Active)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `lifecycle_stage` SET TAGS ('dbx_pii_business_glossary_term' = 'Lifecycle Stage (Lifecycle)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `lifecycle_stage` SET TAGS ('dbx_pii_value_regex' = 'prototype|pre_production|production|post_production');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `linked_requirements` SET TAGS ('dbx_pii_business_glossary_term' = 'Linked Requirement Identifiers (Req IDs)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `material_specification` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Specification Details (Material Spec)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `obsolescence_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Obsolescence Date (Obsolescence Date)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `program` SET TAGS ('dbx_pii_business_glossary_term' = 'Program Name (Program)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp (Created At)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp (Updated At)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `regulatory_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Reference Codes (Reg Ref)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `related_documents` SET TAGS ('dbx_pii_business_glossary_term' = 'Related Document Identifiers (Related Docs)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `release_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Date (Release Date)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `revision_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Revision Date (Rev Date)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `revision_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Revision Number (Rev No.)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `spec_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Specification Number (DSN)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `spec_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification Type (Spec Type)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `spec_type` SET TAGS ('dbx_pii_value_regex' = 'system|subsystem|component|interface');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `subsystem_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Subsystem Name (Subsystem)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `system_name` SET TAGS ('dbx_pii_business_glossary_term' = 'System Name (System)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `target_performance_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Performance Units (Units)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `target_performance_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Performance Value (Target Perf)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `test_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Method (Test Method)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `test_method` SET TAGS ('dbx_pii_value_regex' = 'CFD|FEA|NVH|Simulation|Physical_Test');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `test_result_summary` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Result Summary (Test Summary)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `title` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification Title (Title)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated By (Updated By)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number (Version)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight (kg) (Weight)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created By (Created By)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `cad_model_id` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Model Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Owning Designer Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Owning Designer Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `assembly_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Assembly Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `compliance_iso26262_level` SET TAGS ('dbx_pii_business_glossary_term' = 'ISO 26262 Safety Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `compliance_iso26262_level` SET TAGS ('dbx_pii_value_regex' = 'ASIL_A|ASIL_B|ASIL_C|ASIL_D|none');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `configuration_context` SET TAGS ('dbx_pii_business_glossary_term' = 'Configuration Context');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `coordinate_system` SET TAGS ('dbx_pii_business_glossary_term' = 'Coordinate System');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `design_approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `design_approval_status` SET TAGS ('dbx_pii_value_regex' = 'pending|approved|rejected');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `design_change_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Change Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `design_change_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Change Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `design_release_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Release Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `digital_twin_ready` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Twin Ready Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `file_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Model File Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `file_path` SET TAGS ('dbx_pii_business_glossary_term' = 'Model File Path');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `file_size_bytes` SET TAGS ('dbx_pii_business_glossary_term' = 'Model File Size (Bytes)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `geometry_units` SET TAGS ('dbx_pii_business_glossary_term' = 'Geometry Units');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `geometry_units` SET TAGS ('dbx_pii_value_regex' = 'mm|cm|m|in|ft');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `is_digital_mockup_included` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Mock‑Up Inclusion Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `last_published_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Published Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Model Lifecycle Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_value_regex' = 'in_design|in_review|approved|released|retired');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `maturity_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Maturity Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `maturity_level` SET TAGS ('dbx_pii_value_regex' = 'concept|detailed_design|validation|production');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `cad_model_name` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Model Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `number` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Model Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_pii_value_regex' = 'pending|approved|rejected');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `related_vehicle_variant` SET TAGS ('dbx_pii_business_glossary_term' = 'Related Vehicle Variant');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `revision` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Model Revision');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `simulation_ready` SET TAGS ('dbx_pii_business_glossary_term' = 'Simulation Ready Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `cad_model_status` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Model Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `cad_model_status` SET TAGS ('dbx_pii_value_regex' = 'draft|released|archived|obsolete');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `tool_version` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Tool Version');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `cad_model_type` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Model Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `cad_model_type` SET TAGS ('dbx_pii_value_regex' = 'part|assembly|surface|solid|wireframe');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By (Designer)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_pii_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `vehicle_model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Year');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `vehicle_platform` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Platform');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `version` SET TAGS ('dbx_pii_business_glossary_term' = 'CAD Model Version');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By (Designer)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_pii_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` SET TAGS ('dbx_pii_subdomain' = 'change_control');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Approver ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `approver_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Approver ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Initiator ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `tooling_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Tooling Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `affected_parts` SET TAGS ('dbx_pii_business_glossary_term' = 'Affected Parts');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `affected_programs` SET TAGS ('dbx_pii_business_glossary_term' = 'Affected Programs');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `closure_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Closure Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `compliance_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_adjustments` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Adjustments');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_adjustments` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_adjustments` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_estimate_gross` SET TAGS ('dbx_pii_business_glossary_term' = 'Gross Cost Estimate');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_estimate_gross` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_estimate_gross` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_net` SET TAGS ('dbx_pii_business_glossary_term' = 'Net Cost Estimate');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_net` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_net` SET TAGS ('dbx_pii_pii_financial' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = 'USD|EUR|JPY|GBP|CAD|AUD');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `effective_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `impact_analysis` SET TAGS ('dbx_pii_business_glossary_term' = 'Impact Analysis');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `implementation_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Implementation Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `number` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `origin` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Origin');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `origin` SET TAGS ('dbx_pii_value_regex' = 'internal|supplier|customer');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `priority` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Priority');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `priority` SET TAGS ('dbx_pii_value_regex' = 'high|medium|low');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `reason_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Reason Category');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `reason_category` SET TAGS ('dbx_pii_value_regex' = 'cost_reduction|quality|regulatory|customer_request|other');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `reason_detail` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Reason Detail');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `request_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Request Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `revision_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Revision Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `risk_assessment` SET TAGS ('dbx_pii_business_glossary_term' = 'Risk Assessment');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Risk Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `scope` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Scope');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `scope` SET TAGS ('dbx_pii_value_regex' = 'part|assembly|specification|process');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_status` SET TAGS ('dbx_pii_value_regex' = 'draft|under_review|approved|implemented|rejected');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `title` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Title');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_type` SET TAGS ('dbx_pii_value_regex' = 'ECR|ECO|ECN');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `version` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Version');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_simulation_id` SET TAGS ('dbx_pii_business_glossary_term' = 'CAE Simulation ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Analyst ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_part_part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Analyst ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `analyst_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Analyst Name (ANALYST_NAME)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `boundary_conditions` SET TAGS ('dbx_pii_business_glossary_term' = 'Boundary Conditions (BC)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `convergence_criteria` SET TAGS ('dbx_pii_business_glossary_term' = 'Convergence Criteria (CONV_CRIT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cpu_time_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'CPU Time (CPU_TIME_S)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp (CREATED_TS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `load_case` SET TAGS ('dbx_pii_business_glossary_term' = 'Load Case Description (LOAD_CASE)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `memory_usage_mb` SET TAGS ('dbx_pii_business_glossary_term' = 'Memory Usage (MEMORY_MB)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `mesh_element_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Mesh Element Count (MESH_ELEM_COUNT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `mesh_quality_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Mesh Quality Score (MESH_QUALITY)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Simulation Notes (NOTES)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `number` SET TAGS ('dbx_pii_business_glossary_term' = 'Simulation Number (SIM_NO)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `part_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Name (PART_NAME)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Number (PART_NO)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_metric_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Result Metric Name (RESULT_METRIC)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_metric_unit` SET TAGS ('dbx_pii_business_glossary_term' = 'Result Metric Unit (RESULT_UNIT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_metric_unit` SET TAGS ('dbx_pii_value_regex' = 'MPa|Pa|N|kg|m/s^2|Hz');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_metric_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Result Metric Value (RESULT_VALUE)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_outcome` SET TAGS ('dbx_pii_business_glossary_term' = 'Result Outcome (OUTCOME)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_outcome` SET TAGS ('dbx_pii_value_regex' = 'pass|fail');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `run_duration_seconds` SET TAGS ('dbx_pii_business_glossary_term' = 'Run Duration (RUN_DURATION_S)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `run_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Run Timestamp (RUN_TS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `solver_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Solver Name (SOLVER)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_simulation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Simulation Status (SIM_STATUS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_simulation_status` SET TAGS ('dbx_pii_value_regex' = 'draft|queued|running|completed|failed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `target_metric_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Metric Name (TARGET_METRIC)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `target_metric_unit` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Metric Unit (TARGET_UNIT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `target_metric_unit` SET TAGS ('dbx_pii_value_regex' = 'MPa|Pa|N|kg|m/s^2|Hz');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `target_metric_value` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Metric Value (TARGET_VALUE)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_simulation_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Simulation Type (SIM_TYPE)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_simulation_type` SET TAGS ('dbx_pii_value_regex' = 'FEA|CFD|NVH|Crash|Thermal|Fatigue');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp (UPDATED_TS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `version` SET TAGS ('dbx_pii_business_glossary_term' = 'Simulation Version (VERSION)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_build_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Prototype Build ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Functional Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Engineer ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_responsible_engineer_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Engineer ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_responsible_engineer_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_responsible_engineer_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_value_regex' = 'compliant|non_compliant|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `configuration_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Configuration Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `cost` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Cost');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `cost` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code (ISO 4217)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = 'USD|EUR|JPY|CAD|GBP|CNY');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `data_source_system` SET TAGS ('dbx_pii_business_glossary_term' = 'Source System of Record');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `data_source_system` SET TAGS ('dbx_pii_value_regex' = 'Teamcenter|CATIA|ENOVIA|SAP|MES');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_build_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `duration_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Duration Hours');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `emission_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Emission Rating');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `emission_rating` SET TAGS ('dbx_pii_value_regex' = 'tier1|tier2|tier3|tier4');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `location` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Location');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Additional Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `number` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `phase` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Phase');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `phase` SET TAGS ('dbx_pii_value_regex' = 'mule|alpha|beta|pre_production|production');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `program_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Program Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Prototype Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `purpose` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Purpose');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `purpose` SET TAGS ('dbx_pii_value_regex' = 'durability|crash|nvh|emissions|homologation|validation');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `safety_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Rating');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `safety_rating` SET TAGS ('dbx_pii_value_regex' = 'ncap|euro_ncap|none');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_build_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Build Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_build_status` SET TAGS ('dbx_pii_value_regex' = 'planned|in_progress|completed|failed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `test_results_summary` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Results Summary');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `vin` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `vin` SET TAGS ('dbx_pii_pii_identifier' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `validation_test_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Validation Test ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Engineer Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Date (AD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Approval Status (TAS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_value_regex' = 'approved|rejected|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By (AB)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_pii_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `batch_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Batch Number (TBN)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `validation_test_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Category (TCAT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `validation_test_category` SET TAGS ('dbx_pii_value_regex' = 'structural|powertrain|electronics|software');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `comments` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Comments (TC)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Standard (CS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_value_regex' = 'FMVSS|EPA|NCAP|WLTP');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp (RCT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `data_source_system` SET TAGS ('dbx_pii_business_glossary_term' = 'Source System for Test Data (SS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `disposition` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Disposition (TD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `disposition` SET TAGS ('dbx_pii_value_regex' = 'accept|rework|reject');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `document_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Document Reference (TDR)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Duration (Minutes) (TDUR)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `emission_co2_g_per_km` SET TAGS ('dbx_pii_business_glossary_term' = 'Measured CO2 Emission (g/km) (MCO2)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `engineer` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Engineer (TE)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `engineer` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `engineer` SET TAGS ('dbx_pii_pii_name' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `engineering_test_result_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Report Identifier (TRID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `equipment_used` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment Used (EU)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `facility` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Facility (TF)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `is_critical` SET TAGS ('dbx_pii_business_glossary_term' = 'Critical Test Flag (CTF)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `location` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Location Code (TLC)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `validation_test_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Validation Test Name (VTN)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `noise_db` SET TAGS ('dbx_pii_business_glossary_term' = 'Measured Noise Level (dB) (MNL)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `phase` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Phase (TPH)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `phase` SET TAGS ('dbx_pii_value_regex' = 'prototype|pre_production|production');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `regulatory_compliance_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Compliance Flag (RCF)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `report_url` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Report URL (TRURL)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `result` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Result (TR)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `result` SET TAGS ('dbx_pii_value_regex' = 'pass|fail|conditional');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `result_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Result Recording Timestamp (RRT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `revision_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Revision Number (TRN)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `standard_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Standard Reference (TSR)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `validation_test_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Status (TS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `validation_test_status` SET TAGS ('dbx_pii_value_regex' = 'planned|in_progress|completed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `target_emission_co2` SET TAGS ('dbx_pii_business_glossary_term' = 'Target CO2 Emission (g/km) (TCO2)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `target_noise_db` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Noise Level (dB) (TNL)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `target_torque_nm` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Torque (Nm) (TTQ)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Execution Timestamp (TET)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `torque_nm` SET TAGS ('dbx_pii_business_glossary_term' = 'Measured Torque (Nm) (MTQ)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `validation_test_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Validation Test Type (VTT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `validation_test_type` SET TAGS ('dbx_pii_value_regex' = 'DVP|PVP|PPAP|Durability|Emissions|NCAP');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp (RUT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `variance_percent` SET TAGS ('dbx_pii_business_glossary_term' = 'Result Variance Percentage (RV%) (VVAR)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `version` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Version (TV)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` ALTER COLUMN `engineering_test_result_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Primary Key for engineering_test_result');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` ALTER COLUMN `validation_test_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Validation Test Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Twin Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Twin Identifier (DT_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Identifier (PART_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `prototype_build_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Prototype Identifier (PROTO_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_prototype_prototype_build_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Prototype Identifier (PROTO_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `engineering_team_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Team Identifier (ENG_TEAM_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Functional Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `primary_digital_part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Identifier (PART_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Program Identifier (ENG_PRG_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `asset_vin` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Identification Number (VIN)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Twin Code (DTC)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `data_quality_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Data Quality Score (DQ_SCORE)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `fidelity_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Fidelity Level (FID_LVL)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `fidelity_level` SET TAGS ('dbx_pii_value_regex' = 'high|medium|low');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `last_sync_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Synchronization Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `model_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Description (MODEL_DESC)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `model_file_path` SET TAGS ('dbx_pii_business_glossary_term' = 'Model File Path (MODEL_PATH)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `model_storage_location` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Storage Location (MODEL_LOC)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Twin Name (DTN)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `performance_metric` SET TAGS ('dbx_pii_business_glossary_term' = 'Performance Metric Score (PERF_METRIC)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `regulatory_compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Compliance Status (REG_COMP_STS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `regulatory_compliance_status` SET TAGS ('dbx_pii_value_regex' = 'compliant|non_compliant|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `simulation_model_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Simulation Model Version (SMV)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `simulation_tool` SET TAGS ('dbx_pii_business_glossary_term' = 'Simulation Tool (SIM_TOOL)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `simulation_tool` SET TAGS ('dbx_pii_value_regex' = 'ANSYS|Siemens|Altair|Dassault');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Twin Lifecycle Status (DTLS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|retired|archived');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `sync_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Synchronization Status (SYNC_STS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `sync_status` SET TAGS ('dbx_pii_value_regex' = 'in_sync|out_of_sync|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Twin Type (DTT)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_type` SET TAGS ('dbx_pii_value_regex' = 'vehicle|powertrain|chassis|body|component');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated By User (UPDATED_BY)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Last Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `validation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Validation Status (VAL_STS)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `validation_status` SET TAGS ('dbx_pii_value_regex' = 'validated|pending|rejected');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created By User (CREATED_BY)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` SET TAGS ('dbx_pii_subdomain' = 'program_management');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Milestone ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Functional Location Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Owner Employee Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_internal' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Milestone Owner ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `primary_milestone_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Milestone Owner ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `primary_milestone_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `primary_milestone_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `tertiary_milestone_sign_off_authority_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sign‑off Authority ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `tertiary_milestone_sign_off_authority_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `tertiary_milestone_sign_off_authority_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Program ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `actual_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `change_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Reason');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Milestone Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_code` SET TAGS ('dbx_pii_value_regex' = 'P0|P1|P2|P3|SOP');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Standard');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Milestone Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `gate_review_outcome` SET TAGS ('dbx_pii_business_glossary_term' = 'Gate Review Outcome');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `gate_review_outcome` SET TAGS ('dbx_pii_value_regex' = 'approved|conditional|deferred|rejected');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `is_critical` SET TAGS ('dbx_pii_business_glossary_term' = 'Critical Milestone Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Milestone Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `open_action_items_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Open Action Items Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `planned_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `plant_location` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Location');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Milestone Risk Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Milestone Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_status` SET TAGS ('dbx_pii_value_regex' = 'planned|in_progress|completed|closed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Milestone Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_type` SET TAGS ('dbx_pii_value_regex' = 'gate|review|release|prototype|pilot');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` SET TAGS ('dbx_pii_subdomain' = 'risk_analysis');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'FMEA Record Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Identifier (Part_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_part_part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Identifier (Part_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Action Owner Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `primary_fmea_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Action Owner Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `primary_fmea_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `primary_fmea_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `actual_completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `analysis_team` SET TAGS ('dbx_pii_business_glossary_term' = 'Analysis Team');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `current_controls` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Controls Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `detection_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Detection Rating (D)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `document_url` SET TAGS ('dbx_pii_business_glossary_term' = 'Document URL');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `failure_effect` SET TAGS ('dbx_pii_business_glossary_term' = 'Failure Effect Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `failure_mode` SET TAGS ('dbx_pii_business_glossary_term' = 'Failure Mode Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_number` SET TAGS ('dbx_pii_business_glossary_term' = 'FMEA Number (FMEA_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_type` SET TAGS ('dbx_pii_business_glossary_term' = 'FMEA Type (Design or Process)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_type` SET TAGS ('dbx_pii_value_regex' = 'DFMEA|PFMEA');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Additional Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `occurrence_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Occurrence Rating (O)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `process_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Process Identifier (Process_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `recommended_action` SET TAGS ('dbx_pii_business_glossary_term' = 'Recommended Action');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `revision_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Revision Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `risk_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Risk Category');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `risk_category` SET TAGS ('dbx_pii_value_regex' = 'high|medium|low');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `rpn` SET TAGS ('dbx_pii_business_glossary_term' = 'Risk Priority Number (RPN)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `severity_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Severity Rating (S)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_record_status` SET TAGS ('dbx_pii_business_glossary_term' = 'FMEA Record Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_record_status` SET TAGS ('dbx_pii_value_regex' = 'open|in_progress|closed|rejected');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `target_completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `version` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_plan_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Verification Plan ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `change_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Change Order ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By User ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_part_part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `design_specification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_related_specification_design_specification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_updated_by_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By User ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_updated_by_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_updated_by_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `primary_dvp_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Engineer ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `primary_dvp_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `primary_dvp_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Engineer ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `tertiary_dvp_updated_by_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By User ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `tertiary_dvp_updated_by_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `tertiary_dvp_updated_by_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `actual_completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_value_regex' = 'draft|pending|approved|rejected|withdrawn');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_plan_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Verification Plan Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `completed_test_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Completed Test Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `completion_percentage` SET TAGS ('dbx_pii_business_glossary_term' = 'Completion Percentage');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `cost_estimate_usd` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Estimate (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_plan_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Verification Plan Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `document_url` SET TAGS ('dbx_pii_business_glossary_term' = 'Document URL');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `is_automated` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Automated');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `is_locked` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Locked');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `last_status_change_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Status Change Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `planned_completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `priority` SET TAGS ('dbx_pii_business_glossary_term' = 'Plan Priority');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `priority` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `regulatory_approval_required` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Approval Required');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_pii_value_regex' = 'not_required|pending|approved|rejected');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Risk Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_plan_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Plan Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_plan_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|archived|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `system_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle System ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_environment` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Environment');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_environment` SET TAGS ('dbx_pii_value_regex' = 'lab|test_track|simulation|field');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_phase` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Phase');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_phase` SET TAGS ('dbx_pii_value_regex' = 'development|prototype|pre-production|production|post-production');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_type` SET TAGS ('dbx_pii_value_regex' = 'functional|performance|durability|safety|regulatory|environmental');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `title` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Verification Plan Title');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `total_test_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Test Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_plan_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Verification Plan Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_plan_type` SET TAGS ('dbx_pii_value_regex' = 'system|component|subsystem|vehicle|process');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `vehicle_variant` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Variant');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` SET TAGS ('dbx_pii_subdomain' = 'risk_analysis');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `homologation_requirement_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Requirement ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Associated Vehicle Program ID (Vehicle_Program_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `homologation_requirement_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Homologation Requirement Code (HRC)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `compliance_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Method (Method)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `compliance_method` SET TAGS ('dbx_pii_value_regex' = 'test|calculation|declaration');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Status (Status)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_value_regex' = 'pending|in_progress|compliant|non_compliant|exempt');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp (Created_Timestamp)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `homologation_requirement_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Requirement Description (Desc)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `effective_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Date (Effective_Date)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Date (Expiration_Date)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `is_mandatory` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Mandatory Flag (Mandatory_Flag)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date (Last_Review_Date)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `linked_validation_test_ids` SET TAGS ('dbx_pii_business_glossary_term' = 'Linked Validation Test IDs (Test_IDs)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `market_region` SET TAGS ('dbx_pii_business_glossary_term' = 'Market Region Code (Region)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Additional Notes (Notes)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Priority Level (Priority)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `priority_level` SET TAGS ('dbx_pii_value_regex' = 'high|medium|low');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `regulation_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulation Name (Regulation)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `regulation_name` SET TAGS ('dbx_pii_value_regex' = 'FMVSS|ECE_R|CARB|Euro_NCAP|WLTP|EPA');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `regulation_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulation Number (Regulation_ID)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `submission_deadline` SET TAGS ('dbx_pii_business_glossary_term' = 'Submission Deadline (Deadline)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp (Updated_Timestamp)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `vehicle_model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Model Year (MY)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `vehicle_variant` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Variant Identifier (Variant)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_specification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Ecu Specification Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `supply_supplier_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Supply Supplier Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `applicable_model_years` SET TAGS ('dbx_pii_business_glossary_term' = 'Applicable Model Years');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `applicable_vehicle_variants` SET TAGS ('dbx_pii_business_glossary_term' = 'Applicable Vehicle Variants');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `asw_release_date` SET TAGS ('dbx_pii_business_glossary_term' = 'ASW Release Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `asw_release_number` SET TAGS ('dbx_pii_business_glossary_term' = 'ASW Release Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `calibration_dataset_reference` SET TAGS ('dbx_pii_business_glossary_term' = 'Calibration Dataset Reference');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `communication_protocol` SET TAGS ('dbx_pii_business_glossary_term' = 'Communication Protocol');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `communication_protocol` SET TAGS ('dbx_pii_value_regex' = 'CAN|LIN|Ethernet|FlexRay|MOST|CANFD');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Standard');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_value_regex' = 'ISO_26262|IATF_16949|ISO_9001');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_specification_description` SET TAGS ('dbx_pii_business_glossary_term' = 'ECU Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `diagnostic_trouble_code_support` SET TAGS ('dbx_pii_business_glossary_term' = 'Diagnostic Trouble Code Support');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `dimensions_mm` SET TAGS ('dbx_pii_business_glossary_term' = 'ECU Dimensions (mm)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_family` SET TAGS ('dbx_pii_business_glossary_term' = 'ECU Family');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_type` SET TAGS ('dbx_pii_business_glossary_term' = 'ECU Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_type` SET TAGS ('dbx_pii_value_regex' = 'engine_control|transmission|adas|body_control|battery_management|infotainment');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `eol_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End‑of‑Life Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `functional_safety_asil` SET TAGS ('dbx_pii_business_glossary_term' = 'Functional Safety ASIL Rating');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `functional_safety_asil` SET TAGS ('dbx_pii_value_regex' = 'ASIL_A|ASIL_B|ASIL_C|ASIL_D');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `hardware_part_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Hardware Part Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `hardware_revision` SET TAGS ('dbx_pii_business_glossary_term' = 'Hardware Revision');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `hardware_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Hardware Version');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `is_critical` SET TAGS ('dbx_pii_business_glossary_term' = 'Critical ECU Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `max_operating_temperature_c` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Operating Temperature (°C)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `memory_size_mb` SET TAGS ('dbx_pii_business_glossary_term' = 'Memory Size (MB)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `min_operating_temperature_c` SET TAGS ('dbx_pii_business_glossary_term' = 'Minimum Operating Temperature (°C)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_specification_name` SET TAGS ('dbx_pii_business_glossary_term' = 'ECU Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `power_consumption_w` SET TAGS ('dbx_pii_business_glossary_term' = 'Power Consumption (W)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `processing_speed_mhz` SET TAGS ('dbx_pii_business_glossary_term' = 'Processing Speed (MHz)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_pii_value_regex' = 'approved|pending|rejected');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `release_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `release_status` SET TAGS ('dbx_pii_value_regex' = 'draft|released|archived|obsolete');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `software_release_notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Software Release Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `software_version` SET TAGS ('dbx_pii_business_glossary_term' = 'Software Version');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_specification_status` SET TAGS ('dbx_pii_business_glossary_term' = 'ECU Lifecycle Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_specification_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|deprecated|retired|development|released');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `supported_features` SET TAGS ('dbx_pii_business_glossary_term' = 'Supported Features');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `vehicle_platform` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Platform');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `voltage_range_v` SET TAGS ('dbx_pii_business_glossary_term' = 'Voltage Range (V)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'ECU Weight (kg)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_spec_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Specification ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `architecture_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Engine Architecture Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `aspiration_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Aspiration Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `aspiration_type` SET TAGS ('dbx_pii_value_regex' = 'naturally_aspirated|turbocharged|supercharged');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `battery_capacity_kwh` SET TAGS ('dbx_pii_business_glossary_term' = 'Battery Capacity (kWh)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_spec_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Specification Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_value_regex' = 'compliant|non_compliant|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `cost_currency` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Currency (ISO 4217)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `cost_estimate_usd` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Estimate (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `cylinder_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Cylinder Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `dimensions_mm` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Dimensions (mm)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `displacement_cc` SET TAGS ('dbx_pii_business_glossary_term' = 'Engine Displacement (cubic centimeters)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `emission_control_technology` SET TAGS ('dbx_pii_business_glossary_term' = 'Emission Control Technology');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `emissions_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Emissions Standard Compliance');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `emissions_standard` SET TAGS ('dbx_pii_value_regex' = 'Euro6|EPA_Tier3|CARB_LEVIII|WLTP');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `end_of_production_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End of Production Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `epa_range_miles` SET TAGS ('dbx_pii_business_glossary_term' = 'EPA Range (miles)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `fuel_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Fuel Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `fuel_type` SET TAGS ('dbx_pii_value_regex' = 'gasoline|diesel|electric|hydrogen|hybrid');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `is_locked` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification Lock Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_spec_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Specification Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `power_output_kw` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Power Output (kW)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Type (ICE|HEV|PHEV|BEV|FCEV)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_pii_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `start_of_production_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start of Production Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_spec_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Specification Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_spec_status` SET TAGS ('dbx_pii_value_regex' = 'draft|active|retired|obsolete');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `target_program_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Vehicle Program Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `thermal_management` SET TAGS ('dbx_pii_business_glossary_term' = 'Thermal Management Approach');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `thermal_management` SET TAGS ('dbx_pii_value_regex' = 'air|liquid|phase_change|heat_pump');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `torque_nm` SET TAGS ('dbx_pii_business_glossary_term' = 'Maximum Torque (Nm)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Transmission Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `transmission_type` SET TAGS ('dbx_pii_value_regex' = 'manual|automatic|dual_clutch|CVT|e-gear');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `vehicle_variant` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Variant');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Powertrain Weight (kg)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `wltp_range_km` SET TAGS ('dbx_pii_business_glossary_term' = 'WLTP Range (km)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` SET TAGS ('dbx_pii_subdomain' = 'program_management');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_report_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight Report ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Equipment Registry Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Engineer ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `primary_weight_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Engineer ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `primary_weight_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `primary_weight_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `actual_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Measured Weight (kg)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `comments` SET TAGS ('dbx_pii_business_glossary_term' = 'Comments');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `compliance_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `component_scope` SET TAGS ('dbx_pii_business_glossary_term' = 'Component Scope');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `estimated_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Estimated Weight (kg)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `is_locked` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Locked');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_report_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Report Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `number` SET TAGS ('dbx_pii_business_glossary_term' = 'Report Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `reduction_action` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight Reduction Action');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_pii_value_regex' = 'pending|approved|rejected|not_required');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `reporting_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Reporting Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_report_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Report Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_report_status` SET TAGS ('dbx_pii_value_regex' = 'draft|in_review|approved|rejected|archived');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `system_scope` SET TAGS ('dbx_pii_business_glossary_term' = 'System Scope');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `target_weight_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Weight (kg)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_delta_kg` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight Delta (kg)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_delta_percent` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight Delta Percentage');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_source` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight Source');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_target_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Weight Target Category');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` SET TAGS ('dbx_pii_subdomain' = 'change_control');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `design_review_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Review ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Chair Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `attendees_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Attendees Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `chair_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Chair Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `compliance_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `design_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Review Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `duration_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Duration (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `findings_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Findings Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `identifier` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Review Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `location` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Location');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `minutes_document_ref` SET TAGS ('dbx_pii_business_glossary_term' = 'Minutes Document Reference');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `open_actions_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Open Actions Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `outcome` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Outcome');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `outcome` SET TAGS ('dbx_pii_value_regex' = 'approved|conditional|rejected');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Risk Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `design_review_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `design_review_status` SET TAGS ('dbx_pii_value_regex' = 'scheduled|in_progress|completed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `system_or_component` SET TAGS ('dbx_pii_business_glossary_term' = 'Reviewed System or Component');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `total_action_items` SET TAGS ('dbx_pii_business_glossary_term' = 'Total Action Items');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `design_review_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Design Review Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `design_review_type` SET TAGS ('dbx_pii_value_regex' = 'PDR|CDR|System|Supplier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Specification ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Part Master Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `applicable_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Applicable Standard');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `application_restriction` SET TAGS ('dbx_pii_business_glossary_term' = 'Application Restriction');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `approved_supplier` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved Supplier(s)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `compliance_reach` SET TAGS ('dbx_pii_business_glossary_term' = 'REACH Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `compliance_reach` SET TAGS ('dbx_pii_value_regex' = 'compliant|non_compliant|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `compliance_rohs` SET TAGS ('dbx_pii_business_glossary_term' = 'RoHS Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `compliance_rohs` SET TAGS ('dbx_pii_value_regex' = 'compliant|non_compliant|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `cost_per_kg_usd` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost per Kilogram (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `density_kg_per_m3` SET TAGS ('dbx_pii_business_glossary_term' = 'Density (kg/m³)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `elongation_percent` SET TAGS ('dbx_pii_business_glossary_term' = 'Elongation Percentage');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `environmental_impact_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Environmental Impact Score');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `grade_or_alloy` SET TAGS ('dbx_pii_business_glossary_term' = 'Grade or Alloy Designation');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `is_critical` SET TAGS ('dbx_pii_business_glossary_term' = 'Critical Material Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Lead Time (Days)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Lifecycle Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_pii_value_regex' = 'in_design|approved|in_use|retired|archived');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_class` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Class');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_class` SET TAGS ('dbx_pii_value_regex' = 'steel|aluminum|polymer|composite|glass');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Specification Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `safety_rating` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Rating');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `safety_rating` SET TAGS ('dbx_pii_value_regex' = 'A|B|C|D|E');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `specific_heat_j_per_kgk` SET TAGS ('dbx_pii_business_glossary_term' = 'Specific Heat Capacity (J/kg·K)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|deprecated|pending');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `surface_treatment` SET TAGS ('dbx_pii_business_glossary_term' = 'Surface Treatment');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `surface_treatment` SET TAGS ('dbx_pii_value_regex' = 'none|coating|plating|anodizing|galvanizing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `tensile_strength_mpa` SET TAGS ('dbx_pii_business_glossary_term' = 'Tensile Strength (MPa)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `thermal_conductivity_w_per_mk` SET TAGS ('dbx_pii_business_glossary_term' = 'Thermal Conductivity (W/m·K)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_type` SET TAGS ('dbx_pii_value_regex' = 'structural|electrical|thermal|decorative');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `warranty_period_months` SET TAGS ('dbx_pii_business_glossary_term' = 'Warranty Period (Months)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `yield_strength_mpa` SET TAGS ('dbx_pii_business_glossary_term' = 'Yield Strength (MPa)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Configuration Rule Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_value_regex' = 'approved|pending|rejected');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `change_reason` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Reason');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Configuration Rule Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Standard');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Rule Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `effective_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `expiration_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiration Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `is_mandatory` SET TAGS ('dbx_pii_business_glossary_term' = 'Mandatory Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `market` SET TAGS ('dbx_pii_business_glossary_term' = 'Market Applicability');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `model_year` SET TAGS ('dbx_pii_business_glossary_term' = 'Model Year');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Configuration Rule Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Additional Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `option_category` SET TAGS ('dbx_pii_business_glossary_term' = 'Option Category');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `option_code_a` SET TAGS ('dbx_pii_business_glossary_term' = 'Option Code A');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `option_code_b` SET TAGS ('dbx_pii_business_glossary_term' = 'Option Code B');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `priority` SET TAGS ('dbx_pii_business_glossary_term' = 'Rule Priority');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `program_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `source` SET TAGS ('dbx_pii_business_glossary_term' = 'Rule Source');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `source` SET TAGS ('dbx_pii_value_regex' = 'commercial|engineering|regulatory');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Rule Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|retired|draft');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Configuration Rule Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_type` SET TAGS ('dbx_pii_value_regex' = 'include|exclude|requires|incompatible');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `vehicle_platform` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Platform');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` SET TAGS ('dbx_pii_subdomain' = 'change_control');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` SET TAGS ('dbx_pii_coverage_preserved' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` SET TAGS ('dbx_pii_domain_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ota_release_id` SET TAGS ('dbx_pii_business_glossary_term' = 'OTA Release Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By Employee Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `engineering_team_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Team Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ota_compliance_approval_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Ota Compliance Approval Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ecu_specification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Target ECU Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_ecu_ecu_specification_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Target ECU Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `validation_test_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Validation Test Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Approval Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `build_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Build Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `compatible_vin_range` SET TAGS ('dbx_pii_business_glossary_term' = 'Compatible VIN Range');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Standard');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `cybersecurity_assessment_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Cybersecurity Assessment Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `cybersecurity_assessment_status` SET TAGS ('dbx_pii_value_regex' = 'passed|failed|not_tested');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `cybersecurity_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Cybersecurity Score');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `distribution_method` SET TAGS ('dbx_pii_business_glossary_term' = 'Distribution Method');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `distribution_method` SET TAGS ('dbx_pii_value_regex' = 'ota|dealer|service_center');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `effective_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `estimated_download_size_mb` SET TAGS ('dbx_pii_business_glossary_term' = 'Estimated Download Size (MB)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `estimated_install_time_minutes` SET TAGS ('dbx_pii_business_glossary_term' = 'Estimated Install Time (Minutes)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `expiry_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Expiry Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `hash` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Hash');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `is_critical` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Critical');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `is_mandatory` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Mandatory');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `regulatory_compliance_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Regulatory Compliance Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `rollback_supported` SET TAGS ('dbx_pii_business_glossary_term' = 'Rollback Supported');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `rollback_window_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Rollback Window (Days)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `rollout_strategy` SET TAGS ('dbx_pii_business_glossary_term' = 'Rollout Strategy');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `signature` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Signature');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `signature` SET TAGS ('dbx_pii_pii_person_data' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `software_delta_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Software Delta Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `source` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Source');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `source` SET TAGS ('dbx_pii_value_regex' = 'internal|supplier|partner');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ota_release_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ota_release_status` SET TAGS ('dbx_pii_value_regex' = 'draft|pending|approved|deployed|retracted');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_market` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Market');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_model_year_end` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Model Year End');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_model_year_start` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Model Year Start');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_region` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Region');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_vehicle_model` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Vehicle Model');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `test_result_summary` SET TAGS ('dbx_pii_business_glossary_term' = 'Test Result Summary');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ota_release_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ota_release_type` SET TAGS ('dbx_pii_value_regex' = 'feature|security|calibration|regulatory');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `validation_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Validation Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `validation_status` SET TAGS ('dbx_pii_value_regex' = 'passed|failed|not_tested');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `version` SET TAGS ('dbx_pii_business_glossary_term' = 'Release Version');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` SET TAGS ('dbx_pii_ssot_reference' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` ALTER COLUMN `engineering_adas_feature_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Primary Key for engineering_adas_feature');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` SET TAGS ('dbx_pii_subdomain' = 'program_management');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_target_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Target ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Engineer ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Responsible Engineer ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program ID');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `approval_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Approval Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `approval_status` SET TAGS ('dbx_pii_value_regex' = 'pending|approved|rejected|under_review');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_target_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Target Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `component_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Component Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_basis` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Basis');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_basis` SET TAGS ('dbx_pii_value_regex' = 'baseline|benchmark|historical|target');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_gap_percentage` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Gap Percentage');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_gap_total` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Gap Total (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_manufacturing` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Cost Manufacturing (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_material` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Cost Material (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_methodology` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Methodology');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_methodology` SET TAGS ('dbx_pii_value_regex' = 'DTC|Value Engineering|Target Costing|Other');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_reduction_ideas_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Reduction Ideas Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_total` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Cost Total (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `currency` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Currency');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `current_estimated_cost_manufacturing` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Estimated Cost Manufacturing (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `current_estimated_cost_material` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Estimated Cost Material (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `current_estimated_cost_total` SET TAGS ('dbx_pii_business_glossary_term' = 'Current Estimated Cost Total (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective End Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Start Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `freeze_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Freeze Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `is_locked` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Locked');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_target_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Target Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_target_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_target_status` SET TAGS ('dbx_pii_value_regex' = 'active|inactive|archived|draft');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `system_or_component` SET TAGS ('dbx_pii_business_glossary_term' = 'System or Component');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_target_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Target Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_target_type` SET TAGS ('dbx_pii_value_regex' = 'design|manufacturing|total|material|labor');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` SET TAGS ('dbx_pii_data_type' = 'association_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` SET TAGS ('dbx_pii_association_edges' = 'engineering.part_master,manufacturing.production_bom');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `engineering_bom_component_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Bom Component - Bom Component Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Bom Component - Part Master Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `production_bom_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Bom Component - Production Bom Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `installation_sequence` SET TAGS ('dbx_pii_business_glossary_term' = 'Installation Sequence');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `quantity_per_vehicle` SET TAGS ('dbx_pii_business_glossary_term' = 'Quantity per Vehicle');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `engineering_bom_component_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Component Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit of Measure');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` SET TAGS ('dbx_pii_data_type' = 'association_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` SET TAGS ('dbx_pii_association_edges' = 'engineering.part_master,dealer.dealership');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `dealer_part_inventory_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - Dealer Part Inventory Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `dealership_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - Dealership Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `part_master_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - Part Master Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `dealer_cost_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - Dealer Cost Price');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - Lead Time Days');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `list_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - List Price');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - Quantity On Hand');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `reorder_point` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - Reorder Point');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `reorder_quantity` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - Reorder Quantity');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `retail_price` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - Retail Price');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Dealer Part Inventory - Unit Of Measure');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` SET TAGS ('dbx_pii_subdomain' = 'program_management');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Team Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Manager Employee Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_internal' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `parent_engineering_team_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Parent Engineering Team Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `parent_engineering_team_id` SET TAGS ('dbx_pii_self_ref_fk' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Employee Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `budget_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Budget Amount');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `compliance_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_email` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Email');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_email` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_email` SET TAGS ('dbx_pii_pii_email' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_phone` SET TAGS ('dbx_pii_business_glossary_term' = 'Contact Phone');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_phone` SET TAGS ('dbx_pii_restricted' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_phone` SET TAGS ('dbx_pii_pii_phone' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Center Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `data_classification` SET TAGS ('dbx_pii_business_glossary_term' = 'Data Classification');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `digital_twin_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Twin Enabled');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `domain` SET TAGS ('dbx_pii_business_glossary_term' = 'Domain');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_toolset` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Toolset');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `is_virtual` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Virtual');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `last_reviewed_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Reviewed By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Team Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `location` SET TAGS ('dbx_pii_business_glossary_term' = 'Location');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `number_of_members` SET TAGS ('dbx_pii_business_glossary_term' = 'Number Of Members');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `primary_skill` SET TAGS ('dbx_pii_business_glossary_term' = 'Primary Skill');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `safety_certification_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Safety Certification Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Team Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `parent_material_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Parent Material Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `parent_material_id` SET TAGS ('dbx_pii_self_ref_fk' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `application` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Application');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `boiling_point_c` SET TAGS ('dbx_pii_business_glossary_term' = 'Boiling Point C');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `certification` SET TAGS ('dbx_pii_business_glossary_term' = 'Certification');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `color` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Color');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `corrosion_resistance` SET TAGS ('dbx_pii_business_glossary_term' = 'Corrosion Resistance');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `cost_per_kg_usd` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Per Kg Usd');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `customs_tariff_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Customs Tariff Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `density_kg_per_m3` SET TAGS ('dbx_pii_business_glossary_term' = 'Density Kg Per M3');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `effective_from` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective From');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `effective_until` SET TAGS ('dbx_pii_business_glossary_term' = 'Effective Until');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `electrical_resistivity_ohm_m` SET TAGS ('dbx_pii_business_glossary_term' = 'Electrical Resistivity Ohm M');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `elongation_percent` SET TAGS ('dbx_pii_business_glossary_term' = 'Elongation Percent');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `environmental_impact_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Environmental Impact Score');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `family` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Family');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `grade` SET TAGS ('dbx_pii_business_glossary_term' = 'Grade');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `group` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Group');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `hardness_hb` SET TAGS ('dbx_pii_business_glossary_term' = 'Hardness Hb');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `hazardous` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `hazardous_class` SET TAGS ('dbx_pii_business_glossary_term' = 'Hazardous Class');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `melting_point_c` SET TAGS ('dbx_pii_business_glossary_term' = 'Melting Point C');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `msds_url` SET TAGS ('dbx_pii_business_glossary_term' = 'Msds Url');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `origin_country` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Origin Country');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `reach_compliant` SET TAGS ('dbx_pii_business_glossary_term' = 'Reach Compliant');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `recyclable` SET TAGS ('dbx_pii_business_glossary_term' = 'Recyclable');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `recycle_rate_percent` SET TAGS ('dbx_pii_business_glossary_term' = 'Recycle Rate Percent');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `revision_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Revision Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `rohs_compliant` SET TAGS ('dbx_pii_business_glossary_term' = 'Rohs Compliant');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `source` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Source');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `specification` SET TAGS ('dbx_pii_business_glossary_term' = 'Specification');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `surface_finish` SET TAGS ('dbx_pii_business_glossary_term' = 'Surface Finish');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `tensile_strength_mpa` SET TAGS ('dbx_pii_business_glossary_term' = 'Tensile Strength Mpa');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `thermal_conductivity_w_per_mk` SET TAGS ('dbx_pii_business_glossary_term' = 'Thermal Conductivity W Per Mk');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Material Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_pii_business_glossary_term' = 'Unit Of Measure');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `yield_strength_mpa` SET TAGS ('dbx_pii_business_glossary_term' = 'Yield Strength Mpa');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` SET TAGS ('dbx_pii_subdomain' = 'change_control');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_change_action_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Action Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Assigned Engineer Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Assigned Engineer Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `actual_effort_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Effort (Hours)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `attachment_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Attachment Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `closure_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Closure Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_change_action_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Action Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `comments` SET TAGS ('dbx_pii_business_glossary_term' = 'Comments');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `completion_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Completion Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `compliance_flag` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Requirement Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `cost_estimate` SET TAGS ('dbx_pii_business_glossary_term' = 'Cost Estimate (USD)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Creation Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code (ISO 4217)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_value_regex' = '^[A-Z]{3}$');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_change_action_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Action Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `due_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Due Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `estimated_effort_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Estimated Effort (Hours)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `is_critical` SET TAGS ('dbx_pii_business_glossary_term' = 'Critical Flag');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `priority` SET TAGS ('dbx_pii_business_glossary_term' = 'Action Priority');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `priority` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `resolution_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Resolution Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Risk Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_value_regex' = 'low|medium|high|critical');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `source_event` SET TAGS ('dbx_pii_business_glossary_term' = 'Source Event');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `source_event` SET TAGS ('dbx_pii_value_regex' = 'test_failure|fmea_finding|gate_review|audit|customer_feedback|regulatory_issue');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_change_action_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Action Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_change_action_status` SET TAGS ('dbx_pii_value_regex' = 'open|in_progress|completed|closed|cancelled');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `target_milestone` SET TAGS ('dbx_pii_business_glossary_term' = 'Target Milestone');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Action Event Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `title` SET TAGS ('dbx_pii_business_glossary_term' = 'Action Title');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_change_action_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Action Type (Design Change, Test Rerun, etc.)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_change_action_type` SET TAGS ('dbx_pii_value_regex' = 'design_change|test_rerun|analysis|supplier_engagement|process_improvement|documentation_update');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Record Update Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Created By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` SET TAGS ('dbx_pii_subdomain' = 'program_management');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Project Identifier');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Sponsor Employee Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Employee Id');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_confidential' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `primary_employee_id` SET TAGS ('dbx_pii_pii' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `actual_cost` SET TAGS ('dbx_pii_business_glossary_term' = 'Actual Cost');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved By');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Approved Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `budget_amount` SET TAGS ('dbx_pii_business_glossary_term' = 'Budget Amount');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `change_order_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Change Order Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `compliance_regulation` SET TAGS ('dbx_pii_business_glossary_term' = 'Compliance Regulation');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Created Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `currency_code` SET TAGS ('dbx_pii_business_glossary_term' = 'Currency Code');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `data_classification` SET TAGS ('dbx_pii_business_glossary_term' = 'Data Classification');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `department` SET TAGS ('dbx_pii_business_glossary_term' = 'Department');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_description` SET TAGS ('dbx_pii_business_glossary_term' = 'Description');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `digital_twin_enabled` SET TAGS ('dbx_pii_business_glossary_term' = 'Digital Twin Enabled');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'End Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_phase` SET TAGS ('dbx_pii_business_glossary_term' = 'Engineering Phase');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `expected_mtbf_hours` SET TAGS ('dbx_pii_business_glossary_term' = 'Expected Mtbf Hours');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `external_partner` SET TAGS ('dbx_pii_business_glossary_term' = 'External Partner');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `is_archived` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Archived');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `is_global` SET TAGS ('dbx_pii_business_glossary_term' = 'Is Global');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `last_review_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Last Review Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `milestone_count` SET TAGS ('dbx_pii_business_glossary_term' = 'Milestone Count');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `milestone_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Milestone Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_name` SET TAGS ('dbx_pii_business_glossary_term' = 'Name');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `notes` SET TAGS ('dbx_pii_business_glossary_term' = 'Notes');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `planned_end_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned End Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `planned_start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Planned Start Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `plant_location` SET TAGS ('dbx_pii_business_glossary_term' = 'Plant Location');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `priority` SET TAGS ('dbx_pii_business_glossary_term' = 'Priority');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `review_outcome` SET TAGS ('dbx_pii_business_glossary_term' = 'Review Outcome');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `risk_level` SET TAGS ('dbx_pii_business_glossary_term' = 'Risk Level');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `start_date` SET TAGS ('dbx_pii_business_glossary_term' = 'Start Date');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_status` SET TAGS ('dbx_pii_business_glossary_term' = 'Status');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `sustainability_score` SET TAGS ('dbx_pii_business_glossary_term' = 'Sustainability Score');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_type` SET TAGS ('dbx_pii_business_glossary_term' = 'Type');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_pii_business_glossary_term' = 'Updated Timestamp');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `vehicle_platform` SET TAGS ('dbx_pii_business_glossary_term' = 'Vehicle Platform');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `version_number` SET TAGS ('dbx_pii_business_glossary_term' = 'Version Number');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`test_bench_run` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`test_bench_run` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`test_bench_run` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` SET TAGS ('dbx_pii_data_type' = 'transactional_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` SET TAGS ('dbx_pii_data_type' = 'reference_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` SET TAGS ('dbx_pii_subdomain' = 'validation_testing');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` SET TAGS ('dbx_pii_ecm_scope' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` SET TAGS ('dbx_pii_data_type' = 'association_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` SET TAGS ('dbx_pii_subdomain' = 'risk_analysis');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` SET TAGS ('dbx_pii_governance_verified' = 'true');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` SET TAGS ('dbx_pii_data_type' = 'master_data');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` SET TAGS ('dbx_pii_subdomain' = 'product_definition');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` SET TAGS ('dbx_pii_domain' = 'engineering');
-ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` SET TAGS ('dbx_pii_governance_verified' = 'true');
+ALTER SCHEMA `vibe_automotive_v1`.`engineering` SET TAGS ('dbx_division' = 'operations');
+ALTER SCHEMA `vibe_automotive_v1`.`engineering` SET TAGS ('dbx_domain' = 'engineering');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` SET TAGS ('dbx_subdomain' = 'program_management');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Program Manager Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `aftersales_nameplate_id` SET TAGS ('dbx_business_glossary_term' = 'Nameplate Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `ota_campaign_id` SET TAGS ('dbx_business_glossary_term' = 'Ota Campaign Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `profit_center_id` SET TAGS ('dbx_business_glossary_term' = 'Profit Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `bom_version` SET TAGS ('dbx_business_glossary_term' = 'BOM Version');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `budget_allocation` SET TAGS ('dbx_business_glossary_term' = 'Program Budget Allocation');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `budget_allocation` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `cad_release_version` SET TAGS ('dbx_business_glossary_term' = 'CAD Release Version');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `cae_release_version` SET TAGS ('dbx_business_glossary_term' = 'CAE Release Version');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_description` SET TAGS ('dbx_business_glossary_term' = 'Program Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `digital_twin_enabled` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Enabled Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `drivetrain` SET TAGS ('dbx_business_glossary_term' = 'Drivetrain Configuration');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `drivetrain` SET TAGS ('dbx_value_regex' = 'FWD|RWD|AWD|4WD');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `emission_standard` SET TAGS ('dbx_business_glossary_term' = 'Emission Standard');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `emission_standard` SET TAGS ('dbx_value_regex' = 'EPA|Euro6|Euro5|CARB|UN/ECE');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `end_date` SET TAGS ('dbx_business_glossary_term' = 'End of Production Target Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `engineering_change_order_count` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Order Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `launch_date` SET TAGS ('dbx_business_glossary_term' = 'Program Launch Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `model_year_end` SET TAGS ('dbx_business_glossary_term' = 'Model Year End');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `model_year_start` SET TAGS ('dbx_business_glossary_term' = 'Model Year Start');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Program Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `ota_update_capability` SET TAGS ('dbx_business_glossary_term' = 'OTA Update Capability Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `platform_architecture` SET TAGS ('dbx_business_glossary_term' = 'Platform Architecture');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|EV|HEV|PHEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `program_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `program_name` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `program_type` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `program_type` SET TAGS ('dbx_value_regex' = 'nameplate|platform|concept');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected|under_review');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `segment` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Segment');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `segment` SET TAGS ('dbx_value_regex' = 'sedan|suv|truck|crossover|van|coupe');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `start_date` SET TAGS ('dbx_business_glossary_term' = 'Start of Production Target Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_cost_per_vehicle` SET TAGS ('dbx_business_glossary_term' = 'Target Cost Per Vehicle');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_cost_per_vehicle` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_emissions_g_per_km` SET TAGS ('dbx_business_glossary_term' = 'Target Emissions (g/km)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_fuel_efficiency_mpg` SET TAGS ('dbx_business_glossary_term' = 'Target Fuel Efficiency (MPG)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_market` SET TAGS ('dbx_business_glossary_term' = 'Target Market Region');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_production_volume` SET TAGS ('dbx_business_glossary_term' = 'Target Production Volume');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_range_km` SET TAGS ('dbx_business_glossary_term' = 'Target Electric Range (km)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `target_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Target Vehicle Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_class` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Class');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_status` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`vehicle_program` ALTER COLUMN `vehicle_program_status` SET TAGS ('dbx_value_regex' = 'concept|development|validation|launch|completed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering BOM ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Approved By Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `change_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Order ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_engineering_change_order_change_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Order ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `sku_master_id` SET TAGS ('dbx_business_glossary_term' = 'Sku Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_type` SET TAGS ('dbx_business_glossary_term' = 'BOM Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_type` SET TAGS ('dbx_value_regex' = 'eBOM|mBOM|sBOM');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `change_reason` SET TAGS ('dbx_business_glossary_term' = 'Change Reason');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_code` SET TAGS ('dbx_business_glossary_term' = 'Engineering BOM Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_business_glossary_term' = 'Compliance Standard');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_value_regex' = 'ISO26262|IATF16949|SAEJ3061');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_description` SET TAGS ('dbx_business_glossary_term' = 'BOM Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `is_locked` SET TAGS ('dbx_business_glossary_term' = 'Is Locked');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_business_glossary_term' = 'Lifecycle Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_value_regex' = 'active|inactive|pending|retired');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `bom_name` SET TAGS ('dbx_business_glossary_term' = 'Engineering BOM Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `owner_department` SET TAGS ('dbx_business_glossary_term' = 'Owner Department');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `plant_location` SET TAGS ('dbx_business_glossary_term' = 'Plant Location');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `program_name` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `release_status` SET TAGS ('dbx_business_glossary_term' = 'Release Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `release_status` SET TAGS ('dbx_value_regex' = 'draft|released|archived|obsolete');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `revision_number` SET TAGS ('dbx_business_glossary_term' = 'Revision Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `total_parts_count` SET TAGS ('dbx_business_glossary_term' = 'Total Parts Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `total_quantity` SET TAGS ('dbx_business_glossary_term' = 'Total Quantity');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `vehicle_variant` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Variant Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`bom` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` ALTER COLUMN `engineering_bom_line_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Key for engineering_bom_line');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` ALTER COLUMN `bom_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Bom Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Assembly Part Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_line` ALTER COLUMN `procurement_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supplier Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Master Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `cost_center_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Owning Engineer ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_owning_engineer_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Owning Engineer ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_owning_engineer_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_owning_engineer_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `regulatory_requirement_id` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Requirement Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `supply_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supply Supplier Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `cad_model_reference` SET TAGS ('dbx_business_glossary_term' = 'CAD Model Reference');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `cost_usd` SET TAGS ('dbx_business_glossary_term' = 'Standard Cost (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `cost_usd` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `criticality` SET TAGS ('dbx_business_glossary_term' = 'Criticality Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `criticality` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `drawing_number` SET TAGS ('dbx_business_glossary_term' = 'Drawing Number (DRW)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `eol_reason` SET TAGS ('dbx_business_glossary_term' = 'End‑of‑Life Reason');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `height_mm` SET TAGS ('dbx_business_glossary_term' = 'Height (mm)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `inspection_status` SET TAGS ('dbx_business_glossary_term' = 'Inspection Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `inspection_status` SET TAGS ('dbx_value_regex' = 'passed|failed|rework|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `is_active` SET TAGS ('dbx_business_glossary_term' = 'Active Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `last_inspection_date` SET TAGS ('dbx_business_glossary_term' = 'Last Inspection Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `last_updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time (Days)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `length_mm` SET TAGS ('dbx_business_glossary_term' = 'Length (mm)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_business_glossary_term' = 'Lifecycle Status (LCS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_value_regex' = 'in_work|released|obsoleted|pending_release|discontinued');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `material` SET TAGS ('dbx_business_glossary_term' = 'Material (MAT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `obsolescence_notice` SET TAGS ('dbx_business_glossary_term' = 'Obsolescence Notice Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_classification` SET TAGS ('dbx_business_glossary_term' = 'Part Classification');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_classification` SET TAGS ('dbx_value_regex' = 'mechanical|electrical|hydraulic|software|electronic|structural');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_description` SET TAGS ('dbx_business_glossary_term' = 'Part Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_family` SET TAGS ('dbx_business_glossary_term' = 'Part Family');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_number` SET TAGS ('dbx_business_glossary_term' = 'Part Number (PN)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_type` SET TAGS ('dbx_business_glossary_term' = 'Part Type (PT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `part_type` SET TAGS ('dbx_value_regex' = 'raw|processed|assembly|subassembly|component');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `quality_rating` SET TAGS ('dbx_business_glossary_term' = 'Quality Rating');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `quality_rating` SET TAGS ('dbx_value_regex' = 'A|B|C|D|E|F');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `reach_compliance` SET TAGS ('dbx_business_glossary_term' = 'REACH Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `revision_level` SET TAGS ('dbx_business_glossary_term' = 'Revision Level (REV)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `rohs_compliance` SET TAGS ('dbx_business_glossary_term' = 'RoHS Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `supplier_part_number` SET TAGS ('dbx_business_glossary_term' = 'Supplier Part Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `volume_cm3` SET TAGS ('dbx_business_glossary_term' = 'Volume (cm³)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`part_master` ALTER COLUMN `width_mm` SET TAGS ('dbx_business_glossary_term' = 'Width (mm)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `design_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Design Specification Identifier (DSID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Author Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `regulatory_requirement_id` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Requirement Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date (Approval Date)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Approval Status (Approval Status)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'approved|rejected|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `approver` SET TAGS ('dbx_business_glossary_term' = 'Approver Name (Approver)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `author` SET TAGS ('dbx_business_glossary_term' = 'Author Name (Author)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `change_order_date` SET TAGS ('dbx_business_glossary_term' = 'Change Order Date (CO Date)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `change_order_number` SET TAGS ('dbx_business_glossary_term' = 'Change Order Number (CO Number)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Compliance Status (Compliance)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `component_name` SET TAGS ('dbx_business_glossary_term' = 'Component Name (Component)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `confidentiality_level` SET TAGS ('dbx_business_glossary_term' = 'Confidentiality Level (Conf Level)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `confidentiality_level` SET TAGS ('dbx_value_regex' = 'internal|confidential|restricted');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `cost_estimate_usd` SET TAGS ('dbx_business_glossary_term' = 'Cost Estimate (USD) (Cost Est)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `design_specification_description` SET TAGS ('dbx_business_glossary_term' = 'Specification Description (Description)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `design_phase` SET TAGS ('dbx_business_glossary_term' = 'Design Phase (Phase)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `design_phase` SET TAGS ('dbx_value_regex' = 'concept|development|validation|production');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `dimensions_mm` SET TAGS ('dbx_business_glossary_term' = 'Dimensions (mm) (Dimensions)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `document_status` SET TAGS ('dbx_business_glossary_term' = 'Document Lifecycle Status (Doc Status)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `document_status` SET TAGS ('dbx_value_regex' = 'draft|in_review|approved|released|archived');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Date (Effective Date)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `engineering_department` SET TAGS ('dbx_business_glossary_term' = 'Engineering Department (Dept)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Expiration Date (Expiration Date)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `interface_name` SET TAGS ('dbx_business_glossary_term' = 'Interface Name (Interface)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `is_active` SET TAGS ('dbx_business_glossary_term' = 'Is Active Flag (Active)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `lifecycle_stage` SET TAGS ('dbx_business_glossary_term' = 'Lifecycle Stage (Lifecycle)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `lifecycle_stage` SET TAGS ('dbx_value_regex' = 'prototype|pre_production|production|post_production');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `linked_requirements` SET TAGS ('dbx_business_glossary_term' = 'Linked Requirement Identifiers (Req IDs)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `material_specification` SET TAGS ('dbx_business_glossary_term' = 'Material Specification Details (Material Spec)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `obsolescence_date` SET TAGS ('dbx_business_glossary_term' = 'Obsolescence Date (Obsolescence Date)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `program` SET TAGS ('dbx_business_glossary_term' = 'Program Name (Program)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp (Created At)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp (Updated At)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `regulatory_reference` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Reference Codes (Reg Ref)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `related_documents` SET TAGS ('dbx_business_glossary_term' = 'Related Document Identifiers (Related Docs)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `release_date` SET TAGS ('dbx_business_glossary_term' = 'Release Date (Release Date)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `revision_date` SET TAGS ('dbx_business_glossary_term' = 'Revision Date (Rev Date)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `revision_number` SET TAGS ('dbx_business_glossary_term' = 'Revision Number (Rev No.)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `spec_number` SET TAGS ('dbx_business_glossary_term' = 'Design Specification Number (DSN)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `spec_type` SET TAGS ('dbx_business_glossary_term' = 'Specification Type (Spec Type)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `spec_type` SET TAGS ('dbx_value_regex' = 'system|subsystem|component|interface');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `subsystem_name` SET TAGS ('dbx_business_glossary_term' = 'Subsystem Name (Subsystem)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `system_name` SET TAGS ('dbx_business_glossary_term' = 'System Name (System)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `target_performance_units` SET TAGS ('dbx_business_glossary_term' = 'Target Performance Units (Units)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `target_performance_value` SET TAGS ('dbx_business_glossary_term' = 'Target Performance Value (Target Perf)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `test_method` SET TAGS ('dbx_business_glossary_term' = 'Test Method (Test Method)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `test_method` SET TAGS ('dbx_value_regex' = 'CFD|FEA|NVH|Simulation|Physical_Test');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `test_result_summary` SET TAGS ('dbx_business_glossary_term' = 'Test Result Summary (Test Summary)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `title` SET TAGS ('dbx_business_glossary_term' = 'Specification Title (Title)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `updated_by` SET TAGS ('dbx_business_glossary_term' = 'Record Updated By (Updated By)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number (Version)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Weight (kg) (Weight)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_specification` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Record Created By (Created By)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `cad_model_id` SET TAGS ('dbx_business_glossary_term' = 'CAD Model Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Owning Designer Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `primary_cad_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Owning Designer Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `primary_cad_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `primary_cad_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `assembly_name` SET TAGS ('dbx_business_glossary_term' = 'Assembly Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `cad_model_status` SET TAGS ('dbx_business_glossary_term' = 'CAD Model Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `cad_model_status` SET TAGS ('dbx_value_regex' = 'draft|released|archived|obsolete');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `compliance_iso26262_level` SET TAGS ('dbx_business_glossary_term' = 'ISO 26262 Safety Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `compliance_iso26262_level` SET TAGS ('dbx_value_regex' = 'ASIL_A|ASIL_B|ASIL_C|ASIL_D|none');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `configuration_context` SET TAGS ('dbx_business_glossary_term' = 'Configuration Context');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `coordinate_system` SET TAGS ('dbx_business_glossary_term' = 'Coordinate System');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `design_approval_status` SET TAGS ('dbx_business_glossary_term' = 'Design Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `design_approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `design_change_date` SET TAGS ('dbx_business_glossary_term' = 'Design Change Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `design_change_number` SET TAGS ('dbx_business_glossary_term' = 'Design Change Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `design_release_date` SET TAGS ('dbx_business_glossary_term' = 'Design Release Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `digital_twin_ready` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Ready Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `file_name` SET TAGS ('dbx_business_glossary_term' = 'Model File Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `file_path` SET TAGS ('dbx_business_glossary_term' = 'Model File Path');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `file_size_bytes` SET TAGS ('dbx_business_glossary_term' = 'Model File Size (Bytes)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `geometry_units` SET TAGS ('dbx_business_glossary_term' = 'Geometry Units');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `geometry_units` SET TAGS ('dbx_value_regex' = 'mm|cm|m|in|ft');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `is_digital_mockup_included` SET TAGS ('dbx_business_glossary_term' = 'Digital Mock‑Up Inclusion Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `last_published_date` SET TAGS ('dbx_business_glossary_term' = 'Last Published Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_business_glossary_term' = 'CAD Model Lifecycle Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_value_regex' = 'in_design|in_review|approved|released|retired');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `maturity_level` SET TAGS ('dbx_business_glossary_term' = 'Model Maturity Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `maturity_level` SET TAGS ('dbx_value_regex' = 'concept|detailed_design|validation|production');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `model_number` SET TAGS ('dbx_business_glossary_term' = 'CAD Model Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `model_type` SET TAGS ('dbx_business_glossary_term' = 'CAD Model Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `model_type` SET TAGS ('dbx_value_regex' = 'part|assembly|surface|solid|wireframe');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `cad_model_name` SET TAGS ('dbx_business_glossary_term' = 'CAD Model Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Model Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `part_number` SET TAGS ('dbx_business_glossary_term' = 'Part Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `related_vehicle_variant` SET TAGS ('dbx_business_glossary_term' = 'Related Vehicle Variant');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `revision` SET TAGS ('dbx_business_glossary_term' = 'CAD Model Revision');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `simulation_ready` SET TAGS ('dbx_business_glossary_term' = 'Simulation Ready Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `tool_version` SET TAGS ('dbx_business_glossary_term' = 'CAD Tool Version');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `updated_by` SET TAGS ('dbx_business_glossary_term' = 'Updated By (Designer)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `updated_by` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `updated_by` SET TAGS ('dbx_pii_name' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `vehicle_model_year` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Year');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `vehicle_platform` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Platform');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `version` SET TAGS ('dbx_business_glossary_term' = 'CAD Model Version');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Created By (Designer)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `created_by` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cad_model` ALTER COLUMN `created_by` SET TAGS ('dbx_pii_name' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` SET TAGS ('dbx_subdomain' = 'change_control');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` SET TAGS ('dbx_retention' = 'preserve_core_coverage');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Approver ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `approver_id` SET TAGS ('dbx_business_glossary_term' = 'Approver ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Initiator ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `primary_change_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Initiator ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `primary_change_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `primary_change_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `tooling_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Tooling Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `affected_parts` SET TAGS ('dbx_business_glossary_term' = 'Affected Parts');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `affected_programs` SET TAGS ('dbx_business_glossary_term' = 'Affected Programs');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_number` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_status` SET TAGS ('dbx_business_glossary_term' = 'Change Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_status` SET TAGS ('dbx_value_regex' = 'draft|under_review|approved|implemented|rejected');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_type` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_type` SET TAGS ('dbx_value_regex' = 'ECR|ECO|ECN');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `closure_date` SET TAGS ('dbx_business_glossary_term' = 'Change Closure Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `compliance_flag` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_adjustments` SET TAGS ('dbx_business_glossary_term' = 'Cost Adjustments');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_adjustments` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_adjustments` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_estimate_gross` SET TAGS ('dbx_business_glossary_term' = 'Gross Cost Estimate');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_estimate_gross` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_estimate_gross` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_net` SET TAGS ('dbx_business_glossary_term' = 'Net Cost Estimate');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_net` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `cost_net` SET TAGS ('dbx_pii_financial' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|GBP|CAD|AUD');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `change_description` SET TAGS ('dbx_business_glossary_term' = 'Change Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `impact_analysis` SET TAGS ('dbx_business_glossary_term' = 'Impact Analysis');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `implementation_date` SET TAGS ('dbx_business_glossary_term' = 'Planned Implementation Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `origin` SET TAGS ('dbx_business_glossary_term' = 'Change Origin');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `origin` SET TAGS ('dbx_value_regex' = 'internal|supplier|customer');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `priority` SET TAGS ('dbx_business_glossary_term' = 'Change Priority');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `priority` SET TAGS ('dbx_value_regex' = 'high|medium|low');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `reason_category` SET TAGS ('dbx_business_glossary_term' = 'Change Reason Category');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `reason_category` SET TAGS ('dbx_value_regex' = 'cost_reduction|quality|regulatory|customer_request|other');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `reason_detail` SET TAGS ('dbx_business_glossary_term' = 'Change Reason Detail');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `request_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Change Request Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `revision_number` SET TAGS ('dbx_business_glossary_term' = 'Change Revision Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `risk_assessment` SET TAGS ('dbx_business_glossary_term' = 'Risk Assessment');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `risk_level` SET TAGS ('dbx_business_glossary_term' = 'Risk Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `risk_level` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `scope` SET TAGS ('dbx_business_glossary_term' = 'Change Scope');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `scope` SET TAGS ('dbx_value_regex' = 'part|assembly|specification|process');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `title` SET TAGS ('dbx_business_glossary_term' = 'Change Title');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`change` ALTER COLUMN `version` SET TAGS ('dbx_business_glossary_term' = 'Change Version');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_simulation_id` SET TAGS ('dbx_business_glossary_term' = 'CAE Simulation ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Analyst ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Analyst ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cae_part_part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `analyst_name` SET TAGS ('dbx_business_glossary_term' = 'Analyst Name (ANALYST_NAME)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `boundary_conditions` SET TAGS ('dbx_business_glossary_term' = 'Boundary Conditions (BC)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `convergence_criteria` SET TAGS ('dbx_business_glossary_term' = 'Convergence Criteria (CONV_CRIT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `cpu_time_seconds` SET TAGS ('dbx_business_glossary_term' = 'CPU Time (CPU_TIME_S)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp (CREATED_TS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `load_case` SET TAGS ('dbx_business_glossary_term' = 'Load Case Description (LOAD_CASE)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `memory_usage_mb` SET TAGS ('dbx_business_glossary_term' = 'Memory Usage (MEMORY_MB)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `mesh_element_count` SET TAGS ('dbx_business_glossary_term' = 'Mesh Element Count (MESH_ELEM_COUNT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `mesh_quality_score` SET TAGS ('dbx_business_glossary_term' = 'Mesh Quality Score (MESH_QUALITY)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Simulation Notes (NOTES)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `part_name` SET TAGS ('dbx_business_glossary_term' = 'Part Name (PART_NAME)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `part_number` SET TAGS ('dbx_business_glossary_term' = 'Part Number (PART_NO)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_metric_name` SET TAGS ('dbx_business_glossary_term' = 'Result Metric Name (RESULT_METRIC)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_metric_unit` SET TAGS ('dbx_business_glossary_term' = 'Result Metric Unit (RESULT_UNIT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_metric_unit` SET TAGS ('dbx_value_regex' = 'MPa|Pa|N|kg|m/s^2|Hz');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_metric_value` SET TAGS ('dbx_business_glossary_term' = 'Result Metric Value (RESULT_VALUE)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_outcome` SET TAGS ('dbx_business_glossary_term' = 'Result Outcome (OUTCOME)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `result_outcome` SET TAGS ('dbx_value_regex' = 'pass|fail');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `run_duration_seconds` SET TAGS ('dbx_business_glossary_term' = 'Run Duration (RUN_DURATION_S)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `run_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Run Timestamp (RUN_TS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `simulation_number` SET TAGS ('dbx_business_glossary_term' = 'Simulation Number (SIM_NO)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `simulation_status` SET TAGS ('dbx_business_glossary_term' = 'Simulation Status (SIM_STATUS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `simulation_status` SET TAGS ('dbx_value_regex' = 'draft|queued|running|completed|failed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `simulation_type` SET TAGS ('dbx_business_glossary_term' = 'Simulation Type (SIM_TYPE)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `simulation_type` SET TAGS ('dbx_value_regex' = 'FEA|CFD|NVH|Crash|Thermal|Fatigue');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `solver_name` SET TAGS ('dbx_business_glossary_term' = 'Solver Name (SOLVER)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `target_metric_name` SET TAGS ('dbx_business_glossary_term' = 'Target Metric Name (TARGET_METRIC)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `target_metric_unit` SET TAGS ('dbx_business_glossary_term' = 'Target Metric Unit (TARGET_UNIT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `target_metric_unit` SET TAGS ('dbx_value_regex' = 'MPa|Pa|N|kg|m/s^2|Hz');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `target_metric_value` SET TAGS ('dbx_business_glossary_term' = 'Target Metric Value (TARGET_VALUE)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp (UPDATED_TS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cae_simulation` ALTER COLUMN `version` SET TAGS ('dbx_business_glossary_term' = 'Simulation Version (VERSION)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_build_id` SET TAGS ('dbx_business_glossary_term' = 'Prototype Build ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_business_glossary_term' = 'Functional Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Engineer ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_responsible_engineer_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Engineer ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_responsible_engineer_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_responsible_engineer_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `build_cost` SET TAGS ('dbx_business_glossary_term' = 'Build Cost');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `build_cost` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `build_date` SET TAGS ('dbx_business_glossary_term' = 'Build Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `build_duration_hours` SET TAGS ('dbx_business_glossary_term' = 'Build Duration Hours');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `build_location` SET TAGS ('dbx_business_glossary_term' = 'Build Location');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `build_number` SET TAGS ('dbx_business_glossary_term' = 'Build Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `build_phase` SET TAGS ('dbx_business_glossary_term' = 'Build Phase');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `build_phase` SET TAGS ('dbx_value_regex' = 'mule|alpha|beta|pre_production|production');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `build_purpose` SET TAGS ('dbx_business_glossary_term' = 'Build Purpose');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `build_purpose` SET TAGS ('dbx_value_regex' = 'durability|crash|nvh|emissions|homologation|validation');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `configuration_description` SET TAGS ('dbx_business_glossary_term' = 'Configuration Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = 'USD|EUR|JPY|CAD|GBP|CNY');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `data_source_system` SET TAGS ('dbx_business_glossary_term' = 'Source System of Record');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `data_source_system` SET TAGS ('dbx_value_regex' = 'Teamcenter|CATIA|ENOVIA|SAP|MES');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `emission_rating` SET TAGS ('dbx_business_glossary_term' = 'Emission Rating');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `emission_rating` SET TAGS ('dbx_value_regex' = 'tier1|tier2|tier3|tier4');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Additional Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `program_code` SET TAGS ('dbx_business_glossary_term' = 'Program Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_build_status` SET TAGS ('dbx_business_glossary_term' = 'Build Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_build_status` SET TAGS ('dbx_value_regex' = 'planned|in_progress|completed|failed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `prototype_number` SET TAGS ('dbx_business_glossary_term' = 'Prototype Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `safety_rating` SET TAGS ('dbx_business_glossary_term' = 'Safety Rating');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `safety_rating` SET TAGS ('dbx_value_regex' = 'ncap|euro_ncap|none');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `test_results_summary` SET TAGS ('dbx_business_glossary_term' = 'Test Results Summary');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `vin` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`prototype_build` ALTER COLUMN `vin` SET TAGS ('dbx_pii_identifier' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `validation_test_id` SET TAGS ('dbx_business_glossary_term' = 'Validation Test ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Test Engineer Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `engineering_test_result_id` SET TAGS ('dbx_business_glossary_term' = 'Test Report Identifier (TRID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date (AD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By (AB)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `approved_by` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `approved_by` SET TAGS ('dbx_pii_name' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `comments` SET TAGS ('dbx_business_glossary_term' = 'Test Comments (TC)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_business_glossary_term' = 'Compliance Standard (CS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_value_regex' = 'FMVSS|EPA|NCAP|WLTP');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp (RCT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `data_source_system` SET TAGS ('dbx_business_glossary_term' = 'Source System for Test Data (SS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `disposition` SET TAGS ('dbx_business_glossary_term' = 'Test Disposition (TD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `disposition` SET TAGS ('dbx_value_regex' = 'accept|rework|reject');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `emission_co2_g_per_km` SET TAGS ('dbx_business_glossary_term' = 'Measured CO2 Emission (g/km) (MCO2)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `equipment_used` SET TAGS ('dbx_business_glossary_term' = 'Equipment Used (EU)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `is_critical` SET TAGS ('dbx_business_glossary_term' = 'Critical Test Flag (CTF)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `noise_db` SET TAGS ('dbx_business_glossary_term' = 'Measured Noise Level (dB) (MNL)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `regulatory_compliance_flag` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Compliance Flag (RCF)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `target_emission_co2` SET TAGS ('dbx_business_glossary_term' = 'Target CO2 Emission (g/km) (TCO2)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `target_noise_db` SET TAGS ('dbx_business_glossary_term' = 'Target Noise Level (dB) (TNL)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `target_torque_nm` SET TAGS ('dbx_business_glossary_term' = 'Target Torque (Nm) (TTQ)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_approval_status` SET TAGS ('dbx_business_glossary_term' = 'Test Approval Status (TAS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_approval_status` SET TAGS ('dbx_value_regex' = 'approved|rejected|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_batch_number` SET TAGS ('dbx_business_glossary_term' = 'Test Batch Number (TBN)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_category` SET TAGS ('dbx_business_glossary_term' = 'Test Category (TCAT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_category` SET TAGS ('dbx_value_regex' = 'structural|powertrain|electronics|software');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_document_reference` SET TAGS ('dbx_business_glossary_term' = 'Test Document Reference (TDR)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Test Duration (Minutes) (TDUR)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_engineer` SET TAGS ('dbx_business_glossary_term' = 'Test Engineer (TE)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_engineer` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_engineer` SET TAGS ('dbx_pii_name' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_facility` SET TAGS ('dbx_business_glossary_term' = 'Test Facility (TF)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_location` SET TAGS ('dbx_business_glossary_term' = 'Test Location Code (TLC)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_name` SET TAGS ('dbx_business_glossary_term' = 'Validation Test Name (VTN)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_phase` SET TAGS ('dbx_business_glossary_term' = 'Test Phase (TPH)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_phase` SET TAGS ('dbx_value_regex' = 'prototype|pre_production|production');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_report_url` SET TAGS ('dbx_business_glossary_term' = 'Test Report URL (TRURL)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_result` SET TAGS ('dbx_business_glossary_term' = 'Test Result (TR)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_result` SET TAGS ('dbx_value_regex' = 'pass|fail|conditional');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_result_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Result Recording Timestamp (RRT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_revision_number` SET TAGS ('dbx_business_glossary_term' = 'Test Revision Number (TRN)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_standard_reference` SET TAGS ('dbx_business_glossary_term' = 'Test Standard Reference (TSR)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_status` SET TAGS ('dbx_business_glossary_term' = 'Test Status (TS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_status` SET TAGS ('dbx_value_regex' = 'planned|in_progress|completed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Test Execution Timestamp (TET)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_type` SET TAGS ('dbx_business_glossary_term' = 'Validation Test Type (VTT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_type` SET TAGS ('dbx_value_regex' = 'DVP|PVP|PPAP|Durability|Emissions|NCAP');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `test_version` SET TAGS ('dbx_business_glossary_term' = 'Test Version (TV)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `torque_nm` SET TAGS ('dbx_business_glossary_term' = 'Measured Torque (Nm) (MTQ)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp (RUT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`validation_test` ALTER COLUMN `variance_percent` SET TAGS ('dbx_business_glossary_term' = 'Result Variance Percentage (RV%) (VVAR)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` ALTER COLUMN `engineering_test_result_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Key for engineering_test_result');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_test_result` ALTER COLUMN `validation_test_id` SET TAGS ('dbx_business_glossary_term' = 'Validation Test Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_id` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `connected_vehicle_id` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Identifier (DT_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Identifier (PART_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `prototype_build_id` SET TAGS ('dbx_business_glossary_term' = 'Prototype Identifier (PROTO_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_prototype_prototype_build_id` SET TAGS ('dbx_business_glossary_term' = 'Prototype Identifier (PROTO_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `engineering_team_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Team Identifier (ENG_TEAM_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_business_glossary_term' = 'Functional Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `primary_digital_part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Identifier (PART_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `vehicle_ownership_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Ownership Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Program Identifier (ENG_PRG_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `asset_vin` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Identification Number (VIN)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `data_quality_score` SET TAGS ('dbx_business_glossary_term' = 'Data Quality Score (DQ_SCORE)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_status` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Lifecycle Status (DTLS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_status` SET TAGS ('dbx_value_regex' = 'active|inactive|retired|archived');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `fidelity_level` SET TAGS ('dbx_business_glossary_term' = 'Model Fidelity Level (FID_LVL)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `fidelity_level` SET TAGS ('dbx_value_regex' = 'high|medium|low');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `last_sync_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Synchronization Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `model_description` SET TAGS ('dbx_business_glossary_term' = 'Model Description (MODEL_DESC)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `model_file_path` SET TAGS ('dbx_business_glossary_term' = 'Model File Path (MODEL_PATH)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `model_storage_location` SET TAGS ('dbx_business_glossary_term' = 'Model Storage Location (MODEL_LOC)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `digital_twin_name` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Name (DTN)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `performance_metric` SET TAGS ('dbx_business_glossary_term' = 'Performance Metric Score (PERF_METRIC)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `regulatory_compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Compliance Status (REG_COMP_STS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `regulatory_compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `simulation_model_version` SET TAGS ('dbx_business_glossary_term' = 'Simulation Model Version (SMV)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `simulation_tool` SET TAGS ('dbx_business_glossary_term' = 'Simulation Tool (SIM_TOOL)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `simulation_tool` SET TAGS ('dbx_value_regex' = 'ANSYS|Siemens|Altair|Dassault');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `sync_status` SET TAGS ('dbx_business_glossary_term' = 'Synchronization Status (SYNC_STS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `sync_status` SET TAGS ('dbx_value_regex' = 'in_sync|out_of_sync|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `twin_code` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Code (DTC)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `twin_type` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Type (DTT)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `twin_type` SET TAGS ('dbx_value_regex' = 'vehicle|powertrain|chassis|body|component');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `updated_by` SET TAGS ('dbx_business_glossary_term' = 'Record Updated By User (UPDATED_BY)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Last Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `validation_status` SET TAGS ('dbx_business_glossary_term' = 'Model Validation Status (VAL_STS)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `validation_status` SET TAGS ('dbx_value_regex' = 'validated|pending|rejected');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`digital_twin` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Record Created By User (CREATED_BY)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` SET TAGS ('dbx_subdomain' = 'program_management');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Milestone ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Milestone Owner ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_role' = 'primary_employee');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `employee_id` SET TAGS ('dbx_renamed_from' = 'employee_id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `functional_location_id` SET TAGS ('dbx_business_glossary_term' = 'Functional Location Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `owner_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Owner Employee Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `owner_employee_id` SET TAGS ('dbx_internal' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `primary_milestone_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Milestone Owner ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `primary_milestone_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `primary_milestone_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `tertiary_milestone_sign_off_authority_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Sign‑off Authority ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `tertiary_milestone_sign_off_authority_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `tertiary_milestone_sign_off_authority_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Program ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `actual_date` SET TAGS ('dbx_business_glossary_term' = 'Actual Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approved Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `change_reason` SET TAGS ('dbx_business_glossary_term' = 'Change Reason');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_code` SET TAGS ('dbx_business_glossary_term' = 'Milestone Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_code` SET TAGS ('dbx_value_regex' = 'P0|P1|P2|P3|SOP');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_business_glossary_term' = 'Compliance Standard');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_description` SET TAGS ('dbx_business_glossary_term' = 'Milestone Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `gate_review_outcome` SET TAGS ('dbx_business_glossary_term' = 'Gate Review Outcome');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `gate_review_outcome` SET TAGS ('dbx_value_regex' = 'approved|conditional|deferred|rejected');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `is_critical` SET TAGS ('dbx_business_glossary_term' = 'Critical Milestone Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_status` SET TAGS ('dbx_business_glossary_term' = 'Milestone Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_status` SET TAGS ('dbx_value_regex' = 'planned|in_progress|completed|closed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_type` SET TAGS ('dbx_business_glossary_term' = 'Milestone Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_type` SET TAGS ('dbx_value_regex' = 'gate|review|release|prototype|pilot');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `milestone_name` SET TAGS ('dbx_business_glossary_term' = 'Milestone Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `open_action_items_count` SET TAGS ('dbx_business_glossary_term' = 'Open Action Items Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `planned_date` SET TAGS ('dbx_business_glossary_term' = 'Planned Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `plant_location` SET TAGS ('dbx_business_glossary_term' = 'Plant Location');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `risk_level` SET TAGS ('dbx_business_glossary_term' = 'Milestone Risk Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `risk_level` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`milestone` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_record_id` SET TAGS ('dbx_business_glossary_term' = 'FMEA Record Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Approved By Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Action Owner Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Identifier (Part_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_part_part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Identifier (Part_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `primary_fmea_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Action Owner Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `primary_fmea_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `primary_fmea_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `actual_completion_date` SET TAGS ('dbx_business_glossary_term' = 'Actual Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `analysis_team` SET TAGS ('dbx_business_glossary_term' = 'Analysis Team');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `current_controls` SET TAGS ('dbx_business_glossary_term' = 'Current Controls Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `detection_rating` SET TAGS ('dbx_business_glossary_term' = 'Detection Rating (D)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `document_url` SET TAGS ('dbx_business_glossary_term' = 'Document URL');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `failure_effect` SET TAGS ('dbx_business_glossary_term' = 'Failure Effect Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `failure_mode` SET TAGS ('dbx_business_glossary_term' = 'Failure Mode Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_number` SET TAGS ('dbx_business_glossary_term' = 'FMEA Number (FMEA_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_record_status` SET TAGS ('dbx_business_glossary_term' = 'FMEA Record Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_record_status` SET TAGS ('dbx_value_regex' = 'open|in_progress|closed|rejected');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_type` SET TAGS ('dbx_business_glossary_term' = 'FMEA Type (Design or Process)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `fmea_type` SET TAGS ('dbx_value_regex' = 'DFMEA|PFMEA');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Additional Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `occurrence_rating` SET TAGS ('dbx_business_glossary_term' = 'Occurrence Rating (O)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `process_code` SET TAGS ('dbx_business_glossary_term' = 'Process Identifier (Process_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `recommended_action` SET TAGS ('dbx_business_glossary_term' = 'Recommended Action');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `revision_number` SET TAGS ('dbx_business_glossary_term' = 'Revision Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `risk_category` SET TAGS ('dbx_business_glossary_term' = 'Risk Category');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `risk_category` SET TAGS ('dbx_value_regex' = 'high|medium|low');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `rpn` SET TAGS ('dbx_business_glossary_term' = 'Risk Priority Number (RPN)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `severity_rating` SET TAGS ('dbx_business_glossary_term' = 'Severity Rating (S)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `target_completion_date` SET TAGS ('dbx_business_glossary_term' = 'Target Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fmea_record` ALTER COLUMN `version` SET TAGS ('dbx_business_glossary_term' = 'Version Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_plan_id` SET TAGS ('dbx_business_glossary_term' = 'Design Verification Plan ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `change_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Change Order ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Created By User ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Engineer ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_part_part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `design_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Specification ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_related_specification_design_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Specification ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_updated_by_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Updated By User ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_updated_by_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_updated_by_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `primary_dvp_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Engineer ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `primary_dvp_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `primary_dvp_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `tertiary_dvp_updated_by_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Updated By User ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `tertiary_dvp_updated_by_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `tertiary_dvp_updated_by_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `actual_completion_date` SET TAGS ('dbx_business_glossary_term' = 'Actual Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'draft|pending|approved|rejected|withdrawn');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `completed_test_count` SET TAGS ('dbx_business_glossary_term' = 'Completed Test Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `completion_percentage` SET TAGS ('dbx_business_glossary_term' = 'Completion Percentage');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `cost_estimate_usd` SET TAGS ('dbx_business_glossary_term' = 'Cost Estimate (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `document_url` SET TAGS ('dbx_business_glossary_term' = 'Document URL');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_plan_status` SET TAGS ('dbx_business_glossary_term' = 'Plan Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `dvp_plan_status` SET TAGS ('dbx_value_regex' = 'active|inactive|archived|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `is_automated` SET TAGS ('dbx_business_glossary_term' = 'Is Automated');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `is_locked` SET TAGS ('dbx_business_glossary_term' = 'Is Locked');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `last_status_change_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Last Status Change Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `plan_code` SET TAGS ('dbx_business_glossary_term' = 'Design Verification Plan Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `plan_description` SET TAGS ('dbx_business_glossary_term' = 'Design Verification Plan Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `plan_title` SET TAGS ('dbx_business_glossary_term' = 'Design Verification Plan Title');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `plan_type` SET TAGS ('dbx_business_glossary_term' = 'Design Verification Plan Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `plan_type` SET TAGS ('dbx_value_regex' = 'system|component|subsystem|vehicle|process');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `planned_completion_date` SET TAGS ('dbx_business_glossary_term' = 'Planned Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `priority` SET TAGS ('dbx_business_glossary_term' = 'Plan Priority');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `priority` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `regulatory_approval_required` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Approval Required');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_value_regex' = 'not_required|pending|approved|rejected');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `risk_level` SET TAGS ('dbx_business_glossary_term' = 'Risk Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `risk_level` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `system_code` SET TAGS ('dbx_business_glossary_term' = 'Vehicle System ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_environment` SET TAGS ('dbx_business_glossary_term' = 'Test Environment');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_environment` SET TAGS ('dbx_value_regex' = 'lab|test_track|simulation|field');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_phase` SET TAGS ('dbx_business_glossary_term' = 'Test Phase');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_phase` SET TAGS ('dbx_value_regex' = 'development|prototype|pre-production|production|post-production');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_type` SET TAGS ('dbx_business_glossary_term' = 'Test Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `test_type` SET TAGS ('dbx_value_regex' = 'functional|performance|durability|safety|regulatory|environmental');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `total_test_count` SET TAGS ('dbx_business_glossary_term' = 'Total Test Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `vehicle_variant` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Variant');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dvp_plan` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `homologation_requirement_id` SET TAGS ('dbx_business_glossary_term' = 'Homologation Requirement ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `homologation_record_id` SET TAGS ('dbx_business_glossary_term' = 'Homologation Record Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Associated Vehicle Program ID (Vehicle_Program_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `compliance_method` SET TAGS ('dbx_business_glossary_term' = 'Compliance Method (Method)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `compliance_method` SET TAGS ('dbx_value_regex' = 'test|calculation|declaration');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Compliance Status (Status)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `compliance_status` SET TAGS ('dbx_value_regex' = 'pending|in_progress|compliant|non_compliant|exempt');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp (Created_Timestamp)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Date (Effective_Date)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Expiration Date (Expiration_Date)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `is_mandatory` SET TAGS ('dbx_business_glossary_term' = 'Is Mandatory Flag (Mandatory_Flag)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date (Last_Review_Date)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `linked_validation_test_ids` SET TAGS ('dbx_business_glossary_term' = 'Linked Validation Test IDs (Test_IDs)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `market_region` SET TAGS ('dbx_business_glossary_term' = 'Market Region Code (Region)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Additional Notes (Notes)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `priority_level` SET TAGS ('dbx_business_glossary_term' = 'Priority Level (Priority)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `priority_level` SET TAGS ('dbx_value_regex' = 'high|medium|low');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `regulation_name` SET TAGS ('dbx_business_glossary_term' = 'Regulation Name (Regulation)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `regulation_name` SET TAGS ('dbx_value_regex' = 'FMVSS|ECE_R|CARB|Euro_NCAP|WLTP|EPA');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `regulation_number` SET TAGS ('dbx_business_glossary_term' = 'Regulation Number (Regulation_ID)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `requirement_code` SET TAGS ('dbx_business_glossary_term' = 'Homologation Requirement Code (HRC)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `requirement_description` SET TAGS ('dbx_business_glossary_term' = 'Requirement Description (Desc)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `submission_deadline` SET TAGS ('dbx_business_glossary_term' = 'Submission Deadline (Deadline)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp (Updated_Timestamp)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `vehicle_model_year` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Model Year (MY)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`homologation_requirement` ALTER COLUMN `vehicle_variant` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Variant Identifier (Variant)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Ecu Specification Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `supply_supplier_id` SET TAGS ('dbx_business_glossary_term' = 'Supply Supplier Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `applicable_model_years` SET TAGS ('dbx_business_glossary_term' = 'Applicable Model Years');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `applicable_vehicle_variants` SET TAGS ('dbx_business_glossary_term' = 'Applicable Vehicle Variants');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `asw_release_date` SET TAGS ('dbx_business_glossary_term' = 'ASW Release Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `asw_release_number` SET TAGS ('dbx_business_glossary_term' = 'ASW Release Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `calibration_dataset_reference` SET TAGS ('dbx_business_glossary_term' = 'Calibration Dataset Reference');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `communication_protocol` SET TAGS ('dbx_business_glossary_term' = 'Communication Protocol');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `communication_protocol` SET TAGS ('dbx_value_regex' = 'CAN|LIN|Ethernet|FlexRay|MOST|CANFD');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_business_glossary_term' = 'Compliance Standard');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_value_regex' = 'ISO_26262|IATF_16949|ISO_9001');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_specification_description` SET TAGS ('dbx_business_glossary_term' = 'ECU Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `diagnostic_trouble_code_support` SET TAGS ('dbx_business_glossary_term' = 'Diagnostic Trouble Code Support');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `dimensions_mm` SET TAGS ('dbx_business_glossary_term' = 'ECU Dimensions (mm)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_family` SET TAGS ('dbx_business_glossary_term' = 'ECU Family');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_specification_status` SET TAGS ('dbx_business_glossary_term' = 'ECU Lifecycle Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_specification_status` SET TAGS ('dbx_value_regex' = 'active|inactive|deprecated|retired|development|released');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_type` SET TAGS ('dbx_business_glossary_term' = 'ECU Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_type` SET TAGS ('dbx_value_regex' = 'engine_control|transmission|adas|body_control|battery_management|infotainment');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `eol_date` SET TAGS ('dbx_business_glossary_term' = 'End‑of‑Life Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `functional_safety_asil` SET TAGS ('dbx_business_glossary_term' = 'Functional Safety ASIL Rating');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `functional_safety_asil` SET TAGS ('dbx_value_regex' = 'ASIL_A|ASIL_B|ASIL_C|ASIL_D');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `hardware_part_number` SET TAGS ('dbx_business_glossary_term' = 'Hardware Part Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `hardware_revision` SET TAGS ('dbx_business_glossary_term' = 'Hardware Revision');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `hardware_version` SET TAGS ('dbx_business_glossary_term' = 'Hardware Version');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `is_critical` SET TAGS ('dbx_business_glossary_term' = 'Critical ECU Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `max_operating_temperature_c` SET TAGS ('dbx_business_glossary_term' = 'Maximum Operating Temperature (°C)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `memory_size_mb` SET TAGS ('dbx_business_glossary_term' = 'Memory Size (MB)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `min_operating_temperature_c` SET TAGS ('dbx_business_glossary_term' = 'Minimum Operating Temperature (°C)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `ecu_specification_name` SET TAGS ('dbx_business_glossary_term' = 'ECU Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `power_consumption_w` SET TAGS ('dbx_business_glossary_term' = 'Power Consumption (W)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `processing_speed_mhz` SET TAGS ('dbx_business_glossary_term' = 'Processing Speed (MHz)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_value_regex' = 'approved|pending|rejected');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `release_status` SET TAGS ('dbx_business_glossary_term' = 'Release Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `release_status` SET TAGS ('dbx_value_regex' = 'draft|released|archived|obsolete');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `software_release_notes` SET TAGS ('dbx_business_glossary_term' = 'Software Release Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `software_version` SET TAGS ('dbx_business_glossary_term' = 'Software Version');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `supported_features` SET TAGS ('dbx_business_glossary_term' = 'Supported Features');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `vehicle_platform` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Platform');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `voltage_range_v` SET TAGS ('dbx_business_glossary_term' = 'Voltage Range (V)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ecu_specification` ALTER COLUMN `weight_kg` SET TAGS ('dbx_business_glossary_term' = 'ECU Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_spec_id` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Specification ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `architecture_type` SET TAGS ('dbx_business_glossary_term' = 'Engine Architecture Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `aspiration_type` SET TAGS ('dbx_business_glossary_term' = 'Aspiration Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `aspiration_type` SET TAGS ('dbx_value_regex' = 'naturally_aspirated|turbocharged|supercharged');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `battery_capacity_kwh` SET TAGS ('dbx_business_glossary_term' = 'Battery Capacity (kWh)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `battery_capacity_kwh` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `compliance_status` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `cost_currency` SET TAGS ('dbx_business_glossary_term' = 'Cost Currency (ISO 4217)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `cost_estimate_usd` SET TAGS ('dbx_business_glossary_term' = 'Cost Estimate (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `cylinder_count` SET TAGS ('dbx_business_glossary_term' = 'Cylinder Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `dimensions_mm` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Dimensions (mm)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `displacement_cc` SET TAGS ('dbx_business_glossary_term' = 'Engine Displacement (cubic centimeters)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `emission_control_technology` SET TAGS ('dbx_business_glossary_term' = 'Emission Control Technology');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `emissions_standard` SET TAGS ('dbx_business_glossary_term' = 'Emissions Standard Compliance');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `emissions_standard` SET TAGS ('dbx_value_regex' = 'Euro6|EPA_Tier3|CARB_LEVIII|WLTP');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `end_of_production_date` SET TAGS ('dbx_business_glossary_term' = 'End of Production Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `epa_range_miles` SET TAGS ('dbx_business_glossary_term' = 'EPA Range (miles)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `fuel_type` SET TAGS ('dbx_business_glossary_term' = 'Fuel Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `fuel_type` SET TAGS ('dbx_value_regex' = 'gasoline|diesel|electric|hydrogen|hybrid');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `is_locked` SET TAGS ('dbx_business_glossary_term' = 'Specification Lock Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Specification Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `power_output_kw` SET TAGS ('dbx_business_glossary_term' = 'Maximum Power Output (kW)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_spec_status` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Specification Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_spec_status` SET TAGS ('dbx_value_regex' = 'draft|active|retired|obsolete');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Type (ICE|HEV|PHEV|BEV|FCEV)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `powertrain_type` SET TAGS ('dbx_value_regex' = 'ICE|HEV|PHEV|BEV|FCEV');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `spec_code` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Specification Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `spec_name` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Specification Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `start_of_production_date` SET TAGS ('dbx_business_glossary_term' = 'Start of Production Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `target_program_code` SET TAGS ('dbx_business_glossary_term' = 'Target Vehicle Program Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `thermal_management` SET TAGS ('dbx_business_glossary_term' = 'Thermal Management Approach');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `thermal_management` SET TAGS ('dbx_value_regex' = 'air|liquid|phase_change|heat_pump');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `torque_nm` SET TAGS ('dbx_business_glossary_term' = 'Maximum Torque (Nm)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `transmission_type` SET TAGS ('dbx_business_glossary_term' = 'Transmission Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `transmission_type` SET TAGS ('dbx_value_regex' = 'manual|automatic|dual_clutch|CVT|e-gear');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `vehicle_variant` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Variant');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Specification Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Powertrain Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`powertrain_spec` ALTER COLUMN `wltp_range_km` SET TAGS ('dbx_business_glossary_term' = 'WLTP Range (km)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_report_id` SET TAGS ('dbx_business_glossary_term' = 'Weight Report ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `equipment_registry_id` SET TAGS ('dbx_business_glossary_term' = 'Equipment Registry Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Engineer ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Engineer ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `actual_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Actual Measured Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approved Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `comments` SET TAGS ('dbx_business_glossary_term' = 'Comments');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `compliance_flag` SET TAGS ('dbx_business_glossary_term' = 'Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `component_scope` SET TAGS ('dbx_business_glossary_term' = 'Component Scope');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `estimated_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Estimated Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `is_locked` SET TAGS ('dbx_business_glossary_term' = 'Is Locked');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `reduction_action` SET TAGS ('dbx_business_glossary_term' = 'Weight Reduction Action');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `regulatory_approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected|not_required');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `report_name` SET TAGS ('dbx_business_glossary_term' = 'Report Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `report_number` SET TAGS ('dbx_business_glossary_term' = 'Report Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `report_status` SET TAGS ('dbx_business_glossary_term' = 'Report Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `report_status` SET TAGS ('dbx_value_regex' = 'draft|in_review|approved|rejected|archived');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `reporting_date` SET TAGS ('dbx_business_glossary_term' = 'Reporting Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `system_scope` SET TAGS ('dbx_business_glossary_term' = 'System Scope');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `target_weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Target Weight (kg)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_delta_kg` SET TAGS ('dbx_business_glossary_term' = 'Weight Delta (kg)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_delta_percent` SET TAGS ('dbx_business_glossary_term' = 'Weight Delta Percentage');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_source` SET TAGS ('dbx_business_glossary_term' = 'Weight Source');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`weight_report` ALTER COLUMN `weight_target_category` SET TAGS ('dbx_business_glossary_term' = 'Weight Target Category');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` SET TAGS ('dbx_subdomain' = 'program_management');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `design_review_id` SET TAGS ('dbx_business_glossary_term' = 'Design Review ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Chair Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `attendees_count` SET TAGS ('dbx_business_glossary_term' = 'Attendees Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `chair_name` SET TAGS ('dbx_business_glossary_term' = 'Review Chair Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `compliance_flag` SET TAGS ('dbx_business_glossary_term' = 'Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `design_review_status` SET TAGS ('dbx_business_glossary_term' = 'Review Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `design_review_status` SET TAGS ('dbx_value_regex' = 'scheduled|in_progress|completed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `findings_count` SET TAGS ('dbx_business_glossary_term' = 'Findings Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `minutes_document_ref` SET TAGS ('dbx_business_glossary_term' = 'Minutes Document Reference');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Review Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `open_actions_count` SET TAGS ('dbx_business_glossary_term' = 'Open Actions Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `outcome` SET TAGS ('dbx_business_glossary_term' = 'Review Outcome');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `outcome` SET TAGS ('dbx_value_regex' = 'approved|conditional|rejected');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `review_date` SET TAGS ('dbx_business_glossary_term' = 'Design Review Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `review_duration_minutes` SET TAGS ('dbx_business_glossary_term' = 'Review Duration (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `review_identifier` SET TAGS ('dbx_business_glossary_term' = 'Design Review Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `review_location` SET TAGS ('dbx_business_glossary_term' = 'Review Location');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `review_type` SET TAGS ('dbx_business_glossary_term' = 'Design Review Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `review_type` SET TAGS ('dbx_value_regex' = 'PDR|CDR|System|Supplier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `risk_level` SET TAGS ('dbx_business_glossary_term' = 'Review Risk Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `risk_level` SET TAGS ('dbx_value_regex' = 'low|medium|high');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `system_or_component` SET TAGS ('dbx_business_glossary_term' = 'Reviewed System or Component');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `total_action_items` SET TAGS ('dbx_business_glossary_term' = 'Total Action Items');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`design_review` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Record Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Material Specification ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_id` SET TAGS ('dbx_business_glossary_term' = 'Material Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `applicable_standard` SET TAGS ('dbx_business_glossary_term' = 'Applicable Standard');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `application_restriction` SET TAGS ('dbx_business_glossary_term' = 'Application Restriction');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `approved_supplier` SET TAGS ('dbx_business_glossary_term' = 'Approved Supplier(s)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `compliance_reach` SET TAGS ('dbx_business_glossary_term' = 'REACH Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `compliance_reach` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `compliance_rohs` SET TAGS ('dbx_business_glossary_term' = 'RoHS Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `compliance_rohs` SET TAGS ('dbx_value_regex' = 'compliant|non_compliant|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `cost_per_kg_usd` SET TAGS ('dbx_business_glossary_term' = 'Cost per Kilogram (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `density_kg_per_m3` SET TAGS ('dbx_business_glossary_term' = 'Density (kg/m³)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `elongation_percent` SET TAGS ('dbx_business_glossary_term' = 'Elongation Percentage');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `environmental_impact_score` SET TAGS ('dbx_business_glossary_term' = 'Environmental Impact Score');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `grade_or_alloy` SET TAGS ('dbx_business_glossary_term' = 'Grade or Alloy Designation');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `is_critical` SET TAGS ('dbx_business_glossary_term' = 'Critical Material Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Lead Time (Days)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_business_glossary_term' = 'Lifecycle Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `lifecycle_status` SET TAGS ('dbx_value_regex' = 'in_design|approved|in_use|retired|archived');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_class` SET TAGS ('dbx_business_glossary_term' = 'Material Class');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_class` SET TAGS ('dbx_value_regex' = 'steel|aluminum|polymer|composite|glass');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_status` SET TAGS ('dbx_business_glossary_term' = 'Specification Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_status` SET TAGS ('dbx_value_regex' = 'active|inactive|deprecated|pending');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_type` SET TAGS ('dbx_business_glossary_term' = 'Specification Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_type` SET TAGS ('dbx_value_regex' = 'structural|electrical|thermal|decorative');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `material_specification_name` SET TAGS ('dbx_business_glossary_term' = 'Material Specification Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `safety_rating` SET TAGS ('dbx_business_glossary_term' = 'Safety Rating');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `safety_rating` SET TAGS ('dbx_value_regex' = 'A|B|C|D|E');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `specific_heat_j_per_kgk` SET TAGS ('dbx_business_glossary_term' = 'Specific Heat Capacity (J/kg·K)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `surface_treatment` SET TAGS ('dbx_business_glossary_term' = 'Surface Treatment');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `surface_treatment` SET TAGS ('dbx_value_regex' = 'none|coating|plating|anodizing|galvanizing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `tensile_strength_mpa` SET TAGS ('dbx_business_glossary_term' = 'Tensile Strength (MPa)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `thermal_conductivity_w_per_mk` SET TAGS ('dbx_business_glossary_term' = 'Thermal Conductivity (W/m·K)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `updated_by` SET TAGS ('dbx_business_glossary_term' = 'Updated By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `warranty_period_months` SET TAGS ('dbx_business_glossary_term' = 'Warranty Period (Months)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `yield_strength_mpa` SET TAGS ('dbx_business_glossary_term' = 'Yield Strength (MPa)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material_specification` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Created By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_id` SET TAGS ('dbx_business_glossary_term' = 'Configuration Rule Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Created By Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'approved|pending|rejected');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `change_reason` SET TAGS ('dbx_business_glossary_term' = 'Change Reason');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_business_glossary_term' = 'Compliance Standard');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_status` SET TAGS ('dbx_business_glossary_term' = 'Rule Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_status` SET TAGS ('dbx_value_regex' = 'active|inactive|retired|draft');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `configuration_rule_description` SET TAGS ('dbx_business_glossary_term' = 'Rule Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `expiration_date` SET TAGS ('dbx_business_glossary_term' = 'Expiration Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `is_mandatory` SET TAGS ('dbx_business_glossary_term' = 'Mandatory Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `market` SET TAGS ('dbx_business_glossary_term' = 'Market Applicability');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `model_year` SET TAGS ('dbx_business_glossary_term' = 'Model Year');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Additional Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `option_category` SET TAGS ('dbx_business_glossary_term' = 'Option Category');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `option_code_a` SET TAGS ('dbx_business_glossary_term' = 'Option Code A');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `option_code_b` SET TAGS ('dbx_business_glossary_term' = 'Option Code B');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `program_name` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `rule_code` SET TAGS ('dbx_business_glossary_term' = 'Configuration Rule Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `rule_name` SET TAGS ('dbx_business_glossary_term' = 'Configuration Rule Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `rule_priority` SET TAGS ('dbx_business_glossary_term' = 'Rule Priority');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `rule_source` SET TAGS ('dbx_business_glossary_term' = 'Rule Source');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `rule_source` SET TAGS ('dbx_value_regex' = 'commercial|engineering|regulatory');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `rule_type` SET TAGS ('dbx_business_glossary_term' = 'Configuration Rule Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `rule_type` SET TAGS ('dbx_value_regex' = 'include|exclude|requires|incompatible');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `updated_by` SET TAGS ('dbx_business_glossary_term' = 'Updated By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `vehicle_platform` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Platform');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`configuration_rule` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Created By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` SET TAGS ('dbx_subdomain' = 'change_control');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ota_release_id` SET TAGS ('dbx_business_glossary_term' = 'OTA Release Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Approved By Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `engineering_team_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Team Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ota_compliance_approval_id` SET TAGS ('dbx_business_glossary_term' = 'Ota Compliance Approval Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ecu_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Target ECU Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_ecu_ecu_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Target ECU Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `validation_test_id` SET TAGS ('dbx_business_glossary_term' = 'Validation Test Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `compatible_vin_range` SET TAGS ('dbx_business_glossary_term' = 'Compatible VIN Range');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_business_glossary_term' = 'Compliance Standard');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `cybersecurity_assessment_status` SET TAGS ('dbx_business_glossary_term' = 'Cybersecurity Assessment Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `cybersecurity_assessment_status` SET TAGS ('dbx_value_regex' = 'passed|failed|not_tested');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `cybersecurity_score` SET TAGS ('dbx_business_glossary_term' = 'Cybersecurity Score');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `distribution_method` SET TAGS ('dbx_business_glossary_term' = 'Distribution Method');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `distribution_method` SET TAGS ('dbx_value_regex' = 'ota|dealer|service_center');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `effective_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `estimated_download_size_mb` SET TAGS ('dbx_business_glossary_term' = 'Estimated Download Size (MB)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `estimated_install_time_minutes` SET TAGS ('dbx_business_glossary_term' = 'Estimated Install Time (Minutes)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `expiry_date` SET TAGS ('dbx_business_glossary_term' = 'Expiry Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `is_critical` SET TAGS ('dbx_business_glossary_term' = 'Is Critical');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `is_mandatory` SET TAGS ('dbx_business_glossary_term' = 'Is Mandatory');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ota_release_status` SET TAGS ('dbx_business_glossary_term' = 'Release Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `ota_release_status` SET TAGS ('dbx_value_regex' = 'draft|pending|approved|deployed|retracted');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `regulatory_compliance_flag` SET TAGS ('dbx_business_glossary_term' = 'Regulatory Compliance Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `release_approval_date` SET TAGS ('dbx_business_glossary_term' = 'Release Approval Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `release_build_number` SET TAGS ('dbx_business_glossary_term' = 'Release Build Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `release_hash` SET TAGS ('dbx_business_glossary_term' = 'Release Hash');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `release_signature` SET TAGS ('dbx_business_glossary_term' = 'Release Signature');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `release_signature` SET TAGS ('dbx_pii_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `release_source` SET TAGS ('dbx_business_glossary_term' = 'Release Source');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `release_source` SET TAGS ('dbx_value_regex' = 'internal|supplier|partner');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `release_type` SET TAGS ('dbx_business_glossary_term' = 'Release Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `release_type` SET TAGS ('dbx_value_regex' = 'feature|security|calibration|regulatory');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `release_version` SET TAGS ('dbx_business_glossary_term' = 'Release Version');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `rollback_supported` SET TAGS ('dbx_business_glossary_term' = 'Rollback Supported');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `rollback_window_days` SET TAGS ('dbx_business_glossary_term' = 'Rollback Window (Days)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `rollout_strategy` SET TAGS ('dbx_business_glossary_term' = 'Rollout Strategy');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `software_delta_description` SET TAGS ('dbx_business_glossary_term' = 'Software Delta Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_market` SET TAGS ('dbx_business_glossary_term' = 'Target Market');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_model_year_end` SET TAGS ('dbx_business_glossary_term' = 'Target Model Year End');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_model_year_start` SET TAGS ('dbx_business_glossary_term' = 'Target Model Year Start');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_region` SET TAGS ('dbx_business_glossary_term' = 'Target Region');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `target_vehicle_model` SET TAGS ('dbx_business_glossary_term' = 'Target Vehicle Model');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `test_result_summary` SET TAGS ('dbx_business_glossary_term' = 'Test Result Summary');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `validation_status` SET TAGS ('dbx_business_glossary_term' = 'Validation Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`ota_release` ALTER COLUMN `validation_status` SET TAGS ('dbx_value_regex' = 'passed|failed|not_tested');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `engineering_document_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Document ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Author Employee Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `approval_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approval Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `associated_part` SET TAGS ('dbx_business_glossary_term' = 'Associated Part Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `associated_program` SET TAGS ('dbx_business_glossary_term' = 'Associated Vehicle Program');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `author` SET TAGS ('dbx_business_glossary_term' = 'Document Author');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_business_glossary_term' = 'Compliance Standard');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `confidentiality_level` SET TAGS ('dbx_business_glossary_term' = 'Confidentiality Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `confidentiality_level` SET TAGS ('dbx_value_regex' = 'public|internal|confidential|restricted');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `document_number` SET TAGS ('dbx_business_glossary_term' = 'Document Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `document_type` SET TAGS ('dbx_business_glossary_term' = 'Document Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `engineering_document_status` SET TAGS ('dbx_business_glossary_term' = 'Document Lifecycle Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `engineering_document_status` SET TAGS ('dbx_value_regex' = 'draft|released|archived|obsolete');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `file_path` SET TAGS ('dbx_business_glossary_term' = 'Storage File Path');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `file_size_bytes` SET TAGS ('dbx_business_glossary_term' = 'File Size (Bytes)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `format` SET TAGS ('dbx_business_glossary_term' = 'Document File Format');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `format` SET TAGS ('dbx_value_regex' = 'pdf|dwg|docx|xlsx|xml');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `is_digital_twin_ready` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Ready Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `release_date` SET TAGS ('dbx_business_glossary_term' = 'Release Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `retention_policy` SET TAGS ('dbx_business_glossary_term' = 'Document Retention Policy');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `retention_policy` SET TAGS ('dbx_value_regex' = 'keep_5_years|keep_10_years|permanent');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `revision` SET TAGS ('dbx_business_glossary_term' = 'Revision Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `title` SET TAGS ('dbx_business_glossary_term' = 'Document Title');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_document` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` ALTER COLUMN `engineering_adas_feature_id` SET TAGS ('dbx_business_glossary_term' = 'Primary Key for engineering_adas_feature');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_adas_feature` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` SET TAGS ('dbx_subdomain' = 'program_management');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_target_id` SET TAGS ('dbx_business_glossary_term' = 'Cost Target ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Engineer ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `primary_cost_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Responsible Engineer ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `primary_cost_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `primary_cost_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program ID');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `approval_date` SET TAGS ('dbx_business_glossary_term' = 'Approval Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `approval_status` SET TAGS ('dbx_business_glossary_term' = 'Approval Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `approval_status` SET TAGS ('dbx_value_regex' = 'pending|approved|rejected|under_review');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `component_code` SET TAGS ('dbx_business_glossary_term' = 'Component Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_basis` SET TAGS ('dbx_business_glossary_term' = 'Cost Basis');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_basis` SET TAGS ('dbx_value_regex' = 'baseline|benchmark|historical|target');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_gap_percentage` SET TAGS ('dbx_business_glossary_term' = 'Cost Gap Percentage');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_gap_total` SET TAGS ('dbx_business_glossary_term' = 'Cost Gap Total (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_methodology` SET TAGS ('dbx_business_glossary_term' = 'Cost Methodology');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_methodology` SET TAGS ('dbx_value_regex' = 'DTC|Value Engineering|Target Costing|Other');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_reduction_ideas_count` SET TAGS ('dbx_business_glossary_term' = 'Cost Reduction Ideas Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_target_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `cost_target_status` SET TAGS ('dbx_value_regex' = 'active|inactive|archived|draft');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `current_estimated_cost_manufacturing` SET TAGS ('dbx_business_glossary_term' = 'Current Estimated Cost Manufacturing (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `current_estimated_cost_material` SET TAGS ('dbx_business_glossary_term' = 'Current Estimated Cost Material (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `current_estimated_cost_total` SET TAGS ('dbx_business_glossary_term' = 'Current Estimated Cost Total (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `effective_end_date` SET TAGS ('dbx_business_glossary_term' = 'Effective End Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `effective_start_date` SET TAGS ('dbx_business_glossary_term' = 'Effective Start Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `is_locked` SET TAGS ('dbx_business_glossary_term' = 'Is Locked');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `system_or_component` SET TAGS ('dbx_business_glossary_term' = 'System or Component');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `target_code` SET TAGS ('dbx_business_glossary_term' = 'Cost Target Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `target_cost_manufacturing` SET TAGS ('dbx_business_glossary_term' = 'Target Cost Manufacturing (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `target_cost_material` SET TAGS ('dbx_business_glossary_term' = 'Target Cost Material (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `target_cost_total` SET TAGS ('dbx_business_glossary_term' = 'Target Cost Total (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `target_currency` SET TAGS ('dbx_business_glossary_term' = 'Target Currency');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `target_freeze_date` SET TAGS ('dbx_business_glossary_term' = 'Target Freeze Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `target_name` SET TAGS ('dbx_business_glossary_term' = 'Cost Target Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `target_type` SET TAGS ('dbx_business_glossary_term' = 'Cost Target Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `target_type` SET TAGS ('dbx_value_regex' = 'design|manufacturing|total|material|labor');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cost_target` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` SET TAGS ('dbx_data_type' = 'association_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` SET TAGS ('dbx_association_edges' = 'engineering.part_master,manufacturing.production_bom');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `engineering_bom_component_id` SET TAGS ('dbx_business_glossary_term' = 'Bom Component - Bom Component Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Bom Component - Part Master Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `production_bom_id` SET TAGS ('dbx_business_glossary_term' = 'Bom Component - Production Bom Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `component_type` SET TAGS ('dbx_business_glossary_term' = 'Component Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `installation_sequence` SET TAGS ('dbx_business_glossary_term' = 'Installation Sequence');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `quantity_per_vehicle` SET TAGS ('dbx_business_glossary_term' = 'Quantity per Vehicle');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_bom_component` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit of Measure');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` SET TAGS ('dbx_data_type' = 'association_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` SET TAGS ('dbx_association_edges' = 'engineering.part_master,dealer.dealership');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `dealer_part_inventory_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - Dealer Part Inventory Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `dealership_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - Dealership Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - Part Master Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `dealer_cost_price` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - Dealer Cost Price');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `lead_time_days` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - Lead Time Days');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `list_price` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - List Price');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `quantity_on_hand` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - Quantity On Hand');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `reorder_point` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - Reorder Point');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `reorder_quantity` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - Reorder Quantity');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `retail_price` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - Retail Price');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`dealer_part_inventory` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Dealer Part Inventory - Unit Of Measure');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` SET TAGS ('dbx_subdomain' = 'program_management');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Team Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Employee Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_manager_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Manager Employee Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_manager_employee_id` SET TAGS ('dbx_internal' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `parent_engineering_team_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Engineering Team Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `parent_engineering_team_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `budget_amount` SET TAGS ('dbx_business_glossary_term' = 'Budget Amount');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_code` SET TAGS ('dbx_business_glossary_term' = 'Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `compliance_status` SET TAGS ('dbx_business_glossary_term' = 'Compliance Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_email` SET TAGS ('dbx_business_glossary_term' = 'Contact Email');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_email` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_email` SET TAGS ('dbx_pii_email' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_phone` SET TAGS ('dbx_business_glossary_term' = 'Contact Phone');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_phone` SET TAGS ('dbx_restricted' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `contact_phone` SET TAGS ('dbx_pii_phone' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `cost_center_code` SET TAGS ('dbx_business_glossary_term' = 'Cost Center Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `data_classification` SET TAGS ('dbx_business_glossary_term' = 'Data Classification');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_description` SET TAGS ('dbx_business_glossary_term' = 'Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `digital_twin_enabled` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Enabled');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `domain` SET TAGS ('dbx_business_glossary_term' = 'Domain');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_toolset` SET TAGS ('dbx_business_glossary_term' = 'Engineering Toolset');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `is_virtual` SET TAGS ('dbx_business_glossary_term' = 'Is Virtual');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `last_reviewed_by` SET TAGS ('dbx_business_glossary_term' = 'Last Reviewed By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `location` SET TAGS ('dbx_business_glossary_term' = 'Location');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_name` SET TAGS ('dbx_business_glossary_term' = 'Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `number_of_members` SET TAGS ('dbx_business_glossary_term' = 'Number Of Members');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `primary_skill` SET TAGS ('dbx_business_glossary_term' = 'Primary Skill');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `safety_certification_level` SET TAGS ('dbx_business_glossary_term' = 'Safety Certification Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `engineering_team_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `team_level` SET TAGS ('dbx_business_glossary_term' = 'Team Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `team_type` SET TAGS ('dbx_business_glossary_term' = 'Team Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_team` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_id` SET TAGS ('dbx_business_glossary_term' = 'Material Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `parent_material_id` SET TAGS ('dbx_business_glossary_term' = 'Parent Material Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `parent_material_id` SET TAGS ('dbx_self_ref_fk' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `application` SET TAGS ('dbx_business_glossary_term' = 'Material Application');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `boiling_point_c` SET TAGS ('dbx_business_glossary_term' = 'Boiling Point C');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `certification` SET TAGS ('dbx_business_glossary_term' = 'Certification');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_code` SET TAGS ('dbx_business_glossary_term' = 'Material Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `color` SET TAGS ('dbx_business_glossary_term' = 'Material Color');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `corrosion_resistance` SET TAGS ('dbx_business_glossary_term' = 'Corrosion Resistance');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `cost_per_kg_usd` SET TAGS ('dbx_business_glossary_term' = 'Cost Per Kg Usd');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `customs_tariff_code` SET TAGS ('dbx_business_glossary_term' = 'Customs Tariff Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `density_kg_per_m3` SET TAGS ('dbx_business_glossary_term' = 'Density Kg Per M3');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `electrical_resistivity_ohm_m` SET TAGS ('dbx_business_glossary_term' = 'Electrical Resistivity Ohm M');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `elongation_percent` SET TAGS ('dbx_business_glossary_term' = 'Elongation Percent');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `environmental_impact_score` SET TAGS ('dbx_business_glossary_term' = 'Environmental Impact Score');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `family` SET TAGS ('dbx_business_glossary_term' = 'Material Family');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `grade` SET TAGS ('dbx_business_glossary_term' = 'Grade');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `hardness_hb` SET TAGS ('dbx_business_glossary_term' = 'Hardness Hb');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `hazardous` SET TAGS ('dbx_business_glossary_term' = 'Hazardous');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `hazardous_class` SET TAGS ('dbx_business_glossary_term' = 'Hazardous Class');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_group` SET TAGS ('dbx_business_glossary_term' = 'Material Group');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_type` SET TAGS ('dbx_business_glossary_term' = 'Material Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `melting_point_c` SET TAGS ('dbx_business_glossary_term' = 'Melting Point C');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `msds_url` SET TAGS ('dbx_business_glossary_term' = 'Msds Url');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_name` SET TAGS ('dbx_business_glossary_term' = 'Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `origin_country` SET TAGS ('dbx_business_glossary_term' = 'Material Origin Country');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `reach_compliant` SET TAGS ('dbx_business_glossary_term' = 'Reach Compliant');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `recyclable` SET TAGS ('dbx_business_glossary_term' = 'Recyclable');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `recycle_rate_percent` SET TAGS ('dbx_business_glossary_term' = 'Recycle Rate Percent');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `revision_number` SET TAGS ('dbx_business_glossary_term' = 'Revision Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `rohs_compliant` SET TAGS ('dbx_business_glossary_term' = 'Rohs Compliant');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `source` SET TAGS ('dbx_business_glossary_term' = 'Material Source');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `specification` SET TAGS ('dbx_business_glossary_term' = 'Specification');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `material_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `surface_finish` SET TAGS ('dbx_business_glossary_term' = 'Surface Finish');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `tensile_strength_mpa` SET TAGS ('dbx_business_glossary_term' = 'Tensile Strength Mpa');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `thermal_conductivity_w_per_mk` SET TAGS ('dbx_business_glossary_term' = 'Thermal Conductivity W Per Mk');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `unit_of_measure` SET TAGS ('dbx_business_glossary_term' = 'Unit Of Measure');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`material` ALTER COLUMN `yield_strength_mpa` SET TAGS ('dbx_business_glossary_term' = 'Yield Strength Mpa');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` SET TAGS ('dbx_subdomain' = 'product_definition');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `packaging_specification_id` SET TAGS ('dbx_business_glossary_term' = 'Packaging Specification Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `part_master_id` SET TAGS ('dbx_business_glossary_term' = 'Part Master Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `compliance_standard` SET TAGS ('dbx_business_glossary_term' = 'Compliance Standard');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `effective_from` SET TAGS ('dbx_business_glossary_term' = 'Effective From');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `effective_until` SET TAGS ('dbx_business_glossary_term' = 'Effective Until');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `environmental_impact_score` SET TAGS ('dbx_business_glossary_term' = 'Environmental Impact Score');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `hazardous` SET TAGS ('dbx_business_glossary_term' = 'Hazardous');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `height_mm` SET TAGS ('dbx_business_glossary_term' = 'Height Mm');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `is_default` SET TAGS ('dbx_business_glossary_term' = 'Is Default');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `length_mm` SET TAGS ('dbx_business_glossary_term' = 'Length Mm');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `material_grade` SET TAGS ('dbx_business_glossary_term' = 'Material Grade');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `material_type` SET TAGS ('dbx_business_glossary_term' = 'Material Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `packaging_category` SET TAGS ('dbx_business_glossary_term' = 'Packaging Category');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `packaging_cost_usd` SET TAGS ('dbx_business_glossary_term' = 'Packaging Cost Usd');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `packaging_subcategory` SET TAGS ('dbx_business_glossary_term' = 'Packaging Subcategory');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `record_audit_created` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Created');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `record_audit_updated` SET TAGS ('dbx_business_glossary_term' = 'Record Audit Updated');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `recyclable` SET TAGS ('dbx_business_glossary_term' = 'Recyclable');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `spec_code` SET TAGS ('dbx_business_glossary_term' = 'Spec Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `spec_name` SET TAGS ('dbx_business_glossary_term' = 'Spec Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `spec_type` SET TAGS ('dbx_business_glossary_term' = 'Spec Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `packaging_specification_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `supplier_code` SET TAGS ('dbx_business_glossary_term' = 'Supplier Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `volume_l` SET TAGS ('dbx_business_glossary_term' = 'Volume L');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `weight_kg` SET TAGS ('dbx_business_glossary_term' = 'Weight Kg');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`packaging_specification` ALTER COLUMN `width_mm` SET TAGS ('dbx_business_glossary_term' = 'Width Mm');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` SET TAGS ('dbx_subdomain' = 'change_control');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_change_action_id` SET TAGS ('dbx_business_glossary_term' = 'Engineering Action Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned Engineer Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Assigned Engineer Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `engineering_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `action_code` SET TAGS ('dbx_business_glossary_term' = 'Engineering Action Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `action_description` SET TAGS ('dbx_business_glossary_term' = 'Action Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `action_status` SET TAGS ('dbx_business_glossary_term' = 'Action Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `action_status` SET TAGS ('dbx_value_regex' = 'open|in_progress|completed|closed|cancelled');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `action_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Action Event Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `action_type` SET TAGS ('dbx_business_glossary_term' = 'Action Type (Design Change, Test Rerun, etc.)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `action_type` SET TAGS ('dbx_value_regex' = 'design_change|test_rerun|analysis|supplier_engagement|process_improvement|documentation_update');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `actual_effort_hours` SET TAGS ('dbx_business_glossary_term' = 'Actual Effort (Hours)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `attachment_count` SET TAGS ('dbx_business_glossary_term' = 'Attachment Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `closure_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Closure Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `comments` SET TAGS ('dbx_business_glossary_term' = 'Comments');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `completion_date` SET TAGS ('dbx_business_glossary_term' = 'Completion Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `compliance_flag` SET TAGS ('dbx_business_glossary_term' = 'Compliance Requirement Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `cost_estimate` SET TAGS ('dbx_business_glossary_term' = 'Cost Estimate (USD)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Creation Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code (ISO 4217)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `currency_code` SET TAGS ('dbx_value_regex' = '^[A-Z]{3}$');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `due_date` SET TAGS ('dbx_business_glossary_term' = 'Due Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `estimated_effort_hours` SET TAGS ('dbx_business_glossary_term' = 'Estimated Effort (Hours)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `is_critical` SET TAGS ('dbx_business_glossary_term' = 'Critical Flag');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `priority` SET TAGS ('dbx_business_glossary_term' = 'Action Priority');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `priority` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `resolution_description` SET TAGS ('dbx_business_glossary_term' = 'Resolution Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `risk_level` SET TAGS ('dbx_business_glossary_term' = 'Risk Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `risk_level` SET TAGS ('dbx_value_regex' = 'low|medium|high|critical');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `source_event` SET TAGS ('dbx_business_glossary_term' = 'Source Event');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `source_event` SET TAGS ('dbx_value_regex' = 'test_failure|fmea_finding|gate_review|audit|customer_feedback|regulatory_issue');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `target_milestone` SET TAGS ('dbx_business_glossary_term' = 'Target Milestone');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `title` SET TAGS ('dbx_business_glossary_term' = 'Action Title');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `updated_by` SET TAGS ('dbx_business_glossary_term' = 'Updated By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Record Update Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_change_action` ALTER COLUMN `created_by` SET TAGS ('dbx_business_glossary_term' = 'Created By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` SET TAGS ('dbx_data_type' = 'master_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` SET TAGS ('dbx_subdomain' = 'program_management');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_id` SET TAGS ('dbx_business_glossary_term' = 'Project Identifier');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `employee_id` SET TAGS ('dbx_business_glossary_term' = 'Employee Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_sponsor_employee_id` SET TAGS ('dbx_business_glossary_term' = 'Sponsor Employee Id');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_sponsor_employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_sponsor_employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `vehicle_program_id` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Program Id (Foreign Key)');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `actual_cost` SET TAGS ('dbx_business_glossary_term' = 'Actual Cost');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `approved_by` SET TAGS ('dbx_business_glossary_term' = 'Approved By');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `approved_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Approved Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `budget_amount` SET TAGS ('dbx_business_glossary_term' = 'Budget Amount');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `change_order_count` SET TAGS ('dbx_business_glossary_term' = 'Change Order Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_code` SET TAGS ('dbx_business_glossary_term' = 'Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `compliance_regulation` SET TAGS ('dbx_business_glossary_term' = 'Compliance Regulation');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `created_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Created Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `currency_code` SET TAGS ('dbx_business_glossary_term' = 'Currency Code');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `data_classification` SET TAGS ('dbx_business_glossary_term' = 'Data Classification');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `department` SET TAGS ('dbx_business_glossary_term' = 'Department');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_description` SET TAGS ('dbx_business_glossary_term' = 'Description');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `digital_twin_enabled` SET TAGS ('dbx_business_glossary_term' = 'Digital Twin Enabled');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `end_date` SET TAGS ('dbx_business_glossary_term' = 'End Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_phase` SET TAGS ('dbx_business_glossary_term' = 'Engineering Phase');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `expected_mtbf_hours` SET TAGS ('dbx_business_glossary_term' = 'Expected Mtbf Hours');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `external_partner` SET TAGS ('dbx_business_glossary_term' = 'External Partner');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `is_archived` SET TAGS ('dbx_business_glossary_term' = 'Is Archived');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `is_global` SET TAGS ('dbx_business_glossary_term' = 'Is Global');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `last_review_date` SET TAGS ('dbx_business_glossary_term' = 'Last Review Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `milestone_count` SET TAGS ('dbx_business_glossary_term' = 'Milestone Count');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `milestone_status` SET TAGS ('dbx_business_glossary_term' = 'Milestone Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_name` SET TAGS ('dbx_business_glossary_term' = 'Name');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `notes` SET TAGS ('dbx_business_glossary_term' = 'Notes');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `planned_end_date` SET TAGS ('dbx_business_glossary_term' = 'Planned End Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `planned_start_date` SET TAGS ('dbx_business_glossary_term' = 'Planned Start Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `plant_location` SET TAGS ('dbx_business_glossary_term' = 'Plant Location');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `priority` SET TAGS ('dbx_business_glossary_term' = 'Priority');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `review_outcome` SET TAGS ('dbx_business_glossary_term' = 'Review Outcome');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `risk_level` SET TAGS ('dbx_business_glossary_term' = 'Risk Level');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `start_date` SET TAGS ('dbx_business_glossary_term' = 'Start Date');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_status` SET TAGS ('dbx_business_glossary_term' = 'Status');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `sustainability_score` SET TAGS ('dbx_business_glossary_term' = 'Sustainability Score');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `engineering_project_type` SET TAGS ('dbx_business_glossary_term' = 'Type');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `updated_timestamp` SET TAGS ('dbx_business_glossary_term' = 'Updated Timestamp');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `vehicle_platform` SET TAGS ('dbx_business_glossary_term' = 'Vehicle Platform');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`engineering_project` ALTER COLUMN `version_number` SET TAGS ('dbx_business_glossary_term' = 'Version Number');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`cfd_simulation_result` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`fea_simulation_result` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`nvh_test_result` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`test_bench_run` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`test_bench_run` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`test_bench_run` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`test_bench_run` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` SET TAGS ('dbx_data_type' = 'transactional_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`sensor_dataset` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` SET TAGS ('dbx_data_type' = 'reference_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`driving_scenario_library` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` SET TAGS ('dbx_data_type' = 'association_data');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` SET TAGS ('dbx_subdomain' = 'validation_testing');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` ALTER COLUMN `employee_id` SET TAGS ('dbx_confidential' = 'true');
+ALTER TABLE `vibe_automotive_v1`.`engineering`.`requirements_traceability` ALTER COLUMN `employee_id` SET TAGS ('dbx_pii' = 'true');
