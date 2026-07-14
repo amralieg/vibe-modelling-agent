@@ -390,6 +390,7 @@ The notebook exposes fine-grained widgets for naming conventions, tag prefixes, 
 | 07 | **Included Org Divisions** | Yes | Operations / Operations and Business / all three |
 | 08 | **Model Vibes** | Conditional | Natural-language instructions — inline text or a path to a `.txt` on a UC Volume |
 | 09 | **Installation Catalog** | Conditional | Unity Catalog target for physical deployment |
+| 09a | **Cataloging Style** | No | Physical catalog layout: `One Catalog` (whole model in one), `Catalog per Division`, or `Catalog per Domain` |
 | 10 | **Sample Records** | No | Synthetic records per table (0 = none) |
 | 11 | **Model JSON File** | Conditional | Path to a previously generated `model.json` for re-install or continuation |
 
