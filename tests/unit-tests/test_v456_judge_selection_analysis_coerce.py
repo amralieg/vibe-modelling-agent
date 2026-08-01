@@ -15,6 +15,8 @@ Reporter cases covered:
   4. missing key -> default {}
 """
 import ast
+
+from notebook_source_util import agent_version_line
 import json
 import os
 
@@ -135,7 +137,7 @@ def _issue21_judge(selection_analysis):
 
 
 def test_version_is_456():
-    assert '__AGENT_VERSION__ = "4.6.5"' in _full_src()
+    assert agent_version_line() in _full_src()
 
 
 def test_wiring_matches_issue21_fix_site():

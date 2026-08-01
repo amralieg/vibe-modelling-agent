@@ -1,7 +1,7 @@
 """v4.5.2 behavioral tests for the post-finalize cycle guard (alias=v452-post-finalize-cycle-guard).
 
 ROOT CAUSE (fail-pre): the reviewer finalizer `_v441_reviewer_finalization` materializes
-reviewer-named products and stubs their FK columns at cell-188 line ~545, AFTER the `_v403`
+reviewer-named products and stubs their FK columns at the model-json serialization cell, AFTER the `_v403`
 serialize cycle guard runs at line ~517. Two sibling products created by one reviewer
 directive each received an FK to the other (A.b_id->B and B.a_id->A), shipping a 2-cycle /
 bidirectional pair that failed G4 (no FK cycles) and G6 (no bidirectional FK). The shipping
@@ -49,16 +49,21 @@ def _module_consts(names, source=_SRC):
 
 def _cell188_source():
     nb = json.loads(Path(NOTEBOOK_PATH).read_text(encoding="utf-8"))
-    c = nb["cells"][188]
-    s = c["source"]
-    return "".join(s) if isinstance(s, list) else s
+    for c in nb["cells"]:
+        if c.get("cell_type") != "code":
+            continue
+        s = c["source"]
+        s = "".join(s) if isinstance(s, list) else s
+        if "def step_generate_data_model_json(" in s:
+            return s
+    raise AssertionError("step_generate_data_model_json cell not found")
 
 
 def test_v452_guard_alias_ordered_after_finalizer():
     """FAIL-PRE on HEAD (alias absent); PASS-POST (guard call ordered after the finalizer)."""
     src = _cell188_source()
     assert "v452-post-finalize-cycle-guard FIRED" in src, (
-        "v4.5.2 post-finalize guard alias missing from cell 188 (pre-patch state)"
+        "v4.5.2 post-finalize guard alias missing from the model-json serialization cell (pre-patch state)"
     )
     lines = src.split("\n")
     fin_idx = next(i for i, l in enumerate(lines) if "_v441_reviewer_finalization(data_model" in l)

@@ -2,6 +2,7 @@ import re
 from collections import defaultdict
 
 from notebook_source_util import (
+    agent_version_line,
     exec_function_namespace,
     exec_functions_namespace,
     notebook_concat_source,
@@ -307,6 +308,6 @@ def test_post_clean_new_edge_writers_use_shared_guard():
 
 def test_version_is_v460_and_first_code_statement():
     source = notebook_concat_source()
-    assert '__AGENT_VERSION__ = "4.6.5"' in source
+    assert agent_version_line() in source
     first_code_cell = source.lstrip().splitlines()[0]
-    assert first_code_cell == '__AGENT_VERSION__ = "4.6.5"  # alias=agent-version-global'
+    assert first_code_cell == agent_version_line()

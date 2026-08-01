@@ -1,6 +1,6 @@
 """v4.6.4 — behavioral tests for the 05b sample-data-not-landing root cause.
 
-ROOT CAUSE (proven): the standalone 'generate sample data' op built its
+ROOT CAUSE (proven): a caller built its
 CatalogResolver from the widget cataloging_style in its DISPLAY form
 ("Catalog per Division") without normalizing to the snake form
 ("catalog_per_division") that CatalogResolver.resolve_catalog() matches on.
@@ -138,9 +138,8 @@ def test_style_normalization_recorded_on_instance():
     assert CatalogResolver("catalog_per_domain", "b").style == "catalog_per_domain"
 
 
-def test_landing_hardfail_gate_present_in_source():
-    """Smoke: the 0-rows hard-fail gate and SSOT catalog-map fixes are wired
-    (behavioral landing verification runs against Spark in the live tester)."""
-    assert "gensamples-landing-hardfail FIRED v4.6.5" in SOURCE
-    assert "gensamples-catalog-ssot FIRED v4.6.4" in SOURCE
+def test_style_normalize_alias_present_in_source():
+    """Smoke: the resolver's normalization is wired at the one component that
+    needs the snake form. The gensamples landing gates left with the sample
+    subsystem in v4.8.0 and now live in the model installer."""
     assert "catalogresolver-style-normalize FIRED v4.6.4" in SOURCE

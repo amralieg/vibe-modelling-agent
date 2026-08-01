@@ -33,9 +33,14 @@ _SRC = concat_source()
 
 def _cell188_source():
     nb = json.loads(Path(NOTEBOOK_PATH).read_text(encoding="utf-8"))
-    c = nb["cells"][188]
-    s = c["source"]
-    return "".join(s) if isinstance(s, list) else s
+    for c in nb["cells"]:
+        if c.get("cell_type") != "code":
+            continue
+        s = c["source"]
+        s = "".join(s) if isinstance(s, list) else s
+        if "def step_generate_data_model_json(" in s:
+            return s
+    raise AssertionError("step_generate_data_model_json cell not found")
 
 
 def _guard():
@@ -59,7 +64,7 @@ def test_v453_call_ordered_before_cycle_guard():
     """FAIL-PRE on HEAD (alias absent); PASS-POST (v453 call ordered BEFORE the v452 cycle guard)."""
     src = _cell188_source()
     assert "v453-identical-ref-ssot-collapse call-site" in src, (
-        "v4.5.3 SSOT-collapse call-site missing from cell 188 (pre-patch state)"
+        "v4.5.3 SSOT-collapse call-site missing from the model-json serialization cell (pre-patch state)"
     )
     lines = src.split("\n")
     v453_idx = next(i for i, l in enumerate(lines) if "_v453_collapse_identical_cross_domain_refs(data_model, logger)" in l)

@@ -178,9 +178,3 @@ def test_empty_inputs_return_none():
     assert not spark.calls  # no SQL issued on degenerate input
 
 
-def test_helper_and_callers_wired_in_source():
-    """Smoke: the helper exists and BOTH the write path and the landing check call it."""
-    assert "def _resolve_existing_physical_table(" in SOURCE
-    assert SOURCE.count("_resolve_existing_physical_table(spark,") >= 2  # write + landing
-    assert "gensamples-physical-ground-truth" in SOURCE
-    assert "gensamples-landing-hardfail FIRED v4.6.5" in SOURCE

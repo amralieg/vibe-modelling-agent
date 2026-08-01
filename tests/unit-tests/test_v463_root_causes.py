@@ -3,6 +3,7 @@ import json
 import re
 
 from notebook_source_util import (
+    agent_version_line,
     exec_function_namespace as _exec_function_namespace,
     exec_functions_namespace as _exec_functions_namespace,
     notebook_concat_source,
@@ -518,9 +519,7 @@ def test_architect_gate_bag_merge_preserves_domain_queue_when_global_bag_empty()
 
 def test_v463_version_aliases_and_terminal_residual_wiring():
     source = SOURCE
-    assert source.lstrip().splitlines()[0] == (
-        '__AGENT_VERSION__ = "4.6.5"  # alias=agent-version-global'
-    )
+    assert source.lstrip().splitlines()[0] == agent_version_line()
     for alias in (
         "in-domain-cycle-skip",
         "cross-domain-cycle-skip",

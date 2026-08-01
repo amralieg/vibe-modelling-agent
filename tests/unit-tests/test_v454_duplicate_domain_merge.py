@@ -32,9 +32,14 @@ _SRC = concat_source()
 
 def _cell188_source():
     nb = json.loads(Path(NOTEBOOK_PATH).read_text(encoding="utf-8"))
-    c = nb["cells"][188]
-    s = c["source"]
-    return "".join(s) if isinstance(s, list) else s
+    for c in nb["cells"]:
+        if c.get("cell_type") != "code":
+            continue
+        s = c["source"]
+        s = "".join(s) if isinstance(s, list) else s
+        if "def step_generate_data_model_json(" in s:
+            return s
+    raise AssertionError("step_generate_data_model_json cell not found")
 
 
 def _merge():
@@ -57,7 +62,7 @@ class _Log:
 def test_v454_call_ordered_before_v453_and_guard():
     src = _cell188_source()
     assert "v454-duplicate-domain-merge call-site" in src, (
-        "v4.5.4 domain-merge call-site missing from cell 188 (pre-patch state)"
+        "v4.5.4 domain-merge call-site missing from the model-json serialization cell (pre-patch state)"
     )
     i454 = src.find("_v454_merge_duplicate_named_domains(data_model, logger)")
     i453 = src.find("_v453_collapse_identical_cross_domain_refs(data_model, logger)")

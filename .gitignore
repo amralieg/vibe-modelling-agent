@@ -25,6 +25,7 @@ __pycache__/
 *.ipynb.*.bak
 *.ipynb.v*
 *.bak
+*.bak-*
 *bak
 *_BACKUP.ipynb
 .scratch_audit/

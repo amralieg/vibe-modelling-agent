@@ -5,6 +5,8 @@ string (or list-of-strings) nested fields instead of dict / list-of-dicts.
 """
 from __future__ import annotations
 
+from notebook_source_util import agent_version_line
+
 import ast
 import json
 import types
@@ -84,13 +86,13 @@ class _Log:
 
 def test_agent_version_is_457():
     src = _cell_src(1)
-    assert '__AGENT_VERSION__ = "4.6.5"' in src
+    assert agent_version_line() in src
     # first non-comment code statement
     for line in src.splitlines():
         s = line.strip()
         if not s or s.startswith("#"):
             continue
-        assert s.startswith('__AGENT_VERSION__ = "4.6.5"')
+        assert s == agent_version_line()
         break
 
 

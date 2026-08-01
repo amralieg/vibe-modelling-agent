@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -24,17 +25,68 @@ def notebook_concat_source() -> str:
     return "\n\n".join(parts)
 
 
+AGENT_VERSION_LINE_RE = re.compile(
+    r'^__AGENT_VERSION__ = "(\d)\.(\d)\.(\d)"  # alias=agent-version-global$'
+)
+
+
+def agent_version_line() -> str:
+    """First code statement of Cell 1, which CLAUDE.md 3a-bis pins to the version.
+
+    Returned instead of a frozen literal so a version bump does not redden every
+    prior version's test file.
+    """
+    nb = json.loads(NOTEBOOK_PATH.read_text(encoding="utf-8"))
+    for cell in nb.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        src = cell.get("source", "")
+        if isinstance(src, list):
+            src = "".join(src)
+        for line in src.split("\n"):
+            if line.strip() and not line.lstrip().startswith("#"):
+                assert AGENT_VERSION_LINE_RE.match(line), (
+                    f"first code statement must be the single-digit-semver version "
+                    f"constant, got: {line!r}"
+                )
+                return line
+    raise AssertionError("no code cell found in the agent notebook")
+
+
 def slice_function_source(fn_name: str, source: Optional[str] = None) -> str:
-    """Return source of the last module-level function named fn_name."""
+    """Return source of the last module-level function named fn_name.
+
+    Also supports a dotted ``"ClassName.method"`` form: it walks the matching
+    ClassDef and returns the last method of that name defined inside it. This is
+    the ``getsource_OR_slice`` fallback for class methods whose LIVE object has
+    no introspectable Python source (e.g. re-bound / dynamically assigned
+    methods, or a class swapped for a C-extension) — the source still exists in
+    the notebook, so we prove it by slicing. Method lookup is class-scoped so a
+    common method name (e.g. ``add``) defined in several classes resolves to the
+    right one.
+    """
     source = source or notebook_concat_source()
     lines = source.splitlines(keepends=True)
     tree = ast.parse(source)
-    target: Optional[ast.FunctionDef] = None
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == fn_name:
-            target = node
-    if target is None:
-        raise LookupError(f"module-level def {fn_name!r} not found in agent notebook")
+    _func_types = (ast.FunctionDef, ast.AsyncFunctionDef)
+    target = None
+    if "." in fn_name:
+        class_name, method_name = fn_name.split(".", 1)
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef) and node.name == class_name:
+                for sub in node.body:
+                    if isinstance(sub, _func_types) and sub.name == method_name:
+                        target = sub
+        if target is None:
+            raise LookupError(
+                f"method {fn_name!r} not found in agent notebook"
+            )
+    else:
+        for node in tree.body:
+            if isinstance(node, _func_types) and node.name == fn_name:
+                target = node
+        if target is None:
+            raise LookupError(f"module-level def {fn_name!r} not found in agent notebook")
     start = target.lineno - 1
     end = target.end_lineno
     return "".join(lines[start:end])

@@ -1,9 +1,28 @@
+import ast
+
+from notebook_source_util import agent_version_line
 import json
 import re
 from pathlib import Path
 
 
 NB = Path(__file__).resolve().parents[2] / "agent" / "dbx_vibe_modelling_agent.ipynb"
+
+
+def _coerce_helpers():
+    """Slice the real coerce helpers from cell 25 so isolated class methods that
+    reference _v466_coerce_llm_obj (v4.6.6 parse-site hardening) exec cleanly."""
+    nb = json.loads(NB.read_text(encoding="utf-8"))
+    cell25 = "".join(nb["cells"][25]["source"])
+    tree = ast.parse(cell25)
+    wanted = {"_coerce_dict", "_coerce_list_of_dicts", "_v466_coerce_llm_obj"}
+    body = [
+        n for n in tree.body
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in wanted
+    ]
+    ns = {"json": json, "re": re, "logging": __import__("logging")}
+    exec(compile(ast.Module(body=body, type_ignores=[]), "<cell25>", "exec"), ns)
+    return {k: ns[k] for k in wanted}
 
 
 def _source():
@@ -30,6 +49,7 @@ def _validator_class():
         "_DOMAIN_CEILING_FACTOR": 1.5,
         "_vov_user_product_tokens": lambda config: set(),
         "_vibe_get_system_meta": lambda value, key: "",
+        **_coerce_helpers(),
     }
     exec(match.group(0).lstrip("\n"), namespace)
     return namespace["SmartWorkerValidator"]
@@ -93,10 +113,8 @@ def _validate(count, with_vibe, malformed=False):
 
 def test_v462_version_and_relaxation_alias():
     source = _source()
-    assert '__AGENT_VERSION__ = "4.6.5"' in source
-    assert source.lstrip().splitlines()[0] == (
-        '__AGENT_VERSION__ = "4.6.5"  # alias=agent-version-global'
-    )
+    assert agent_version_line() in source
+    assert source.lstrip().splitlines()[0] == agent_version_line()
     assert "[vibe-product-count-relax FIRED v4.6.2]" in source
 
 
