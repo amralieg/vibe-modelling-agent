@@ -238,5 +238,9 @@ class TestExportMirrorResync:
         assert text.index("v481-export-mirror-resync") < text.index("    products = products_for_export")
 
 
-def test_the_agent_version_is_bumped_for_this_change():
-    assert agent_version_line().endswith('"4.8.1"  # alias=agent-version-global') or '"4.8.1"' in agent_version_line()
+def test_the_agent_version_is_at_least_the_one_that_shipped_these_fixes():
+    # pinned to a floor, not a literal: a later bump must not fail a test about v4.8.1's
+    # fixes, but a rollback below 4.8.1 must.
+    m = re.search(r'__AGENT_VERSION__ = "(\d)\.(\d)\.(\d)"', agent_version_line())
+    assert m, agent_version_line()
+    assert tuple(int(g) for g in m.groups()) >= (4, 8, 1), agent_version_line()
