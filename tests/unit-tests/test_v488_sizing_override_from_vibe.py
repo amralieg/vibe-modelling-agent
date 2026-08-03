@@ -15,7 +15,7 @@ import os
 
 import pytest
 
-from notebook_source_util import cell_containing
+from notebook_source_util import assert_agent_version_at_least, cell_containing
 
 CLAMP_ANCHOR = "def _clamp_and_validate_model_params("
 HELPER_NAME = "_v488_sizing_override_from_directives"
@@ -186,8 +186,5 @@ def test_it_announces_itself_only_when_it_changed_the_outcome():
     assert "alias=sizing-override-from-vibe" in src
 
 
-def test_version_is_488():
-    nb = json.load(open(os.path.join(os.path.dirname(__file__), "..", "..",
-                                     "agent", "dbx_vibe_modelling_agent.ipynb")))
-    src = "".join(nb["cells"][1]["source"])
-    assert '__AGENT_VERSION__ = "4.8.8"' in src
+def test_version_is_488_or_later():
+    assert_agent_version_at_least("4.8.8")
