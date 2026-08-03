@@ -10,7 +10,7 @@ Each test drives production notebook source, not a reimplementation.
 import re
 
 import pytest
-from notebook_source_util import cell_containing
+from notebook_source_util import assert_agent_version_at_least, cell_containing
 
 
 def _ddl_resync_source():
@@ -121,9 +121,8 @@ def test_the_flat_rename_site_carries_column_name(needle):
     assert needle in src
 
 
-def test_the_running_version_is_487():
-    src = cell_containing("__AGENT_VERSION__ = ")
-    assert '__AGENT_VERSION__ = "4.8.7"' in src
+def test_the_running_version_is_487_or_later():
+    assert_agent_version_at_least("4.8.7")
 
 
 def test_the_resync_runs_before_any_ddl_is_emitted():
