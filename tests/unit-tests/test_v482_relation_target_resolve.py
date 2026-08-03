@@ -141,5 +141,9 @@ def test_the_guard_is_wired_into_the_notebook_source():
     assert re.search(r"if not _rel_known:\s*\n\s+try:", src)
 
 
-def test_the_agent_version_is_bumped_for_this_change():
-    assert agent_version_line().startswith('__AGENT_VERSION__ = "4.8.2"')
+def test_the_agent_version_is_at_least_the_one_that_shipped_this_fix():
+    # a floor, not a literal: a later bump must not fail a test about v4.8.2's fix,
+    # but a rollback below 4.8.2 must.
+    m = re.search(r'__AGENT_VERSION__ = "(\d)\.(\d)\.(\d)"', agent_version_line())
+    assert m, agent_version_line()
+    assert tuple(int(g) for g in m.groups()) >= (4, 8, 2), agent_version_line()
