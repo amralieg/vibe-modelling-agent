@@ -35,3 +35,6 @@ __pycache__/
 *_src_scratch.py
 .databricks/
 **/.databricks/
+
+# Auto-generated coverage snapshot rewritten every pytest run
+tests/unit-tests/.last_coverage_report.json
