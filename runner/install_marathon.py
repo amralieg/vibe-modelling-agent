@@ -32,6 +32,7 @@ from pathlib import Path
 _STATE_LOCK = threading.Lock()
 _SETUP_LOCK = threading.Lock()
 _setup_active = 0
+MAX_SETUP_PARALLEL = 10
 
 INDUSTRIES = [
     "advertising", "agriculture", "airlines", "apparel_fashion", "automotive",
@@ -70,10 +71,21 @@ MVM_TIMEOUT_S = 10800   # 3h
 JOB_TIMEOUT_S = 16200   # 4.5h
 DEFAULT_MAX_PARALLEL = 40
 
-STATE_FILE = os.path.expanduser("~/claude/vibe-agent/install_marathon_v2_state.json")
-PULSE_FILE = os.path.expanduser("~/claude/vibe-agent/install_marathon_v2_pulses.txt")
-HEARTBEAT_FILE = os.path.expanduser("~/claude/vibe-agent/install_marathon_heartbeat.log")
-HEARTBEAT_STATE_FILE = os.path.expanduser("~/claude/vibe-agent/install_marathon_heartbeat_state.json")
+STATE_FILE = os.path.expanduser(
+    os.environ.get("MARATHON_STATE_FILE", "~/claude/vibe-agent/install_marathon_v2_state.json")
+)
+PULSE_FILE = os.path.expanduser(
+    os.environ.get("MARATHON_PULSE_FILE", "~/claude/vibe-agent/install_marathon_v2_pulses.txt")
+)
+HEARTBEAT_FILE = os.path.expanduser(
+    os.environ.get("MARATHON_HEARTBEAT_FILE", "~/claude/vibe-agent/install_marathon_heartbeat.log")
+)
+HEARTBEAT_STATE_FILE = os.path.expanduser(
+    os.environ.get("MARATHON_HEARTBEAT_STATE_FILE", "~/claude/vibe-agent/install_marathon_heartbeat_state.json")
+)
+AUDIT_FILE = os.path.expanduser(
+    os.environ.get("MARATHON_AUDIT_FILE", "~/claude/vibe-agent/install_marathon_verify_audit.log")
+)
 HEARTBEAT_INTERVAL_S = 900  # 15 minutes
 MODEL_CACHE = Path("/tmp/install_marathon_models")
 
@@ -272,14 +284,18 @@ def drop_owned_catalogs(profile: str, owner: str = "amr.ali@databricks.com") -> 
 
 
 def catalog_name(ind: str, size: str) -> str:
-    return f"marathon_{ind}_{size}"
+    return f"idx_{ind}_{size}"
 
 
 def staging_catalog(profile: str, ind: str, size: str) -> str:
     """Parent catalog for pruned-model volume staging (fe-adp slot cap: reuse ECM)."""
     if profile == "fe-adp" and ind == "health_insurance" and size == "mvm":
-        return "marathon_health_insurance_ecm"
-    return f"marathon_staging_{profile.replace('-', '_')}"
+        return "idx_health_insurance_ecm"
+    target = catalog_name(ind, size)
+    st, _, _ = sql_exec(profile, f"DESCRIBE CATALOG EXTENDED `{target}`", timeout=30)
+    if st == "SUCCEEDED":
+        return target
+    return f"idx_staging_{profile.replace('-', '_')}"
 
 
 def resolve_install_catalog(profile: str, ind: str, size: str) -> str:
@@ -442,7 +458,7 @@ def parse_industry_from_output(output: dict) -> tuple[str, str] | None:
     m = re.search(r"INSTALLED[^:]*:\s*([^/]+)/(ecm|mvm)\s*->", nb, re.I)
     if m:
         return m.group(1).strip(), m.group(2).lower()
-    m = re.search(r"`marathon_([a-z0-9_]+)_(ecm|mvm)`", nb)
+    m = re.search(r"`idx_([a-z0-9_]+)_(ecm|mvm)`", nb)
     if m:
         return m.group(1), m.group(2)
     return None
@@ -769,7 +785,7 @@ def cleanup_marathon_catalogs(profile: str, industries: list[str] | None = None)
         try:
             cats = dbj(["catalogs", "list"], profile, timeout=120)
             items = cats if isinstance(cats, list) else cats.get("catalogs", [])
-            targets = [c["name"] for c in items if c.get("name", "").startswith("marathon_")]
+            targets = [c["name"] for c in items if c.get("name", "").startswith("idx_")]
         except Exception:
             return 0
     for cat in targets:
@@ -1002,6 +1018,7 @@ def monitor_pool(
     pulse(f"monitor pool max_parallel={max_parallel} every {poll_s}s (ECM+MVM unified)")
     work = work_items or work_items_from_assign(assign)
     ppar = profile_parallel or {}
+    last_heartbeat = time.time()
     while True:
         reconcile_pool(state)
         items = pool.get("items", {})
@@ -1012,6 +1029,9 @@ def monitor_pool(
         for profile, ind, size in pending:
             if submitted >= slots:
                 break
+            blocked = state.get("blocked_profiles") or {}
+            if profile in blocked:
+                continue
             pmax = ppar.get(profile, max_parallel)
             if _profile_active_count(items, profile) >= pmax:
                 continue
@@ -1026,6 +1046,12 @@ def monitor_pool(
         still_pending = sum(1 for p, i, sz in work if _pool_needs_submit(items.get(pool_item_key(p, i, sz))))
         if s["running"] == 0 and still_pending == 0:
             break
+        if time.time() - last_heartbeat >= HEARTBEAT_INTERVAL_S:
+            try:
+                emit_marathon_heartbeat(state)
+            except Exception as e:
+                pulse(f"[HEARTBEAT] emit failed: {e}")
+            last_heartbeat = time.time()
         time.sleep(poll_s)
     return reconcile_pool(state)
 
@@ -1131,38 +1157,183 @@ def _retry_targets(state: dict) -> list[str]:
     ]
 
 
+def _pool_coming_queue(state: dict) -> list[str]:
+    """Next installs not yet clean or in-flight (pool verification mode)."""
+    split = state.get("split_mode")
+    assign = state.get("assign", {})
+    work = build_work_items(assign, split)
+    items = state.get("waves", {}).get("pool", {}).get("items", {})
+    coming: list[str] = []
+    for profile, ind, size in work:
+        key = pool_item_key(profile, ind, size)
+        it = items.get(key)
+        if it and it.get("bucket") == "clean":
+            continue
+        if it and _item_running(it):
+            continue
+        if it and it.get("bucket") in ("warning", "failed"):
+            coming.append(f"  {ind}/{size} @{profile}  RETRY ({it.get('bucket')})")
+        else:
+            coming.append(f"  {ind}/{size} @{profile}")
+    return coming
+
+
+_AUDIT_ERROR_PATTERNS = [
+    (re.compile(r"\bERROR\b"), "ERROR"),
+    (re.compile(r"Traceback \(most recent"), "Traceback"),
+    (re.compile(r"UNRECOVERABLE STATEMENTS"), "UNRECOVERABLE"),
+    (re.compile(r"Failed metric view"), "Failed metric view"),
+    (re.compile(r"installed_with_warnings"), "installed_with_warnings"),
+    (re.compile(r"Max retries \(3\) exhausted"), "soft-accept"),
+]
+
+
+def _audit_text_blob(item: dict) -> str:
+    out = item.get("output") or {}
+    nb = out.get("notebook_output") if isinstance(out, dict) else ""
+    if isinstance(nb, dict):
+        nb = str(nb.get("result") or nb.get("truncated") or "")
+    err = ""
+    if isinstance(out, dict):
+        err = str(out.get("error") or "")
+    return f"{nb}\n{err}"
+
+
+def _audit_success_line(text: str) -> tuple[bool, str]:
+    m = re.search(
+        r"SUCCESS:\s*(\S+)\s*->\s*`([^`]+)`\s*\((\d+)\s*statements,\s*(\d+)\s*failures",
+        text,
+    )
+    if not m:
+        return False, "missing SUCCESS line"
+    failures = int(m.group(4))
+    if failures > 0:
+        return False, f"SUCCESS reports {failures} failures"
+    return True, f"catalog={m.group(2)} statements={m.group(3)}"
+
+
+def audit_pool_item(key: str, item: dict, profile: str | None = None) -> dict:
+    """Independent per-install audit — returns {key, pass, issues[], detail}."""
+    prof = profile or item.get("profile") or key.split(":")[0]
+    issues: list[str] = []
+    text = _audit_text_blob(item)
+    if not text.strip() and item.get("run_id"):
+        try:
+            run = get_run(prof, item["run_id"])
+            task = run["tasks"][0] if run.get("tasks") else {}
+            if task.get("run_id"):
+                out = fetch_task_output(prof, task["run_id"])
+                item = {**item, "output": out}
+                text = _audit_text_blob(item)
+        except Exception as e:
+            issues.append(f"fetch_output: {str(e)[:120]}")
+    ok_line, detail = _audit_success_line(text)
+    if not ok_line:
+        issues.append(detail)
+    for pat, label in _AUDIT_ERROR_PATTERNS:
+        hits = pat.findall(text)
+        if hits:
+            issues.append(f"{label} x{len(hits)}")
+    cat = item.get("catalog") or catalog_name(item.get("industry", ""), item.get("size", ""))
+    try:
+        logs_base = f"dbfs:/Volumes/{cat}/_install/logs"
+        listing = db(["fs", "ls", logs_base], prof, timeout=60)
+        log_files = [ln.split()[-1] for ln in listing.splitlines() if "install_" in ln and ln.endswith(".log")]
+        if log_files:
+            latest = sorted(log_files)[-1]
+            local = f"/tmp/audit_{cat}.log"
+            db(["fs", "cp", f"{logs_base}/{latest}", local, "--overwrite"], prof, timeout=120)
+            vol_text = Path(local).read_text(errors="ignore")
+            for pat, label in _AUDIT_ERROR_PATTERNS:
+                hits = pat.findall(vol_text)
+                if hits:
+                    issues.append(f"volume_log:{label} x{len(hits)}")
+            if re.search(r"(\d+)\s*failures", vol_text):
+                fm = re.search(r"(\d+)\s*failures", vol_text)
+                if fm and int(fm.group(1)) > 0:
+                    issues.append(f"volume_log:failures={fm.group(1)}")
+    except Exception:
+        pass
+    return {"key": key, "pass": len(issues) == 0, "issues": issues, "detail": detail}
+
+
+def run_independent_audit(state: dict, only_clean: bool = True) -> dict:
+    """Audit all clean (or all terminal) pool installs; write AUDIT_FILE."""
+    items = state.get("waves", {}).get("pool", {}).get("items", {})
+    results: list[dict] = []
+    for key, item in sorted(items.items()):
+        if only_clean and item.get("bucket") != "clean":
+            continue
+        if not only_clean and item.get("bucket") not in ("clean", "warning", "failed"):
+            continue
+        results.append(audit_pool_item(key, item))
+    passed = sum(1 for r in results if r["pass"])
+    failed = [r for r in results if not r["pass"]]
+    report = {
+        "audited_at": now(),
+        "audited": len(results),
+        "passed": passed,
+        "failed": len(failed),
+        "failures": failed,
+    }
+    lines = [
+        f"========== INDEPENDENT AUDIT {now()} ==========",
+        f"AUDITED: {len(results)}  PASSED: {passed}  FAILED: {len(failed)}",
+    ]
+    if failed:
+        lines.append("VIOLATIONS (must be ZERO for 80/80 clean):")
+        for r in failed:
+            lines.append(f"  {r['key']}: {', '.join(r['issues'])}")
+    else:
+        lines.append("VIOLATIONS: none")
+    lines.append("=" * 52)
+    block = "\n".join(lines)
+    Path(os.path.dirname(AUDIT_FILE)).mkdir(parents=True, exist_ok=True)
+    with open(AUDIT_FILE, "a") as f:
+        f.write(block + "\n")
+    pulse(f"[AUDIT] audited={len(results)} pass={passed} fail={len(failed)}")
+    return report
+
+
 def emit_marathon_heartbeat(state: dict) -> str:
-    """Write a 15m-style status block: running / fixed / coming."""
+    """Write a 15m-style status block: installed / running / coming + independent audit."""
+    reconcile_pool(state)
     items = state.get("waves", {}).get("pool", {}).get("items", {})
     retries = state.get("retries", {})
     score = _pool_score(state)
-    targets = _retry_targets(state)
+    split = state.get("split_mode")
 
     clean_keys = sorted(k for k, v in items.items() if v.get("bucket") == "clean")
-    running_keys: set[str] = set()
-    running: list[str] = []
-    for k in targets:
-        ri = retries.get(k, {})
-        if ri.get("run_id") and not ri.get("final_bucket"):
-            running_keys.add(k)
-            running.append(f"  {k}  run={ri['run_id']}  attempt={ri.get('attempt', 1)}")
-    for k, v in items.items():
-        if v.get("life_cycle") in ("RUNNING", "PENDING", "QUEUED") and k not in running_keys:
-            running.append(
-                f"  {k}  legacy_run={v.get('task_run_id') or v.get('run_id') or '?'}"
-            )
+    clean_lines = [
+        f"  {k}  catalog={items[k].get('catalog', '?')}"
+        for k in clean_keys
+    ]
 
-    coming: list[str] = []
-    for k in sorted(targets):
-        ri = retries.get(k, {})
-        if ri.get("final_bucket") == "clean":
+    running: list[str] = []
+    for k, v in sorted(items.items()):
+        if not _item_running(v):
+            ri = retries.get(k, {})
+            if ri.get("run_id") and not ri.get("final_bucket"):
+                running.append(f"  {k}  retry_run={ri['run_id']}  attempt={ri.get('attempt', 1)}")
             continue
-        if ri.get("run_id") and not ri.get("final_bucket"):
-            continue
-        if ri.get("error"):
-            coming.append(f"  {k}  (setup retry after error)")
-        else:
-            coming.append(f"  {k}")
+        rid = v.get("run_id") or v.get("task_run_id") or "?"
+        running.append(f"  {v.get('industry')}/{v.get('size')} @{v.get('profile')}  run={rid}")
+
+    if split:
+        coming = _pool_coming_queue(state)
+    else:
+        targets = _retry_targets(state)
+        coming = []
+        for k in sorted(targets):
+            ri = retries.get(k, {})
+            if ri.get("final_bucket") == "clean":
+                continue
+            if ri.get("run_id") and not ri.get("final_bucket"):
+                continue
+            if ri.get("error"):
+                coming.append(f"  {k}  (setup retry after error)")
+            else:
+                coming.append(f"  {k}")
 
     prev_clean: set[str] = set()
     if os.path.exists(HEARTBEAT_STATE_FILE):
@@ -1175,35 +1346,54 @@ def emit_marathon_heartbeat(state: dict) -> str:
         "last_beat": now(), "clean_keys": clean_keys,
     }, indent=2))
 
+    audit = run_independent_audit(state, only_clean=True)
+
     with _SETUP_LOCK:
         setup_busy = _setup_active
     monitor_pid = os.getpid()
+    mode = "VERIFY" if split else "MARATHON"
+    ecm_p = split.get("ecm", "?") if split else "?"
+    mvm_p = split.get("mvm", "?") if split else "?"
 
     lines = [
-        f"========== MARATHON HEARTBEAT {now()} ==========",
-        f"TARGET: 80/80 clean zero warnings",
-        f"SCORE:  clean={score['clean']}/80  warning={score['warning']}  failed={score['failed']}  other={score['other']}",
+        f"========== {mode} HEARTBEAT {now()} ==========",
+        f"TARGET: 80/80 clean — ZERO errors (independent audit)",
+        f"LAYOUT:  ECM@{ecm_p}  MVM@{mvm_p}" if split else "LAYOUT: multi-profile pool",
+        f"SCORE:  clean={score['clean']}/80  warning={score['warning']}  failed={score['failed']}",
         f"MONITOR: pid={monitor_pid}  setup_in_flight={setup_busy}",
         "",
-        f"RUNNING ({len(running)}):",
+        f"INSTALLED CLEAN ({score['clean']}):",
     ]
+    if clean_lines:
+        lines.extend(clean_lines[-40:])
+        if len(clean_lines) > 40:
+            lines.append(f"  ... +{len(clean_lines) - 40} more (see state file)")
+    else:
+        lines.append("  (none yet)")
+    lines.append("")
+    lines.append(f"NEW CLEAN since last beat (+{len(new_fixed)}):")
+    if new_fixed:
+        lines.extend(f"  {k}" for k in new_fixed)
+    else:
+        lines.append("  (none)")
+    lines.append("")
+    lines.append(f"RUNNING ({len(running)}):")
     lines.extend(running[:40] if running else ["  (none)"])
     if len(running) > 40:
         lines.append(f"  ... +{len(running) - 40} more")
     lines.append("")
-    lines.append(f"FIXED since last heartbeat (+{len(new_fixed)}):")
-    if new_fixed:
-        lines.extend(f"  {k}" for k in new_fixed[:30])
-        if len(new_fixed) > 30:
-            lines.append(f"  ... +{len(new_fixed) - 30} more")
-    else:
-        lines.append("  (no new clean since last beat)")
-    lines.append(f"  TOTAL CLEAN: {score['clean']}/80")
+    lines.append(f"COMING NEXT ({len(coming)}):")
+    lines.extend(coming[:30] if coming else ["  (none — all submitted or done)"])
+    if len(coming) > 30:
+        lines.append(f"  ... +{len(coming) - 30} more")
     lines.append("")
-    lines.append(f"COMING / QUEUED ({len(coming)}):")
-    lines.extend(coming[:25] if coming else ["  (none — all submitted or done)"])
-    if len(coming) > 25:
-        lines.append(f"  ... +{len(coming) - 25} more")
+    lines.append("INDEPENDENT AUDITOR (clean installs only):")
+    lines.append(f"  audited={audit['audited']}  passed={audit['passed']}  violations={audit['failed']}")
+    if audit["failed"]:
+        for r in audit["failures"][:10]:
+            lines.append(f"  FAIL {r['key']}: {', '.join(r['issues'])}")
+    else:
+        lines.append("  violations=ZERO")
     lines.append("=" * 52)
 
     block = "\n".join(lines)
@@ -1212,7 +1402,7 @@ def emit_marathon_heartbeat(state: dict) -> str:
         f.write(block + "\n")
     pulse(
         f"[HEARTBEAT] clean={score['clean']}/80 warn={score['warning']} fail={score['failed']} "
-        f"run={len(running)} queue={len(coming)} setup={setup_busy} new_clean=+{len(new_fixed)}"
+        f"run={len(running)} queue={len(coming)} audit_violations={audit['failed']} new_clean=+{len(new_fixed)}"
     )
     return block
 
@@ -1220,7 +1410,7 @@ def emit_marathon_heartbeat(state: dict) -> str:
 def _start_setup_async(state: dict, key: str, row: dict) -> bool:
     global _setup_active
     with _SETUP_LOCK:
-        if _setup_active >= 1:
+        if _setup_active >= MAX_SETUP_PARALLEL:
             return False
         _setup_active += 1
 
@@ -1400,9 +1590,9 @@ def monitor_retries_parallel(state: dict, max_parallel: int, poll_s: int = 90, *
                     if slots <= 0:
                         break
                     try:
-                        submit_warning_retry(state, key, items[key])
-                        started += 1
-                        slots -= 1
+                        if _start_setup_async(state, key, items[key]):
+                            started += 1
+                            slots -= 1
                     except Exception as e:
                         pulse(f"[retry setup] {key} failed: {e}")
 
@@ -1615,7 +1805,7 @@ def final_cleanup(state: dict, assign: dict[str, list[str]]) -> int:
     total = 0
     for profile, industries in assign.items():
         total += cleanup_marathon_catalogs(profile, industries)
-        staging = f"marathon_staging_{profile.replace('-', '_')}"
+        staging = f"idx_staging_{profile.replace('-', '_')}"
         try:
             sql_exec(profile, f"DROP CATALOG IF EXISTS `{staging}` CASCADE", timeout=60)
         except Exception:
@@ -1853,7 +2043,7 @@ def main() -> None:
     work_items = build_work_items(assign, split_mode)
     profile_parallel: dict[str, int] = {}
     if split_mode:
-        per = args.max_parallel if args.max_parallel > 0 else 20
+        per = min(20, max(1, args.max_parallel // 2)) if args.max_parallel > 0 else 20
         profile_parallel = {split_mode["ecm"]: per, split_mode["mvm"]: per}
         state["profile_parallel"] = profile_parallel
 
@@ -1886,7 +2076,7 @@ def main() -> None:
             pulse(f"[submit-next] {'started ' + key if key else 'nothing to submit (at capacity or queue empty)'}")
             save_state(state)
             return
-        if args.poll_retries_only:
+        if args.poll_retries_only and not args.fix_warnings:
             pulse(f"--poll-retries-only every {args.poll}s — target 80/80 clean")
             last_heartbeat = 0.0
             emit_marathon_heartbeat(state)

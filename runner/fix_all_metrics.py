@@ -153,12 +153,31 @@ def parse_schema_columns(schema_dir: Path) -> dict[tuple[str, str], set[str]]:
     return cols
 
 
-def resolve_column(bad: str, valid: set[str]) -> str | None:
+def _table_prefixed(bad: str, valid: set[str], table: str) -> str | None:
+    """Prefer the column qualified by the source table name, e.g. view on table
+    `tier` referencing bare `code` -> `tier_code` (NOT the greedy-longest `color_code`).
+    Also try the table's singular form (drop trailing 's')."""
+    if not table:
+        return None
+    stems = [table]
+    if table.endswith("s") and len(table) > 3:
+        stems.append(table[:-1])
+    for stem in stems:
+        cand = f"{stem}_{bad}"
+        if cand in valid:
+            return cand
+    return None
+
+
+def resolve_column(bad: str, valid: set[str], table: str = "") -> str | None:
     if bad in valid:
         return bad
     mapped = FK_COLUMN_RENAMES.get(bad)
     if mapped and mapped in valid:
         return mapped
+    tp = _table_prefixed(bad, valid, table)
+    if tp:
+        return tp
     for suffix in GENERIC_SUFFIX_FALLBACKS.get(bad, ()):
         if suffix.startswith("_"):
             matches = [c for c in valid if c.endswith(suffix)]
@@ -262,7 +281,7 @@ def fix_metric_file(
             if hint_col and hint_col in valid:
                 renames[ident] = hint_col
                 continue
-            resolved = resolve_column(ident, valid)
+            resolved = resolve_column(ident, valid, src[1])
             if resolved:
                 renames[ident] = resolved
             else:

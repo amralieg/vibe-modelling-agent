@@ -63,7 +63,9 @@ def scan():
     hits = {}
     for pat, label in (
         ("verifier-relation-target-resolvable FIRED", "v482 guard fired"),
-        ("responseFormat is invalid", "F-responseFormat"),
+        # anchored on the SparkException prefix: the v4.8.1 envelope log line quotes the
+        # bare message, so an unanchored needle self-triggers on every healthy run.
+        ("SparkException: The responseFormat is invalid", "F-responseFormat"),
         ("Max retries (3) exhausted", "F2 soft-accept"),
         ("SILOED TABLES DETECTED", "F4 silo"),
         ("Fidelity gates FAILED", "N2 fidelity"),

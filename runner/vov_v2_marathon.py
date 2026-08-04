@@ -515,7 +515,8 @@ def build_job_spec(ind, installed=False):
     # no run_id tags, e.g. <profile> tag_keys=[]). Replaces the retired separate self_run_id base-param.
     common = {"business_name": ind, "business_description": desc,
               "deployment_catalog": cat, "generate_samples": "0",
-              "vibe_session_id": "{{job.run_id}}"}
+              "vibe_session_id": "{{job.run_id}}",
+              "databricks_task_run_id": "{{task.run_id}}"}
     install = dict(common, operation="install model", model_version="1",
                    data_model_scopes=ECM_SCOPE,
                    context_file=f"{base}/model/model.json", model_vibes="")

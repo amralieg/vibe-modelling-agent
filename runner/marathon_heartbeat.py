@@ -1,10 +1,27 @@
 #!/usr/bin/env python3
-"""Standalone 15-minute heartbeat for install marathon — runs alongside fix-warnings."""
+"""Standalone 15-minute heartbeat — verification or marathon state via env."""
 from __future__ import annotations
 
 import os
 import sys
 import time
+
+os.environ.setdefault(
+    "MARATHON_STATE_FILE",
+    os.path.expanduser("~/claude/vibe-agent/install_marathon_v2_state.json"),
+)
+os.environ.setdefault(
+    "MARATHON_HEARTBEAT_FILE",
+    os.path.expanduser("~/claude/vibe-agent/install_marathon_heartbeat.log"),
+)
+os.environ.setdefault(
+    "MARATHON_HEARTBEAT_STATE_FILE",
+    os.path.expanduser("~/claude/vibe-agent/install_marathon_heartbeat_state.json"),
+)
+os.environ.setdefault(
+    "MARATHON_AUDIT_FILE",
+    os.path.expanduser("~/claude/vibe-agent/install_marathon_verify_audit.log"),
+)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from install_marathon import (  # noqa: E402
