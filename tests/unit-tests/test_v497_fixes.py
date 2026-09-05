@@ -106,6 +106,25 @@ def test_audit_loop_skips_non_producing_tests():
     assert 'if not getattr(tr, "produced_model", True):' in src
 
 
+# ---------------- Fix 1b: resize/base builders inherit the session vibes cap ----------------
+def test_model_producing_builders_inherit_session_vibes_cap():
+    # ROOT CAUSE of the enlarge TIMEOUT: _build_resize passed bare w_model_vibes, so an empty
+    # tester model_vibes widget meant enlarge got NO cap -> full 8-domain ECM -> 2.5h timeout,
+    # while the base model already defaulted to "max 2 domains". Both builders must default now.
+    src = _tester_main_cell()
+    assert '_DEFAULT_TEST_VIBES = "maximum of 2 domains, and 8 tables for any model you generate"' in src
+    # both org_pool builders (_build_base_model, _build_resize) + the base use the fallback
+    assert src.count('"model_vibes": (w_model_vibes or _DEFAULT_TEST_VIBES),') == 3
+    # fail-pre: the bare no-fallback form must be gone from the org_pool builders
+    assert '"org_divisions": _pick(org_pool),\n                "model_vibes": w_model_vibes,\n' not in src
+
+
+def test_default_vibes_fallback_expression_behaviour():
+    default = "maximum of 2 domains, and 8 tables for any model you generate"
+    assert ("" or default) == default            # empty widget -> cap applied (the fix)
+    assert ("keep 5 domains" or default) == "keep 5 domains"  # explicit vibe wins
+
+
 def test_testresult_produced_model_default_and_override():
     # exec the real TestResult class in isolation and prove the flag behaves
     import ast
