@@ -100,6 +100,18 @@ def test_negative_tests_marked_non_producing():
     assert 'params=td_13["params"], produced_model=False))' in src, "13_no_biz_name must be produced_model=False"
 
 
+def test_empty_vibes_passed_branch_marked_non_producing():
+    # 10_empty_vibes has TWO append paths: the FAILED branch builds a TestResult with
+    # produced_model=False, but the PASSED/exit_with_warning branch re-appends the raw
+    # run_test result (produced_model defaults True) -> its snake_case no-op copy leaked
+    # into the convention average (57.5% instead of 75.8%). Both branches must exclude it.
+    src = _tester_main_cell()
+    passed_branch = src.split('if r12.status == "PASSED":', 1)[1].split("elif r12.status", 1)[0]
+    assert "r12.produced_model = False" in passed_branch, \
+        "empty_vibes PASSED branch must mark produced_model=False before R.append(r12)"
+    assert passed_branch.index("r12.produced_model = False") < passed_branch.index("R.append(r12)")
+
+
 def test_audit_loop_skips_non_producing_tests():
     src = _tester_main_cell()
     assert "v497-conv-skip-nonproducing" in src
